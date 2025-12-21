@@ -1,7 +1,8 @@
+using Tsvrc.TsNetworking.Utils;
 using UdonSharp;
 using VRC.SDKBase;
 
-namespace Tsvrc
+namespace Tsvrc.TsNetworking
 {
     /// <summary>
     /// TsvrcMessenger - High-level message transmission for VRChat using network events.

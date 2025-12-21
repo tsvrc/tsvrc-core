@@ -4,7 +4,7 @@ using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
 
-namespace Tsvrc
+namespace Tsvrc.TsNetworking
 {
     /// <summary>
     /// Error codes for ready check failures.

@@ -4,7 +4,7 @@ using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
 
-namespace Tsvrc
+namespace Tsvrc.TsNetworking.Utils
 {
     /// <summary>
     /// Error codes for message delivery failures.

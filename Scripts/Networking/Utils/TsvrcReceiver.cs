@@ -1,6 +1,6 @@
 using UdonSharp;
 
-namespace Tsvrc
+namespace Tsvrc.TsNetworking.Utils
 {
 
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
