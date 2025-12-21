@@ -1,4 +1,6 @@
 using TMPro;
+using Tsvrc.TsNetworking;
+using Tsvrc.TsNetworking.Utils;
 using UnityEngine;
 using VRC.SDKBase;
 

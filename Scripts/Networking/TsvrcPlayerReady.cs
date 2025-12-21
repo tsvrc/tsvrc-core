@@ -1,3 +1,4 @@
+using Tsvrc.Core;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
@@ -22,7 +23,7 @@ namespace Tsvrc.TsNetworking
     /// Base class for synchronized player ready tracking.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsvrcPlayerReady : UdonSharpBehaviour
+    public class TsvrcPlayerReady : TsvrcBehaviour
     {
         private int _maxPlayers = 255;
         private bool[] _playerChecks = new bool[0];
