@@ -4,13 +4,13 @@ namespace Tsvrc.Core
 {
     public class TsvrcBehaviour : UdonSharpBehaviour
     {
-        protected TsvrcSingleton _singleton;
-        protected TsvrcInstance _instance;
+        public TsvrcSingleton Singleton { get; private set; }
+        public TsvrcInstance Instance { get; private set; }
 
-        public void ConstructBehaviour(TsvrcSingleton singleton, TsvrcInstance instance)
+        public void TsConstruct(TsvrcSingleton singleton, TsvrcInstance instance)
         {
-            _instance = instance;
-            _singleton = singleton;
+            Instance = instance;
+            Singleton = singleton;
         }
     }
 }

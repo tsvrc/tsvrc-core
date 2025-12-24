@@ -1,56 +1,47 @@
 using UdonSharp;
-using UnityEngine;
+using VRC.SDK3.Data;
 
 namespace Tsvrc.Core
 {
     public class TsvrcSingleton : UdonSharpBehaviour
     {
-        private TsvrcInstance _instance;
-        private TsvrcBehaviour[] _behaviours = null;
+        private DataList _behaviours;
 
-        public void Initialize(TsvrcInstance instance)
+        public void TsConstruct(TsvrcInstance instance)
         {
-            _instance = instance;
+            OnBeforeInitialize();
+
+            for (int i = 0; i < _behaviours.Count; i++)
+            {
+                ((TsvrcBehaviour)_behaviours[i].Reference).TsConstruct(this, instance);
+            }
+
+            OnAfterInitialize();
         }
 
-        public virtual void ConstructSingleton()
-        {
-            if (_behaviours == null)
-            {
-                Debug.LogWarning("No behaviours registered in TsvrcSingleton.");
-            }
-            else
-            {
-                int length = _behaviours.Length;
-                for (int i = 0; i < length; i++)
-                {
-                    if (_behaviours[i] != null)
-                    {
-                        _behaviours[i].ConstructBehaviour(this, _instance);
-                    }
-                    else
-                    {
-                        Debug.LogError($"[TsvrcSingleton] Behaviour at index {i} is null!");
-                    }
-                }
-            }
-        }
-
-        public void RegisterBehaviour(TsvrcBehaviour behaviour)
+        /// <summary>
+        /// Adds a TsvrcBehaviour that will act as a singleton.
+        /// These behaviours must be assigned before initialization.
+        /// </summary>
+        protected TsvrcBehaviour AddSingleton(TsvrcBehaviour behaviour)
         {
             if (_behaviours == null)
-            {
-                _behaviours = new TsvrcBehaviour[0];
-            }
+                _behaviours = new DataList();
 
-            int length = _behaviours.Length;
-            TsvrcBehaviour[] newBehaviours = new TsvrcBehaviour[length + 1];
-            for (int i = 0; i < length; i++)
-            {
-                newBehaviours[i] = _behaviours[i];
-            }
-            newBehaviours[length] = behaviour;
-            _behaviours = newBehaviours;
+            _behaviours.Add(behaviour);
+            return behaviour;
         }
+
+        /// <summary>
+        /// Called before initializing Tsvrc behaviours. Override this method to initialize
+        /// non-Tsvrc behaviours before the Tsvrc ones.
+        /// </summary>
+        protected virtual void OnBeforeInitialize() { }
+
+        /// <summary>
+        /// Called after initializing Tsvrc behaviours. Override this method to initialize
+        /// non-Tsvrc behaviours after the Tsvrc ones.
+        /// </summary>
+        protected virtual void OnAfterInitialize() { }
     }
 }
