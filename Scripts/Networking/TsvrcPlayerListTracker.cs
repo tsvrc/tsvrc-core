@@ -1,10 +1,11 @@
+using Tsvrc.Core;
 using UdonSharp;
 using VRC.SDKBase;
 
 namespace Tsvrc.TsNetworking
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsvrcPlayerListTracker : UdonSharpBehaviour
+    public class TsvrcPlayerListTracker : TsvrcBehaviour
     {
         [UdonSynced] private string[] playerNames = new string[0];
 
@@ -17,19 +18,42 @@ namespace Tsvrc.TsNetworking
             playerCount = playerNames != null ? playerNames.Length : 0;
         }
 
-        public void AddPlayer(VRCPlayerApi player)
+        public void AddTrackedPlayer(VRCPlayerApi player)
         {
-            // Only master can modify the player list
-            if (!Networking.IsMaster) return;
-            if (!Utilities.IsValid(player)) return;
+            // Create single-item array and call array method
+            VRCPlayerApi[] players = new VRCPlayerApi[1];
+            players[0] = player;
+            AddTrackedPlayers(players);
+        }
 
-            string displayName = player.displayName;
+        public void RemoveTrackedPlayer(VRCPlayerApi player)
+        {
+            // Create single-item array and call array method
+            VRCPlayerApi[] players = new VRCPlayerApi[1];
+            players[0] = player;
+            RemoveTrackedPlayers(players);
+        }
 
-            // Quick check using cached count
-            if (ContainsPlayer(displayName)) return;
+        public void AddTrackedPlayers(VRCPlayerApi[] players)
+        {
+            // Only owner can modify the player list
+            if (!Networking.IsOwner(gameObject)) return;
+            if (players == null || players.Length == 0) return;
+
+            // Count valid new players
+            int validNewPlayers = 0;
+            for (int i = 0; i < players.Length; i++)
+            {
+                if (Utilities.IsValid(players[i]) && !ContainsPlayer(players[i].displayName))
+                {
+                    validNewPlayers++;
+                }
+            }
+
+            if (validNewPlayers == 0) return;
 
             // Resize array
-            string[] newPlayerNames = new string[playerCount + 1];
+            string[] newPlayerNames = new string[playerCount + validNewPlayers];
 
             // Copy existing players
             if (playerCount > 0)
@@ -37,30 +61,66 @@ namespace Tsvrc.TsNetworking
                 System.Array.Copy(playerNames, newPlayerNames, playerCount);
             }
 
-            newPlayerNames[playerCount] = displayName;
+            // Add new players
+            int newIndex = playerCount;
+            for (int i = 0; i < players.Length; i++)
+            {
+                if (Utilities.IsValid(players[i]) && !ContainsPlayer(players[i].displayName))
+                {
+                    newPlayerNames[newIndex] = players[i].displayName;
+                    newIndex++;
+                }
+            }
+
             playerNames = newPlayerNames;
-            playerCount++;
+            playerCount += validNewPlayers;
 
             RequestSerialization();
 
-            // Trigger callbacks for master
-            OnPlayerAdded(player);
+            // Trigger callbacks for owner
+            for (int i = 0; i < players.Length; i++)
+            {
+                if (Utilities.IsValid(players[i]))
+                {
+                    OnPlayerAdded(players[i]);
+                }
+            }
             OnPlayersUpdate();
         }
 
-        public void RemovePlayer(VRCPlayerApi player)
+        public void RemoveTrackedPlayers(VRCPlayerApi[] players)
         {
-            // Only master can modify the player list
-            if (!Networking.IsMaster) return;
-            if (!Utilities.IsValid(player) || playerCount == 0) return;
+            // Only owner can modify the player list
+            if (!Networking.IsOwner(gameObject)) return;
+            if (players == null || players.Length == 0 || playerCount == 0) return;
 
-            string displayName = player.displayName;
-            int indexToRemove = FindPlayerIndex(displayName);
+            // Find indices to remove
+            int[] indicesToRemove = new int[players.Length];
+            int removeCount = 0;
 
-            if (indexToRemove == -1) return;
+            for (int i = 0; i < players.Length; i++)
+            {
+                if (Utilities.IsValid(players[i]))
+                {
+                    int index = FindPlayerIndex(players[i].displayName);
+                    if (index != -1)
+                    {
+                        indicesToRemove[removeCount] = index;
+                        removeCount++;
+                    }
+                }
+            }
 
-            // Handle single player case
-            if (playerCount == 1)
+            if (removeCount == 0) return;
+
+            // Sort indices in descending order to remove from end first
+            System.Array.Sort(indicesToRemove, 0, removeCount);
+            System.Array.Reverse(indicesToRemove, 0, removeCount);
+
+            // Calculate new size
+            int newSize = playerCount - removeCount;
+
+            if (newSize == 0)
             {
                 playerNames = new string[0];
                 playerCount = 0;
@@ -68,33 +128,48 @@ namespace Tsvrc.TsNetworking
             else
             {
                 // Create new array
-                string[] newPlayerNames = new string[playerCount - 1];
+                string[] newPlayerNames = new string[newSize];
+                int newIndex = 0;
 
-                // Copy elements before removed index
-                if (indexToRemove > 0)
+                // Copy players not being removed
+                for (int i = 0; i < playerCount; i++)
                 {
-                    System.Array.Copy(playerNames, 0, newPlayerNames, 0, indexToRemove);
-                }
+                    bool shouldRemove = false;
+                    for (int j = 0; j < removeCount; j++)
+                    {
+                        if (indicesToRemove[j] == i)
+                        {
+                            shouldRemove = true;
+                            break;
+                        }
+                    }
 
-                // Copy elements after removed index
-                if (indexToRemove < playerCount - 1)
-                {
-                    System.Array.Copy(playerNames, indexToRemove + 1, newPlayerNames, indexToRemove, playerCount - indexToRemove - 1);
+                    if (!shouldRemove)
+                    {
+                        newPlayerNames[newIndex] = playerNames[i];
+                        newIndex++;
+                    }
                 }
 
                 playerNames = newPlayerNames;
-                playerCount--;
+                playerCount = newSize;
             }
 
             RequestSerialization();
 
-            // Trigger callbacks for master
-            OnPlayerRemoved(player);
+            // Trigger callbacks for owner
+            for (int i = 0; i < players.Length; i++)
+            {
+                if (Utilities.IsValid(players[i]))
+                {
+                    OnPlayerRemoved(players[i]);
+                }
+            }
             OnPlayersUpdate();
         }
 
         // Helper method to check if player exists
-        private bool ContainsPlayer(string displayName)
+        protected bool ContainsPlayer(string displayName)
         {
             for (int i = 0; i < playerCount; i++)
             {
@@ -125,7 +200,19 @@ namespace Tsvrc.TsNetworking
             return playerCount;
         }
 
-        // Get VRCPlayerApi array from stored player names
+        /// <summary>
+        ///  Gets the list of tracked player names.
+        /// </summary>
+        /// <returns></returns>
+        protected string[] GetPlayerNames()
+        {
+            return playerNames;
+        }
+
+        /// <summary>
+        /// Gets the list of tracked player APIs.
+        /// </summary>
+        /// <returns></returns>
         private VRCPlayerApi[] GetPlayerApis()
         {
             VRCPlayerApi[] players = new VRCPlayerApi[playerCount];
@@ -189,10 +276,10 @@ namespace Tsvrc.TsNetworking
         public override void OnPlayerLeft(VRCPlayerApi player)
 #pragma warning restore
         {
-            // Only master processes player leaves
-            if (!Networking.IsMaster) return;
+            // Only owner processes player leaves
+            if (!Networking.IsOwner(gameObject)) return;
 
-            RemovePlayer(player);
+            RemoveTrackedPlayer(player);
         }
 
         // Sync callback to update cache when data is received
