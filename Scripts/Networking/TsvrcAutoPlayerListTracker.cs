@@ -12,10 +12,10 @@ namespace Tsvrc.TsNetworking
     {
         public override void OnPlayerJoined(VRCPlayerApi player)
         {
-            // Only master processes player joins
-            if (!Networking.IsMaster) return;
+            // Only owner processes player joins
+            if (!Networking.IsOwner(gameObject)) return;
 
-            AddPlayer(player);
+            AddTrackedPlayer(player);
         }
     }
 }
