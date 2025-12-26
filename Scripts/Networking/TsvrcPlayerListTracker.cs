@@ -1,5 +1,6 @@
 using Tsvrc.Core;
 using UdonSharp;
+using UnityEngine;
 using VRC.SDKBase;
 
 namespace Tsvrc.TsNetworking
@@ -8,6 +9,7 @@ namespace Tsvrc.TsNetworking
     public class TsvrcPlayerListTracker : TsvrcBehaviour
     {
         [UdonSynced] private string[] playerNames = new string[0];
+        [UdonSynced] private bool isTracking = false;
 
         #region Unity Lifecycle
         #endregion
@@ -37,8 +39,14 @@ namespace Tsvrc.TsNetworking
         /// <summary>
         /// Starts tracking players with ownership mode enabled.
         /// </summary>
-        public void StartTracking(VRCPlayerApi[] players, VRCPlayerApi owner = null)
+        public void StartTracking(VRCPlayerApi owner = null)
         {
+            if (isTracking)
+            {
+                Debug.LogWarning("[TsvrcPlayerListTracker] Tracking is already in progress.");
+                return;
+            }
+
             if (owner != null)
             {
                 Networking.SetOwner(owner, gameObject);
@@ -50,8 +58,8 @@ namespace Tsvrc.TsNetworking
 
             if (!IsTrackerOwner()) return;
 
-            CancelTracking();
-            AddTrackedPlayers(players);
+            isTracking = true;
+            RequestSerialization();
         }
 
         /// <summary>

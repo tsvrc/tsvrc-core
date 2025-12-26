@@ -10,6 +10,7 @@ namespace Tsvrc.TsNetworking
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsvrcAutoPlayerListTracker : TsvrcPlayerListTracker
     {
+        #region VRChat Callbacks
         public override void OnPlayerJoined(VRCPlayerApi player)
         {
             // Only owner processes player joins
@@ -17,5 +18,12 @@ namespace Tsvrc.TsNetworking
 
             AddTrackedPlayer(player);
         }
+
+        public override void OnMasterTransferred(VRCPlayerApi newMaster)
+        {
+            // Transfer ownership to the new master
+            SetTrackerOwner(newMaster);
+        }
+        #endregion
     }
 }
