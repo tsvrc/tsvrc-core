@@ -39,7 +39,7 @@ namespace Tsvrc.TsNetworking
         /// <summary>
         /// Starts tracking players with ownership mode enabled.
         /// </summary>
-        public void StartTracking(VRCPlayerApi owner = null)
+        public void StartTracking()
         {
             if (isTracking)
             {
@@ -47,16 +47,7 @@ namespace Tsvrc.TsNetworking
                 return;
             }
 
-            if (owner != null)
-            {
-                Networking.SetOwner(owner, gameObject);
-            }
-            else
-            {
-                Networking.SetOwner(Networking.LocalPlayer, gameObject);
-            }
-
-            if (!IsTrackerOwner()) return;
+            Networking.SetOwner(Networking.LocalPlayer, gameObject);
 
             isTracking = true;
             RequestSerialization();
@@ -78,8 +69,8 @@ namespace Tsvrc.TsNetworking
             if (!IsTrackerOwner()) return;
 
             playerNames = new string[0];
+            isTracking = false;
             RequestSerialization();
-            OnTrackedPlayersUpdate();
         }
 
         /// <summary>
@@ -149,7 +140,6 @@ namespace Tsvrc.TsNetworking
                     OnTrackedPlayerAdded(players[i]);
                 }
             }
-            OnTrackedPlayersUpdate();
         }
 
         /// <summary>
@@ -224,17 +214,7 @@ namespace Tsvrc.TsNetworking
                     OnTrackedPlayerRemoved(players[i]);
                 }
             }
-            OnTrackedPlayersUpdate();
         }
-
-        /// <summary>
-        /// Gets the current count of tracked players.
-        /// </summary>
-        public int GetPlayerCount()
-        {
-            return playerNames.Length;
-        }
-
         #endregion
 
         #region Protected Methods
