@@ -42,27 +42,33 @@ namespace Tsvrc.Example
             }
         }
 
-        protected override void OnTrackedPlayerAdded(VRCPlayerApi player)
+        protected override void OnTrackedPlayersAdded(VRCPlayerApi[] players)
         {
-            Debug.Log($"[InstancePlayersExample] Player added: {player.displayName}");
-            var slotObj = Instantiate(InstancePlayersExampleSlot, ContentParent);
-            var slot = slotObj.GetComponent<InstancePlayersExampleSlot>();
-            slot.SetPlayerName(player.displayName);
-            slotObj.SetActive(true);
+            Debug.Log($"[InstancePlayersExample] Players added: {players.Length}");
+            foreach (var player in players)
+            {
+                var slotObj = Instantiate(InstancePlayersExampleSlot, ContentParent);
+                var slot = slotObj.GetComponent<InstancePlayersExampleSlot>();
+                slot.SetPlayerName(player.displayName);
+                slotObj.SetActive(true);
+            }
         }
 
-        protected override void OnTrackedPlayerRemoved(VRCPlayerApi player)
+        protected override void OnTrackedPlayersRemoved(VRCPlayerApi[] players)
         {
-            Debug.Log($"[InstancePlayersExample] Player removed: {player.displayName}");
-            // Find and remove the slot for this player
-            for (int i = ContentParent.childCount - 1; i >= 0; i--)
+            Debug.Log($"[InstancePlayersExample] Players removed: {players.Length}");
+            foreach (var player in players)
             {
-                var child = ContentParent.GetChild(i);
-                var slot = child.GetComponent<InstancePlayersExampleSlot>();
-                if (slot != null && slot.GetPlayerName() == player.displayName)
+                // Find and remove the slot for this player
+                for (int i = ContentParent.childCount - 1; i >= 0; i--)
                 {
-                    Destroy(child.gameObject);
-                    break;
+                    var child = ContentParent.GetChild(i);
+                    var slot = child.GetComponent<InstancePlayersExampleSlot>();
+                    if (slot != null && slot.GetPlayerName() == player.displayName)
+                    {
+                        Destroy(child.gameObject);
+                        break;
+                    }
                 }
             }
         }

@@ -135,13 +135,26 @@ namespace Tsvrc.TsNetworking
             playerNames = newPlayerNames;
             RequestSerialization();
 
-            // Broadcast individual player added events
+            // Collect player names for batch network event
+            string[] addedPlayerNames = new string[players.Length];
+            int addedCount = 0;
             for (int i = 0; i < players.Length; i++)
             {
                 if (Utilities.IsValid(players[i]))
                 {
-                    SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayerAdded), players[i].displayName);
+                    addedPlayerNames[addedCount++] = players[i].displayName;
                 }
+            }
+
+            if (addedCount > 0)
+            {
+                if (addedCount < players.Length)
+                {
+                    string[] trimmed = new string[addedCount];
+                    System.Array.Copy(addedPlayerNames, trimmed, addedCount);
+                    addedPlayerNames = trimmed;
+                }
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayersAdded), addedPlayerNames);
             }
         }
 
@@ -204,13 +217,26 @@ namespace Tsvrc.TsNetworking
 
             RequestSerialization();
 
-            // Broadcast individual player removed events
+            // Collect player names for batch network event
+            string[] removedPlayerNames = new string[players.Length];
+            int removedCount = 0;
             for (int i = 0; i < players.Length; i++)
             {
                 if (Utilities.IsValid(players[i]))
                 {
-                    SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayerRemoved), players[i].displayName);
+                    removedPlayerNames[removedCount++] = players[i].displayName;
                 }
+            }
+
+            if (removedCount > 0)
+            {
+                if (removedCount < players.Length)
+                {
+                    string[] trimmed = new string[removedCount];
+                    System.Array.Copy(removedPlayerNames, trimmed, removedCount);
+                    removedPlayerNames = trimmed;
+                }
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayersRemoved), removedPlayerNames);
             }
         }
         #endregion
@@ -255,17 +281,17 @@ namespace Tsvrc.TsNetworking
         }
 
         /// <summary>
-        /// Called when a player is added to the tracked list.
+        /// Called when players are added to the tracked list.
         /// </summary>
-        protected virtual void OnTrackedPlayerAdded(VRCPlayerApi player)
+        protected virtual void OnTrackedPlayersAdded(VRCPlayerApi[] players)
         {
             // Override this in child classes to handle player additions
         }
 
         /// <summary>
-        /// Called when a player is removed from the tracked list.
+        /// Called when players are removed from the tracked list.
         /// </summary>
-        protected virtual void OnTrackedPlayerRemoved(VRCPlayerApi player)
+        protected virtual void OnTrackedPlayersRemoved(VRCPlayerApi[] players)
         {
             // Override this in child classes to handle player removals
         }
@@ -275,28 +301,28 @@ namespace Tsvrc.TsNetworking
         #region Network Events
 
         /// <summary>
-        /// Network callable event to trigger player added callback on all clients.
+        /// Network callable event to trigger players added callback on all clients.
         /// </summary>
         [NetworkCallable]
-        public void BroadcastPlayerAdded(string playerName)
+        public void BroadcastPlayersAdded(string[] playerNames)
         {
-            VRCPlayerApi player = GetPlayerByName(playerName);
-            if (Utilities.IsValid(player))
+            VRCPlayerApi[] players = GetPlayersByNames(playerNames);
+            if (players.Length > 0)
             {
-                OnTrackedPlayerAdded(player);
+                OnTrackedPlayersAdded(players);
             }
         }
 
         /// <summary>
-        /// Network callable event to trigger player removed callback on all clients.
+        /// Network callable event to trigger players removed callback on all clients.
         /// </summary>
         [NetworkCallable]
-        public void BroadcastPlayerRemoved(string playerName)
+        public void BroadcastPlayersRemoved(string[] playerNames)
         {
-            VRCPlayerApi player = GetPlayerByName(playerName);
-            if (Utilities.IsValid(player))
+            VRCPlayerApi[] players = GetPlayersByNames(playerNames);
+            if (players.Length > 0)
             {
-                OnTrackedPlayerRemoved(player);
+                OnTrackedPlayersRemoved(players);
             }
         }
 
@@ -343,6 +369,39 @@ namespace Tsvrc.TsNetworking
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// Gets VRCPlayerApi objects by display names.
+        /// </summary>
+        private VRCPlayerApi[] GetPlayersByNames(string[] displayNames)
+        {
+            VRCPlayerApi[] allPlayers = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
+            VRCPlayerApi.GetPlayers(allPlayers);
+            
+            VRCPlayerApi[] foundPlayers = new VRCPlayerApi[displayNames.Length];
+            int foundCount = 0;
+
+            for (int i = 0; i < displayNames.Length; i++)
+            {
+                for (int j = 0; j < allPlayers.Length; j++)
+                {
+                    if (Utilities.IsValid(allPlayers[j]) && allPlayers[j].displayName == displayNames[i])
+                    {
+                        foundPlayers[foundCount++] = allPlayers[j];
+                        break;
+                    }
+                }
+            }
+
+            if (foundCount < displayNames.Length)
+            {
+                VRCPlayerApi[] trimmed = new VRCPlayerApi[foundCount];
+                System.Array.Copy(foundPlayers, trimmed, foundCount);
+                return trimmed;
+            }
+
+            return foundPlayers;
         }
 
         /// <summary>
