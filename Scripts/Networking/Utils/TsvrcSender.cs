@@ -1,3 +1,4 @@
+using Tsvrc.List.Utils;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
@@ -11,7 +12,6 @@ namespace Tsvrc.TsNetworking.Utils
     /// </summary>
     public enum MessageError
     {
-        None = 0,
         DeliveryAlreadyInProgress = 1,
         TooManyPlayers = 2,
         OwnerLeftDuringDelivery = 3,
@@ -21,7 +21,7 @@ namespace Tsvrc.TsNetworking.Utils
     }
 
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsvrcSender : TsvrcPlayerReady
+    public class TsvrcSender : TsvrcPlayerReadyChecker
     {
         // Chunking constants
         protected const int CHUNK_SIZE = 15000;
@@ -34,12 +34,12 @@ namespace Tsvrc.TsNetworking.Utils
 
         // Temporary storage for chunking (owner only)
         protected string _pendingMessage;
-        protected int[] _pendingTargetPlayerIds;
+        protected string[] _pendingTargetPlayerIds;
 
         // Target tracking (all clients)
-        protected int[] _targetPlayerIds;
+        protected string[] _targetPlayerIds = new string[0];
 
-        public virtual void SendMessage(string message, int[] targetPlayerIds)
+        public virtual void SendTsMessage(string message, string[] targetPlayerIds)
         {
             // Check if a message send is already in progress BEFORE taking ownership
             if (_isCheckInProgress || _messageChunks != null || _pendingMessage != null)
@@ -49,7 +49,7 @@ namespace Tsvrc.TsNetworking.Utils
                 return;
             }
 
-            if (!Networking.IsOwner(gameObject))
+            if (!IsMessengerOwner())
             {
                 Networking.SetOwner(Networking.LocalPlayer, gameObject);
             }
@@ -61,6 +61,11 @@ namespace Tsvrc.TsNetworking.Utils
             _pendingTargetPlayerIds = targetPlayerIds;
 
             SendCustomEventDelayedSeconds(nameof(ChunkAndSendMessage), 0.01f);
+        }
+
+        private bool IsMessengerOwner()
+        {
+            return Networking.IsOwner(gameObject);
         }
 
         protected bool ValidateMessage(string message)
@@ -120,19 +125,18 @@ namespace Tsvrc.TsNetworking.Utils
             _pendingTargetPlayerIds = null;
         }
 
-        protected override void OnCheckStarted(int[] expectedPlayerIds)
+        protected override void OnReadyCheckStarted(string[] expectedPlayerIds)
         {
             _targetPlayerIds = expectedPlayerIds;
 
-            if (Networking.IsOwner(gameObject))
-            {
-                if (_currentChunkIndex == 0)
-                {
-                    SendCustomNetworkEvent(NetworkEventTarget.All, nameof(SendStartedEvent), _totalChunks);
-                }
+            if (!IsMessengerOwner()) return;
 
-                SendCurrentChunk();
+            if (_currentChunkIndex == 0)
+            {
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(SendStartedEvent), _totalChunks);
             }
+
+            SendCurrentChunk();
         }
 
         [NetworkCallable]
@@ -160,10 +164,9 @@ namespace Tsvrc.TsNetworking.Utils
 
         protected virtual void OnChunkSended(int chunkIndex, int totalChunks, string chunkData) { }
 
-        protected override void OnAllPlayersReady(int[] playerIds)
+        protected override void OnAllPlayersReady(string[] playerIds)
         {
-            if (!Networking.IsOwner(gameObject))
-                return;
+            if (!IsMessengerOwner()) return;
 
             if (_messageChunks != null && _currentChunkIndex < _totalChunks - 1)
             {
@@ -190,63 +193,28 @@ namespace Tsvrc.TsNetworking.Utils
             _totalChunks = 0;
         }
 
-        /// <summary>
-        /// Called when message delivery fails.
-        /// DO NOT CALL DIRECTLY. Called automatically when the ready check fails.
-        /// </summary>
-        protected override void OnCheckFailed(ReadyCheckError errorCode)
+        protected override void OnReadyCheckCancelled()
         {
-            // Map ready check errors to message delivery errors
-            MessageError deliveryError = MessageError.None;
-
-            switch (errorCode)
-            {
-                case ReadyCheckError.CheckAlreadyInProgress:
-                    deliveryError = MessageError.DeliveryAlreadyInProgress;
-                    break;
-                case ReadyCheckError.ExceededMaxPlayers:
-                    deliveryError = MessageError.TooManyPlayers;
-                    break;
-                case ReadyCheckError.OwnerLeftDuringCheck:
-                    deliveryError = MessageError.OwnerLeftDuringDelivery;
-                    break;
-            }
-
-            OnSendFailed(deliveryError);
-        }
-
-        protected override void OnCheckCancelled()
-        {
-            if (Networking.IsOwner(gameObject))
+            if (IsMessengerOwner())
             {
                 ClearSenderState();
                 ClearPendingData();
             }
 
-            _targetPlayerIds = null;
+            _targetPlayerIds = new string[0];
 
             OnSendCancelled();
         }
 
         public void CancelSend()
         {
-            CancelReadyCheck();
+            StopReadyCheck();
         }
 
         protected bool IsLocalPlayerTargeted()
         {
-            if (_targetPlayerIds == null)
-                return false;
-
-            int localPlayerId = Networking.LocalPlayer.playerId;
-
-            for (int i = 0; i < _targetPlayerIds.Length; i++)
-            {
-                if (_targetPlayerIds[i] == localPlayerId)
-                    return true;
-            }
-
-            return false;
+            string playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            return TsArray.Contains(_targetPlayerIds, playerId);
         }
 
         protected virtual void OnSendStarted(int totalChunks) { }

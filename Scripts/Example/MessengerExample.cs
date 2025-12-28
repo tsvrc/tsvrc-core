@@ -13,16 +13,10 @@ namespace Tsvrc.Example
 
         public override void Interact()
         {
-            // Get all current players in the instance
             VRCPlayerApi[] players = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
             VRCPlayerApi.GetPlayers(players);
 
-            // Extract their player IDs
-            int[] playerIds = new int[players.Length];
-            for (int i = 0; i < players.Length; i++)
-            {
-                playerIds[i] = players[i].playerId;
-            }
+            string[] playerIds = TsPlayerUtils.ToPlayerIDs(players);
 
             _statusText.text = $"Generating message for {players.Length} players...";
 
@@ -36,11 +30,7 @@ namespace Tsvrc.Example
             VRCPlayerApi[] players = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
             VRCPlayerApi.GetPlayers(players);
 
-            int[] playerIds = new int[players.Length];
-            for (int i = 0; i < players.Length; i++)
-            {
-                playerIds[i] = players[i].playerId;
-            }
+            string[] playerIds = TsPlayerUtils.ToPlayerIDs(players);
 
             // Parse length from input field, default to 500000 if invalid
             int messageLength = 1000;
@@ -68,8 +58,7 @@ namespace Tsvrc.Example
 
             _statusText.text = $"Sending {message.Length} characters to {players.Length} players...";
 
-            // Send the message
-            SendMessage(message, playerIds);
+            SendTsMessage(message, playerIds);
         }
 
         protected override void OnReceiveStarted(int totalChunks)

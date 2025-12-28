@@ -15,11 +15,9 @@ namespace Tsvrc.TsNetworking
         /// Sends a message to specified players using network events.
         /// Starts a ready check to track when all players have received it.
         /// </summary>
-        /// <param name="message">Message to send</param>
-        /// <param name="targetPlayerIds">Array of player IDs to target</param>
-        public override void SendMessage(string message, int[] targetPlayerIds)
+        public override void SendTsMessage(string message, string[] targetPlayerIds)
         {
-            base.SendMessage(message, targetPlayerIds);
+            base.SendTsMessage(message, targetPlayerIds);
         }
 
         /// <summary>
@@ -31,13 +29,9 @@ namespace Tsvrc.TsNetworking
             VRCPlayerApi[] players = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
             VRCPlayerApi.GetPlayers(players);
 
-            int[] playerIds = new int[players.Length];
-            for (int i = 0; i < players.Length; i++)
-            {
-                playerIds[i] = players[i].playerId;
-            }
+            string[] playerIds = TsPlayerUtils.ToPlayerIDs(players);
 
-            base.SendMessage(message, playerIds);
+            SendTsMessage(message, playerIds);
         }
 
         /// <summary>
