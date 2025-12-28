@@ -23,7 +23,7 @@ namespace Tsvrc.Example
             }
         }
 
-        protected override void OnTrackerSynced(VRCPlayerApi[] players)
+        protected override void OnTrackedPlayersSynced(VRCPlayerApi[] players)
         {
             Debug.Log($"[InstancePlayersExample] Synced player list received. Count: {players.Length}");
             // Clear existing slots

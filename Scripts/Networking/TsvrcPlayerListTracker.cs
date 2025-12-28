@@ -275,7 +275,7 @@ namespace Tsvrc.TsNetworking
         /// This provides the initial full player list to clients when they join or when the list is updated.
         /// For individual player add/remove events, use OnTrackedPlayerAdded and OnTrackedPlayerRemoved.
         /// </summary>
-        protected virtual void OnTrackerSynced(VRCPlayerApi[] players)
+        protected virtual void OnTrackedPlayersSynced(VRCPlayerApi[] players)
         {
             // Override this in child classes to handle initial player list sync
         }
@@ -445,7 +445,7 @@ namespace Tsvrc.TsNetworking
         private void OnTrackerSynced()
         {
             VRCPlayerApi[] players = GetPlayerApis();
-            OnTrackerSynced(players);
+            OnTrackedPlayersSynced(players);
         }
 
         #endregion
