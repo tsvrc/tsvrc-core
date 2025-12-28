@@ -168,9 +168,6 @@ namespace Tsvrc.TsNetworking
 
             if (removeCount == 0) return;
 
-            System.Array.Sort(indicesToRemove, 0, removeCount);
-            System.Array.Reverse(indicesToRemove, 0, removeCount);
-
             int currentCount = playerNames.Length;
             int newSize = currentCount - removeCount;
 
@@ -180,22 +177,19 @@ namespace Tsvrc.TsNetworking
             }
             else
             {
+                // Mark indices to remove
+                bool[] toRemove = new bool[currentCount];
+                for (int i = 0; i < removeCount; i++)
+                {
+                    toRemove[indicesToRemove[i]] = true;
+                }
+
+                // Build new array excluding marked indices
                 string[] newPlayerNames = new string[newSize];
                 int newIndex = 0;
-
                 for (int i = 0; i < currentCount; i++)
                 {
-                    bool shouldRemove = false;
-                    for (int j = 0; j < removeCount; j++)
-                    {
-                        if (indicesToRemove[j] == i)
-                        {
-                            shouldRemove = true;
-                            break;
-                        }
-                    }
-
-                    if (!shouldRemove)
+                    if (!toRemove[i])
                     {
                         newPlayerNames[newIndex] = playerNames[i];
                         newIndex++;
