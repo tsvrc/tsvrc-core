@@ -1,7 +1,9 @@
 using Tsvrc.Core;
 using UdonSharp;
 using UnityEngine;
+using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
+using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.TsNetworking
 {
@@ -133,13 +135,17 @@ namespace Tsvrc.TsNetworking
             playerNames = newPlayerNames;
             RequestSerialization();
 
+            // Broadcast individual player added events
             for (int i = 0; i < players.Length; i++)
             {
                 if (Utilities.IsValid(players[i]))
                 {
-                    OnTrackedPlayerAdded(players[i]);
+                    SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayerAdded), players[i]);
                 }
             }
+
+            // Broadcast update to all clients
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayerListUpdate));
         }
 
         /// <summary>
@@ -201,13 +207,17 @@ namespace Tsvrc.TsNetworking
 
             RequestSerialization();
 
+            // Broadcast individual player removed events
             for (int i = 0; i < players.Length; i++)
             {
                 if (Utilities.IsValid(players[i]))
                 {
-                    OnTrackedPlayerRemoved(players[i]);
+                    SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayerRemoved), players[i]);
                 }
             }
+
+            // Broadcast update to all clients
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayerListUpdate));
         }
         #endregion
 
@@ -243,7 +253,7 @@ namespace Tsvrc.TsNetworking
         /// <summary>
         /// Called when the player list is updated.
         /// </summary>
-        public virtual void OnTrackedPlayersUpdate(VRCPlayerApi[] players)
+        protected virtual void OnTrackedPlayersUpdate(VRCPlayerApi[] players)
         {
             // Override this in child classes to handle player list updates
         }
@@ -251,7 +261,7 @@ namespace Tsvrc.TsNetworking
         /// <summary>
         /// Called when a player is added to the tracked list.
         /// </summary>
-        public virtual void OnTrackedPlayerAdded(VRCPlayerApi player)
+        protected virtual void OnTrackedPlayerAdded(VRCPlayerApi player)
         {
             // Override this in child classes to handle player additions
         }
@@ -259,9 +269,47 @@ namespace Tsvrc.TsNetworking
         /// <summary>
         /// Called when a player is removed from the tracked list.
         /// </summary>
-        public virtual void OnTrackedPlayerRemoved(VRCPlayerApi player)
+        protected virtual void OnTrackedPlayerRemoved(VRCPlayerApi player)
         {
             // Override this in child classes to handle player removals
+        }
+
+        #endregion
+
+        #region Network Events
+
+        /// <summary>
+        /// Network callable event to trigger player list update on all clients.
+        /// Call this with SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayerListUpdate))
+        /// </summary>
+        [NetworkCallable]
+        public void BroadcastPlayerListUpdate()
+        {
+            OnTrackedPlayersUpdate();
+        }
+
+        /// <summary>
+        /// Network callable event to trigger player added callback on all clients.
+        /// </summary>
+        [NetworkCallable]
+        public void BroadcastPlayerAdded(VRCPlayerApi player)
+        {
+            if (Utilities.IsValid(player))
+            {
+                OnTrackedPlayerAdded(player);
+            }
+        }
+
+        /// <summary>
+        /// Network callable event to trigger player removed callback on all clients.
+        /// </summary>
+        [NetworkCallable]
+        public void BroadcastPlayerRemoved(VRCPlayerApi player)
+        {
+            if (Utilities.IsValid(player))
+            {
+                OnTrackedPlayerRemoved(player);
+            }
         }
 
         #endregion
