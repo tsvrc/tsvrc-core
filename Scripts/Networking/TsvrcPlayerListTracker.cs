@@ -12,8 +12,8 @@ namespace Tsvrc.TsNetworking
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsvrcPlayerListTracker : TsvrcBehaviour
     {
-        [UdonSynced] private string[] playerIds = new string[0];
-        [UdonSynced] private bool isTracking = false;
+        [UdonSynced] private string[] _playerIds = new string[0];
+        [UdonSynced] private bool _isTracking = false;
 
         #region Unity Lifecycle
         #endregion
@@ -45,7 +45,7 @@ namespace Tsvrc.TsNetworking
         /// </summary>
         public void StartTracking()
         {
-            if (isTracking)
+            if (_isTracking)
             {
                 Debug.LogWarning("[TsvrcPlayerListTracker] Tracking is already in progress.");
                 return;
@@ -53,7 +53,7 @@ namespace Tsvrc.TsNetworking
 
             Networking.SetOwner(Networking.LocalPlayer, gameObject);
 
-            isTracking = true;
+            _isTracking = true;
             RequestSerialization();
         }
 
@@ -72,8 +72,8 @@ namespace Tsvrc.TsNetworking
         {
             if (!IsTrackerOwner()) return;
 
-            playerIds = new string[0];
-            isTracking = false;
+            _playerIds = new string[0];
+            _isTracking = false;
             RequestSerialization();
         }
 
@@ -127,7 +127,7 @@ namespace Tsvrc.TsNetworking
                 validPlayerIds = trimmed;
             }
 
-            this.playerIds = TsArray.Add(this.playerIds, validPlayerIds);
+            _playerIds = TsArray.Add(_playerIds, validPlayerIds);
             RequestSerialization();
 
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayersAdded), validPlayerIds);
@@ -139,7 +139,7 @@ namespace Tsvrc.TsNetworking
         public void RemoveTrackedPlayers(string[] playerIds)
         {
             if (!IsTrackerOwner()) return;
-            if (playerIds == null || playerIds.Length == 0 || this.playerIds.Length == 0) return;
+            if (playerIds == null || playerIds.Length == 0 || _playerIds.Length == 0) return;
 
             // Filter to only tracked players
             string[] validPlayerIds = new string[playerIds.Length];
@@ -163,7 +163,7 @@ namespace Tsvrc.TsNetworking
                 validPlayerIds = trimmed;
             }
 
-            this.playerIds = TsArray.Remove(this.playerIds, validPlayerIds);
+            _playerIds = TsArray.Remove(_playerIds, validPlayerIds);
             RequestSerialization();
 
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayersRemoved), validPlayerIds);
@@ -177,7 +177,7 @@ namespace Tsvrc.TsNetworking
         /// </summary>
         protected string[] GetTrackedPlayerIds()
         {
-            return playerIds;
+            return _playerIds;
         }
 
         /// <summary>
@@ -185,7 +185,7 @@ namespace Tsvrc.TsNetworking
         /// </summary>
         protected bool ContainsTrackedPlayer(string playerId)
         {
-            return TsArray.Contains(playerIds, playerId);
+            return TsArray.Contains(_playerIds, playerId);
         }
 
         #endregion
@@ -259,7 +259,7 @@ namespace Tsvrc.TsNetworking
         /// </summary>
         private void OnTrackerSynced()
         {
-            VRCPlayerApi[] players = TsPlayerUtils.ToPlayerApis(playerIds);
+            VRCPlayerApi[] players = TsPlayerUtils.ToPlayerApis(_playerIds);
             OnTrackedPlayersSynced(players);
         }
 
