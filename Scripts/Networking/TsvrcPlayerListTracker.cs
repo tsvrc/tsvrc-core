@@ -1,4 +1,6 @@
 using Tsvrc.Core;
+using Tsvrc.List.Utils;
+using Tsvrc.TsNetworking.Utils;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
@@ -10,7 +12,7 @@ namespace Tsvrc.TsNetworking
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsvrcPlayerListTracker : TsvrcBehaviour
     {
-        [UdonSynced] private string[] playerNames = new string[0];
+        [UdonSynced] private string[] playerIds = new string[0];
         [UdonSynced] private bool isTracking = false;
 
         #region Unity Lifecycle
@@ -23,7 +25,7 @@ namespace Tsvrc.TsNetworking
 #pragma warning restore
         {
             if (!IsTrackerOwner()) return;
-            RemoveTrackedPlayer(player);
+            RemoveTrackedPlayer(TsPlayerUtils.GetPlayerID(player));
         }
 
         /// <summary>
@@ -70,7 +72,7 @@ namespace Tsvrc.TsNetworking
         {
             if (!IsTrackerOwner()) return;
 
-            playerNames = new string[0];
+            playerIds = new string[0];
             isTracking = false;
             RequestSerialization();
         }
@@ -78,192 +80,112 @@ namespace Tsvrc.TsNetworking
         /// <summary>
         /// Adds a single player to the tracked list.
         /// </summary>
-        public void AddTrackedPlayer(VRCPlayerApi player)
+        public void AddTrackedPlayer(string playerId)
         {
-            VRCPlayerApi[] players = new VRCPlayerApi[1];
-            players[0] = player;
-            AddTrackedPlayers(players);
+            string[] playerIds = new string[1];
+            playerIds[0] = playerId;
+            AddTrackedPlayers(playerIds);
         }
 
         /// <summary>
         /// Removes a single player from the tracked list.
         /// </summary>
-        public void RemoveTrackedPlayer(VRCPlayerApi player)
+        public void RemoveTrackedPlayer(string playerId)
         {
-            VRCPlayerApi[] players = new VRCPlayerApi[1];
-            players[0] = player;
-            RemoveTrackedPlayers(players);
+            string[] playerIds = new string[1];
+            playerIds[0] = playerId;
+            RemoveTrackedPlayers(playerIds);
         }
 
         /// <summary>
         /// Adds multiple players to the tracked list.
         /// </summary>
-        public void AddTrackedPlayers(VRCPlayerApi[] players)
+        public void AddTrackedPlayers(string[] playerIds)
         {
             if (!IsTrackerOwner()) return;
-            if (players == null || players.Length == 0) return;
+            if (playerIds == null || playerIds.Length == 0) return;
 
-            int validNewPlayers = 0;
-            for (int i = 0; i < players.Length; i++)
+            // Filter out already tracked players
+            string[] validPlayerIds = new string[playerIds.Length];
+            int validCount = 0;
+
+            for (int i = 0; i < playerIds.Length; i++)
             {
-                if (Utilities.IsValid(players[i]) && !ContainsTrackedPlayer(players[i].displayName))
+                if (!ContainsTrackedPlayer(playerIds[i]))
                 {
-                    validNewPlayers++;
+                    validPlayerIds[validCount++] = playerIds[i];
                 }
             }
 
-            if (validNewPlayers == 0) return;
+            if (validCount == 0) return;
 
-            int currentCount = playerNames.Length;
-            string[] newPlayerNames = new string[currentCount + validNewPlayers];
-
-            if (currentCount > 0)
+            // Trim to actual count
+            if (validCount < playerIds.Length)
             {
-                System.Array.Copy(playerNames, newPlayerNames, currentCount);
+                string[] trimmed = new string[validCount];
+                System.Array.Copy(validPlayerIds, trimmed, validCount);
+                validPlayerIds = trimmed;
             }
 
-            int newIndex = currentCount;
-            for (int i = 0; i < players.Length; i++)
-            {
-                if (Utilities.IsValid(players[i]) && !ContainsTrackedPlayer(players[i].displayName))
-                {
-                    newPlayerNames[newIndex] = players[i].displayName;
-                    newIndex++;
-                }
-            }
-
-            playerNames = newPlayerNames;
+            this.playerIds = TsArray.Add(this.playerIds, validPlayerIds);
             RequestSerialization();
 
-            // Collect player names for batch network event
-            string[] addedPlayerNames = new string[players.Length];
-            int addedCount = 0;
-            for (int i = 0; i < players.Length; i++)
-            {
-                if (Utilities.IsValid(players[i]))
-                {
-                    addedPlayerNames[addedCount++] = players[i].displayName;
-                }
-            }
-
-            if (addedCount > 0)
-            {
-                if (addedCount < players.Length)
-                {
-                    string[] trimmed = new string[addedCount];
-                    System.Array.Copy(addedPlayerNames, trimmed, addedCount);
-                    addedPlayerNames = trimmed;
-                }
-                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayersAdded), addedPlayerNames);
-            }
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayersAdded), validPlayerIds);
         }
 
         /// <summary>
         /// Removes multiple players from the tracked list.
         /// </summary>
-        public void RemoveTrackedPlayers(VRCPlayerApi[] players)
+        public void RemoveTrackedPlayers(string[] playerIds)
         {
             if (!IsTrackerOwner()) return;
-            if (players == null || players.Length == 0 || playerNames.Length == 0) return;
+            if (playerIds == null || playerIds.Length == 0 || this.playerIds.Length == 0) return;
 
-            int[] indicesToRemove = new int[players.Length];
-            int removeCount = 0;
+            // Filter to only tracked players
+            string[] validPlayerIds = new string[playerIds.Length];
+            int validCount = 0;
 
-            for (int i = 0; i < players.Length; i++)
+            for (int i = 0; i < playerIds.Length; i++)
             {
-                if (Utilities.IsValid(players[i]))
+                if (ContainsTrackedPlayer(playerIds[i]))
                 {
-                    int index = FindTrackedPlayerIndex(players[i].displayName);
-                    if (index != -1)
-                    {
-                        indicesToRemove[removeCount] = index;
-                        removeCount++;
-                    }
+                    validPlayerIds[validCount++] = playerIds[i];
                 }
             }
 
-            if (removeCount == 0) return;
+            if (validCount == 0) return;
 
-            int currentCount = playerNames.Length;
-            int newSize = currentCount - removeCount;
-
-            if (newSize == 0)
+            // Trim to actual count
+            if (validCount < playerIds.Length)
             {
-                playerNames = new string[0];
-            }
-            else
-            {
-                // Mark indices to remove
-                bool[] toRemove = new bool[currentCount];
-                for (int i = 0; i < removeCount; i++)
-                {
-                    toRemove[indicesToRemove[i]] = true;
-                }
-
-                // Build new array excluding marked indices
-                string[] newPlayerNames = new string[newSize];
-                int newIndex = 0;
-                for (int i = 0; i < currentCount; i++)
-                {
-                    if (!toRemove[i])
-                    {
-                        newPlayerNames[newIndex] = playerNames[i];
-                        newIndex++;
-                    }
-                }
-
-                playerNames = newPlayerNames;
+                string[] trimmed = new string[validCount];
+                System.Array.Copy(validPlayerIds, trimmed, validCount);
+                validPlayerIds = trimmed;
             }
 
+            this.playerIds = TsArray.Remove(this.playerIds, validPlayerIds);
             RequestSerialization();
 
-            // Collect player names for batch network event
-            string[] removedPlayerNames = new string[players.Length];
-            int removedCount = 0;
-            for (int i = 0; i < players.Length; i++)
-            {
-                if (Utilities.IsValid(players[i]))
-                {
-                    removedPlayerNames[removedCount++] = players[i].displayName;
-                }
-            }
-
-            if (removedCount > 0)
-            {
-                if (removedCount < players.Length)
-                {
-                    string[] trimmed = new string[removedCount];
-                    System.Array.Copy(removedPlayerNames, trimmed, removedCount);
-                    removedPlayerNames = trimmed;
-                }
-                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayersRemoved), removedPlayerNames);
-            }
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayersRemoved), validPlayerIds);
         }
         #endregion
 
         #region Protected Methods
 
         /// <summary>
-        /// Gets the array of tracked player names.
+        /// Gets the list of currently tracked player IDs.
         /// </summary>
-        protected string[] GetPlayerNames()
+        protected string[] GetTrackedPlayerIds()
         {
-            return playerNames;
+            return playerIds;
         }
 
         /// <summary>
-        /// Checks if a player with the given display name is being tracked.
+        /// Checks if a player with the given ID is being tracked.
         /// </summary>
-        protected bool ContainsTrackedPlayer(string displayName)
+        protected bool ContainsTrackedPlayer(string playerId)
         {
-            for (int i = 0; i < playerNames.Length; i++)
-            {
-                if (playerNames[i] == displayName)
-                {
-                    return true;
-                }
-            }
-            return false;
+            return TsArray.Contains(playerIds, playerId);
         }
 
         #endregion
@@ -304,26 +226,20 @@ namespace Tsvrc.TsNetworking
         /// Network callable event to trigger players added callback on all clients.
         /// </summary>
         [NetworkCallable]
-        public void BroadcastPlayersAdded(string[] playerNames)
+        public void BroadcastPlayersAdded(string[] playerIds)
         {
-            VRCPlayerApi[] players = GetPlayersByNames(playerNames);
-            if (players.Length > 0)
-            {
-                OnTrackedPlayersAdded(players);
-            }
+            VRCPlayerApi[] players = TsPlayerUtils.ToPlayerApis(playerIds);
+            OnTrackedPlayersAdded(players);
         }
 
         /// <summary>
         /// Network callable event to trigger players removed callback on all clients.
         /// </summary>
         [NetworkCallable]
-        public void BroadcastPlayersRemoved(string[] playerNames)
+        public void BroadcastPlayersRemoved(string[] playerIds)
         {
-            VRCPlayerApi[] players = GetPlayersByNames(playerNames);
-            if (players.Length > 0)
-            {
-                OnTrackedPlayersRemoved(players);
-            }
+            VRCPlayerApi[] players = TsPlayerUtils.ToPlayerApis(playerIds);
+            OnTrackedPlayersRemoved(players);
         }
 
         #endregion
@@ -339,112 +255,11 @@ namespace Tsvrc.TsNetworking
         }
 
         /// <summary>
-        /// Finds the index of a player by display name.
-        /// </summary>
-        private int FindTrackedPlayerIndex(string displayName)
-        {
-            for (int i = 0; i < playerNames.Length; i++)
-            {
-                if (playerNames[i] == displayName)
-                {
-                    return i;
-                }
-            }
-            return -1;
-        }
-
-        /// <summary>
-        /// Gets a VRCPlayerApi by display name.
-        /// </summary>
-        private VRCPlayerApi GetPlayerByName(string displayName)
-        {
-            VRCPlayerApi[] allPlayers = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
-            VRCPlayerApi.GetPlayers(allPlayers);
-
-            for (int i = 0; i < allPlayers.Length; i++)
-            {
-                if (Utilities.IsValid(allPlayers[i]) && allPlayers[i].displayName == displayName)
-                {
-                    return allPlayers[i];
-                }
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Gets VRCPlayerApi objects by display names.
-        /// </summary>
-        private VRCPlayerApi[] GetPlayersByNames(string[] displayNames)
-        {
-            VRCPlayerApi[] allPlayers = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
-            VRCPlayerApi.GetPlayers(allPlayers);
-            
-            VRCPlayerApi[] foundPlayers = new VRCPlayerApi[displayNames.Length];
-            int foundCount = 0;
-
-            for (int i = 0; i < displayNames.Length; i++)
-            {
-                for (int j = 0; j < allPlayers.Length; j++)
-                {
-                    if (Utilities.IsValid(allPlayers[j]) && allPlayers[j].displayName == displayNames[i])
-                    {
-                        foundPlayers[foundCount++] = allPlayers[j];
-                        break;
-                    }
-                }
-            }
-
-            if (foundCount < displayNames.Length)
-            {
-                VRCPlayerApi[] trimmed = new VRCPlayerApi[foundCount];
-                System.Array.Copy(foundPlayers, trimmed, foundCount);
-                return trimmed;
-            }
-
-            return foundPlayers;
-        }
-
-        /// <summary>
-        /// Gets the VRCPlayerApi objects for all tracked players.
-        /// </summary>
-        private VRCPlayerApi[] GetPlayerApis()
-        {
-            int currentCount = playerNames.Length;
-            VRCPlayerApi[] players = new VRCPlayerApi[currentCount];
-            VRCPlayerApi[] allPlayers = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
-            VRCPlayerApi.GetPlayers(allPlayers);
-
-            int foundCount = 0;
-            for (int i = 0; i < currentCount; i++)
-            {
-                string targetName = playerNames[i];
-
-                for (int j = 0; j < allPlayers.Length; j++)
-                {
-                    if (Utilities.IsValid(allPlayers[j]) && allPlayers[j].displayName == targetName)
-                    {
-                        players[foundCount++] = allPlayers[j];
-                        break;
-                    }
-                }
-            }
-
-            if (foundCount < currentCount)
-            {
-                VRCPlayerApi[] validPlayers = new VRCPlayerApi[foundCount];
-                System.Array.Copy(players, validPlayers, foundCount);
-                return validPlayers;
-            }
-
-            return players;
-        }
-
-        /// <summary>
         /// Triggers the OnPlayersUpdate callback with current tracked players.
         /// </summary>
         private void OnTrackerSynced()
         {
-            VRCPlayerApi[] players = GetPlayerApis();
+            VRCPlayerApi[] players = TsPlayerUtils.ToPlayerApis(playerIds);
             OnTrackedPlayersSynced(players);
         }
 

@@ -1,3 +1,4 @@
+using Tsvrc.TsNetworking.Utils;
 using UdonSharp;
 using VRC.SDKBase;
 
@@ -16,7 +17,7 @@ namespace Tsvrc.TsNetworking
             // Only owner processes player joins
             if (!Networking.IsOwner(gameObject)) return;
 
-            AddTrackedPlayer(player);
+            AddTrackedPlayer(TsPlayerUtils.GetPlayerID(player));
         }
 
         public override void OnMasterTransferred(VRCPlayerApi newMaster)

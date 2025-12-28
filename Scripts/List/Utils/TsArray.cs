@@ -123,5 +123,29 @@ namespace Tsvrc.List.Utils
 
             return result;
         }
+
+        public static bool Contains(string[] array, string value)
+        {
+            for (int i = 0; i < array.Length; i++)
+            {
+                if (array[i] == value)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public static bool Contains(int[] array, int value)
+        {
+            for (int i = 0; i < array.Length; i++)
+            {
+                if (array[i] == value)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 }

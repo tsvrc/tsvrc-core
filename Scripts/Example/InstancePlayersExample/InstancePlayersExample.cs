@@ -1,4 +1,5 @@
 using Tsvrc.TsNetworking;
+using Tsvrc.TsNetworking.Utils;
 using UnityEngine;
 using VRC.SDKBase;
 
@@ -16,10 +17,9 @@ namespace Tsvrc.Example
                 Debug.Log("[InstancePlayersExample] Master starting player tracking.");
                 StartTracking();
 
-                // Add all existing players to the tracker
                 VRCPlayerApi[] allPlayers = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
                 VRCPlayerApi.GetPlayers(allPlayers);
-                AddTrackedPlayers(allPlayers);
+                AddTrackedPlayers(TsPlayerUtils.ToPlayerIDs(allPlayers));
             }
         }
 
