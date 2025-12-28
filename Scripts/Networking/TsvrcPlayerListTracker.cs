@@ -53,7 +53,9 @@ namespace Tsvrc.TsNetworking
 
             Networking.SetOwner(Networking.LocalPlayer, gameObject);
 
+            StopTracking();
             _isTracking = true;
+
             RequestSerialization();
         }
 
@@ -68,7 +70,7 @@ namespace Tsvrc.TsNetworking
         /// <summary>
         /// Cancels tracking and clears all tracked players.
         /// </summary>
-        public void CancelTracking()
+        public void StopTracking()
         {
             if (!IsTrackerOwner()) return;
 
