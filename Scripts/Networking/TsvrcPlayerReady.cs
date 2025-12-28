@@ -1,4 +1,5 @@
-using Tsvrc.Core;
+using Tsvrc.List.Utils;
+using Tsvrc.TsNetworking.Utils;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
@@ -8,252 +9,252 @@ using VRC.Udon.Common.Interfaces;
 namespace Tsvrc.TsNetworking
 {
     /// <summary>
-    /// Error codes for ready check failures.
-    /// </summary>
-    public enum ReadyCheckError
-    {
-        None = 0,
-        CheckAlreadyInProgress = 1,
-        ExceededMaxPlayers = 2,
-        OwnerLeftDuringCheck = 3,
-        Cancelled = 4
-    }
-
-    /// <summary>
-    /// Base class for synchronized player ready tracking.
+    /// Tracks player readiness.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsvrcPlayerReady : TsvrcBehaviour
+    public class TsvrcPlayerReady : TsvrcPlayerListTracker
     {
-        private int _maxPlayers = 255;
-        private bool[] _playerChecks = new bool[0];
-        protected bool _isCheckInProgress = false;
+        [UdonSynced] private string[] _readyPlayerIds = new string[0];
+        [UdonSynced] protected bool _isCheckInProgress = false;
 
-        private int[] _expectedPlayerIds = new int[0];
+        #region Unity Lifecycle
 
-        /// <summary>
-        /// Monitors the ready check progress and completes it when all expected players are ready.
-        /// Only runs on the owner who tracks the ready states.
-        /// </summary>
-        protected void Update()
+        private void Update()
         {
-            if (!Networking.IsOwner(gameObject)) return;
+            if (!IsCurrentOwner()) return;
+            if (!_isCheckInProgress) return;
 
-            if (_isCheckInProgress)
+            string[] trackedPlayerIds = GetTrackedPlayerIds();
+
+            foreach (string playerId in trackedPlayerIds)
             {
-                // Check if any expected players are not ready
-                foreach (int playerId in _expectedPlayerIds)
+                if (!IsPlayerReady(playerId))
                 {
-                    if (!GetPlayerReadyStatus(playerId))
-                    {
-                        return; // At least one player is not ready
-                    }
+                    return; // At least one player is not ready
                 }
+            }
 
-                // All expected players are ready
-                _isCheckInProgress = false;
+            CompleteReadyCheck(trackedPlayerIds);
+        }
 
-                // Save the completed player IDs before resetting
-                int[] completedPlayerIds = _expectedPlayerIds;
-                ResetCheckState();
+        #endregion
 
-                // Notify all clients that everyone is ready
-                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(AllPlayersReadyEvent), completedPlayerIds);
+        #region Tsvrc Callbacks
+
+        protected override void OnTrackedPlayersRemoved(VRCPlayerApi[] players)
+        {
+            if (!IsCurrentOwner()) return;
+
+            foreach (VRCPlayerApi player in players)
+            {
+                string playerId = TsPlayerUtils.GetPlayerID(player);
+                if (IsPlayerReady(playerId))
+                {
+                    RemoveReadyPlayer(playerId);
+                }
             }
         }
 
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// Set the local player's ready status.
+        /// </summary>
         public void SetReady(bool ready = true)
         {
-            int playerId = Networking.LocalPlayer.playerId;
+            if (!_isCheckInProgress) return;
+
+            string playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
             SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(UpdatePlayerCheck), playerId, ready);
         }
 
         /// <summary>
-        /// Updates the ready status for a specific player.
-        /// DO NOT CALL DIRECTLY. Use SetReady() instead.
+        /// Stops the current ready check.
         /// </summary>
-        [NetworkCallable]
-        public void UpdatePlayerCheck(int playerId, bool ready)
+        public void StopReadyCheck()
         {
-            if (!Networking.IsOwner(gameObject))
+            if (!IsCurrentOwner()) return;
+            if (!_isCheckInProgress) return;
+
+            ResetReadyState();
+
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastCheckCancelled));
+        }
+
+        #endregion
+
+        #region Protected Methods
+
+        /// <summary>
+        /// Starts a ready check for the specified players.
+        /// </summary>
+        protected void StartReadyCheck(string[] playerIds)
+        {
+            if (_isCheckInProgress)
             {
-                Debug.LogWarning("TsvrcPlayerReady: Only the owner can update player ready status.");
+                Debug.LogWarning("TsvrcPlayerReady: A ready check is already in progress.");
                 return;
             }
 
-            _playerChecks[playerId] = ready;
-        }
+            if (!IsCurrentOwner())
+            {
+                Networking.SetOwner(Networking.LocalPlayer, gameObject);
+            }
 
-        /// <summary>
-        /// Network callable event to notify clients that a ready check has started.
-        /// DO NOT CALL DIRECTLY. Use StartReadyCheck() instead.
-        /// </summary>
-        [NetworkCallable]
-        public void CheckStartedEvent(int[] expectedPlayerIds)
-        {
-            _playerChecks = new bool[_maxPlayers];
-            _expectedPlayerIds = expectedPlayerIds;
+            ResetReadyState();
+            StartTracking();
+            AddTrackedPlayers(playerIds);
             _isCheckInProgress = true;
-            OnCheckStarted(expectedPlayerIds);
+            RequestSerialization();
+
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastCheckStarted), playerIds);
         }
 
-        /// <summary>
-        /// Network callable event to notify all clients that all players are ready.
-        /// DO NOT CALL DIRECTLY. Called automatically by owner.
-        /// </summary>
-        [NetworkCallable]
-        public void AllPlayersReadyEvent(int[] completedPlayerIds)
-        {
-            ResetCheckState();
-            OnAllPlayersReady(completedPlayerIds);
-        }
+        #endregion
 
-        /// <summary>
-        /// Network callable event to notify all clients that the ready check failed.
-        /// DO NOT CALL DIRECTLY. Called automatically when errors occur.
-        /// </summary>
-        [NetworkCallable]
-        public void CheckFailedEvent(int errorCode)
-        {
-            ReadyCheckError error = (ReadyCheckError)errorCode;
-
-            // Reset state when an active check is aborted
-            ResetCheckState();
-            OnCheckFailed(error);
-        }
-
-        /// <summary>
-        /// Network callable event to notify all clients that the ready check was cancelled.
-        /// DO NOT CALL DIRECTLY. Use CancelReadyCheck() instead.
-        /// </summary>
-        [NetworkCallable]
-        public void CheckCancelledEvent()
-        {
-            ResetCheckState();
-            OnCheckCancelled();
-        }
+        #region Virtual Methods
 
         /// <summary>
         /// Called when a ready check is started.
         /// Override in subclasses to handle initialization.
         /// </summary>
         /// <param name="expectedPlayerIds">Array of player IDs expected to be ready</param>
-        protected virtual void OnCheckStarted(int[] expectedPlayerIds) { }
+        protected virtual void OnReadyCheckStarted(string[] expectedPlayerIds) { }
 
         /// <summary>
         /// Called when all expected players are ready.
         /// Override in subclasses to handle completion.
         /// </summary>
         /// <param name="playerIds">Array of player IDs who completed the ready check</param>
-        protected virtual void OnAllPlayersReady(int[] playerIds) { }
-
-        /// <summary>
-        /// Called when the ready check fails.
-        /// Override in subclasses to handle errors.
-        /// </summary>
-        /// <param name="errorCode">The error code indicating why the check failed</param>
-        protected virtual void OnCheckFailed(ReadyCheckError errorCode) { }
+        protected virtual void OnAllPlayersReady(string[] playerIds) { }
 
         /// <summary>
         /// Called when the ready check is cancelled.
         /// Override in subclasses to handle cancellation.
         /// </summary>
-        protected virtual void OnCheckCancelled() { }
+        protected virtual void OnReadyCheckCancelled() { }
 
-#pragma warning disable
-        public override void OnPlayerLeft(VRCPlayerApi player)
-#pragma warning restore
+        #endregion
+
+        #region Network Events
+
+        /// <summary>
+        /// Updates the ready status for a specific player.
+        /// This is an internal method. Use SetReady() instead to set the player ready.
+        /// </summary>
+        [NetworkCallable]
+        public void UpdatePlayerCheck(string playerId, bool ready)
         {
-            int leftPlayerId = player.playerId;
+            if (!IsCurrentOwner()) return;
 
-            // Check if the owner left during an active check
-            if (_isCheckInProgress && Networking.GetOwner(gameObject).playerId == leftPlayerId)
+            if (ready)
             {
-                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(CheckFailedEvent), (int)ReadyCheckError.OwnerLeftDuringCheck);
-                return;
+                AddReadyPlayer(playerId);
             }
-
-            // Remove the player from expected list
-            int[] newExpected = new int[_expectedPlayerIds.Length - 1];
-            int index = 0;
-            for (int i = 0; i < _expectedPlayerIds.Length; i++)
+            else
             {
-                if (_expectedPlayerIds[i] != leftPlayerId)
-                {
-                    newExpected[index++] = _expectedPlayerIds[i];
-                }
+                RemoveReadyPlayer(playerId);
             }
-            _expectedPlayerIds = newExpected;
         }
 
         /// <summary>
-        /// Starts a ready check for the specified players.
+        /// Network callable event to notify clients that a ready check has started.
         /// </summary>
-        /// <param name="targetPlayerIds">Array of player IDs who should be ready</param>
-        protected void StartReadyCheck(int[] targetPlayerIds)
+        [NetworkCallable]
+        public void BroadcastCheckStarted(string[] expectedPlayerIds)
         {
-            if (targetPlayerIds.Length > _maxPlayers)
-            {
-                Debug.LogError($"TsvrcPlayerReady: Exceeded max player count of {_maxPlayers}");
-                OnCheckFailed(ReadyCheckError.ExceededMaxPlayers);
-                return;
-            }
-
-            // Check if a ready check is already in progress BEFORE taking ownership
-            if (_isCheckInProgress)
-            {
-                Debug.LogWarning("TsvrcPlayerReady: A ready check is already in progress.");
-                OnCheckFailed(ReadyCheckError.CheckAlreadyInProgress);
-                return;
-            }
-
-            if (!Networking.IsOwner(gameObject))
-            {
-                Networking.SetOwner(Networking.LocalPlayer, gameObject);
-            }
-
-            _isCheckInProgress = true;
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(CheckStartedEvent), targetPlayerIds);
+            OnReadyCheckStarted(expectedPlayerIds);
         }
 
         /// <summary>
-        /// Cancels the current ready check if one is in progress.
-        /// Only the owner can cancel a check.
+        /// Network callable event to notify all clients that all players are ready.
         /// </summary>
-        public void CancelReadyCheck()
+        [NetworkCallable]
+        public void BroadcastAllPlayersReady(string[] completedPlayerIds)
         {
-            if (!Networking.IsOwner(gameObject))
-            {
-                Debug.LogWarning("TsvrcPlayerReady: Only the owner can cancel a ready check.");
-                return;
-            }
-
-            if (!_isCheckInProgress)
-            {
-                Debug.LogWarning("TsvrcPlayerReady: No ready check is in progress to cancel.");
-                return;
-            }
-
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(CheckCancelledEvent));
+            OnAllPlayersReady(completedPlayerIds);
         }
 
         /// <summary>
-        /// Resets the check state and clears all player ready statuses.
+        /// Network callable event to notify all clients that the ready check was cancelled.
         /// </summary>
-        private void ResetCheckState()
+        [NetworkCallable]
+        public void BroadcastCheckCancelled()
         {
+            OnReadyCheckCancelled();
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        private bool IsCurrentOwner()
+        {
+            return Networking.IsOwner(gameObject);
+        }
+
+        /// <summary>
+        /// Resets the ready check state and clears all tracking.
+        /// </summary>
+        private void ResetReadyState()
+        {
+            StopTracking();
+            _readyPlayerIds = new string[0];
             _isCheckInProgress = false;
-            _expectedPlayerIds = new int[0];
-            _playerChecks = new bool[0];
+            RequestSerialization();
         }
 
-        private bool GetPlayerReadyStatus(int playerId)
+        /// <summary>
+        /// Completes the ready check when all players are ready.
+        /// Resets tracker and ready lists, then broadcasts to all clients.
+        /// </summary>
+        private void CompleteReadyCheck(string[] completedPlayerIds)
         {
-            if (playerId >= 0 && playerId < _maxPlayers)
-            {
-                return _playerChecks[playerId];
-            }
-            return false;
+            if (!IsCurrentOwner()) return;
+
+            ResetReadyState();
+
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastAllPlayersReady), completedPlayerIds);
         }
+
+        /// <summary>
+        /// Adds a player to the ready list.
+        /// This is an internal method. Use SetReady() instead to set the player ready.
+        /// </summary>
+        private void AddReadyPlayer(string playerId)
+        {
+            if (IsPlayerReady(playerId)) return;
+
+            string[] playerIds = new string[1];
+            playerIds[0] = playerId;
+            _readyPlayerIds = TsArray.Add(_readyPlayerIds, playerIds);
+            RequestSerialization();
+        }
+
+        /// <summary>
+        /// Removes a player from the ready list.
+        /// This is an internal method; use SetReady(false) to mark a player as not ready.
+        /// </summary>
+        private void RemoveReadyPlayer(string playerId)
+        {
+            if (!IsPlayerReady(playerId)) return;
+
+            string[] playerIds = new string[1];
+            playerIds[0] = playerId;
+            _readyPlayerIds = TsArray.Remove(_readyPlayerIds, playerIds);
+            RequestSerialization();
+        }
+
+        /// <summary>
+        /// Gets the ready status of a specific player by ID.
+        /// </summary>
+        private bool IsPlayerReady(string playerId)
+        {
+            return TsArray.Contains(_readyPlayerIds, playerId);
+        }
+
+        #endregion
     }
 }

@@ -1,8 +1,8 @@
 using TMPro;
 using Tsvrc.TsNetworking;
+using Tsvrc.TsNetworking.Utils;
 using UnityEngine;
 using VRC.SDKBase;
-using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Example
 {
@@ -16,64 +16,34 @@ namespace Tsvrc.Example
             VRCPlayerApi[] players = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
             VRCPlayerApi.GetPlayers(players);
 
-            // Extract their player IDs
-            int[] playerIds = new int[players.Length];
-            for (int i = 0; i < players.Length; i++)
-            {
-                playerIds[i] = players[i].playerId;
-            }
+            // Convert players to their unique IDs
+            string[] playerIds = TsPlayerUtils.ToPlayerIDs(players);
 
             _statusText.text = "Starting ready check...";
 
             StartReadyCheck(playerIds);
-            SendCustomNetworkEvent(NetworkEventTarget.All, "SimulateReady");
         }
 
-        public void SimulateReady()
+        protected override void OnReadyCheckStarted(string[] expectedPlayerIds)
         {
-            SendCustomEventDelayedSeconds("CustomSetReady", 2f);
+            _statusText.text = $"Ready check started for {expectedPlayerIds.Length} players.";
+
+            SendCustomEventDelayedSeconds(nameof(SetReadyEvent), 2f);
         }
 
-        public void CustomSetReady()
+        public void SetReadyEvent()
         {
             SetReady();
         }
 
-        protected override void OnCheckStarted(int[] expectedPlayerIds)
+        protected override void OnAllPlayersReady(string[] playerIds)
         {
-            int playerId = Networking.LocalPlayer.playerId;
-            foreach (int id in expectedPlayerIds)
-            {
-                if (id == playerId)
-                {
-                    _statusText.text = "Ready check started. Please set ready.";
-                    return;
-                }
-            }
+            _statusText.text = $"All players are ready! ({playerIds.Length} players)";
         }
 
-        protected override void OnAllPlayersReady(int[] playerIds)
+        protected override void OnReadyCheckCancelled()
         {
-            _statusText.text = $"All {playerIds.Length} players are ready!";
-        }
-
-        protected override void OnCheckFailed(ReadyCheckError errorCode)
-        {
-            switch (errorCode)
-            {
-                case ReadyCheckError.CheckAlreadyInProgress:
-                    _statusText.text = "Error: A ready check is already in progress.";
-                    break;
-                case ReadyCheckError.ExceededMaxPlayers:
-                    _statusText.text = "Error: Too many players for ready check.";
-                    break;
-                case ReadyCheckError.OwnerLeftDuringCheck:
-                    _statusText.text = "Error: Owner left during ready check.";
-                    break;
-                default:
-                    _statusText.text = $"Error: Ready check failed (code: {errorCode})";
-                    break;
-            }
+            _statusText.text = "Ready check was cancelled.";
         }
     }
 }
