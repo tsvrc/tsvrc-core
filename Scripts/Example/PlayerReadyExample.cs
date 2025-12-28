@@ -6,7 +6,7 @@ using VRC.SDKBase;
 
 namespace Tsvrc.Example
 {
-    public class PlayerReadyExample : TsvrcPlayerReady
+    public class PlayerReadyExample : TsvrcPlayerReadyChecker
     {
         [SerializeField] private TextMeshProUGUI _statusText;
 

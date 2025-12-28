@@ -12,7 +12,7 @@ namespace Tsvrc.TsNetworking
     /// Tracks player readiness.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsvrcPlayerReady : TsvrcPlayerListTracker
+    public class TsvrcPlayerReadyChecker : TsvrcPlayerListTracker
     {
         [UdonSynced] private string[] _readyPlayerIds = new string[0];
         [UdonSynced] protected bool _isCheckInProgress = false;
