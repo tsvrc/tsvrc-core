@@ -24,6 +24,15 @@ namespace Tsvrc.TsNetworking
         public override void OnPlayerLeft(VRCPlayerApi player)
 #pragma warning restore
         {
+            if (!_isTracking) return;
+
+            /* If the owner is also the master, UdonSharp auto-transfers ownership before 
+             invoking the OnPlayerLeft; otherwise we must reassign it. */
+            if (player.IsOwner(gameObject))
+            {
+                Networking.SetOwner(Networking.Master, gameObject);
+            }
+
             if (!IsTrackerOwner()) return;
             RemoveTrackedPlayer(TsPlayerUtils.GetPlayerID(player));
         }
