@@ -16,7 +16,7 @@ namespace Tsvrc.Core
 
         private void Start()
         {
-            if (IsProcessOwner())
+            if (IsOwner())
             {
                 // Ensure synced state is correct on start
                 SetOwner(Networking.GetOwner(gameObject));
@@ -28,7 +28,6 @@ namespace Tsvrc.Core
         #region VRChat Callbacks
 
 #pragma warning disable
-        [EditorBrowsable(EditorBrowsableState.Never)]
         public override void OnPlayerLeft(VRCPlayerApi player)
 #pragma warning restore
         {
@@ -44,6 +43,8 @@ namespace Tsvrc.Core
                 // Only the master (new owner) should invoke the event.
                 OnOwnerAbandonedProcess();
             }
+
+            OnTsPlayerLeft(player);
         }
 
         #endregion
@@ -61,7 +62,7 @@ namespace Tsvrc.Core
                 return;
             }
 
-            if (!IsProcessOwner())
+            if (!IsOwner())
             {
                 SetOwner(Networking.LocalPlayer);
             }
@@ -83,7 +84,7 @@ namespace Tsvrc.Core
                 return;
             }
 
-            if (!IsProcessOwner())
+            if (!IsOwner())
             {
                 SetOwner(Networking.LocalPlayer);
             }
@@ -118,6 +119,14 @@ namespace Tsvrc.Core
             RequestSerialization();
         }
 
+        /// <summary>
+        /// Determines if the local player is the process owner.
+        /// </summary>
+        protected bool IsOwner()
+        {
+            return Networking.IsOwner(gameObject);
+        }
+
         #endregion
 
         #region Virtual Methods
@@ -126,31 +135,27 @@ namespace Tsvrc.Core
         /// Called when the process is started.
         /// Only called on the process owner.
         /// </summary>
-        public virtual void OnProcessStarted() { }
+        protected virtual void OnProcessStarted() { }
 
         /// <summary>
         /// Called when the process is stopped.
         /// Only called on the process owner.
         /// </summary>
-        public virtual void OnProcessStopped() { }
+        protected virtual void OnProcessStopped() { }
 
         /// <summary>
         /// Called when the process owner leaves the instance and
         /// the process is still running.
         /// This method is called only on the new owner (master).
         /// </summary>
-        public virtual void OnOwnerAbandonedProcess() { }
+        protected virtual void OnOwnerAbandonedProcess() { }
 
-        #endregion
+        /// <summary>
+        /// Called when a player leaves the instance.
+        /// Only called on the process owner when the process is running.
+        /// </summary>
+        protected virtual void OnTsPlayerLeft(VRCPlayerApi player) { }
 
-        #region Network Events
-        #endregion
-
-        #region Private Methods
-        private bool IsProcessOwner()
-        {
-            return Networking.IsOwner(gameObject);
-        }
         #endregion
     }
 }

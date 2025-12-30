@@ -9,34 +9,11 @@ using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.TsNetworking
 {
-    [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsvrcPlayerListTracker : TsvrcBehaviour
+    public class TsvrcPlayerListTracker : TsvrcProcess
     {
         [UdonSynced] private string[] _playerIds = new string[0];
-        [UdonSynced] private bool _isTracking = false;
-
-        #region Unity Lifecycle
-        #endregion
 
         #region VRChat Callbacks
-
-#pragma warning disable
-        public override void OnPlayerLeft(VRCPlayerApi player)
-#pragma warning restore
-        {
-            if (!_isTracking) return;
-
-            /* If the owner is also the master, UdonSharp auto-transfers ownership before 
-             invoking the OnPlayerLeft; otherwise we must reassign it. */
-            if (player.IsOwner(gameObject))
-            {
-                Networking.SetOwner(Networking.Master, gameObject);
-            }
-
-            if (!IsTrackerOwner()) return;
-            RemoveTrackedPlayer(TsPlayerUtils.GetPlayerID(player));
-        }
-
         /// <summary>
         /// Updates local state when synced data is received.
         /// </summary>
@@ -47,46 +24,36 @@ namespace Tsvrc.TsNetworking
 
         #endregion
 
-        #region Public Methods
+        #region TsvrcProcess Callbacks
 
-        /// <summary>
-        /// Starts tracking players with ownership mode enabled.
-        /// </summary>
-        public void StartTracking()
+        protected override void OnProcessStarted()
         {
-            if (_isTracking)
-            {
-                Debug.LogWarning("[TsvrcPlayerListTracker] Tracking is already in progress.");
-                return;
-            }
-
-            Networking.SetOwner(Networking.LocalPlayer, gameObject);
-
-            StopTracking();
-            _isTracking = true;
-
-            RequestSerialization();
-        }
-
-        /// <summary>
-        /// Sets a new owner for the player list tracker.
-        /// </summary>
-        public void SetTrackerOwner(VRCPlayerApi newOwner)
-        {
-            Networking.SetOwner(newOwner, gameObject);
-        }
-
-        /// <summary>
-        /// Cancels tracking and clears all tracked players.
-        /// </summary>
-        public void StopTracking()
-        {
-            if (!IsTrackerOwner()) return;
-
             _playerIds = new string[0];
-            _isTracking = false;
             RequestSerialization();
         }
+
+        protected override void OnProcessStopped()
+        {
+            _playerIds = new string[0];
+            RequestSerialization();
+        }
+
+        /// <summary>
+        /// Called when a player leaves the instance.
+        /// Only called on the tracker owner when the process is running.
+        /// <para>
+        /// To override this method, ensure to call base.OnTsPlayerLeft at
+        /// the start of your override to maintain correct behavior.
+        /// </para>
+        /// </summary>
+        protected override void OnTsPlayerLeft(VRCPlayerApi player)
+        {
+            RemoveTrackedPlayer(TsPlayerUtils.GetPlayerID(player));
+        }
+
+        #endregion
+
+        #region Public Methods
 
         /// <summary>
         /// Adds a single player to the tracked list.
@@ -113,16 +80,89 @@ namespace Tsvrc.TsNetworking
         /// </summary>
         public void AddTrackedPlayers(string[] playerIds)
         {
-            if (!IsTrackerOwner()) return;
-            if (playerIds == null || playerIds.Length == 0) return;
+            if (playerIds == null || playerIds.Length == 0)
+            {
+                Debug.LogWarning("AddTrackedPlayers called with null or empty array");
+                return;
+            }
 
+            SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(AddTrackedPlayersEvent), playerIds);
+        }
+
+        /// <summary>
+        /// Removes multiple players from the tracked list.
+        /// </summary>
+        public void RemoveTrackedPlayers(string[] playerIds)
+        {
+            if (playerIds == null || playerIds.Length == 0 || _playerIds.Length == 0)
+            {
+                Debug.LogWarning("RemoveTrackedPlayers called with null or empty array");
+                return;
+            }
+
+            SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RemoveTrackedPlayersEvent), playerIds);
+        }
+        #endregion
+
+        #region Protected Methods
+
+        /// <summary>
+        /// Gets the list of currently tracked player IDs.
+        /// </summary>
+        protected string[] GetTrackedPlayerIds()
+        {
+            return _playerIds;
+        }
+
+        /// <summary>
+        /// Checks if a player with the given ID is being tracked.
+        /// </summary>
+        protected bool IsTrackedPlayer(string playerId)
+        {
+            return TsArray.Contains(_playerIds, playerId);
+        }
+
+        #endregion
+
+        #region Virtual Methods
+
+        /// <summary>
+        /// Called when the tracker's synced data is received via OnDeserialization.
+        /// This provides the initial full player list to clients when they join or when the list is updated.
+        /// For individual player add/remove events, use OnTrackedPlayerAdded and OnTrackedPlayerRemoved.
+        /// </summary>
+        protected virtual void OnTrackedPlayersSynced(VRCPlayerApi[] players) { }
+
+        /// <summary>
+        /// Called when players are added to the tracked list.
+        /// Only called on the tracker owner.
+        /// </summary>
+        protected virtual void OnTrackedPlayersAdded(VRCPlayerApi[] players) { }
+
+        /// <summary>
+        /// Called when players are removed from the tracked list.
+        /// Only called on the tracker owner.
+        /// </summary>
+        protected virtual void OnTrackedPlayersRemoved(VRCPlayerApi[] players) { }
+
+        #endregion
+
+        #region  Network Events
+
+        /// <summary>
+        /// Adds players to the tracked list.
+        /// This method is network callable and is intended to be called on the owner.
+        /// </summary>
+        [NetworkCallable]
+        private void AddTrackedPlayersEvent(string[] playerIds)
+        {
             // Filter out already tracked players
             string[] validPlayerIds = new string[playerIds.Length];
             int validCount = 0;
 
             for (int i = 0; i < playerIds.Length; i++)
             {
-                if (!ContainsTrackedPlayer(playerIds[i]))
+                if (!IsTrackedPlayer(playerIds[i]))
                 {
                     validPlayerIds[validCount++] = playerIds[i];
                 }
@@ -141,24 +181,23 @@ namespace Tsvrc.TsNetworking
             _playerIds = TsArray.Add(_playerIds, validPlayerIds);
             RequestSerialization();
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayersAdded), validPlayerIds);
+            OnTrackedPlayersAdded(TsPlayerUtils.ToPlayerApis(validPlayerIds));
         }
 
         /// <summary>
-        /// Removes multiple players from the tracked list.
+        /// Removes players from the tracked list.
+        /// This method is network callable and is intended to be called on the owner.
         /// </summary>
-        public void RemoveTrackedPlayers(string[] playerIds)
+        [NetworkCallable]
+        private void RemoveTrackedPlayersEvent(string[] playerIds)
         {
-            if (!IsTrackerOwner()) return;
-            if (playerIds == null || playerIds.Length == 0 || _playerIds.Length == 0) return;
-
             // Filter to only tracked players
             string[] validPlayerIds = new string[playerIds.Length];
             int validCount = 0;
 
             for (int i = 0; i < playerIds.Length; i++)
             {
-                if (ContainsTrackedPlayer(playerIds[i]))
+                if (IsTrackedPlayer(playerIds[i]))
                 {
                     validPlayerIds[validCount++] = playerIds[i];
                 }
@@ -177,93 +216,12 @@ namespace Tsvrc.TsNetworking
             _playerIds = TsArray.Remove(_playerIds, validPlayerIds);
             RequestSerialization();
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastPlayersRemoved), validPlayerIds);
-        }
-        #endregion
-
-        #region Protected Methods
-
-        /// <summary>
-        /// Gets the list of currently tracked player IDs.
-        /// </summary>
-        protected string[] GetTrackedPlayerIds()
-        {
-            return _playerIds;
-        }
-
-        /// <summary>
-        /// Checks if a player with the given ID is being tracked.
-        /// </summary>
-        protected bool ContainsTrackedPlayer(string playerId)
-        {
-            return TsArray.Contains(_playerIds, playerId);
-        }
-
-        #endregion
-
-        #region Virtual Methods
-
-        /// <summary>
-        /// Called when the tracker's synced data is received via OnDeserialization.
-        /// This provides the initial full player list to clients when they join or when the list is updated.
-        /// For individual player add/remove events, use OnTrackedPlayerAdded and OnTrackedPlayerRemoved.
-        /// </summary>
-        protected virtual void OnTrackedPlayersSynced(VRCPlayerApi[] players)
-        {
-            // Override this in child classes to handle initial player list sync
-        }
-
-        /// <summary>
-        /// Called when players are added to the tracked list.
-        /// </summary>
-        protected virtual void OnTrackedPlayersAdded(VRCPlayerApi[] players)
-        {
-            // Override this in child classes to handle player additions
-        }
-
-        /// <summary>
-        /// Called when players are removed from the tracked list.
-        /// </summary>
-        protected virtual void OnTrackedPlayersRemoved(VRCPlayerApi[] players)
-        {
-            // Override this in child classes to handle player removals
-        }
-
-        #endregion
-
-        #region Network Events
-
-        /// <summary>
-        /// Network callable event to trigger players added callback on all clients.
-        /// </summary>
-        [NetworkCallable]
-        public void BroadcastPlayersAdded(string[] playerIds)
-        {
-            VRCPlayerApi[] players = TsPlayerUtils.ToPlayerApis(playerIds);
-            OnTrackedPlayersAdded(players);
-        }
-
-        /// <summary>
-        /// Network callable event to trigger players removed callback on all clients.
-        /// </summary>
-        [NetworkCallable]
-        public void BroadcastPlayersRemoved(string[] playerIds)
-        {
-            VRCPlayerApi[] players = TsPlayerUtils.ToPlayerApis(playerIds);
-            OnTrackedPlayersRemoved(players);
+            OnTrackedPlayersRemoved(TsPlayerUtils.ToPlayerApis(validPlayerIds));
         }
 
         #endregion
 
         #region Private Methods
-
-        /// <summary>
-        /// Determines if the local player can modify the player list based on ownership.
-        /// </summary>
-        private bool IsTrackerOwner()
-        {
-            return Networking.IsOwner(gameObject);
-        }
 
         /// <summary>
         /// Triggers the OnPlayersUpdate callback with current tracked players.
