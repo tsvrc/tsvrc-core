@@ -140,7 +140,7 @@ namespace Tsvrc.Core
         }
 
         /// <summary>
-        /// Checks if the process is currently running.
+        /// Checks if Tsvrc the process is currently running.
         /// </summary>
         public bool IsRunning()
         {
