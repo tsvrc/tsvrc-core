@@ -36,9 +36,9 @@ namespace Tsvrc.Example
             SetReady();
         }
 
-        protected override void OnAllPlayersReady(string[] playerIds)
+        protected override void OnReadyCheckCompleted(string[] playerIds)
         {
-            _statusText.text = $"All players are ready! ({playerIds.Length} players)";
+            _statusText.text = $"Ready check completed successfully! {playerIds.Length} players are ready.";
         }
 
         protected override void OnReadyCheckCancelled()

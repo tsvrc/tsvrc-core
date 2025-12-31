@@ -10,15 +10,16 @@ namespace Tsvrc.Example
         [SerializeField] private Transform ContentParent;
         [SerializeField] private GameObject InstancePlayersExampleSlot;
 
-        private void Start()
+        protected override void Start()
         {
+            base.Start();
             if (Networking.IsMaster)
             {
                 Debug.Log("[InstancePlayersExample] Master starting player tracking.");
-                StartTracking();
+                StartProcess();
 
-                VRCPlayerApi[] allPlayers = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
-                VRCPlayerApi.GetPlayers(allPlayers);
+                VRCPlayerApi[] allPlayers = new VRCPlayerApi[1];
+                allPlayers[0] = Networking.LocalPlayer;
                 AddTrackedPlayers(TsPlayerUtils.ToPlayerIDs(allPlayers));
             }
         }

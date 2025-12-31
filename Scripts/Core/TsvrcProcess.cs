@@ -96,6 +96,50 @@ namespace Tsvrc.Core
         }
 
         /// <summary>
+        /// Completes the Tsvrc Process successfully.
+        /// </summary>
+        public void CompleteProcess()
+        {
+            if (!_isRunning)
+            {
+                Debug.LogWarning("[TsvrcProcess] Process is not running.");
+                return;
+            }
+
+            if (!IsOwner())
+            {
+                SetOwner(Networking.LocalPlayer);
+            }
+
+            _isRunning = false;
+            RequestSerialization();
+
+            OnProcessCompleted();
+        }
+
+        /// <summary>
+        /// Cancels the Tsvrc Process.
+        /// </summary>
+        public void CancelProcess()
+        {
+            if (!_isRunning)
+            {
+                Debug.LogWarning("[TsvrcProcess] Process is not running.");
+                return;
+            }
+
+            if (!IsOwner())
+            {
+                SetOwner(Networking.LocalPlayer);
+            }
+
+            _isRunning = false;
+            RequestSerialization();
+
+            OnProcessCancelled();
+        }
+
+        /// <summary>
         /// Checks if the process is currently running.
         /// </summary>
         public bool IsRunning()
@@ -142,6 +186,18 @@ namespace Tsvrc.Core
         /// Only called on the process owner.
         /// </summary>
         protected virtual void OnProcessStopped() { }
+
+        /// <summary>
+        /// Called when the process is completed successfully.
+        /// Only called on the process owner.
+        /// </summary>
+        protected virtual void OnProcessCompleted() { }
+
+        /// <summary>
+        /// Called when the process is cancelled.
+        /// Only called on the process owner.
+        /// </summary>
+        protected virtual void OnProcessCancelled() { }
 
         /// <summary>
         /// Called when the process owner leaves the instance and

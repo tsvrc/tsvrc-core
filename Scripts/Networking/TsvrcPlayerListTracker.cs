@@ -28,12 +28,24 @@ namespace Tsvrc.TsNetworking
 
         protected override void OnProcessStarted()
         {
+            base.OnProcessStarted();
+
             _playerIds = new string[0];
             RequestSerialization();
         }
 
-        protected override void OnProcessStopped()
+        protected override void OnProcessCompleted()
         {
+            base.OnProcessCompleted();
+
+            _playerIds = new string[0];
+            RequestSerialization();
+        }
+
+        protected override void OnProcessCancelled()
+        {
+            base.OnProcessCancelled();
+
             _playerIds = new string[0];
             RequestSerialization();
         }

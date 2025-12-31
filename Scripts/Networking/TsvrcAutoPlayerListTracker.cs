@@ -19,12 +19,6 @@ namespace Tsvrc.TsNetworking
 
             AddTrackedPlayer(TsPlayerUtils.GetPlayerID(player));
         }
-
-        public override void OnMasterTransferred(VRCPlayerApi newMaster)
-        {
-            // Transfer ownership to the new master
-            SetTrackerOwner(newMaster);
-        }
         #endregion
     }
 }
