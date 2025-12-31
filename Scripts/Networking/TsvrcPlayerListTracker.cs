@@ -154,7 +154,7 @@ namespace Tsvrc.TsNetworking
         /// This method is network callable and is intended to be called on the owner.
         /// </summary>
         [NetworkCallable]
-        private void AddTrackedPlayersEvent(string[] playerIds)
+        public void AddTrackedPlayersEvent(string[] playerIds)
         {
             // Filter out already tracked players
             string[] validPlayerIds = new string[playerIds.Length];
@@ -189,7 +189,7 @@ namespace Tsvrc.TsNetworking
         /// This method is network callable and is intended to be called on the owner.
         /// </summary>
         [NetworkCallable]
-        private void RemoveTrackedPlayersEvent(string[] playerIds)
+        public void RemoveTrackedPlayersEvent(string[] playerIds)
         {
             // Filter to only tracked players
             string[] validPlayerIds = new string[playerIds.Length];
