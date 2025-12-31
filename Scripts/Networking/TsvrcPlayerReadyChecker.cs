@@ -11,8 +11,8 @@ namespace Tsvrc.TsNetworking
     {
         [UdonSynced] private string[] _readyPlayerIds = new string[0];
 
-        // Temporary storage for expected player IDs during process start and completion.
-        private string[] _tempPlayerIds = new string[0];
+        // Temporary storage for expected player IDs during process start.
+        private string[] _initialPlayerIds = new string[0];
 
         #region Unity Lifecycle
 
@@ -30,7 +30,6 @@ namespace Tsvrc.TsNetworking
                 }
             }
 
-            _tempPlayerIds = trackedPlayerIds;
             CompleteProcess();
         }
 
@@ -42,25 +41,12 @@ namespace Tsvrc.TsNetworking
             base.OnProcessStarted();
 
             _readyPlayerIds = new string[0];
-            AddTrackedPlayers(_tempPlayerIds);
+            AddTrackedPlayers(_initialPlayerIds);
             RequestSerialization();
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastCheckStarted), _tempPlayerIds);
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastCheckStarted), _initialPlayerIds);
 
-            _tempPlayerIds = new string[0];
-        }
-
-        protected override void OnProcessCompleted()
-        {
-            base.OnProcessCompleted();
-            // Store the ready player IDs to send with the completion event
-            var playerIds = _tempPlayerIds;
-
-            _readyPlayerIds = new string[0];
-            _tempPlayerIds = new string[0];
-            RequestSerialization();
-
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastCheckCompleted), playerIds);
+            _initialPlayerIds = new string[0];
         }
 
         protected override void OnProcessCancelled()
@@ -68,10 +54,21 @@ namespace Tsvrc.TsNetworking
             base.OnProcessCancelled();
 
             _readyPlayerIds = new string[0];
-            _tempPlayerIds = new string[0];
+            _initialPlayerIds = new string[0];
             RequestSerialization();
 
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastCheckCancelled));
+        }
+
+        protected override void OnTrackerProcessCompleted(string[] playerIds)
+        {
+            base.OnTrackerProcessCompleted(playerIds);
+
+            _readyPlayerIds = new string[0];
+            _initialPlayerIds = new string[0];
+            RequestSerialization();
+
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastCheckCompleted), playerIds);
         }
 
         protected override void OnTrackedPlayersRemoved(VRCPlayerApi[] players)
@@ -97,7 +94,7 @@ namespace Tsvrc.TsNetworking
         /// </summary>
         public void StartReadyCheck(string[] playerIds)
         {
-            _tempPlayerIds = playerIds;
+            _initialPlayerIds = playerIds;
             StartProcess();
         }
 

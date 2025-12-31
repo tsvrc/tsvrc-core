@@ -38,6 +38,7 @@ namespace Tsvrc.TsNetworking
         {
             base.OnProcessCompleted();
 
+            OnTrackerProcessCompleted(_playerIds);
             _playerIds = new string[0];
             RequestSerialization();
         }
@@ -137,6 +138,12 @@ namespace Tsvrc.TsNetworking
         #endregion
 
         #region Virtual Methods
+
+        /// <summary>
+        /// Called when the tracking process is completed.
+        /// Only called on the tracker owner.
+        /// </summary>
+        protected virtual void OnTrackerProcessCompleted(string[] playerIds) { }
 
         /// <summary>
         /// Called when the tracker's synced data is received via OnDeserialization.
