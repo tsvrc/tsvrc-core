@@ -14,7 +14,7 @@ namespace Tsvrc.Core
 
         #region Unity Lifecycle
 
-        private void Start()
+        protected virtual void Start()
         {
             if (IsOwner())
             {
