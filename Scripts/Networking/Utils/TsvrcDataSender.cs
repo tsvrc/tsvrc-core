@@ -60,6 +60,17 @@ namespace Tsvrc.TsNetworking.Utils
             StartReadyCheck(_targetPlayerIds);
         }
 
+        protected override void OnReadyCheckCancelled()
+        {
+            base.OnReadyCheckCancelled();
+
+            if (!IsProcessOwner()) return;
+
+            ResetInternalTransferData();
+
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataTransferCancelled));
+        }
+
         #endregion
 
         #region Public Methods
@@ -108,6 +119,13 @@ namespace Tsvrc.TsNetworking.Utils
         protected virtual void OnDataTransferCompleted() { }
 
         /// <summary>
+        /// Called when the data transfer is cancelled.
+        /// This method is intended to be called on the tracker players and the process owner.
+        /// Make sure to invoke base.OnDataTransferCancelled if overridden.
+        /// </summary>
+        protected virtual void OnDataTransferCancelled() { }
+
+        /// <summary>
         /// Called when a data chunk is sended.
         /// Only called on the owner of the sender.
         /// Make sure to invoke base.OnDataChunkSended if overridden.
@@ -141,6 +159,18 @@ namespace Tsvrc.TsNetworking.Utils
             if (!IsTrackedPlayer(playerId) && !IsProcessOwner()) return;
 
             OnDataTransferCompleted();
+        }
+
+        /// <summary>
+        /// Network event to broadcast the cancellation of data transfer.
+        /// </summary>
+        [NetworkCallable]
+        public void BroadcastDataTransferCancelled()
+        {
+            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            if (!IsTrackedPlayer(playerId) && !IsProcessOwner()) return;
+
+            OnDataTransferCancelled();
         }
 
         #endregion

@@ -67,5 +67,10 @@ namespace Tsvrc.Example
         {
             _statusText.text = $"All players have received the message! Length: {data.Length} characters";
         }
+
+        protected override void OnDataReceptionCancelled()
+        {
+            _statusText.text = "Data reception cancelled.";
+        }
     }
 }

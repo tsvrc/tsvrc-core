@@ -27,6 +27,15 @@ namespace Tsvrc.TsNetworking.Utils
             OnDataReceptionCompleted(completeMessage);
         }
 
+        protected override void OnDataTransferCancelled()
+        {
+            base.OnDataTransferCancelled();
+
+            _receivedChunks = new string[0];
+
+            OnDataReceptionCancelled();
+        }
+
         protected override void OnSendDataChunkRequested(string dataChunk, int chunkIndex, int totalChunks)
         {
             base.OnSendDataChunkRequested(dataChunk, chunkIndex, totalChunks);
@@ -59,6 +68,13 @@ namespace Tsvrc.TsNetworking.Utils
         /// Make sure to invoke base.OnDataTransferCompleted if overridden.
         /// </summary>
         protected virtual void OnDataReceptionCompleted(string data) { }
+
+        /// <summary>
+        /// Called when the data reception is cancelled.
+        /// This method is intended to be called on the tracker players and the process owner.
+        /// Make sure to invoke base.OnDataReceptionCancelled if overridden.
+        /// </summary>
+        protected virtual void OnDataReceptionCancelled() { }
 
         #endregion
 
