@@ -12,8 +12,8 @@ namespace Tsvrc.Example
 
         public override void Interact()
         {
-            if (IsRunning()) return;
-            
+            if (IsProcessRunning()) return;
+
             // Get all current players in the instance
             VRCPlayerApi[] players = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
             VRCPlayerApi.GetPlayers(players);

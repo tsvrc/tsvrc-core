@@ -19,8 +19,7 @@ namespace Tsvrc.TsNetworking.Utils
         /// </summary>
         public static VRCPlayerApi FindPlayerByID(string playerID)
         {
-            VRCPlayerApi[] allPlayers = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
-            VRCPlayerApi.GetPlayers(allPlayers);
+            VRCPlayerApi[] allPlayers = GetAllPlayers();
             foreach (var player in allPlayers)
             {
                 if (GetPlayerID(player) == playerID)
@@ -70,6 +69,25 @@ namespace Tsvrc.TsNetworking.Utils
             }
 
             return players;
+        }
+
+        /// <summary>
+        /// Gets all players currently in the instance.
+        /// </summary>
+        public static VRCPlayerApi[] GetAllPlayers()
+        {
+            VRCPlayerApi[] players = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
+            VRCPlayerApi.GetPlayers(players);
+            return players;
+        }
+
+        /// <summary>
+        /// Gets the unique IDs of all players currently in the instance.
+        /// </summary>
+        public static string[] GetAllPlayerIDs()
+        {
+            VRCPlayerApi[] players = GetAllPlayers();
+            return ToPlayerIDs(players);
         }
     }
 }

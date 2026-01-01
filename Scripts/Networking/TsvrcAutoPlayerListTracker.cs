@@ -15,7 +15,7 @@ namespace Tsvrc.TsNetworking
         public override void OnPlayerJoined(VRCPlayerApi player)
         {
             // Only owner processes player joins
-            if (!Networking.IsOwner(gameObject)) return;
+            if (!IsProcessOwner()) return;
 
             AddTrackedPlayer(TsPlayerUtils.GetPlayerID(player));
         }

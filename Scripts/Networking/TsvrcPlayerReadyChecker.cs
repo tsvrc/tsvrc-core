@@ -18,7 +18,7 @@ namespace Tsvrc.TsNetworking
 
         private void Update()
         {
-            if (!IsRunning() || !IsOwner()) return;
+            if (!IsProcessRunning() || !IsProcessOwner()) return;
 
             string[] trackedPlayerIds = GetTrackedPlayerIds();
 
@@ -111,7 +111,7 @@ namespace Tsvrc.TsNetworking
         /// </summary>
         public void SetReady(bool ready = true)
         {
-            if (!IsRunning()) return;
+            if (!IsProcessRunning()) return;
 
             string playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
 
@@ -145,21 +145,21 @@ namespace Tsvrc.TsNetworking
 
         /// <summary>
         /// Called when a ready check is started.
-        /// This method is intended to be called on all clients.
+        /// This method is intended to be called on the tracker players and the process owner.
         /// Make sure to invoked base.OnReadyCheckStarted if overridden.
         /// </summary>
         protected virtual void OnReadyCheckStarted(string[] expectedPlayerIds) { }
 
         /// <summary>
         /// Called when a ready check is completed successfully.
-        /// This method is intended to be called on all clients.
+        /// This method is intended to be called on the tracker players and the process owner.
         /// Make sure to invoked base.OnReadyCheckCompleted if overridden.
         /// </summary>
         protected virtual void OnReadyCheckCompleted(string[] playerIds) { }
 
         /// <summary>
         /// Called when a ready check is cancelled.
-        /// This method is intended to be called on all clients.
+        /// This method is intended to be called on the tracker players and the process owner.
         /// Make sure to invoked base.OnReadyCheckCancelled if overridden.
         /// </summary>
         protected virtual void OnReadyCheckCancelled() { }
@@ -200,6 +200,9 @@ namespace Tsvrc.TsNetworking
         [NetworkCallable]
         public void BroadcastCheckStarted(string[] expectedPlayerIds)
         {
+            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            if (!IsTrackedPlayer(playerId) && !IsProcessOwner()) return;
+
             OnReadyCheckStarted(expectedPlayerIds);
         }
 
@@ -209,6 +212,9 @@ namespace Tsvrc.TsNetworking
         [NetworkCallable]
         public void BroadcastCheckCompleted(string[] playerIds)
         {
+            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            if (!IsTrackedPlayer(playerId) && !IsProcessOwner()) return;
+
             OnReadyCheckCompleted(playerIds);
         }
 
@@ -218,6 +224,9 @@ namespace Tsvrc.TsNetworking
         [NetworkCallable]
         public void BroadcastCheckCancelled()
         {
+            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            if (!IsTrackedPlayer(playerId) && !IsProcessOwner()) return;
+
             OnReadyCheckCancelled();
         }
 

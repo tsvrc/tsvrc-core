@@ -16,10 +16,10 @@ namespace Tsvrc.Core
 
         protected virtual void Start()
         {
-            if (IsOwner())
+            if (IsProcessOwner())
             {
                 // Ensure synced state is correct on start
-                SetOwner(Networking.GetOwner(gameObject));
+                SetProcessOwner(Networking.GetOwner(gameObject));
             }
         }
 
@@ -38,7 +38,7 @@ namespace Tsvrc.Core
             var playerId = TsPlayerUtils.GetPlayerID(player);
             if (playerId == _ownerId)
             {
-                SetOwner(Networking.Master);
+                SetProcessOwner(Networking.Master);
 
                 // Only the master (new owner) should invoke the event.
                 OnOwnerAbandonedProcess();
@@ -62,9 +62,9 @@ namespace Tsvrc.Core
                 return;
             }
 
-            if (!IsOwner())
+            if (!IsProcessOwner())
             {
-                SetOwner(Networking.LocalPlayer);
+                SetProcessOwner(Networking.LocalPlayer);
             }
 
             _isRunning = true;
@@ -84,9 +84,9 @@ namespace Tsvrc.Core
                 return;
             }
 
-            if (!IsOwner())
+            if (!IsProcessOwner())
             {
-                SetOwner(Networking.LocalPlayer);
+                SetProcessOwner(Networking.LocalPlayer);
             }
 
             _isRunning = false;
@@ -106,9 +106,9 @@ namespace Tsvrc.Core
                 return;
             }
 
-            if (!IsOwner())
+            if (!IsProcessOwner())
             {
-                SetOwner(Networking.LocalPlayer);
+                SetProcessOwner(Networking.LocalPlayer);
             }
 
             _isRunning = false;
@@ -128,9 +128,9 @@ namespace Tsvrc.Core
                 return;
             }
 
-            if (!IsOwner())
+            if (!IsProcessOwner())
             {
-                SetOwner(Networking.LocalPlayer);
+                SetProcessOwner(Networking.LocalPlayer);
             }
 
             _isRunning = false;
@@ -142,7 +142,7 @@ namespace Tsvrc.Core
         /// <summary>
         /// Checks if Tsvrc the process is currently running.
         /// </summary>
-        public bool IsRunning()
+        public bool IsProcessRunning()
         {
             return _isRunning;
         }
@@ -156,7 +156,7 @@ namespace Tsvrc.Core
         /// Use this method instead of SetOwner to ensure
         /// the internal state is updated correctly.
         /// </summary>
-        protected void SetOwner(VRCPlayerApi newOwner)
+        protected void SetProcessOwner(VRCPlayerApi newOwner)
         {
             _ownerId = TsPlayerUtils.GetPlayerID(newOwner);
             Networking.SetOwner(newOwner, gameObject);
@@ -166,7 +166,7 @@ namespace Tsvrc.Core
         /// <summary>
         /// Determines if the local player is the process owner.
         /// </summary>
-        protected bool IsOwner()
+        protected bool IsProcessOwner()
         {
             return Networking.IsOwner(gameObject);
         }

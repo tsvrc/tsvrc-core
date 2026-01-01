@@ -2,35 +2,26 @@ using TMPro;
 using Tsvrc.TsNetworking;
 using Tsvrc.TsNetworking.Utils;
 using UnityEngine;
-using VRC.SDKBase;
 
 namespace Tsvrc.Example
 {
-    public class MessengerExample : TsvrcMessenger
+    public class MessengerExample : TsvrcDataTransferer
     {
         [SerializeField] private TextMeshProUGUI _statusText;
         [SerializeField] private TMP_InputField _lengthInput;
 
         public override void Interact()
         {
-            VRCPlayerApi[] players = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
-            VRCPlayerApi.GetPlayers(players);
+            string[] playerIds = TsPlayerUtils.GetAllPlayerIDs();
 
-            string[] playerIds = TsPlayerUtils.ToPlayerIDs(players);
+            _statusText.text = $"Generating message for {playerIds.Length} players...";
 
-            _statusText.text = $"Generating message for {players.Length} players...";
-
-            // Generate and send message in a custom event to avoid blocking
-            SendCustomEventDelayedSeconds(nameof(GenerateAndSendMessage), 1);
+            GenerateAndSendMessage();
         }
 
         public void GenerateAndSendMessage()
         {
-            // Get all current players again
-            VRCPlayerApi[] players = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
-            VRCPlayerApi.GetPlayers(players);
-
-            string[] playerIds = TsPlayerUtils.ToPlayerIDs(players);
+            string[] playerIds = TsPlayerUtils.GetAllPlayerIDs();
 
             // Parse length from input field, default to 500000 if invalid
             int messageLength = 1000;
@@ -56,53 +47,25 @@ namespace Tsvrc.Example
             }
             string message = sb.ToString();
 
-            _statusText.text = $"Sending {message.Length} characters to {players.Length} players...";
+            _statusText.text = $"Sending {message.Length} characters to {playerIds.Length} players...";
 
-            SendTsMessage(message, playerIds);
+            TransferData(message, playerIds);
         }
 
-        protected override void OnReceiveStarted(int totalChunks)
+        protected override void OnDataReceptionStarted()
         {
-            _statusText.text = $"Delivery started: 0% (0/{totalChunks} chunks)";
+            _statusText.text = "Data reception started...";
         }
 
-        protected override void OnChunkReceived(int chunkIndex, int totalChunks)
+        protected override void OnDataChunkReceived(int chunkIndex, int totalChunks)
         {
-            float percentage = (chunkIndex + 1) / (float)totalChunks * 100f;
-            _statusText.text = $"Delivery in progress: {percentage:F1}% ({chunkIndex + 1}/{totalChunks} chunks)";
+            float percentage = chunkIndex / (float)totalChunks * 100f;
+            _statusText.text = $"Delivery in progress: {percentage:F1}% ({chunkIndex}/{totalChunks} chunks)";
         }
 
-        protected override void OnAllPlayersReceived(string message)
+        protected override void OnDataReceptionCompleted(string data)
         {
-            _statusText.text = $"All players have received the message! Length: {message.Length} characters";
-        }
-
-        protected override void OnReceiveFailed(MessageError errorCode)
-        {
-            switch (errorCode)
-            {
-                case MessageError.DeliveryAlreadyInProgress:
-                    _statusText.text = "Error: A message delivery is already in progress.";
-                    break;
-                case MessageError.TooManyPlayers:
-                    _statusText.text = "Error: Too many players for message delivery.";
-                    break;
-                case MessageError.OwnerLeftDuringDelivery:
-                    _statusText.text = "Error: Owner left during message delivery.";
-                    break;
-                case MessageError.EmptyMessage:
-                    _statusText.text = "Error: Cannot send empty message.";
-                    break;
-                case MessageError.MessageTooLarge:
-                    _statusText.text = "Error: Message is too large to send.";
-                    break;
-                case MessageError.Cancelled:
-                    _statusText.text = "Error: Message delivery was cancelled.";
-                    break;
-                default:
-                    _statusText.text = $"Error: Message delivery failed (code: {errorCode})";
-                    break;
-            }
+            _statusText.text = $"All players have received the message! Length: {data.Length} characters";
         }
     }
 }
