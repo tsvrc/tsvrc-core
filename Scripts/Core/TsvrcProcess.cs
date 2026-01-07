@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using Tsvrc.TsNetworking.Utils;
 using UdonSharp;
 using UnityEngine;
@@ -33,18 +32,14 @@ namespace Tsvrc.Core
         {
             /* UdonSharp transfers the master before invoking OnPlayerLeft,
              so its safe to check only for master here. */
-            if (!_isRunning || !Networking.IsMaster) return;
+            if (!IsProcessRunning() || !Networking.IsMaster) return;
 
             var playerId = TsPlayerUtils.GetPlayerID(player);
             if (playerId == _ownerId)
             {
                 SetProcessOwner(Networking.Master);
-
-                // Only the master (new owner) should invoke the event.
                 OnOwnerAbandonedProcess();
             }
-
-            OnTsPlayerLeft(player);
         }
 
         #endregion
@@ -54,7 +49,7 @@ namespace Tsvrc.Core
         /// <summary>
         /// Starts the Tsvrc Process.
         /// </summary>
-        public void StartProcess()
+        public virtual void StartProcess()
         {
             if (_isRunning)
             {
@@ -67,16 +62,16 @@ namespace Tsvrc.Core
                 SetProcessOwner(Networking.LocalPlayer);
             }
 
+            OnProcessStarted();
+
             _isRunning = true;
             RequestSerialization();
-
-            OnProcessStarted();
         }
 
         /// <summary>
-        /// Stops the Tsvrc Process.
+        /// Forcibly stops the Tsvrc Process before completion.
         /// </summary>
-        public void StopProcess()
+        public virtual void StopProcess()
         {
             if (!_isRunning)
             {
@@ -86,6 +81,8 @@ namespace Tsvrc.Core
 
             if (!IsProcessOwner())
             {
+                // Minor FIXME: Setting another owner could cause that a synced variable don't be loaded
+                // yet in the new owner, leading to inconsistent states.
                 SetProcessOwner(Networking.LocalPlayer);
             }
 
@@ -115,28 +112,6 @@ namespace Tsvrc.Core
             RequestSerialization();
 
             OnProcessCompleted();
-        }
-
-        /// <summary>
-        /// Cancels the Tsvrc Process.
-        /// </summary>
-        public void CancelProcess()
-        {
-            if (!_isRunning)
-            {
-                Debug.LogWarning("[TsvrcProcess] Process is not running.");
-                return;
-            }
-
-            if (!IsProcessOwner())
-            {
-                SetProcessOwner(Networking.LocalPlayer);
-            }
-
-            _isRunning = false;
-            RequestSerialization();
-
-            OnProcessCancelled();
         }
 
         /// <summary>
@@ -177,40 +152,27 @@ namespace Tsvrc.Core
 
         /// <summary>
         /// Called when the process is started.
-        /// Only called on the process owner.
+        /// Only invoked on the process owner.
         /// </summary>
         protected virtual void OnProcessStarted() { }
 
         /// <summary>
-        /// Called when the process is stopped.
-        /// Only called on the process owner.
+        /// Called when the process is stopped before completion.
+        /// Only invoked on the process owner.
         /// </summary>
         protected virtual void OnProcessStopped() { }
 
         /// <summary>
         /// Called when the process is completed successfully.
-        /// Only called on the process owner.
+        /// Only invoked on the process owner.
         /// </summary>
         protected virtual void OnProcessCompleted() { }
 
         /// <summary>
-        /// Called when the process is cancelled.
-        /// Only called on the process owner.
-        /// </summary>
-        protected virtual void OnProcessCancelled() { }
-
-        /// <summary>
-        /// Called when the process owner leaves the instance and
-        /// the process is still running.
-        /// This method is called only on the new owner (master).
+        /// Called when the process owner leaves the instance and the process is still running.
+        /// Only invoked on the new owner (typically the master client).
         /// </summary>
         protected virtual void OnOwnerAbandonedProcess() { }
-
-        /// <summary>
-        /// Called when a player leaves the instance.
-        /// Only called on the process owner when the process is running.
-        /// </summary>
-        protected virtual void OnTsPlayerLeft(VRCPlayerApi player) { }
 
         #endregion
     }

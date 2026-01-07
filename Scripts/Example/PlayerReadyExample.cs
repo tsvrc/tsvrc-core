@@ -2,7 +2,6 @@ using TMPro;
 using Tsvrc.TsNetworking;
 using Tsvrc.TsNetworking.Utils;
 using UnityEngine;
-using VRC.SDKBase;
 
 namespace Tsvrc.Example
 {
@@ -14,21 +13,16 @@ namespace Tsvrc.Example
         {
             if (IsProcessRunning()) return;
 
-            // Get all current players in the instance
-            VRCPlayerApi[] players = new VRCPlayerApi[VRCPlayerApi.GetPlayerCount()];
-            VRCPlayerApi.GetPlayers(players);
+            string[] playerIds = TsPlayerUtils.GetAllPlayerIDs();
 
-            // Convert players to their unique IDs
-            string[] playerIds = TsPlayerUtils.ToPlayerIDs(players);
-
-            _statusText.text = "Starting ready check...";
+            _statusText.text = $"Starting ready check for: {string.Join(", ", playerIds)}";
 
             StartReadyCheck(playerIds);
         }
 
-        protected override void OnReadyCheckStarted(string[] expectedPlayerIds)
+        protected override void OnReadyCheckStarted(string[] playerIds)
         {
-            _statusText.text = $"Ready check started for {expectedPlayerIds.Length} players.";
+            _statusText.text = $"Ready check started for {playerIds.Length} players.";
 
             SendCustomEventDelayedSeconds(nameof(SetReadyEvent), 2f);
         }

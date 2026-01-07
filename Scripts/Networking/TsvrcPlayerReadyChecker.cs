@@ -11,7 +11,7 @@ namespace Tsvrc.TsNetworking
     {
         [UdonSynced] private string[] _readyPlayerIds = new string[0];
 
-        // Temporary storage for expected player IDs during process start.
+        // Temporary storage for initial player IDs during process start.
         private string[] _initialPlayerIds = new string[0];
 
         #region Unity Lifecycle
@@ -49,41 +49,50 @@ namespace Tsvrc.TsNetworking
             _initialPlayerIds = new string[0];
         }
 
-        protected override void OnProcessCancelled()
-        {
-            base.OnProcessCancelled();
+        // protected override void OnProcessCancelled()
+        // {
+        //     base.OnProcessCancelled();
 
-            _readyPlayerIds = new string[0];
-            _initialPlayerIds = new string[0];
-            RequestSerialization();
+        //     _readyPlayerIds = new string[0];
+        //     _initialPlayerIds = new string[0];
+        //     RequestSerialization();
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastCheckCancelled));
-        }
+        //     SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastCheckCancelled));
+        // }
 
-        protected override void OnTrackerProcessCompleted(string[] playerIds)
-        {
-            base.OnTrackerProcessCompleted(playerIds);
+        // protected override void OnProcessCompleted(string[] playerIds)
+        // {
+        //     base.OnProcessCompleted(playerIds);
 
-            _readyPlayerIds = new string[0];
-            _initialPlayerIds = new string[0];
-            RequestSerialization();
+        //     _readyPlayerIds = new string[0];
+        //     _initialPlayerIds = new string[0];
+        //     RequestSerialization();
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastCheckCompleted), playerIds);
-        }
+        //     SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastCheckCompleted), playerIds);
+        // }
 
-        protected override void OnTrackedPlayersRemoved(VRCPlayerApi[] players)
-        {
-            base.OnTrackedPlayersRemoved(players);
+        // protected override void OnTrackedPlayersRemoved(VRCPlayerApi[] players)
+        // {
+        //     base.OnTrackedPlayersRemoved(players);
 
-            foreach (VRCPlayerApi player in players)
-            {
-                string playerId = TsPlayerUtils.GetPlayerID(player);
-                if (IsPlayerReady(playerId))
-                {
-                    SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RemoveReadyPlayerEvent), playerId);
-                }
-            }
-        }
+        //     foreach (VRCPlayerApi player in players)
+        //     {
+        //         string playerId = TsPlayerUtils.GetPlayerID(player);
+        //         if (IsPlayerReady(playerId))
+        //         {
+        //             SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RemoveReadyPlayerEvent), playerId);
+        //         }
+        //     }
+        // }
+
+        #endregion
+
+        #region TsvrcPlayerListTracker Callbacks
+
+        // protected override void OnProcessStartedAsTrackedPlayer()
+        // {
+        //     // Handled in OnProcessStarted override
+        // }
 
         #endregion
 
@@ -98,13 +107,13 @@ namespace Tsvrc.TsNetworking
             StartProcess();
         }
 
-        /// <summary>
-        /// Cancels the current ready check.
-        /// </summary>
-        public void CancelReadyCheck()
-        {
-            CancelProcess();
-        }
+        // /// <summary>
+        // /// Cancels the current ready check.
+        // /// </summary>
+        // public void CancelReadyCheck()
+        // {
+        //     CancelProcess();
+        // }
 
         /// <summary>
         /// Set the local player's ready status.

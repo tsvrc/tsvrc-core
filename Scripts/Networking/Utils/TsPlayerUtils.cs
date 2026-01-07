@@ -89,5 +89,15 @@ namespace Tsvrc.TsNetworking.Utils
             VRCPlayerApi[] players = GetAllPlayers();
             return ToPlayerIDs(players);
         }
+
+        /// <summary>
+        /// Creates an array containing a single player ID.
+        /// </summary>
+        public static string[] ToArray(string playerId)
+        {
+            var arr = new string[1];
+            arr[0] = playerId;
+            return arr;
+        }
     }
 }

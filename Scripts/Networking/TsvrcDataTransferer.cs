@@ -12,7 +12,7 @@ namespace Tsvrc.TsNetworking
         {
             base.OnOwnerAbandonedProcess();
 
-            CancelDataTransfer();
+           // CancelDataTransfer();
         }
 
         protected override void OnDataReceptionCancelled()
@@ -31,10 +31,10 @@ namespace Tsvrc.TsNetworking
             base.TransferData(data, playerIds);
         }
 
-        public override void CancelDataTransfer()
-        {
-            base.CancelDataTransfer();
-        }
+        // public override void CancelDataTransfer()
+        // {
+        //     base.CancelDataTransfer();
+        // }
 
         #endregion
 

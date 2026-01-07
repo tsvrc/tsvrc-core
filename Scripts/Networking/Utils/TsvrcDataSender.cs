@@ -95,10 +95,10 @@ namespace Tsvrc.TsNetworking.Utils
         /// <summary> 
         /// Cancels the current data transfer before completion.
         /// </summary>
-        public virtual void CancelDataTransfer()
-        {
-            CancelReadyCheck();
-        }
+        // public virtual void CancelDataTransfer()
+        // {
+        //     CancelReadyCheck();
+        // }
 
         #endregion
 

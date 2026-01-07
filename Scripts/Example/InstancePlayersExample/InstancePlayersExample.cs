@@ -10,61 +10,74 @@ namespace Tsvrc.Example
         [SerializeField] private Transform ContentParent;
         [SerializeField] private GameObject InstancePlayersExampleSlot;
 
+        #region Unity Lifecycle
+
         protected override void Start()
         {
             base.Start();
+
             if (Networking.IsMaster)
             {
-                Debug.Log("[InstancePlayersExample] Master starting player tracking.");
-                StartProcess();
-
-                VRCPlayerApi[] allPlayers = new VRCPlayerApi[1];
-                allPlayers[0] = Networking.LocalPlayer;
-                AddTrackedPlayers(TsPlayerUtils.ToPlayerIDs(allPlayers));
+                var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+                var players = TsPlayerUtils.ToArray(playerId);
+                StartProcessFromTracker(players);
             }
         }
 
-        protected override void OnTrackedPlayersSynced(VRCPlayerApi[] players)
+        #endregion
+
+        #region TsvrcAutoPlayerListTracker Callbacks
+
+        protected override void HandleTrackedPlayersDeserialization(string[] playerIds)
         {
-            Debug.Log($"[InstancePlayersExample] Synced player list received. Count: {players.Length}");
-            // Clear existing slots
             for (int i = ContentParent.childCount - 1; i >= 0; i--)
             {
                 Destroy(ContentParent.GetChild(i).gameObject);
             }
 
-            // Create slots for all tracked players
-            foreach (var player in players)
+            foreach (var playerId in playerIds)
             {
                 var slotObj = Instantiate(InstancePlayersExampleSlot, ContentParent);
                 var slot = slotObj.GetComponent<InstancePlayersExampleSlot>();
+                var player = TsPlayerUtils.FindPlayerByID(playerId);
                 slot.SetPlayerName(player.displayName);
                 slotObj.SetActive(true);
             }
         }
 
-        protected override void OnTrackedPlayersAdded(VRCPlayerApi[] players)
+        protected override void OnProcessStartedAsTrackedPlayer(string[] playerIds)
         {
-            Debug.Log($"[InstancePlayersExample] Players added: {players.Length}");
-            foreach (var player in players)
+            foreach (var playerId in playerIds)
             {
                 var slotObj = Instantiate(InstancePlayersExampleSlot, ContentParent);
                 var slot = slotObj.GetComponent<InstancePlayersExampleSlot>();
+                var player = TsPlayerUtils.FindPlayerByID(playerId);
                 slot.SetPlayerName(player.displayName);
                 slotObj.SetActive(true);
             }
         }
 
-        protected override void OnTrackedPlayersRemoved(VRCPlayerApi[] players)
+        protected override void OnPlayersAddedAsTrackedPlayer(string[] playerIds)
         {
-            Debug.Log($"[InstancePlayersExample] Players removed: {players.Length}");
-            foreach (var player in players)
+            foreach (var playerId in playerIds)
             {
-                // Find and remove the slot for this player
+                var slotObj = Instantiate(InstancePlayersExampleSlot, ContentParent);
+                var slot = slotObj.GetComponent<InstancePlayersExampleSlot>();
+                var player = TsPlayerUtils.FindPlayerByID(playerId);
+                slot.SetPlayerName(player.displayName);
+                slotObj.SetActive(true);
+            }
+        }
+
+        protected override void OnPlayersRemovedAsTrackedPlayer(string[] playerIds)
+        {
+            foreach (var playerId in playerIds)
+            {
                 for (int i = ContentParent.childCount - 1; i >= 0; i--)
                 {
                     var child = ContentParent.GetChild(i);
                     var slot = child.GetComponent<InstancePlayersExampleSlot>();
+                    var player = TsPlayerUtils.FindPlayerByID(playerId);
                     if (slot != null && slot.GetPlayerName() == player.displayName)
                     {
                         Destroy(child.gameObject);
@@ -73,5 +86,7 @@ namespace Tsvrc.Example
                 }
             }
         }
+
+        #endregion
     }
 }
