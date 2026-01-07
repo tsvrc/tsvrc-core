@@ -2,12 +2,15 @@ using TMPro;
 using Tsvrc.TsNetworking;
 using Tsvrc.TsNetworking.Utils;
 using UnityEngine;
+using VRC.SDKBase;
 
 namespace Tsvrc.Example
 {
     public class PlayerReadyExample : TsvrcPlayerReadyChecker
     {
         [SerializeField] private TextMeshProUGUI _statusText;
+
+        #region Public Methods
 
         public override void Interact()
         {
@@ -20,26 +23,32 @@ namespace Tsvrc.Example
             StartReadyCheck(playerIds);
         }
 
-        protected override void OnReadyCheckStarted(string[] playerIds)
+        public void SetReadyEvent()
+        {
+            SetReady();
+        }
+
+        #endregion
+
+        #region TsvrcPlayerReadyChecker Callbacks
+
+        protected override void OnReadyCheckStartedAsTrackedPlayer(string[] playerIds)
         {
             _statusText.text = $"Ready check started for {playerIds.Length} players.";
 
             SendCustomEventDelayedSeconds(nameof(SetReadyEvent), 2f);
         }
 
-        public void SetReadyEvent()
-        {
-            SetReady();
-        }
-
-        protected override void OnReadyCheckCompleted(string[] playerIds)
+        protected override void OnReadyCheckCompletedAsTrackedPlayer(string[] playerIds)
         {
             _statusText.text = $"Ready check completed successfully! {playerIds.Length} players are ready.";
         }
 
-        protected override void OnReadyCheckCancelled()
+        protected override void OnReadyCheckStoppedAsTrackedPlayer()
         {
-            _statusText.text = "Ready check was cancelled.";
+            _statusText.text = "Ready check was stopped.";
         }
+
+        #endregion
     }
 }

@@ -19,57 +19,57 @@ namespace Tsvrc.TsNetworking.Utils
 
         #region Tsvrc Callbacks
 
-        protected override void OnReadyCheckStarted(string[] playerIds)
-        {
-            base.OnReadyCheckStarted(playerIds);
+        // protected override void OnReadyCheckStarted(string[] playerIds)
+        // {
+        //     base.OnReadyCheckStarted(playerIds);
 
-            if (!IsProcessOwner()) return;
+        //     if (!IsProcessOwner()) return;
 
-            if (!string.IsNullOrEmpty(_initialData))
-            {
-                _dataChunks = CreateDataChunks(_initialData);
-                _totalChunks = _dataChunks.Length;
-                // Important to clear initial data to avoid re-creating chunks on retries
-                _initialData = "";
-                _currentChunkIndex = 1;
-                _targetPlayerIds = (string[])playerIds.Clone();
-            }
+        //     if (!string.IsNullOrEmpty(_initialData))
+        //     {
+        //         _dataChunks = CreateDataChunks(_initialData);
+        //         _totalChunks = _dataChunks.Length;
+        //         // Important to clear initial data to avoid re-creating chunks on retries
+        //         _initialData = "";
+        //         _currentChunkIndex = 1;
+        //         _targetPlayerIds = (string[])playerIds.Clone();
+        //     }
 
-            if (_currentChunkIndex == 1)
-            {
-                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataTransferStarted));
-            }
+        //     if (_currentChunkIndex == 1)
+        //     {
+        //         SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataTransferStarted));
+        //     }
 
-            SendDataChunk(_currentChunkIndex);
-        }
+        //     SendDataChunk(_currentChunkIndex);
+        // }
 
-        protected override void OnReadyCheckCompleted(string[] playerIds)
-        {
-            base.OnReadyCheckCompleted(playerIds);
+        // protected override void OnReadyCheckCompleted(string[] playerIds)
+        // {
+        //     base.OnReadyCheckCompleted(playerIds);
 
-            if (!IsProcessOwner()) return;
+        //     if (!IsProcessOwner()) return;
 
-            if (_currentChunkIndex == _totalChunks)
-            {
-                ResetInternalTransferData();
-                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataTransferCompleted));
-                return;
-            }
+        //     if (_currentChunkIndex == _totalChunks)
+        //     {
+        //         ResetInternalTransferData();
+        //         SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataTransferCompleted));
+        //         return;
+        //     }
 
-            _currentChunkIndex++;
-            StartReadyCheck(_targetPlayerIds);
-        }
+        //     _currentChunkIndex++;
+        //     StartReadyCheck(_targetPlayerIds);
+        // }
 
-        protected override void OnReadyCheckCancelled()
-        {
-            base.OnReadyCheckCancelled();
+        // protected override void OnReadyCheckCancelled()
+        // {
+        //     base.OnReadyCheckCancelled();
 
-            if (!IsProcessOwner()) return;
+        //     if (!IsProcessOwner()) return;
 
-            ResetInternalTransferData();
+        //     ResetInternalTransferData();
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataTransferCancelled));
-        }
+        //     SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataTransferCancelled));
+        // }
 
         #endregion
 
