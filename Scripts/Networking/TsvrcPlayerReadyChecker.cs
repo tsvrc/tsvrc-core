@@ -41,9 +41,6 @@ namespace Tsvrc.TsNetworking
 
             _readyPlayerIds = new string[0];
             RequestSerialization();
-
-            var trackedPlayerIds = GetTrackedPlayerIds();
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersReadyCheckStarted), trackedPlayerIds);
         }
 
         protected override void OnProcessStopped()
@@ -52,25 +49,37 @@ namespace Tsvrc.TsNetworking
 
             _readyPlayerIds = new string[0];
             RequestSerialization();
-
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersReadyCheckStopped));
         }
 
         protected override void OnProcessCompleted()
         {
-            var completedPlayerIds = (string[])GetTrackedPlayerIds().Clone();
-
             base.OnProcessCompleted();
 
             _readyPlayerIds = new string[0];
             RequestSerialization();
-
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersReadyCheckCompleted), completedPlayerIds);
         }
 
         #endregion
 
         #region TsvrcPlayerListTracker Callbacks
+
+        protected override void OnProcessStartedAsTrackedPlayer(string[] playerIds)
+        {
+            base.OnProcessStartedAsTrackedPlayer(playerIds);
+            OnReadyCheckStartedAsTrackedPlayer(playerIds);
+        }
+
+        protected override void OnProcessStoppedAsTrackedPlayer(string[] playerIds)
+        {
+            base.OnProcessStoppedAsTrackedPlayer(playerIds);
+            OnReadyCheckStoppedAsTrackedPlayer(playerIds);
+        }
+
+        protected override void OnProcessCompletedAsTrackedPlayer(string[] playerIds)
+        {
+            base.OnProcessCompletedAsTrackedPlayer(playerIds);
+            OnReadyCheckCompletedAsTrackedPlayer(playerIds);
+        }
 
         protected override void OnPlayersRemovedAsTrackedPlayer(string[] playerIds)
         {
@@ -154,7 +163,7 @@ namespace Tsvrc.TsNetworking
         /// Invoked via network event on all tracked players (non-owners).
         /// For owner-only logic, override OnProcessStopped() from the base class.
         /// </summary>
-        protected virtual void OnReadyCheckStoppedAsTrackedPlayer() { }
+        protected virtual void OnReadyCheckStoppedAsTrackedPlayer(string[] playerIds) { }
 
         /// <summary>
         /// Called when a ready check is completed on tracked players.
@@ -166,45 +175,6 @@ namespace Tsvrc.TsNetworking
         #endregion
 
         #region Network Events
-
-        /// <summary>
-        /// Network callable method to notify tracked players that the ready check has started.
-        /// This method is invoked on all players via network event, but only executes for tracked players.
-        /// </summary>
-        [NetworkCallable]
-        public void NotifyTrackedPlayersReadyCheckStarted(string[] playerIds)
-        {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!IsTrackedPlayer(playerId)) return;
-
-            OnReadyCheckStartedAsTrackedPlayer(playerIds);
-        }
-
-        /// <summary>
-        /// Network callable method to notify tracked players that the ready check has stopped.
-        /// This method is invoked on all players via network event, but only executes for tracked players.
-        /// </summary>
-        [NetworkCallable]
-        public void NotifyTrackedPlayersReadyCheckStopped()
-        {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!IsTrackedPlayer(playerId)) return;
-
-            OnReadyCheckStoppedAsTrackedPlayer();
-        }
-
-        /// <summary>
-        /// Network callable method to notify tracked players that the ready check has completed.
-        /// This method is invoked on all players via network event, but only executes for tracked players.
-        /// </summary>
-        [NetworkCallable]
-        public void NotifyTrackedPlayersReadyCheckCompleted(string[] playerIds)
-        {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!TsArray.Contains(playerIds, playerId)) return;
-
-            OnReadyCheckCompletedAsTrackedPlayer(playerIds);
-        }
 
         /// <summary>
         /// Adds a player to the ready list.

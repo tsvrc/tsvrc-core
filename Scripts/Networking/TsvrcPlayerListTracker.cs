@@ -15,7 +15,7 @@ namespace Tsvrc.TsNetworking
         [UdonSynced] private string[] _trackedPlayerIds = new string[0];
 
         // Temporary storage for initial player IDs during process start.
-        private string[] _initialTrackerPlayerIds = new string[0];
+        protected string[] _initialTrackerPlayerIds = new string[0];
 
         #region VRChat Callbacks
 
@@ -54,7 +54,8 @@ namespace Tsvrc.TsNetworking
         {
             base.OnProcessStopped();
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessStopped));
+            var stoppedPlayerIds = (string[])_trackedPlayerIds.Clone();
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessStopped), stoppedPlayerIds);
 
             _trackedPlayerIds = new string[0];
             RequestSerialization();
@@ -145,7 +146,7 @@ namespace Tsvrc.TsNetworking
         /// Invoked via network event on all tracked players (non-owners).
         /// For owner-only logic, override OnProcessStopped() from the base class.
         /// </summary>
-        protected virtual void OnProcessStoppedAsTrackedPlayer() { }
+        protected virtual void OnProcessStoppedAsTrackedPlayer(string[] playerIds) { }
 
         /// <summary>
         /// Called when the process is completed on tracked players.
@@ -185,7 +186,7 @@ namespace Tsvrc.TsNetworking
         public void NotifyTrackedPlayersProcessStarted(string[] playerIds)
         {
             var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!IsTrackedPlayer(playerId)) return;
+            if (!TsArray.Contains(playerIds, playerId)) return;
 
             OnProcessStartedAsTrackedPlayer(playerIds);
         }
@@ -195,12 +196,12 @@ namespace Tsvrc.TsNetworking
         /// This method is invoked on all players via network event, but only executes for tracked players.
         /// </summary>
         [NetworkCallable]
-        public void NotifyTrackedPlayersProcessStopped()
+        public void NotifyTrackedPlayersProcessStopped(string[] playerIds)
         {
             var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!IsTrackedPlayer(playerId)) return;
+            if (!TsArray.Contains(playerIds, playerId)) return;
 
-            OnProcessStoppedAsTrackedPlayer();
+            OnProcessStoppedAsTrackedPlayer(playerIds);
         }
 
         /// <summary>
@@ -211,7 +212,7 @@ namespace Tsvrc.TsNetworking
         public void NotifyTrackedPlayersProcessCompleted(string[] playerIds)
         {
             var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!IsTrackedPlayer(playerId)) return;
+            if (!TsArray.Contains(playerIds, playerId)) return;
 
             OnProcessCompletedAsTrackedPlayer(playerIds);
         }
@@ -224,7 +225,7 @@ namespace Tsvrc.TsNetworking
         public void NotifyTrackedPlayersAdded(string[] playerIds)
         {
             var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!IsTrackedPlayer(playerId)) return;
+            if (!TsArray.Contains(playerIds, playerId)) return;
 
             OnPlayersAddedAsTrackedPlayer(playerIds);
         }
@@ -237,7 +238,7 @@ namespace Tsvrc.TsNetworking
         public void NotifyTrackedPlayersRemoved(string[] playerIds)
         {
             var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!IsTrackedPlayer(playerId)) return;
+            if (!TsArray.Contains(playerIds, playerId)) return;
 
             OnPlayersRemovedAsTrackedPlayer(playerIds);
         }

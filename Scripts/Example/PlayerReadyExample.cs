@@ -44,7 +44,7 @@ namespace Tsvrc.Example
             _statusText.text = $"Ready check completed successfully! {playerIds.Length} players are ready.";
         }
 
-        protected override void OnReadyCheckStoppedAsTrackedPlayer()
+        protected override void OnReadyCheckStoppedAsTrackedPlayer(string[] playerIds)
         {
             _statusText.text = "Ready check was stopped.";
         }
