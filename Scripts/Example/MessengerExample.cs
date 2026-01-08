@@ -10,6 +10,8 @@ namespace Tsvrc.Example
         [SerializeField] private TextMeshProUGUI _statusText;
         [SerializeField] private TMP_InputField _lengthInput;
 
+        #region Unity Methods
+
         public override void Interact()
         {
             string[] playerIds = TsPlayerUtils.GetAllPlayerIDs();
@@ -19,11 +21,15 @@ namespace Tsvrc.Example
             GenerateAndSendMessage();
         }
 
+        #endregion
+
+        #region Public Methods
+
         public void GenerateAndSendMessage()
         {
             string[] playerIds = TsPlayerUtils.GetAllPlayerIDs();
 
-            // Parse length from input field, default to 500000 if invalid
+            // Parse length from input field, default to 1000 if invalid
             int messageLength = 1000;
             if (_lengthInput != null && !string.IsNullOrEmpty(_lengthInput.text))
             {
@@ -52,25 +58,43 @@ namespace Tsvrc.Example
             TransferData(message, playerIds);
         }
 
-        protected override void OnDataReceptionStarted()
-        {
-            _statusText.text = "Data reception started...";
-        }
+        #endregion
 
-        protected override void OnDataChunkReceived(int chunkIndex, int totalChunks)
+        #region TsvrcDataReceiver Callbacks
+
+        protected override void OnDataChunkReceivedAsTrackedPlayer(int chunkIndex, int totalChunks)
         {
+            base.OnDataChunkReceivedAsTrackedPlayer(chunkIndex, totalChunks);
+
             float percentage = chunkIndex / (float)totalChunks * 100f;
             _statusText.text = $"Delivery in progress: {percentage:F1}% ({chunkIndex}/{totalChunks} chunks)";
         }
 
-        protected override void OnDataReceptionCompleted(string data)
+        #endregion
+
+        #region TsvrcDataTransferer Callbacks
+
+        protected override void OnDataTransfererStartedAsTrackedPlayer(string[] playerIds)
         {
-            _statusText.text = $"All players have received the message! Length: {data.Length} characters";
+            base.OnDataTransfererStartedAsTrackedPlayer(playerIds);
+
+            _statusText.text = "Data transfer started...";
         }
 
-        protected override void OnDataReceptionCancelled()
+        protected override void OnDataTransfererStoppedAsTrackedPlayer(string[] playerIds)
         {
-            _statusText.text = "Data reception cancelled.";
+            base.OnDataTransfererStoppedAsTrackedPlayer(playerIds);
+
+            _statusText.text = "Data transfer stopped.";
         }
+
+        protected override void OnDataTransfererCompletedAsTrackedPlayer(string data, string[] playerIds)
+        {
+            base.OnDataTransfererCompletedAsTrackedPlayer(data, playerIds);
+
+            _statusText.text = $"Data transfer completed! Received {data.Length} characters from all players.";
+        }
+
+        #endregion
     }
 }

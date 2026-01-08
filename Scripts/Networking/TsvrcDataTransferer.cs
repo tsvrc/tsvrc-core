@@ -6,20 +6,38 @@ namespace Tsvrc.TsNetworking
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsvrcDataTransferer : TsvrcDataReceiver
     {
-        #region Tsvrc Callbacks
+        #region TsvrcProcess Callbacks
 
         protected override void OnOwnerAbandonedProcess()
         {
             base.OnOwnerAbandonedProcess();
 
-           // CancelDataTransfer();
+            CancelDataTransfer();
         }
 
-        protected override void OnDataReceptionCancelled()
-        {
-            base.OnDataReceptionCancelled();
+        #endregion
 
-            OnDataTranfererProcessCancelled();
+        #region TsvrcDataReceiver Callbacks
+
+        protected override void OnDataReceptionStartedAsTrackedPlayer(string[] playerIds)
+        {
+            base.OnDataReceptionStartedAsTrackedPlayer(playerIds);
+
+            OnDataTransfererStartedAsTrackedPlayer(playerIds);
+        }
+
+        protected override void OnDataReceptionStoppedAsTrackedPlayer(string[] playerIds)
+        {
+            base.OnDataReceptionStoppedAsTrackedPlayer(playerIds);
+
+            OnDataTransfererStoppedAsTrackedPlayer(playerIds);
+        }
+
+        protected override void OnDataReceptionCompletedAsTrackedPlayer(string data, string[] playerIds)
+        {
+            base.OnDataReceptionCompletedAsTrackedPlayer(data, playerIds);
+
+            OnDataTransfererCompletedAsTrackedPlayer(data, playerIds);
         }
 
         #endregion
@@ -31,21 +49,39 @@ namespace Tsvrc.TsNetworking
             base.TransferData(data, playerIds);
         }
 
-        // public override void CancelDataTransfer()
-        // {
-        //     base.CancelDataTransfer();
-        // }
+        public override void CancelDataTransfer()
+        {
+            base.CancelDataTransfer();
+        }
 
         #endregion
 
         #region Virtual Methods
 
         /// <summary>
-        /// Called when the data transferer process is cancelled.
-        /// This method is intended to be called on the tracker players and the process owner.
-        /// Make sure to invoke base.OnDataTranfererProcessCancelled if overridden.
+        /// Called when the data transferer starts on tracked players.
+        /// Invoked via network event on all tracked players (non-owners).
+        /// This fires once at the beginning of the transfer (first chunk).
+        /// For owner-only logic, override OnProcessStarted() from the base class.
         /// </summary>
-        protected virtual void OnDataTranfererProcessCancelled() { }
+        protected virtual void OnDataTransfererStartedAsTrackedPlayer(string[] playerIds) { }
+
+        /// <summary>
+        /// Called when the data transferer is stopped on tracked players.
+        /// Invoked via network event on all tracked players (non-owners).
+        /// For owner-only logic, override OnProcessStopped() from the base class.
+        /// </summary>
+        protected virtual void OnDataTransfererStoppedAsTrackedPlayer(string[] playerIds) { }
+
+        /// <summary>
+        /// Called when the data transferer completes on tracked players.
+        /// Invoked via network event on all tracked players (non-owners).
+        /// This fires once at the end when all chunks are complete.
+        /// For owner-only logic, override OnProcessCompleted() from the base class.
+        /// </summary>
+        /// <param name="data">The complete reassembled data.</param>
+        /// <param name="playerIds">The player IDs involved in the transfer.</param>
+        protected virtual void OnDataTransfererCompletedAsTrackedPlayer(string data, string[] playerIds) { }
 
         #endregion
     }
