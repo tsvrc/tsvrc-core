@@ -62,10 +62,10 @@ namespace Tsvrc.Core
                 SetProcessOwner(Networking.LocalPlayer);
             }
 
-            OnProcessStarted();
-
             _isRunning = true;
             RequestSerialization();
+            
+            OnProcessStarted();
         }
 
         /// <summary>
