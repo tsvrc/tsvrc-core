@@ -1,3 +1,4 @@
+using Tsvrc.List.Utils;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
@@ -8,39 +9,63 @@ namespace Tsvrc.TsNetworking.Utils
     {
         protected string[] _receivedChunks = new string[0];
 
-        #region Tsvrc Callbacks
+        #region TsvrcDataSender Callbacks
 
-        protected override void OnDataTransferStarted()
+        protected override void OnDataTransferStartedAsTrackedPlayer(string[] playerIds)
         {
-            base.OnDataTransferStarted();
+            base.OnDataTransferStartedAsTrackedPlayer(playerIds);
 
             _receivedChunks = new string[0];
-            OnDataReceptionStarted();
+            OnDataReceptionStartedAsTrackedPlayer(playerIds);
         }
 
-        protected override void OnDataTransferCompleted()
+        protected override void OnDataTransferStoppedAsTrackedPlayer(string[] playerIds)
         {
-            base.OnDataTransferCompleted();
+            base.OnDataTransferStoppedAsTrackedPlayer(playerIds);
+
+            _receivedChunks = new string[0];
+            OnDataReceptionStoppedAsTrackedPlayer(playerIds);
+        }
+
+        protected override void OnDataTransferCompletedAsTrackedPlayer(string[] playerIds)
+        {
+            base.OnDataTransferCompletedAsTrackedPlayer(playerIds);
 
             string completeMessage = ReassembleMessage(_receivedChunks);
             _receivedChunks = new string[0];
-            OnDataReceptionCompleted(completeMessage);
+            OnDataReceptionCompletedAsTrackedPlayer(completeMessage, playerIds);
         }
 
-        protected override void OnDataTransferCancelled()
+        protected override void OnDataChunkSendRequested(string dataChunk, int chunkIndex, int totalChunks, string[] playerIds)
         {
-            base.OnDataTransferCancelled();
+            base.OnDataChunkSendRequested(dataChunk, chunkIndex, totalChunks, playerIds);
 
-            _receivedChunks = new string[0];
-
-            OnDataReceptionCancelled();
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataChunkReceived), dataChunk, chunkIndex, totalChunks, playerIds);
         }
 
-        protected override void OnSendDataChunkRequested(string dataChunk, int chunkIndex, int totalChunks)
-        {
-            base.OnSendDataChunkRequested(dataChunk, chunkIndex, totalChunks);
+        #endregion
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataChunkReceived), dataChunk, chunkIndex, totalChunks);
+        #region Protected Methods
+
+        /// <summary>
+        /// Reassembles the complete message from received chunks.
+        /// </summary>
+        protected string ReassembleMessage(string[] receivedChunks)
+        {
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            for (int i = 0; i < receivedChunks.Length; i++)
+            {
+                sb.Append(receivedChunks[i]);
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Notifies the sender that this chunk was received by marking ready.
+        /// </summary>
+        protected void NotifyChunkReceived()
+        {
+            SetReady();
         }
 
         #endregion
@@ -48,46 +73,51 @@ namespace Tsvrc.TsNetworking.Utils
         #region Virtual Methods
 
         /// <summary>
-        /// Called when data reception starts.
-        /// This method is intended to be called on the tracker players and the process owner.
-        /// Make sure to invoke base.OnDataReceptionStarted if overridden.
+        /// Called when data reception starts on tracked players.
+        /// Invoked via network event on all tracked players (non-owners).
+        /// This fires once at the beginning of the reception (first chunk).
+        /// For owner-only logic, override OnProcessStarted() from the base class.
         /// </summary>
-        protected virtual void OnDataReceptionStarted() { }
+        protected virtual void OnDataReceptionStartedAsTrackedPlayer(string[] playerIds) { }
 
         /// <summary>
-        /// Called when a data chunk is received.
-        /// This method is intended to be called on the tracker players and the process owner.
-        /// Make sure to invoke base.OnDataChunkReceived if overridden.
+        /// Called when data reception is stopped on tracked players.
+        /// Invoked via network event on all tracked players (non-owners).
+        /// For owner-only logic, override OnProcessStopped() from the base class.
+        /// </summary>
+        protected virtual void OnDataReceptionStoppedAsTrackedPlayer(string[] playerIds) { }
+
+        /// <summary>
+        /// Called when data reception completes on tracked players.
+        /// Invoked via network event on all tracked players (non-owners).
+        /// This fires once at the end when all chunks are received.
+        /// For owner-only logic, override OnProcessCompleted() from the base class.
+        /// </summary>
+        /// <param name="data">The complete reassembled data.</param>
+        /// <param name="playerIds">The player IDs involved in the reception.</param>
+        protected virtual void OnDataReceptionCompletedAsTrackedPlayer(string data, string[] playerIds) { }
+
+        /// <summary>
+        /// Called when a data chunk is received on tracked players.
+        /// This fires for each chunk received.
         /// </summary>
         /// <param name="chunkIndex">The index of the received chunk (1-based).</param>
-        protected virtual void OnDataChunkReceived(int chunkIndex, int totalChunks) { }
-
-        /// <summary>
-        /// Called when the complete message is received.
-        /// This method is intended to be called on the tracker players and the process owner.
-        /// Make sure to invoke base.OnDataTransferCompleted if overridden.
-        /// </summary>
-        protected virtual void OnDataReceptionCompleted(string data) { }
-
-        /// <summary>
-        /// Called when the data reception is cancelled.
-        /// This method is intended to be called on the tracker players and the process owner.
-        /// Make sure to invoke base.OnDataReceptionCancelled if overridden.
-        /// </summary>
-        protected virtual void OnDataReceptionCancelled() { }
+        /// <param name="totalChunks">The total number of chunks to receive.</param>
+        protected virtual void OnDataChunkReceivedAsTrackedPlayer(int chunkIndex, int totalChunks) { }
 
         #endregion
 
         #region Network Events
 
         /// <summary>
-        /// Network event to broadcast the reception of a data chunk.
+        /// Network callable method to broadcast the reception of a data chunk.
+        /// This method is invoked on all players via network event, but only executes for tracked players.
         /// </summary>
         [NetworkCallable]
-        public void BroadcastDataChunkReceived(string dataChunk, int chunkIndex, int totalChunks)
+        public void BroadcastDataChunkReceived(string dataChunk, int chunkIndex, int totalChunks, string[] playerIds)
         {
             var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!IsTrackedPlayer(playerId) && !IsProcessOwner()) return;
+            if (!TsArray.Contains(playerIds, playerId)) return;
 
             if (_receivedChunks.Length != totalChunks)
             {
@@ -97,26 +127,7 @@ namespace Tsvrc.TsNetworking.Utils
             _receivedChunks[chunkIndex - 1] = dataChunk;
 
             NotifyChunkReceived();
-            OnDataChunkReceived(chunkIndex, totalChunks);
-        }
-
-        #endregion
-
-        #region Private Methods
-
-        private void NotifyChunkReceived()
-        {
-            SetReady();
-        }
-
-        private string ReassembleMessage(string[] receivedChunks)
-        {
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            for (int i = 0; i < receivedChunks.Length; i++)
-            {
-                sb.Append(receivedChunks[i]);
-            }
-            return sb.ToString();
+            OnDataChunkReceivedAsTrackedPlayer(chunkIndex, totalChunks);
         }
 
         #endregion

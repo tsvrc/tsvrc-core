@@ -31,16 +31,17 @@ namespace Tsvrc.TsNetworking.Utils
                 // Important to clear initial data to avoid re-creating chunks on retries
                 _initialData = "";
                 _currentChunkIndex = 1;
-                _targetPlayerIds = (string[])GetTrackedPlayerIds().Clone();
             }
+
+            var trackedPlayerIds = (string[])GetTrackedPlayerIds().Clone();
+            _targetPlayerIds = trackedPlayerIds;
 
             if (_currentChunkIndex == 1)
             {
-                var trackedPlayerIds = GetTrackedPlayerIds();
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStarted), trackedPlayerIds);
             }
 
-            SendDataChunk(_currentChunkIndex);
+            SendDataChunk(_currentChunkIndex, trackedPlayerIds);
         }
 
         protected override void OnProcessStopped()
@@ -49,7 +50,7 @@ namespace Tsvrc.TsNetworking.Utils
 
             var stoppedPlayerIds = (string[])_targetPlayerIds.Clone();
             ResetInternalTransferData();
-            
+
             if (stoppedPlayerIds.Length > 0)
             {
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStopped), stoppedPlayerIds);
@@ -174,10 +175,10 @@ namespace Tsvrc.TsNetworking.Utils
         /// <summary>
         /// Sends a data chunk at the specified index.
         /// </summary>
-        protected void SendDataChunk(int chunkIndex)
+        protected void SendDataChunk(int chunkIndex, string[] playerIds)
         {
             string dataChunk = _dataChunks[chunkIndex - 1];
-            OnDataChunkSendRequested(dataChunk, chunkIndex, _totalChunks);
+            OnDataChunkSendRequested(dataChunk, chunkIndex, _totalChunks, playerIds);
         }
 
         #endregion
@@ -215,7 +216,8 @@ namespace Tsvrc.TsNetworking.Utils
         /// <param name="dataChunk">The chunk of data to send.</param>
         /// <param name="chunkIndex">The index of the chunk being sent (1-based).</param>
         /// <param name="totalChunks">The total number of chunks in the transfer.</param>
-        protected virtual void OnDataChunkSendRequested(string dataChunk, int chunkIndex, int totalChunks) { }
+        /// <param name="playerIds">The player IDs for this transfer.</param>
+        protected virtual void OnDataChunkSendRequested(string dataChunk, int chunkIndex, int totalChunks, string[] playerIds) { }
 
         #endregion
 
