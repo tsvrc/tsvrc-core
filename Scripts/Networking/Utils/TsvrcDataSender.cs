@@ -1,3 +1,4 @@
+using Tsvrc.List.Utils;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
@@ -17,59 +18,59 @@ namespace Tsvrc.TsNetworking.Utils
         private int _totalChunks = 0;
         private string[] _targetPlayerIds = new string[0];
 
-        #region Tsvrc Callbacks
+        #region TsvrcProcess Callbacks
 
-        // protected override void OnReadyCheckStarted(string[] playerIds)
-        // {
-        //     base.OnReadyCheckStarted(playerIds);
+        protected override void OnProcessStarted()
+        {
+            base.OnProcessStarted();
 
-        //     if (!IsProcessOwner()) return;
+            if (!string.IsNullOrEmpty(_initialData))
+            {
+                _dataChunks = CreateDataChunks(_initialData);
+                _totalChunks = _dataChunks.Length;
+                // Important to clear initial data to avoid re-creating chunks on retries
+                _initialData = "";
+                _currentChunkIndex = 1;
+                _targetPlayerIds = (string[])GetTrackedPlayerIds().Clone();
+            }
 
-        //     if (!string.IsNullOrEmpty(_initialData))
-        //     {
-        //         _dataChunks = CreateDataChunks(_initialData);
-        //         _totalChunks = _dataChunks.Length;
-        //         // Important to clear initial data to avoid re-creating chunks on retries
-        //         _initialData = "";
-        //         _currentChunkIndex = 1;
-        //         _targetPlayerIds = (string[])playerIds.Clone();
-        //     }
+            if (_currentChunkIndex == 1)
+            {
+                var trackedPlayerIds = GetTrackedPlayerIds();
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStarted), trackedPlayerIds);
+            }
 
-        //     if (_currentChunkIndex == 1)
-        //     {
-        //         SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataTransferStarted));
-        //     }
+            SendDataChunk(_currentChunkIndex);
+        }
 
-        //     SendDataChunk(_currentChunkIndex);
-        // }
+        protected override void OnProcessStopped()
+        {
+            base.OnProcessStopped();
 
-        // protected override void OnReadyCheckCompleted(string[] playerIds)
-        // {
-        //     base.OnReadyCheckCompleted(playerIds);
+            var stoppedPlayerIds = (string[])_targetPlayerIds.Clone();
+            ResetInternalTransferData();
+            
+            if (stoppedPlayerIds.Length > 0)
+            {
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStopped), stoppedPlayerIds);
+            }
+        }
 
-        //     if (!IsProcessOwner()) return;
+        protected override void OnProcessCompleted()
+        {
+            base.OnProcessCompleted();
 
-        //     if (_currentChunkIndex == _totalChunks)
-        //     {
-        //         ResetInternalTransferData();
-        //         SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataTransferCompleted));
-        //         return;
-        //     }
+            if (_currentChunkIndex == _totalChunks)
+            {
+                var completedPlayerIds = (string[])_targetPlayerIds.Clone();
+                ResetInternalTransferData();
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferCompleted), completedPlayerIds);
+                return;
+            }
 
-        //     _currentChunkIndex++;
-        //     StartReadyCheck(_targetPlayerIds);
-        // }
-
-        // protected override void OnReadyCheckCancelled()
-        // {
-        //     base.OnReadyCheckCancelled();
-
-        //     if (!IsProcessOwner()) return;
-
-        //     ResetInternalTransferData();
-
-        //     SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataTransferCancelled));
-        // }
+            _currentChunkIndex++;
+            StartProcessFromTracker(_targetPlayerIds);
+        }
 
         #endregion
 
@@ -82,125 +83,52 @@ namespace Tsvrc.TsNetworking.Utils
         {
             if (!ValidateMessage(data))
             {
-                Debug.LogWarning("[TsvrcSender] Message validation failed. Transfer aborted.");
+                Debug.LogWarning("[TsvrcDataSender] Message validation failed. Transfer aborted.");
                 return;
             }
 
             ResetInternalTransferData();
             _initialData = data;
 
-            StartReadyCheck(playerIds);
+            StartProcessFromTracker(playerIds);
         }
 
-        /// <summary> 
+        /// <summary>
         /// Cancels the current data transfer before completion.
         /// </summary>
-        // public virtual void CancelDataTransfer()
-        // {
-        //     CancelReadyCheck();
-        // }
-
-        #endregion
-
-        #region Virtual Methods
-
-        /// <summary>
-        /// Called when the data transfer is started.
-        /// This method is intended to be called on the tracker players and the process owner.
-        /// Make sure to invoke base.OnDataTransferStarted if overridden.
-        /// </summary>
-        protected virtual void OnDataTransferStarted() { }
-
-        /// <summary>
-        /// Called when the data transfer is completed.
-        /// This method is intended to be called on the tracker players and the process owner.
-        /// Make sure to invoke base.OnDataTransferCompleted if overridden.
-        /// </summary>
-        protected virtual void OnDataTransferCompleted() { }
-
-        /// <summary>
-        /// Called when the data transfer is cancelled.
-        /// This method is intended to be called on the tracker players and the process owner.
-        /// Make sure to invoke base.OnDataTransferCancelled if overridden.
-        /// </summary>
-        protected virtual void OnDataTransferCancelled() { }
-
-        /// <summary>
-        /// Called when a data chunk is sended.
-        /// Only called on the owner of the sender.
-        /// Make sure to invoke base.OnDataChunkSended if overridden.
-        /// </summary>
-        /// <param name="chunkIndex">The index of the chunk being sent (1-based).</param>
-        protected virtual void OnSendDataChunkRequested(string dataChunk, int chunkIndex, int totalChunks) { }
-
-        #endregion
-
-        #region Network Events
-
-        /// <summary>
-        /// Network event to broadcast the start of data transfer.
-        /// </summary>
-        [NetworkCallable]
-        public void BroadcastDataTransferStarted()
+        public virtual void CancelDataTransfer()
         {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!IsTrackedPlayer(playerId) && !IsProcessOwner()) return;
-
-            OnDataTransferStarted();
-        }
-
-        /// <summary>
-        /// Network event to broadcast the completion of data transfer.
-        /// </summary>
-        [NetworkCallable]
-        public void BroadcastDataTransferCompleted()
-        {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!IsTrackedPlayer(playerId) && !IsProcessOwner()) return;
-
-            OnDataTransferCompleted();
-        }
-
-        /// <summary>
-        /// Network event to broadcast the cancellation of data transfer.
-        /// </summary>
-        [NetworkCallable]
-        public void BroadcastDataTransferCancelled()
-        {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!IsTrackedPlayer(playerId) && !IsProcessOwner()) return;
-
-            OnDataTransferCancelled();
+            StopProcess();
         }
 
         #endregion
 
-        #region Private Methods
+        #region Protected Methods
 
-        private void SendDataChunk(int chunkIndex)
-        {
-            string dataChunk = _dataChunks[chunkIndex - 1];
-            OnSendDataChunkRequested(dataChunk, chunkIndex, _totalChunks);
-        }
-
-        private bool ValidateMessage(string message)
+        /// <summary>
+        /// Checks if a message is valid for transfer.
+        /// </summary>
+        protected bool ValidateMessage(string message)
         {
             if (string.IsNullOrEmpty(message))
             {
-                Debug.LogWarning("[TsvrcSender] Cannot send empty message");
+                Debug.LogWarning("[TsvrcDataSender] Cannot send empty message");
                 return false;
             }
 
             if (message.Length > MAX_MESSAGE_SIZE)
             {
-                Debug.LogError($"[TsvrcSender] Message too large: {message.Length} chars (max {MAX_MESSAGE_SIZE})");
+                Debug.LogError($"[TsvrcDataSender] Message too large: {message.Length} chars (max {MAX_MESSAGE_SIZE})");
                 return false;
             }
 
             return true;
         }
 
-        private void ResetInternalTransferData()
+        /// <summary>
+        /// Resets internal data transfer state.
+        /// </summary>
+        protected void ResetInternalTransferData()
         {
             _initialData = "";
             _dataChunks = new string[0];
@@ -209,7 +137,10 @@ namespace Tsvrc.TsNetworking.Utils
             _targetPlayerIds = new string[0];
         }
 
-        private string[] CreateDataChunks(string data)
+        /// <summary>
+        /// Creates data chunks from the full data string.
+        /// </summary>
+        protected string[] CreateDataChunks(string data)
         {
             var chunksCount = CalculateTotalChunks(data.Length);
             var chunks = new string[chunksCount];
@@ -222,16 +153,111 @@ namespace Tsvrc.TsNetworking.Utils
             return chunks;
         }
 
-        private int CalculateTotalChunks(int dataLength)
+        /// <summary>
+        /// Calculates the total number of chunks needed for the data length.
+        /// </summary>
+        protected int CalculateTotalChunks(int dataLength)
         {
             return (dataLength + CHUNK_SIZE - 1) / CHUNK_SIZE;
         }
 
-        private string ExtractChunk(string data, int chunkIndex)
+        /// <summary>
+        /// Extracts a specific chunk from the data string.
+        /// </summary>
+        protected string ExtractChunk(string data, int chunkIndex)
         {
             int startIndex = chunkIndex * CHUNK_SIZE;
             int length = System.Math.Min(CHUNK_SIZE, data.Length - startIndex);
             return data.Substring(startIndex, length);
+        }
+
+        /// <summary>
+        /// Sends a data chunk at the specified index.
+        /// </summary>
+        protected void SendDataChunk(int chunkIndex)
+        {
+            string dataChunk = _dataChunks[chunkIndex - 1];
+            OnDataChunkSendRequested(dataChunk, chunkIndex, _totalChunks);
+        }
+
+        #endregion
+
+        #region Virtual Methods
+
+        /// <summary>
+        /// Called when the data transfer starts on tracked players.
+        /// Invoked via network event on all tracked players (non-owners).
+        /// This fires once at the beginning of the transfer (first chunk).
+        /// For owner-only logic, override OnProcessStarted() from the base class.
+        /// </summary>
+        protected virtual void OnDataTransferStartedAsTrackedPlayer(string[] playerIds) { }
+
+        /// <summary>
+        /// Called when the data transfer is stopped on tracked players.
+        /// Invoked via network event on all tracked players (non-owners).
+        /// For owner-only logic, override OnProcessStopped() from the base class.
+        /// </summary>
+        protected virtual void OnDataTransferStoppedAsTrackedPlayer(string[] playerIds) { }
+
+        /// <summary>
+        /// Called when the data transfer completes on tracked players.
+        /// Invoked via network event on all tracked players (non-owners).
+        /// This fires once at the end when all chunks are complete.
+        /// For owner-only logic, override OnProcessCompleted() from the base class.
+        /// </summary>
+        protected virtual void OnDataTransferCompletedAsTrackedPlayer(string[] playerIds) { }
+
+        /// <summary>
+        /// Called when a data chunk is ready to be sent.
+        /// Only invoked on the process owner.
+        /// This fires for each chunk.
+        /// </summary>
+        /// <param name="dataChunk">The chunk of data to send.</param>
+        /// <param name="chunkIndex">The index of the chunk being sent (1-based).</param>
+        /// <param name="totalChunks">The total number of chunks in the transfer.</param>
+        protected virtual void OnDataChunkSendRequested(string dataChunk, int chunkIndex, int totalChunks) { }
+
+        #endregion
+
+        #region Network Events
+
+        /// <summary>
+        /// Network callable method to notify tracked players that the data transfer has started.
+        /// This method is invoked on all players via network event, but only executes for tracked players.
+        /// </summary>
+        [NetworkCallable]
+        public void NotifyTrackedPlayersDataTransferStarted(string[] playerIds)
+        {
+            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            if (!TsArray.Contains(playerIds, playerId)) return;
+
+            OnDataTransferStartedAsTrackedPlayer(playerIds);
+        }
+
+        /// <summary>
+        /// Network callable method to notify tracked players that the data transfer has stopped.
+        /// This method is invoked on all players via network event, but only executes for tracked players.
+        /// </summary>
+        [NetworkCallable]
+        public void NotifyTrackedPlayersDataTransferStopped(string[] playerIds)
+        {
+            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            if (!TsArray.Contains(playerIds, playerId)) return;
+
+            OnDataTransferStoppedAsTrackedPlayer(playerIds);
+        }
+
+        /// <summary>
+        /// Network callable method to notify tracked players that the data transfer has completed.
+        /// This method is invoked on all players via network event, but only executes for tracked players.
+        /// </summary>
+        [NetworkCallable]
+        public void NotifyTrackedPlayersDataTransferCompleted(string[] playerIds)
+        {
+            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            if (!TsArray.Contains(playerIds, playerId)) return;
+
+            OnDataTransferCompletedAsTrackedPlayer(playerIds);
         }
 
         #endregion
