@@ -19,7 +19,7 @@ namespace Tsvrc.Example
 
             _statusText.text = $"Starting ready check for: {string.Join(", ", playerIds)}";
 
-            StartReadyCheck(playerIds);
+            StartProcessFromTracker(playerIds);
         }
 
         public void SetReadyEvent()

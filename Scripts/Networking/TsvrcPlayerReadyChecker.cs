@@ -1,7 +1,6 @@
 using Tsvrc.List.Utils;
 using Tsvrc.TsNetworking.Utils;
 using UdonSharp;
-using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
@@ -97,22 +96,6 @@ namespace Tsvrc.TsNetworking
         #endregion
 
         #region Public Methods
-
-        /// <summary>
-        /// Starts a ready check for the specified players.
-        /// </summary>
-        public void StartReadyCheck(string[] playerIds)
-        {
-            StartProcessFromTracker(playerIds);
-        }
-
-        /// <summary>
-        /// Stops the current ready check.
-        /// </summary>
-        public void StopReadyCheck()
-        {
-            StopProcess();
-        }
 
         /// <summary>
         /// Sets the local player's ready status.
