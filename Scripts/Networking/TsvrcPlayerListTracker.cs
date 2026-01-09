@@ -223,25 +223,25 @@ namespace Tsvrc.TsNetworking
         /// This method is invoked on all players via network event, but only executes for tracked players.
         /// </summary>
         [NetworkCallable]
-        public void NotifyTrackedPlayersAdded(string[] playerIds)
+        public void NotifyTrackedPlayersAdded(string[] addedPlayerIds, string[] notifyPlayerIds)
         {
             var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!TsArray.Contains(playerIds, playerId)) return;
+            if (!TsArray.Contains(notifyPlayerIds, playerId)) return;
 
-            OnPlayersAddedAsTrackedPlayer(playerIds);
+            OnPlayersAddedAsTrackedPlayer(addedPlayerIds);
         }
 
         /// <summary>
         /// Network callable method to notify tracked players that players were removed.
-        /// This method is invoked on all players via network event, but only executes for tracked players.
+        /// This method is invoked on all players via network event, but only executes for remaining tracked players.
         /// </summary>
         [NetworkCallable]
-        public void NotifyTrackedPlayersRemoved(string[] playerIds)
+        public void NotifyTrackedPlayersRemoved(string[] removedPlayerIds, string[] notifyPlayerIds)
         {
             var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-            if (!TsArray.Contains(playerIds, playerId)) return;
+            if (!TsArray.Contains(notifyPlayerIds, playerId)) return;
 
-            OnPlayersRemovedAsTrackedPlayer(playerIds);
+            OnPlayersRemovedAsTrackedPlayer(removedPlayerIds);
         }
 
         /// <summary>
@@ -273,10 +273,14 @@ namespace Tsvrc.TsNetworking
                 validPlayerIds = trimmed;
             }
 
+            // Save current tracked players before adding new ones
+            var currentTrackedPlayers = (string[])_trackedPlayerIds.Clone();
+
             _trackedPlayerIds = TsArray.Add(_trackedPlayerIds, validPlayerIds);
             RequestSerialization();
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersAdded), validPlayerIds);
+            // Notify current tracked players about new additions
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersAdded), validPlayerIds, currentTrackedPlayers);
         }
 
         /// <summary>
@@ -308,10 +312,14 @@ namespace Tsvrc.TsNetworking
                 validPlayerIds = trimmed;
             }
 
+            // Determine who to notify (all tracked players except those being removed)
+            var notifyPlayerIds = TsArray.Remove(_trackedPlayerIds, validPlayerIds);
+
             _trackedPlayerIds = TsArray.Remove(_trackedPlayerIds, validPlayerIds);
             RequestSerialization();
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersRemoved), validPlayerIds);
+            // Notify remaining tracked players about removals
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersRemoved), validPlayerIds, notifyPlayerIds);
         }
 
         #endregion

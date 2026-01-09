@@ -18,9 +18,8 @@ namespace Tsvrc.Example
 
             if (Networking.IsMaster)
             {
-                var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
-                var players = TsPlayerUtils.ToArray(playerId);
-                StartProcessFromTracker(players);
+                var allPlayerIds = TsPlayerUtils.GetAllPlayerIDs();
+                StartProcessFromTracker(allPlayerIds);
             }
         }
 
