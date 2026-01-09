@@ -16,6 +16,7 @@ namespace Tsvrc.TsNetworking.Utils
         // Current chunk index (1-based)
         private int _currentChunkIndex = 0;
         private int _totalChunks = 0;
+
         private string[] _targetPlayerIds = new string[0];
 
         #region TsvrcProcess Callbacks
@@ -34,7 +35,6 @@ namespace Tsvrc.TsNetworking.Utils
             }
 
             var trackedPlayerIds = (string[])GetTrackedPlayerIds().Clone();
-            _targetPlayerIds = trackedPlayerIds;
 
             if (_currentChunkIndex == 1)
             {
@@ -48,7 +48,7 @@ namespace Tsvrc.TsNetworking.Utils
         {
             base.OnProcessStopped();
 
-            var stoppedPlayerIds = (string[])_targetPlayerIds.Clone();
+            var stoppedPlayerIds = (string[])GetTrackedPlayerIds().Clone();
             ResetInternalTransferData();
 
             if (stoppedPlayerIds.Length > 0)
@@ -61,25 +61,28 @@ namespace Tsvrc.TsNetworking.Utils
         {
             base.OnProcessCompleted();
 
+            var completedPlayerIds = (string[])GetTrackedPlayerIds().Clone();
             if (_currentChunkIndex == _totalChunks)
             {
-                var completedPlayerIds = (string[])_targetPlayerIds.Clone();
-                ResetInternalTransferData();
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferCompleted), completedPlayerIds);
                 return;
             }
 
             _currentChunkIndex++;
-            StartProcessFromTracker(_targetPlayerIds);
+            _targetPlayerIds = completedPlayerIds;
         }
 
         protected override void OnProcessCleanup()
         {
             base.OnProcessCleanup();
 
-            // Update target players from current tracked list before cleanup
-            // This ensures we have the latest list if players left during transfer
-            //_targetPlayerIds = (string[])GetTrackedPlayerIds().Clone();
+            if (_currentChunkIndex == _totalChunks)
+            {
+                ResetInternalTransferData();
+                return;
+            }
+
+            StartProcessFromTracker(_targetPlayerIds);
         }
 
         #endregion
