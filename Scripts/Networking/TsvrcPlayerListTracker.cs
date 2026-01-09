@@ -55,9 +55,6 @@ namespace Tsvrc.TsNetworking
 
             var stoppedPlayerIds = (string[])_trackedPlayerIds.Clone();
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessStopped), stoppedPlayerIds);
-
-            _trackedPlayerIds = new string[0];
-            RequestSerialization();
         }
 
         protected override void OnProcessCompleted()
@@ -66,6 +63,11 @@ namespace Tsvrc.TsNetworking
 
             var newPlayerIds = (string[])_trackedPlayerIds.Clone();
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessCompleted), newPlayerIds);
+        }
+
+        protected override void OnProcessCleanup()
+        {
+            base.OnProcessCleanup();
 
             _trackedPlayerIds = new string[0];
             RequestSerialization();

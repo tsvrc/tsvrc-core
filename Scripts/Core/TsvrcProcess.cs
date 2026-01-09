@@ -64,7 +64,7 @@ namespace Tsvrc.Core
 
             _isRunning = true;
             RequestSerialization();
-            
+
             OnProcessStarted();
         }
 
@@ -90,6 +90,7 @@ namespace Tsvrc.Core
             RequestSerialization();
 
             OnProcessStopped();
+            OnProcessCleanup();
         }
 
         /// <summary>
@@ -112,6 +113,7 @@ namespace Tsvrc.Core
             RequestSerialization();
 
             OnProcessCompleted();
+            OnProcessCleanup();
         }
 
         /// <summary>
@@ -173,6 +175,12 @@ namespace Tsvrc.Core
         /// Only invoked on the new owner (typically the master client).
         /// </summary>
         protected virtual void OnOwnerAbandonedProcess() { }
+
+        /// <summary>
+        /// Called when a cleanup of the process data is requested.
+        /// Only invoked on the process owner.
+        /// </summary>
+        protected virtual void OnProcessCleanup() { }
 
         #endregion
     }

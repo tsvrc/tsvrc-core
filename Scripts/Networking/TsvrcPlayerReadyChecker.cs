@@ -18,7 +18,7 @@ namespace Tsvrc.TsNetworking
             if (!IsProcessRunning() || !IsProcessOwner()) return;
 
             string[] trackedPlayerIds = GetTrackedPlayerIds();
-            
+
             foreach (string playerId in trackedPlayerIds)
             {
                 if (!IsPlayerReady(playerId))
@@ -42,17 +42,9 @@ namespace Tsvrc.TsNetworking
             RequestSerialization();
         }
 
-        protected override void OnProcessStopped()
+        protected override void OnProcessCleanup()
         {
-            base.OnProcessStopped();
-
-            _readyPlayerIds = new string[0];
-            RequestSerialization();
-        }
-
-        protected override void OnProcessCompleted()
-        {
-            base.OnProcessCompleted();
+            base.OnProcessCleanup();
 
             _readyPlayerIds = new string[0];
             RequestSerialization();
@@ -165,7 +157,7 @@ namespace Tsvrc.TsNetworking
         public void BroadcastAddReadyPlayer(string playerId)
         {
             if (!IsProcessRunning()) return;
-            
+
             string[] playerIds = TsPlayerUtils.ToArray(playerId);
             _readyPlayerIds = TsArray.Add(_readyPlayerIds, playerIds);
             RequestSerialization();
@@ -179,7 +171,7 @@ namespace Tsvrc.TsNetworking
         public void BroadcastRemoveReadyPlayer(string playerId)
         {
             if (!IsProcessRunning()) return;
-            
+
             string[] playerIds = TsPlayerUtils.ToArray(playerId);
             _readyPlayerIds = TsArray.Remove(_readyPlayerIds, playerIds);
             RequestSerialization();

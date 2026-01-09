@@ -73,6 +73,15 @@ namespace Tsvrc.TsNetworking.Utils
             StartProcessFromTracker(_targetPlayerIds);
         }
 
+        protected override void OnProcessCleanup()
+        {
+            base.OnProcessCleanup();
+
+            // Update target players from current tracked list before cleanup
+            // This ensures we have the latest list if players left during transfer
+            //_targetPlayerIds = (string[])GetTrackedPlayerIds().Clone();
+        }
+
         #endregion
 
         #region Public Methods
