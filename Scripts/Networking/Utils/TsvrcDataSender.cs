@@ -62,10 +62,10 @@ namespace Tsvrc.TsNetworking.Utils
             base.OnProcessCompleted();
 
             var completedPlayerIds = (string[])GetTrackedPlayerIds().Clone();
-            
+
             // Check if this was the LAST chunk BEFORE incrementing
             bool isLastChunk = _currentChunkIndex == _totalChunks;
-            
+
             if (isLastChunk)
             {
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferCompleted), completedPlayerIds);
@@ -76,14 +76,12 @@ namespace Tsvrc.TsNetworking.Utils
             _targetPlayerIds = completedPlayerIds;
         }
 
-        protected override void OnProcessCleanup()
+        protected override void OnProcessCleanup(bool isCompleted)
         {
-            base.OnProcessCleanup();
+            base.OnProcessCleanup(isCompleted);
 
-            // If not the last chunk, start next; otherwise cleanup
-            bool isLastChunk = _currentChunkIndex == _totalChunks;
-            
-            if (!isLastChunk)
+            // Only continue to next chunk if completed successfully (not stopped)
+            if (isCompleted && _currentChunkIndex < _totalChunks)
             {
                 _currentChunkIndex++;
                 StartProcessFromTracker(_targetPlayerIds);

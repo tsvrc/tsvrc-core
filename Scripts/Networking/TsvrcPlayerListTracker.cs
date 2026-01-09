@@ -65,9 +65,9 @@ namespace Tsvrc.TsNetworking
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessCompleted), newPlayerIds);
         }
 
-        protected override void OnProcessCleanup()
+        protected override void OnProcessCleanup(bool isCompleted)
         {
-            base.OnProcessCleanup();
+            base.OnProcessCleanup(isCompleted);
 
             _trackedPlayerIds = new string[0];
             RequestSerialization();

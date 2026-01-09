@@ -42,9 +42,9 @@ namespace Tsvrc.TsNetworking
             RequestSerialization();
         }
 
-        protected override void OnProcessCleanup()
+        protected override void OnProcessCleanup(bool isCompleted)
         {
-            base.OnProcessCleanup();
+            base.OnProcessCleanup(isCompleted);
 
             _readyPlayerIds = new string[0];
             RequestSerialization();

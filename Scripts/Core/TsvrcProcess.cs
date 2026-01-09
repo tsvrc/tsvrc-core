@@ -90,7 +90,7 @@ namespace Tsvrc.Core
             RequestSerialization();
 
             OnProcessStopped();
-            OnProcessCleanup();
+            OnProcessCleanup(false);
         }
 
         /// <summary>
@@ -113,7 +113,7 @@ namespace Tsvrc.Core
             RequestSerialization();
 
             OnProcessCompleted();
-            OnProcessCleanup();
+            OnProcessCleanup(true);
         }
 
         /// <summary>
@@ -180,7 +180,8 @@ namespace Tsvrc.Core
         /// Called when a cleanup of the process data is requested.
         /// Only invoked on the process owner.
         /// </summary>
-        protected virtual void OnProcessCleanup() { }
+        /// <param name="isCompleted">True if cleanup is after successful completion, false if after stop/abort.</param>
+        protected virtual void OnProcessCleanup(bool isCompleted) { }
 
         #endregion
     }
