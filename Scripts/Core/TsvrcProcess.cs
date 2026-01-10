@@ -6,7 +6,7 @@ using VRC.SDKBase;
 namespace Tsvrc.Core
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsvrcProcess : UdonSharpBehaviour
+    public class TsvrcProcess : TsvrcBehaviour
     {
         [UdonSynced] private bool _isRunning = false;
         [UdonSynced] private string _ownerId = "";
