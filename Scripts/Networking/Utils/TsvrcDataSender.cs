@@ -84,7 +84,7 @@ namespace Tsvrc.TsNetworking.Utils
             if (isCompleted && _currentChunkIndex < _totalChunks)
             {
                 _currentChunkIndex++;
-                StartProcessFromTracker(_targetPlayerIds);
+                StartReadyCheck(_targetPlayerIds);
             }
             else
             {
@@ -110,7 +110,7 @@ namespace Tsvrc.TsNetworking.Utils
             ResetInternalTransferData();
             _initialData = data;
 
-            StartProcessFromTracker(playerIds);
+            StartReadyCheck(playerIds);
         }
 
         /// <summary>
@@ -118,7 +118,7 @@ namespace Tsvrc.TsNetworking.Utils
         /// </summary>
         public virtual void CancelDataTransfer()
         {
-            StopProcess();
+            StopReadyCheck();
         }
 
         #endregion

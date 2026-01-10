@@ -27,7 +27,7 @@ namespace Tsvrc.TsNetworking
                 }
             }
 
-            CompleteProcess();
+            CompleteReadyCheck();
         }
 
         #endregion
@@ -88,6 +88,30 @@ namespace Tsvrc.TsNetworking
         #endregion
 
         #region Public Methods
+
+        /// <summary>
+        /// Starts the ready check process.
+        /// </summary>
+        public virtual void StartReadyCheck(string[] playerIds)
+        {
+            base.StartProcessFromTracker(playerIds);
+        }
+
+        /// <summary>
+        /// Stops the ready check process before completion.
+        /// </summary>
+        public virtual void StopReadyCheck()
+        {
+            base.StopProcessFromTracker();
+        }
+
+        /// <summary>
+        /// Completes the ready check process.
+        /// </summary>
+        public virtual void CompleteReadyCheck()
+        {
+            base.CompleteProcessFromTracker();
+        }
 
         /// <summary>
         /// Sets the local player's ready status.

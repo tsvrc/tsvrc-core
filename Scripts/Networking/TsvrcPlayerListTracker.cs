@@ -77,11 +77,30 @@ namespace Tsvrc.TsNetworking
 
         #region Public Methods
 
+        /// <summary>
+        /// Starts the process from the tracker with the specified player IDs.
+        /// </summary>
         public virtual void StartProcessFromTracker(string[] playerIds)
         {
             _initialTrackerPlayerIds = playerIds;
 
             base.StartProcess();
+        }
+
+        /// <summary>
+        /// Stops the process from the tracker before completion.
+        /// </summary>
+        public virtual void StopProcessFromTracker()
+        {
+            base.StopProcess();
+        }
+
+        /// <summary>
+        /// Completes the process from the tracker.
+        /// </summary>
+        public virtual void CompleteProcessFromTracker()
+        {
+            base.CompleteProcess();
         }
 
         /// <summary>
