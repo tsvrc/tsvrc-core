@@ -4,6 +4,19 @@ namespace Tsvrc.UI.Utils
 {
     public static class FigureGraphics2D
     {
+        public static void FillTexture(Texture2D texture, Color fillColor)
+        {
+            Color[] pixels = new Color[texture.width * texture.height];
+            for (int i = 0; i < pixels.Length; i++)
+                pixels[i] = fillColor;
+            texture.SetPixels(pixels);
+        }
+
+        public static void ClearTexture(Texture2D texture)
+        {
+            FillTexture(texture, Color.clear);
+        }
+
         public static void DrawLine(Texture2D texture, int x0, int y0, int x1, int y1, int thickness, Color color)
         {
             // Bresenham's line algorithm with thickness
