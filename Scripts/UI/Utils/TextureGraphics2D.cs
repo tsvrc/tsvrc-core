@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Tsvrc.UI.Utils
 {
-    public static class FigureGraphics2D
+    public static class TextureGraphics2D
     {
         public static void FillTexture(Texture2D texture, Color fillColor)
         {
