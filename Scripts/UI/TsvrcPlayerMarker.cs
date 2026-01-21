@@ -7,66 +7,97 @@ namespace Tsvrc.UI
 {
     public class TsvrcPlayerMarker : TsvrcBehaviour
     {
-        public RawImage PlayerDisplay;
+        public RawImage OverlayImage;
         public Color PlayerColor = Color.yellow;
         public int MarkerRadius = 6;
 
-        private Texture2D playerTexture;
+        private Texture2D overlayTexture;
         private int textureWidth;
         private int textureHeight;
+        private int lastPixelX = -1;
+        private int lastPixelY = -1;
 
-        /// <summary>
-        /// Initialize the player marker texture with given dimensions
-        /// </summary>
-        public void Initialize(int width, int height)
+        // Coordinate conversion parameters
+        private Vector3 worldOrigin;
+        private float pixelsPerWorldUnitX;
+        private float pixelsPerWorldUnitZ;
+
+        public void Initialize(int width, int height, Vector3 mapWorldOrigin, float worldToPixelScaleX, float worldToPixelScaleZ)
         {
-            if (PlayerDisplay == null) return;
+            if (OverlayImage == null) return;
 
             textureWidth = width;
             textureHeight = height;
+            worldOrigin = mapWorldOrigin;
+            pixelsPerWorldUnitX = worldToPixelScaleX;
+            pixelsPerWorldUnitZ = worldToPixelScaleZ;
 
-            playerTexture = new Texture2D(textureWidth, textureHeight, TextureFormat.RGBA32, false);
+            // Create transparent overlay texture
+            overlayTexture = new Texture2D(textureWidth, textureHeight, TextureFormat.RGBA32, false);
+            ClearTexture();
 
-            // Fill with transparent pixels
-            Color[] pixels = new Color[textureWidth * textureHeight];
-            for (int i = 0; i < pixels.Length; i++)
-                pixels[i] = Color.clear;
-
-            playerTexture.SetPixels(pixels);
-            playerTexture.Apply();
-
-            PlayerDisplay.texture = playerTexture;
+            OverlayImage.texture = overlayTexture;
         }
 
-        /// <summary>
-        /// Update player marker position at given pixel coordinates
-        /// </summary>
-        public void UpdatePosition(int pixelX, int pixelY)
+        public void UpdatePositionFromWorld(Vector3 worldPos)
         {
-            if (playerTexture == null || PlayerDisplay == null) return;
+            if (overlayTexture == null || pixelsPerWorldUnitX <= 0 || pixelsPerWorldUnitZ <= 0) return;
 
-            // Clamp to texture bounds
+            // Convert world position to pixel coordinates
+            int pixelX, pixelY;
+            WorldToPixel(worldPos, out pixelX, out pixelY);
+
+            UpdatePosition(pixelX, pixelY);
+        }
+
+        private void UpdatePosition(int pixelX, int pixelY)
+        {
+            if (overlayTexture == null) return;
+
+            // Only redraw if position changed
+            if (pixelX == lastPixelX && pixelY == lastPixelY) return;
+
+            // Clamp to bounds
             pixelX = Mathf.Clamp(pixelX, 0, textureWidth - 1);
             pixelY = Mathf.Clamp(pixelY, 0, textureHeight - 1);
 
-            // Clear previous marker
-            TextureGraphics2D.ClearTexture(playerTexture);
+            lastPixelX = pixelX;
+            lastPixelY = pixelY;
 
-            // Draw new marker at position
-            TextureGraphics2D.DrawCircle(playerTexture, pixelX, pixelY, MarkerRadius, PlayerColor);
-
-            playerTexture.Apply();
+            // Clear and redraw marker
+            ClearTexture();
+            TextureGraphics2D.DrawCircle(overlayTexture, pixelX, pixelY, MarkerRadius, PlayerColor);
+            overlayTexture.Apply();
         }
 
-        /// <summary>
-        /// Clear the player marker from display
-        /// </summary>
+        private void WorldToPixel(Vector3 worldPos, out int x, out int y)
+        {
+            // Get position relative to map origin
+            float relativeX = worldPos.x - worldOrigin.x;
+            float relativeZ = worldPos.z - worldOrigin.z;
+
+            // Convert to pixel coordinates using scale factors
+            x = Mathf.RoundToInt(relativeX * pixelsPerWorldUnitX);
+            y = Mathf.RoundToInt(relativeZ * pixelsPerWorldUnitZ);
+
+            // Clamp to texture bounds
+            x = Mathf.Clamp(x, 0, textureWidth - 1);
+            y = Mathf.Clamp(y, 0, textureHeight - 1);
+        }
+
         public void Clear()
         {
-            if (playerTexture == null) return;
+            if (overlayTexture == null) return;
+            ClearTexture();
+            overlayTexture.Apply();
+        }
 
-            TextureGraphics2D.ClearTexture(playerTexture);
-            playerTexture.Apply();
+        private void ClearTexture()
+        {
+            Color[] pixels = new Color[textureWidth * textureHeight];
+            for (int i = 0; i < pixels.Length; i++)
+                pixels[i] = Color.clear;
+            overlayTexture.SetPixels(pixels);
         }
     }
 }
