@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 namespace Tsvrc.UI
 {
-    public class TsvrcPlayerMarker : TsvrcBehaviour
+    public class TsvrcMarkerMapOverlay : TsvrcBehaviour
     {
         public RawImage OverlayImage;
         public Color PlayerColor = Color.yellow;
