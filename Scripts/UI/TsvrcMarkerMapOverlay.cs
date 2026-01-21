@@ -34,7 +34,7 @@ namespace Tsvrc.UI
 
             // Create transparent overlay texture
             overlayTexture = new Texture2D(textureWidth, textureHeight, TextureFormat.RGBA32, false);
-            ClearTexture();
+            TextureGraphics2D.ClearTexture(overlayTexture);
 
             OverlayImage.texture = overlayTexture;
         }
@@ -65,7 +65,7 @@ namespace Tsvrc.UI
             lastPixelY = pixelY;
 
             // Clear and redraw marker
-            ClearTexture();
+            TextureGraphics2D.ClearTexture(overlayTexture);
             TextureGraphics2D.DrawCircle(overlayTexture, pixelX, pixelY, MarkerRadius, PlayerColor);
             overlayTexture.Apply();
         }
@@ -88,16 +88,8 @@ namespace Tsvrc.UI
         public void Clear()
         {
             if (overlayTexture == null) return;
-            ClearTexture();
+            TextureGraphics2D.ClearTexture(overlayTexture);
             overlayTexture.Apply();
-        }
-
-        private void ClearTexture()
-        {
-            Color[] pixels = new Color[textureWidth * textureHeight];
-            for (int i = 0; i < pixels.Length; i++)
-                pixels[i] = Color.clear;
-            overlayTexture.SetPixels(pixels);
         }
     }
 }
