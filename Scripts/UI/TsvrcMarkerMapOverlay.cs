@@ -10,12 +10,16 @@ namespace Tsvrc.UI
         public RawImage OverlayImage;
         public Color PlayerColor = Color.yellow;
         public int MarkerRadius = 6;
+        [Tooltip("How often to redraw the marker in seconds (e.g., 0.5 for twice per second, 1.0 for once per second)")]
+        public float UpdateInterval = 0.5f;
 
         private Texture2D overlayTexture;
         private int textureWidth;
         private int textureHeight;
         private int lastPixelX = -1;
         private int lastPixelY = -1;
+        private bool updateScheduled = false;
+        private Vector3 pendingWorldPos;
 
         // Coordinate conversion parameters
         private Vector3 worldOrigin;
@@ -43,9 +47,26 @@ namespace Tsvrc.UI
         {
             if (overlayTexture == null || pixelsPerWorldUnitX <= 0 || pixelsPerWorldUnitZ <= 0) return;
 
+            // Store the pending position
+            pendingWorldPos = worldPos;
+
+            // Schedule an update if one isn't already scheduled
+            if (!updateScheduled)
+            {
+                updateScheduled = true;
+                SendCustomEventDelayedSeconds(nameof(_DelayedUpdate), UpdateInterval);
+            }
+        }
+
+        public void _DelayedUpdate()
+        {
+            updateScheduled = false;
+
+            if (overlayTexture == null || pixelsPerWorldUnitX <= 0 || pixelsPerWorldUnitZ <= 0) return;
+
             // Convert world position to pixel coordinates
             int pixelX, pixelY;
-            WorldToPixel(worldPos, out pixelX, out pixelY);
+            WorldToPixel(pendingWorldPos, out pixelX, out pixelY);
 
             UpdatePosition(pixelX, pixelY);
         }

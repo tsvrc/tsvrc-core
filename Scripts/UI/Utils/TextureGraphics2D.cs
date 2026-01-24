@@ -6,15 +6,17 @@ namespace Tsvrc.UI.Utils
     {
         public static void FillTexture(Texture2D texture, Color fillColor)
         {
-            Color[] pixels = new Color[texture.width * texture.height];
+            Color32[] pixels = new Color32[texture.width * texture.height];
+            Color32 fillColor32 = fillColor;
             for (int i = 0; i < pixels.Length; i++)
-                pixels[i] = fillColor;
-            texture.SetPixels(pixels);
+                pixels[i] = fillColor32;
+            texture.SetPixels32(pixels);
         }
 
         public static void ClearTexture(Texture2D texture)
         {
-            FillTexture(texture, Color.clear);
+            Color32[] clearPixels = new Color32[texture.width * texture.height];
+            texture.SetPixels32(clearPixels);
         }
 
         public static void DrawLine(Texture2D texture, int x0, int y0, int x1, int y1, int thickness, Color color)
