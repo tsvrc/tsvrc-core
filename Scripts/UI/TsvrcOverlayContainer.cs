@@ -1,7 +1,5 @@
-﻿
-using UdonSharp;
+﻿using UdonSharp;
 using UnityEngine;
-using UnityEngine.UI;
 using VRC.SDKBase;
 
 namespace Tsvrc.UI
@@ -9,35 +7,12 @@ namespace Tsvrc.UI
     public class TsvrcOverlayContainer : UdonSharpBehaviour
     {
         public Canvas canvas;
-        public Material overlayMaterial;
 
         #region Unity Callbacks
 
         protected void Start()
         {
-            if (overlayMaterial != null)
-            {
-                // Set material on all MeshRenderers in child objects
-                MeshRenderer[] renderers = GetComponentsInChildren<MeshRenderer>(true);
-                foreach (MeshRenderer renderer in renderers)
-                {
-                    renderer.material = overlayMaterial;
-                }
 
-                // Set material on all UI Images in child objects
-                Image[] images = GetComponentsInChildren<Image>(true);
-                foreach (Image image in images)
-                {
-                    image.material = overlayMaterial;
-                }
-
-                // Set material on all UI RawImages in child objects
-                RawImage[] rawImages = GetComponentsInChildren<RawImage>(true);
-                foreach (RawImage rawImage in rawImages)
-                {
-                    rawImage.material = overlayMaterial;
-                }
-            }
         }
 
         protected void Update()
