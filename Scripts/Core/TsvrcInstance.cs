@@ -5,9 +5,9 @@ namespace Tsvrc.Core
 {
     public class TsvrcInstance : UdonSharpBehaviour
     {
-        [SerializeField] private TsvrcSingleton _singleton;
+        [SerializeField] protected TsvrcSingleton _singleton;
 
-        public void Start()
+        protected virtual void Start()
         {
             _singleton.TsConstruct(instance: this);
         }
