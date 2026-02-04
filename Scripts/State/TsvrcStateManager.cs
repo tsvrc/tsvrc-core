@@ -6,7 +6,7 @@ namespace Tsvrc.State
     {
         protected int currentState = -1;
 
-        public void SetState(int newState)
+        protected void SetState(int newState)
         {
             currentState = newState;
             OnStateChanged(newState);
