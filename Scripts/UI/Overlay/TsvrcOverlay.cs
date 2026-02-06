@@ -47,6 +47,16 @@ namespace Tsvrc.UI.Overlay
 
         private void Start()
         {
+            // Disable all colliders on the canvas to prevent physical collision
+            if (Container != null)
+            {
+                Collider[] colliders = Container.GetComponentsInChildren<Collider>(true);
+                foreach (Collider col in colliders)
+                {
+                    col.enabled = false;
+                }
+            }
+
             VRCPlayerApi localPlayer = Networking.LocalPlayer;
             if (localPlayer != null && localPlayer.IsUserInVR() && DesktopDisplay != null)
             {
@@ -94,7 +104,7 @@ namespace Tsvrc.UI.Overlay
                 Gizmos.color = Color.yellow;
                 Vector3 worldPos = Container.transform.TransformPoint(VRDisplayLocalPosition);
                 Quaternion worldRot = Container.transform.rotation * VRDisplayRotation;
-                
+
                 Gizmos.matrix = Matrix4x4.TRS(worldPos, worldRot, Vector3.one);
                 Gizmos.DrawWireCube(Vector3.zero, VRDisplayScale);
                 Gizmos.matrix = Matrix4x4.identity;
