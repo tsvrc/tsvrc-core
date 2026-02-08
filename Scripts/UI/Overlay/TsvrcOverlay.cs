@@ -13,8 +13,16 @@ namespace Tsvrc.UI.Overlay
         public Transform RightPanel;
         public Transform MainPanel;
 
+        private Vector3 _initialContainerScale;
+
         private void Start()
         {
+            // Store the initial container scale set in the editor
+            if (Container != null)
+            {
+                _initialContainerScale = Container.localScale;
+            }
+
             // Disable all colliders to prevent physical collision
             if (Container != null)
             {
@@ -39,6 +47,10 @@ namespace Tsvrc.UI.Overlay
             Container.rotation = headRotation;
             Vector3 offset = PlayerHeadPosition.position - Container.position;
             Container.position = headPosition - offset;
+
+            // Scale overlay based on player avatar eye height
+            float eyeHeight = localPlayer.GetAvatarEyeHeightAsMeters();
+            Container.localScale = _initialContainerScale * eyeHeight;
         }
 
         private void OnDrawGizmos()
