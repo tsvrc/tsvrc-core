@@ -35,8 +35,10 @@ namespace Tsvrc.UI.Overlay
             Vector3 headPosition = localPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
             Quaternion headRotation = localPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).rotation;
 
-            Container.position = headPosition - headRotation * PlayerHeadPosition.localPosition;
+            // Position Container so that PlayerHeadPosition aligns with the real head
             Container.rotation = headRotation;
+            Vector3 offset = PlayerHeadPosition.position - Container.position;
+            Container.position = headPosition - offset;
         }
 
         private void OnDrawGizmos()
