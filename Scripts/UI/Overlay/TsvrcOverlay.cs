@@ -9,11 +9,10 @@ namespace Tsvrc.UI.Overlay
         [Header("References")]
         public Transform PlayerHeadPosition;
         public Transform Container;
-        public Transform LeftPanel;
-        public Transform RightPanel;
         public Transform MainPanel;
 
         private Vector3 _initialContainerScale;
+        private float _lastEyeHeight = -1f;
 
         private void Start()
         {
@@ -32,6 +31,14 @@ namespace Tsvrc.UI.Overlay
                     col.enabled = false;
                 }
             }
+
+            // Set initial scale based on player height
+            VRCPlayerApi localPlayer = Networking.LocalPlayer;
+            if (localPlayer != null && Container != null)
+            {
+                _lastEyeHeight = localPlayer.GetAvatarEyeHeightAsMeters();
+                Container.localScale = _initialContainerScale * _lastEyeHeight;
+            }
         }
 
         private void Update()
@@ -48,9 +55,13 @@ namespace Tsvrc.UI.Overlay
             Vector3 offset = PlayerHeadPosition.position - Container.position;
             Container.position = headPosition - offset;
 
-            // Scale overlay based on player avatar eye height
+            // Scale overlay based on player avatar eye height (only when it changes)
             float eyeHeight = localPlayer.GetAvatarEyeHeightAsMeters();
-            Container.localScale = _initialContainerScale * eyeHeight;
+            if (Mathf.Abs(eyeHeight - _lastEyeHeight) > 0.001f)
+            {
+                _lastEyeHeight = eyeHeight;
+                Container.localScale = _initialContainerScale * eyeHeight;
+            }
         }
 
         private void OnDrawGizmos()
@@ -74,20 +85,6 @@ namespace Tsvrc.UI.Overlay
             {
                 Gizmos.color = Color.cyan;
                 DrawPanelGizmo(MainPanel);
-            }
-
-            // Draw left panel
-            if (LeftPanel != null)
-            {
-                Gizmos.color = Color.magenta;
-                DrawPanelGizmo(LeftPanel);
-            }
-
-            // Draw right panel
-            if (RightPanel != null)
-            {
-                Gizmos.color = new Color(1f, 0.5f, 0f); // Orange
-                DrawPanelGizmo(RightPanel);
             }
         }
 
