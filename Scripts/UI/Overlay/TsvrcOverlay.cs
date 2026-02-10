@@ -9,10 +9,14 @@ namespace Tsvrc.UI.Overlay
         [Header("References")]
         public Transform PlayerHeadPosition;
         public Transform Container;
-        public Transform MainPanel;
+        public Transform Display;
 
         private Vector3 _initialContainerScale;
         private float _lastEyeHeight = -1f;
+
+        private Vector3 VrPosition = new Vector3(0, -0.015f, -0.255f);
+        private Vector3 VrRotation = new Vector3(5, 0, 0);
+        private Vector3 VrScale = new Vector3(0.00004f, 0.00004f, 0.01f);
 
         private void Start()
         {
@@ -38,6 +42,14 @@ namespace Tsvrc.UI.Overlay
             {
                 _lastEyeHeight = localPlayer.GetAvatarEyeHeightAsMeters();
                 Container.localScale = _initialContainerScale * _lastEyeHeight;
+            }
+
+            // Set VR vectors to the display if player is in VR
+            if (localPlayer != null && localPlayer.IsUserInVR() && Display != null)
+            {
+                Display.localPosition = VrPosition;
+                Display.localEulerAngles = VrRotation;
+                Display.localScale = VrScale;
             }
         }
 
@@ -80,11 +92,11 @@ namespace Tsvrc.UI.Overlay
                 Gizmos.DrawSphere(PlayerHeadPosition.position, 0.05f);
             }
 
-            // Draw main panel
-            if (MainPanel != null)
+            // Draw display
+            if (Display != null)
             {
                 Gizmos.color = Color.cyan;
-                DrawPanelGizmo(MainPanel);
+                DrawPanelGizmo(Display);
             }
         }
 
