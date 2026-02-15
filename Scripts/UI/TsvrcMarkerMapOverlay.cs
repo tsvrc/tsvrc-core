@@ -28,7 +28,11 @@ namespace Tsvrc.UI
 
         public void Initialize(int width, int height, Vector3 mapWorldOrigin, float worldToPixelScaleX, float worldToPixelScaleZ)
         {
-            if (OverlayImage == null) return;
+            if (OverlayImage == null)
+            {
+                Debug.LogError("[MarkerOverlay] Initialize: OverlayImage is null!");
+                return;
+            }
 
             textureWidth = width;
             textureHeight = height;
@@ -39,8 +43,10 @@ namespace Tsvrc.UI
             // Create transparent overlay texture
             overlayTexture = new Texture2D(textureWidth, textureHeight, TextureFormat.RGBA32, false);
             TextureGraphics2D.ClearTexture(overlayTexture);
+            overlayTexture.Apply();
 
             OverlayImage.texture = overlayTexture;
+            OverlayImage.color = new Color(1f, 1f, 1f, 1f);
         }
 
         public void UpdatePositionFromWorld(Vector3 worldPos)
