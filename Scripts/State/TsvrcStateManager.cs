@@ -18,6 +18,11 @@ namespace Tsvrc.State
             OnEnterState(newState);
         }
 
+        public int GetCurrentState()
+        {
+            return currentState;
+        }
+
         /// <summary>
         /// Called when exiting the old state
         /// </summary>

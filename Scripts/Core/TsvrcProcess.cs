@@ -1,7 +1,9 @@
 using Tsvrc.TsNetworking.Utils;
 using UdonSharp;
 using UnityEngine;
+using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
+using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Core
 {
@@ -10,6 +12,8 @@ namespace Tsvrc.Core
     {
         [UdonSynced] private bool _isRunning = false;
         [UdonSynced] private string _ownerId = "";
+        [UdonSynced] private bool _useProcessUpdate = false;
+        [UdonSynced] private float _processUpdateInterval = 0.5f;
 
         #region Unity Lifecycle
 
@@ -42,6 +46,18 @@ namespace Tsvrc.Core
             }
         }
 
+#pragma warning disable
+        public override void OnOwnershipTransferred(VRCPlayerApi player)
+#pragma warning restore
+        {
+            base.OnOwnershipTransferred(player);
+
+            if (IsProcessOwner() && IsProcessRunning() && _useProcessUpdate)
+            {
+                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(BroadcastUpdateProcess));
+            }
+        }
+
         #endregion
 
         #region Public Methods
@@ -49,7 +65,7 @@ namespace Tsvrc.Core
         /// <summary>
         /// Starts the Tsvrc Process.
         /// </summary>
-        public virtual void StartProcess()
+        public virtual void StartProcess(bool useProcessUpdate = false)
         {
             if (_isRunning)
             {
@@ -63,9 +79,15 @@ namespace Tsvrc.Core
             }
 
             _isRunning = true;
+            _useProcessUpdate = useProcessUpdate;
             RequestSerialization();
 
             OnProcessStarted();
+
+            if (_useProcessUpdate)
+            {
+                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(BroadcastUpdateProcess));
+            }
         }
 
         /// <summary>
@@ -148,6 +170,12 @@ namespace Tsvrc.Core
             return Networking.IsOwner(gameObject);
         }
 
+        /// <summary>
+        /// Called at regular intervals if the process is running and the local player is the owner.
+        /// Only invoked on the process owner.
+        /// </summary>
+        protected virtual void OnProcessUpdate() { }
+
         #endregion
 
         #region Virtual Methods
@@ -182,6 +210,20 @@ namespace Tsvrc.Core
         /// </summary>
         /// <param name="isCompleted">True if cleanup is after successful completion, false if after stop/abort.</param>
         protected virtual void OnProcessCleanup(bool isCompleted) { }
+
+        #endregion
+
+        #region Network Events
+
+        [NetworkCallable]
+        public void BroadcastUpdateProcess()
+        {
+            if (!IsProcessRunning()) return;
+
+            OnProcessUpdate();
+
+            SendCustomEventDelayedSeconds(nameof(BroadcastUpdateProcess), _processUpdateInterval);
+        }
 
         #endregion
     }

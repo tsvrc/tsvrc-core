@@ -11,27 +11,6 @@ namespace Tsvrc.TsNetworking
     {
         [UdonSynced] private string[] _readyPlayerIds = new string[0];
 
-        #region Unity Lifecycle
-
-        private void Update()
-        {
-            if (!IsProcessRunning() || !IsProcessOwner()) return;
-
-            string[] trackedPlayerIds = GetTrackedPlayerIds();
-
-            foreach (string playerId in trackedPlayerIds)
-            {
-                if (!IsPlayerReady(playerId))
-                {
-                    return; // At least one player is not ready
-                }
-            }
-
-            CompleteReadyCheck();
-        }
-
-        #endregion
-
         #region TsvrcProcess Callbacks
 
         protected override void OnProcessStarted()
@@ -48,6 +27,23 @@ namespace Tsvrc.TsNetworking
 
             _readyPlayerIds = new string[0];
             RequestSerialization();
+        }
+
+        protected override void OnProcessUpdate()
+        {
+            base.OnProcessUpdate();
+
+            string[] trackedPlayerIds = GetTrackedPlayerIds();
+
+            foreach (string playerId in trackedPlayerIds)
+            {
+                if (!IsPlayerReady(playerId))
+                {
+                    return; // At least one player is not ready
+                }
+            }
+
+            CompleteReadyCheck();
         }
 
         #endregion
@@ -94,7 +90,7 @@ namespace Tsvrc.TsNetworking
         /// </summary>
         public virtual void StartReadyCheck(string[] playerIds)
         {
-            base.StartProcessFromTracker(playerIds);
+            base.StartProcessFromTracker(playerIds, useProcessUpdate: true);
         }
 
         /// <summary>

@@ -80,11 +80,11 @@ namespace Tsvrc.TsNetworking
         /// <summary>
         /// Starts the process from the tracker with the specified player IDs.
         /// </summary>
-        public virtual void StartProcessFromTracker(string[] playerIds)
+        public virtual void StartProcessFromTracker(string[] playerIds, bool useProcessUpdate = false)
         {
             _initialTrackerPlayerIds = playerIds;
 
-            base.StartProcess();
+            base.StartProcess(useProcessUpdate);
         }
 
         /// <summary>
