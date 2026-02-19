@@ -164,10 +164,13 @@ namespace Tsvrc.Core
 
         /// <summary>
         /// Determines if the local player is the process owner.
+        /// Uses _ownerId instead of Networking.IsOwner() because Networking.SetOwner() is
+        /// not immediately reflected on the local client. _ownerId is set synchronously and
+        /// arrives atomically with _isRunning via RequestSerialization on remote clients.
         /// </summary>
         protected bool IsProcessOwner()
         {
-            return Networking.IsOwner(gameObject);
+            return _ownerId == TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
         }
 
         /// <summary>

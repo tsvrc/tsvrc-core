@@ -76,7 +76,7 @@ namespace Tsvrc.TsNetworking
             {
                 if (IsPlayerReady(playerId))
                 {
-                    SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(BroadcastRemoveReadyPlayer), playerId);
+                    SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastRemoveReadyPlayer), playerId);
                 }
             }
         }
@@ -119,12 +119,12 @@ namespace Tsvrc.TsNetworking
             if (ready)
             {
                 if (IsPlayerReady(playerId)) return;
-                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(BroadcastAddReadyPlayer), playerId);
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastAddReadyPlayer), playerId);
             }
             else
             {
                 if (!IsPlayerReady(playerId)) return;
-                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(BroadcastRemoveReadyPlayer), playerId);
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastRemoveReadyPlayer), playerId);
             }
         }
 
@@ -171,12 +171,14 @@ namespace Tsvrc.TsNetworking
 
         /// <summary>
         /// Adds a player to the ready list.
-        /// This method is network callable and is intended to be called on the owner.
+        /// Sent to all players instead of NetworkEventTarget.Owner to avoid a race where
+        /// ownership hasn't propagated yet on the sender's side.
         /// </summary>
         [NetworkCallable]
         public void BroadcastAddReadyPlayer(string playerId)
         {
             if (!IsProcessRunning()) return;
+            if (!IsProcessOwner()) return;
 
             string[] playerIds = TsPlayerUtils.ToArray(playerId);
             _readyPlayerIds = TsArray.Add(_readyPlayerIds, playerIds);
@@ -185,12 +187,13 @@ namespace Tsvrc.TsNetworking
 
         /// <summary>
         /// Removes a player from the ready list.
-        /// This method is network callable and is intended to be called on the owner.
+        /// See BroadcastAddReadyPlayer for the two-guard reasoning.
         /// </summary>
         [NetworkCallable]
         public void BroadcastRemoveReadyPlayer(string playerId)
         {
             if (!IsProcessRunning()) return;
+            if (!IsProcessOwner()) return;
 
             string[] playerIds = TsPlayerUtils.ToArray(playerId);
             _readyPlayerIds = TsArray.Remove(_readyPlayerIds, playerIds);
