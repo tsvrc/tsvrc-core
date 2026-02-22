@@ -11,6 +11,14 @@ namespace Tsvrc.Core
         {
             Instance = instance;
             Singleton = singleton;
+
+            TsStart();
         }
+
+        #region Virtual Methods
+
+        public virtual void TsStart() { }
+
+        #endregion
     }
 }
