@@ -1,3 +1,4 @@
+using Tsvrc.Core;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
@@ -11,7 +12,7 @@ namespace Tsvrc.Player
     /// Usage: Setup(colliders, count) → Activate(). Call Deactivate() to stop.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class VrHeadClipGuard : UdonSharpBehaviour
+    public class VrHeadClipGuard : TsvrcBehaviour
     {
         [Header("Configuration")]
         [SerializeField, Tooltip("Margin (metres) added to solid OBB half-extents. Prevents head from grazing surfaces.")]
@@ -31,9 +32,9 @@ namespace Tsvrc.Player
         private Vector3 _lastSafePlayerPos;
         private Quaternion _lastSafePlayerRot;
 
-        #region Unity Lifecycle
+        #region TsvrcBehaviour Callbacks
 
-        private void Start()
+        protected override void TsStart()
         {
             _localPlayer = Networking.LocalPlayer;
         }
