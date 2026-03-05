@@ -10,7 +10,7 @@ namespace Tsvrc.Editor
     {
         private const string OutputPath = "Assets/TsvrcGenerated/CompiledTsvrc.cs";
 
-        [MenuItem("Tsvrc/Compile Singletons")]
+        [MenuItem("Tsvrc/Compile")]
         public static void Compile()
         {
             string fullPath = Path.Combine(
