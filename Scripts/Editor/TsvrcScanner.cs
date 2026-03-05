@@ -15,6 +15,7 @@ namespace Tsvrc.Editor
         public Type Type;
         public string FieldName;
         public bool FactoryUsed;      // only relevant for Behaviour kind
+        public bool SingletonUsed;    // only relevant for Singleton kind
         public bool IsTsvrcBehaviour; // true if Type extends TsvrcBehaviour
         public UnityEngine.Object SceneObject; // actual scene reference for wiring
     }
@@ -81,13 +82,13 @@ namespace Tsvrc.Editor
                 return null;
             }
 
-            // Filter singletons with no _ts.FieldName reference in code
-            singletonGroup.Entries.RemoveAll(entry =>
+            // Mark singletons: used = has _ts.FieldName reference in code
+            foreach (var entry in singletonGroup.Entries)
             {
-                if (IsSingletonUsed(entry.FieldName)) return false;
-                Debug.LogWarning($"[TsvrcCompiler] '{entry.FieldName}' ({entry.Type.Name}) has no '_ts.{entry.FieldName}' usage — excluded from CompiledTsvrc.");
-                return true;
-            });
+                entry.SingletonUsed = IsSingletonUsed(entry.FieldName);
+                if (!entry.SingletonUsed)
+                    Debug.LogWarning($"[TsvrcCompiler] '{entry.FieldName}' ({entry.Type.Name}) has no '_ts.{entry.FieldName}' usage — will be hidden in inspector.");
+            }
 
             // Resolve factory usage for behaviour entries
             foreach (var entry in behaviourGroup.Entries)

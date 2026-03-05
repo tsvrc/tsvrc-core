@@ -91,7 +91,8 @@ namespace Tsvrc.Editor
             foreach (var group in result.Groups)
                 if (group.Kind == TsvrcGroupKind.Singleton)
                     foreach (var entry in group.Entries)
-                        SetField(tsSerialized, entry.FieldName, ResolveComponent(entry));
+                        if (entry.SingletonUsed)
+                            SetField(tsSerialized, entry.FieldName, ResolveComponent(entry));
 
             foreach (var group in result.Groups)
                 if (group.Kind == TsvrcGroupKind.Behaviour)
@@ -113,7 +114,7 @@ namespace Tsvrc.Editor
             int singletonCount = 0, factoryCount = 0;
             foreach (var group in result.Groups)
             {
-                if (group.Kind == TsvrcGroupKind.Singleton) singletonCount += group.Entries.Count;
+                if (group.Kind == TsvrcGroupKind.Singleton) foreach (var e in group.Entries) { if (e.SingletonUsed) singletonCount++; }
                 if (group.Kind == TsvrcGroupKind.Behaviour)
                     foreach (var entry in group.Entries)
                         if (entry.FactoryUsed) factoryCount++;

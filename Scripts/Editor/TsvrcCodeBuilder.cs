@@ -29,8 +29,16 @@ namespace Tsvrc.Editor
                 if (group.Kind == TsvrcGroupKind.Singleton)
                     foreach (var entry in group.Entries)
                     {
-                        sb.AppendLine($"    /// <summary>Tsvrc singleton — wired by TsvrcSceneWirer.</summary>");
-                        sb.AppendLine($"    [SerializeField] public {entry.Type.Name} {entry.FieldName};");
+                        if (entry.SingletonUsed)
+                        {
+                            sb.AppendLine($"    /// <summary>Tsvrc singleton — wired by TsvrcSceneWirer.</summary>");
+                            sb.AppendLine($"    [SerializeField] public {entry.Type.Name} {entry.FieldName};");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"    /// <summary>Unused singleton — not referenced in code, hidden from inspector.</summary>");
+                            sb.AppendLine($"    [HideInInspector] [SerializeField] public {entry.Type.Name} {entry.FieldName} = null;");
+                        }
                     }
 
             // Behaviour template fields
@@ -76,11 +84,11 @@ namespace Tsvrc.Editor
 
             var startupLines = new List<string>();
 
-            // TsConstruct TsvrcBehaviour singletons
+            // TsConstruct used TsvrcBehaviour singletons
             foreach (var group in result.Groups)
                 if (group.Kind == TsvrcGroupKind.Singleton)
                     foreach (var entry in group.Entries)
-                        if (entry.IsTsvrcBehaviour)
+                        if (entry.IsTsvrcBehaviour && entry.SingletonUsed)
                             startupLines.Add($"_ts.{entry.FieldName}.TsConstruct(_ts);");
 
             var sb = new StringBuilder();
