@@ -14,7 +14,9 @@ namespace Tsvrc.Editor
     {
         public Type Type;
         public string FieldName;
-        public bool FactoryUsed; // only relevant for Behaviour kind
+        public bool FactoryUsed;      // only relevant for Behaviour kind
+        public bool IsTsvrcBehaviour; // true if Type extends TsvrcBehaviour
+        public UnityEngine.Object SceneObject; // actual scene reference for wiring
     }
 
     internal class TsvrcGroup
@@ -26,6 +28,7 @@ namespace Tsvrc.Editor
 
     internal class TsvrcScanResult
     {
+        public TsvrcInstance SourceInstance; // the EditorOnly TsvrcInstance in scene
         public List<TsvrcGroup> Groups = new List<TsvrcGroup>();
 
         public int TotalEntries()
@@ -42,7 +45,7 @@ namespace Tsvrc.Editor
         /// Scans the active scene for a TsvrcInstance and resolves all registered entry groups.
         /// Returns null and logs an error if validation fails.
         /// </summary>
-        internal static TsvrcScanResult Scan(string generatedFilePath)
+        internal static TsvrcScanResult Scan()
         {
             var instances = UnityEngine.Object.FindObjectsOfType<TsvrcInstance>();
             if (instances == null || instances.Length == 0)
@@ -61,7 +64,7 @@ namespace Tsvrc.Editor
             }
 
             var instance = instances[0];
-            var result = new TsvrcScanResult();
+            var result = new TsvrcScanResult { SourceInstance = instance };
             var usedNames = new HashSet<string>();
 
             var singletonGroup = new TsvrcGroup { Label = "Singletons", Kind = TsvrcGroupKind.Singleton };
@@ -80,7 +83,7 @@ namespace Tsvrc.Editor
 
             // Resolve factory usage for behaviour entries
             foreach (var entry in behaviourGroup.Entries)
-                entry.FactoryUsed = IsFactoryUsed(entry.Type, generatedFilePath);
+                entry.FactoryUsed = IsFactoryUsed(entry.Type);
 
             if (singletonGroup.Entries.Count > 0) result.Groups.Add(singletonGroup);
             if (behaviourGroup.Entries.Count > 0) result.Groups.Add(behaviourGroup);
@@ -139,7 +142,13 @@ namespace Tsvrc.Editor
                     fieldName = baseName + (suffix++);
 
                 usedNames.Add(fieldName);
-                group.Entries.Add(new TsvrcEntry { Type = type, FieldName = fieldName });
+                group.Entries.Add(new TsvrcEntry
+                {
+                    Type = type,
+                    FieldName = fieldName,
+                    IsTsvrcBehaviour = typeof(TsvrcBehaviour).IsAssignableFrom(type),
+                    SceneObject = obj
+                });
             }
 
             return true;
@@ -151,15 +160,16 @@ namespace Tsvrc.Editor
         /// Returns true if <c>Create{type.Name}()</c> is called anywhere in the project
         /// except the generated output file.
         /// </summary>
-        private static bool IsFactoryUsed(Type type, string generatedFilePath)
+        private static bool IsFactoryUsed(Type type)
         {
             string assetsPath = Application.dataPath;
-            string normalizedGenerated = Path.GetFullPath(generatedFilePath);
+            // All generated files live under Assets/TsvrcGenerated — exclude entire folder.
+            string generatedFolder = Path.GetFullPath(Path.Combine(assetsPath, "TsvrcGenerated"));
             var callPattern = new Regex(@"\bCreate" + Regex.Escape(type.Name) + @"\s*\(");
 
             foreach (var file in Directory.GetFiles(assetsPath, "*.cs", SearchOption.AllDirectories))
             {
-                if (string.Equals(Path.GetFullPath(file), normalizedGenerated, StringComparison.OrdinalIgnoreCase))
+                if (Path.GetFullPath(file).StartsWith(generatedFolder, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 string src = File.ReadAllText(file);
