@@ -30,7 +30,7 @@ namespace Tsvrc.Editor
             EditorPrefs.SetBool(PendingWireKey, true);
             AssetDatabase.Refresh();
 
-            Debug.Log($"[TsvrcCompiler] Wrote '{AccessorPath}' + '{InstancePath}' — {result.TotalEntries()} entries. Scene wiring queued.");
+            Debug.Log($"[TsvrcCompiler] Wrote '{AccessorPath}' + '{InstancePath}' — {result.TotalEntries()} entries. Scene objects will be wired after Unity recompiles.");
         }
 
         private static string Full(string root, string assetPath) =>

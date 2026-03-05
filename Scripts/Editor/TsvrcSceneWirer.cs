@@ -112,10 +112,19 @@ namespace Tsvrc.Editor
 
             instSerialized.ApplyModifiedProperties();
 
-            // ── Mark scene dirty so Unity prompts to save ───────────────────────────────────
+            // ── Summary log ───────────────────────────────────────────────────────────────
+            int singletonCount = 0, factoryCount = 0;
+            foreach (var group in result.Groups)
+            {
+                if (group.Kind == TsvrcGroupKind.Singleton) singletonCount += group.Entries.Count;
+                if (group.Kind == TsvrcGroupKind.Behaviour)
+                    foreach (var entry in group.Entries)
+                        if (entry.FactoryUsed) factoryCount++;
+            }
+
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
 
-            Debug.Log("[TsvrcSceneWirer] Scene wired: CompiledTsvrc + CompiledTsvrcInstance configured.");
+            Debug.Log($"[TsvrcSceneWirer] Wired {singletonCount} singleton(s) → CompiledTsvrc, {factoryCount} factory template(s) → CompiledTsvrcInstance.");
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────────────────────
