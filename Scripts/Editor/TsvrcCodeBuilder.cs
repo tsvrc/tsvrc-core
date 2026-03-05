@@ -15,7 +15,7 @@ namespace Tsvrc.Editor
 
         internal static string Build(TsvrcScanResult result)
         {
-            var usings = CollectUsings(result, kindFilter: TsvrcGroupKind.Singleton);
+            var usings = CollectUsings(result);
 
             var sb = new StringBuilder();
             sb.Append(AutoGenHeader);
@@ -24,13 +24,44 @@ namespace Tsvrc.Editor
             sb.AppendLine("namespace Tsvrc.Core.Compiled {");
             sb.AppendLine("public class CompiledTsvrc : UdonSharpBehaviour {");
 
+            // Singleton accessor fields
             foreach (var group in result.Groups)
                 if (group.Kind == TsvrcGroupKind.Singleton)
                     foreach (var entry in group.Entries)
                     {
-                        sb.AppendLine($"    /// <summary>Tsvrc singleton — set by CompiledTsvrcInstance.</summary>");
+                        sb.AppendLine($"    /// <summary>Tsvrc singleton — wired by TsvrcSceneWirer.</summary>");
                         sb.AppendLine($"    [SerializeField] public {entry.Type.Name} {entry.FieldName};");
                     }
+
+            // Behaviour template fields
+            var usedBehaviours = new List<TsvrcEntry>();
+            foreach (var group in result.Groups)
+                if (group.Kind == TsvrcGroupKind.Behaviour)
+                    foreach (var entry in group.Entries)
+                        if (entry.FactoryUsed) usedBehaviours.Add(entry);
+
+            if (usedBehaviours.Count > 0)
+            {
+                sb.AppendLine();
+                foreach (var entry in usedBehaviours)
+                    sb.AppendLine($"    [SerializeField] private {entry.Type.Name} _{Low(entry.FieldName)};");
+            }
+
+            // Factory methods
+            foreach (var group in result.Groups)
+                if (group.Kind == TsvrcGroupKind.Behaviour)
+                    foreach (var entry in group.Entries)
+                        sb.Append(FactoryMethod(entry));
+
+            // Start() — disable behaviour templates so they consume zero CPU
+            if (usedBehaviours.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("    protected void Start() {");
+                foreach (var entry in usedBehaviours)
+                    sb.AppendLine($"        _{Low(entry.FieldName)}.gameObject.SetActive(false);");
+                sb.AppendLine("    }");
+            }
 
             sb.AppendLine("} }");
             return sb.ToString();
@@ -40,7 +71,7 @@ namespace Tsvrc.Editor
 
         internal static string BuildInstance(TsvrcScanResult result)
         {
-            var usings = CollectUsings(result);
+            var usings = CollectUsings(result, kindFilter: TsvrcGroupKind.Singleton);
             usings.Add("Tsvrc.Core.Compiled");
 
             var startupLines = new List<string>();
@@ -52,17 +83,6 @@ namespace Tsvrc.Editor
                         if (entry.IsTsvrcBehaviour)
                             startupLines.Add($"_ts.{entry.FieldName}.TsConstruct(_ts);");
 
-            // Disable behaviour templates
-            var usedBehaviours = new List<TsvrcEntry>();
-            foreach (var group in result.Groups)
-                if (group.Kind == TsvrcGroupKind.Behaviour)
-                    foreach (var entry in group.Entries)
-                        if (entry.FactoryUsed)
-                        {
-                            usedBehaviours.Add(entry);
-                            startupLines.Add($"_{Low(entry.FieldName)}.gameObject.SetActive(false);");
-                        }
-
             var sb = new StringBuilder();
             sb.Append(AutoGenHeader);
             sb.AppendLine();
@@ -71,15 +91,6 @@ namespace Tsvrc.Editor
             sb.AppendLine("public class CompiledTsvrcInstance : UdonSharpBehaviour {");
             sb.AppendLine("    [SerializeField] private CompiledTsvrc _ts;");
 
-            // [SerializeField] fields for behaviour templates
-            if (usedBehaviours.Count > 0)
-            {
-                sb.AppendLine();
-                foreach (var entry in usedBehaviours)
-                    sb.AppendLine($"    [SerializeField] private {entry.Type.Name} _{Low(entry.FieldName)};");
-            }
-
-            // Start()
             if (startupLines.Count > 0)
             {
                 sb.AppendLine();
@@ -88,12 +99,6 @@ namespace Tsvrc.Editor
                     sb.AppendLine($"        {line}");
                 sb.AppendLine("    }");
             }
-
-            // Factory methods
-            foreach (var group in result.Groups)
-                if (group.Kind == TsvrcGroupKind.Behaviour)
-                    foreach (var entry in group.Entries)
-                        sb.Append(FactoryMethod(entry));
 
             sb.AppendLine("} }");
             return sb.ToString();
@@ -115,7 +120,7 @@ $@"
         var go = Instantiate(_{lower}.gameObject);
         go.SetActive(true);
         var b = go.GetComponent<{name}>();
-        b.TsConstruct(_ts);
+        b.TsConstruct(this);
         return b;
     }}
 ";
@@ -123,7 +128,7 @@ $@"
 $@"
 {doc}
     public {name} Create{field}() {{
-        Debug.LogError(""[CompiledTsvrcInstance] {name} has no Create{name}() call site."");
+        Debug.LogError(""[CompiledTsvrc] {name} has no Create{name}() call site."");
         return null;
     }}
 ";

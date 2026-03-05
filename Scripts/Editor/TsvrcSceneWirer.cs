@@ -83,7 +83,7 @@ namespace Tsvrc.Editor
                 return;
             }
 
-            // ── CompiledTsvrc : wire [SerializeField] public singleton fields ───────────────
+            // ── CompiledTsvrc : singleton fields + behaviour template fields ──────────────
             var tsGo = FindOrCreateGameObject("CompiledTsvrc", tsType);
             var tsComponent = (Component)tsGo.GetComponent(tsType);
 
@@ -92,24 +92,21 @@ namespace Tsvrc.Editor
                 if (group.Kind == TsvrcGroupKind.Singleton)
                     foreach (var entry in group.Entries)
                         SetField(tsSerialized, entry.FieldName, ResolveComponent(entry));
-            tsSerialized.ApplyModifiedProperties();
 
-            // ── CompiledTsvrcInstance : wire _ts + behaviour template fields ────────────────
-            var instGo = FindOrCreateGameObject("CompiledTsvrcInstance", instType);
-            var instComponent = (Component)instGo.GetComponent(instType);
-
-            var instSerialized = new SerializedObject(instComponent);
-
-            // _ts → CompiledTsvrc
-            SetField(instSerialized, "_ts", tsComponent);
-
-            // FactoryUsed behaviour templates → _fieldName
             foreach (var group in result.Groups)
                 if (group.Kind == TsvrcGroupKind.Behaviour)
                     foreach (var entry in group.Entries)
                         if (entry.FactoryUsed)
-                            SetField(instSerialized, "_" + LowerFirst(entry.FieldName), ResolveComponent(entry));
+                            SetField(tsSerialized, "_" + LowerFirst(entry.FieldName), ResolveComponent(entry));
 
+            tsSerialized.ApplyModifiedProperties();
+
+            // ── CompiledTsvrcInstance : wire _ts only ─────────────────────────────────────
+            var instGo = FindOrCreateGameObject("CompiledTsvrcInstance", instType);
+            var instComponent = (Component)instGo.GetComponent(instType);
+
+            var instSerialized = new SerializedObject(instComponent);
+            SetField(instSerialized, "_ts", tsComponent);
             instSerialized.ApplyModifiedProperties();
 
             // ── Summary log ───────────────────────────────────────────────────────────────
