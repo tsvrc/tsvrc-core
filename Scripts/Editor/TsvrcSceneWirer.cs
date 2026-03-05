@@ -15,7 +15,8 @@ namespace Tsvrc.Editor
     /// CompiledTsvrc + CompiledTsvrcInstance scene objects.
     ///
     /// Hierarchy: CompiledTsvrcInstance (root, index 0)
-    ///                └── CompiledTsvrc (child)
+    ///                ├── CompiledTsvrc
+    ///                └── [InstanceGO]  (copied from TsvrcConfig.Instance prefab default)
     /// </summary>
     [InitializeOnLoad]
     public static class TsvrcSceneWirer
@@ -66,10 +67,15 @@ namespace Tsvrc.Editor
             Debug.Log($"[TsvrcSceneWirer] Created program asset '{assetPath}'.");
         }
 
-        private static void WireScene()
+        internal static void WireScene()
         {
             var result = TsvrcScanner.Scan();
             if (result == null) return;
+
+            // Ensure program assets exist before AddComponent — UdonSharp requires them
+            // in its internal cache regardless of whether a recompile just happened.
+            EnsureProgramAsset(AccessorCsPath, AccessorAssetPath);
+            EnsureProgramAsset(InstanceCsPath, InstanceAssetPath);
 
             // ── Resolve generated types ─────────────────────────────────────────────────────
             var tsType = Type.GetType("Tsvrc.Core.Compiled.CompiledTsvrc, Assembly-CSharp");
@@ -86,20 +92,27 @@ namespace Tsvrc.Editor
                 return;
             }
 
-            // ── CompiledTsvrcInstance : created first so CompiledTsvrc can be parented to it ──
-            var instGo = FindOrCreateGameObject("CompiledTsvrcInstance", instType);
+            // ── CompiledTsvrcInstance : destroy and recreate fresh every time ─────────────
+            var existingInst = UnityEngine.Object.FindObjectsOfType(instType);
+            foreach (var obj in existingInst)
+                Undo.DestroyObjectImmediate(((Component)obj).gameObject);
+
+            var instGo = new GameObject("CompiledTsvrcInstance");
+            instGo.AddComponent(instType);
             instGo.transform.SetSiblingIndex(0);
+            Undo.RegisterCreatedObjectUndo(instGo, "Create CompiledTsvrcInstance");
             var instComponent = (Component)instGo.GetComponent(instType);
 
-            // ── CompiledTsvrc : singleton fields + behaviour template fields ──────────────
-            var tsGo = FindOrCreateGameObject("CompiledTsvrc", tsType);
-            // Make CompiledTsvrc a child of CompiledTsvrcInstance
-            if (tsGo.transform.parent != instGo.transform)
-                tsGo.transform.SetParent(instGo.transform, false);
-
+            // ── CompiledTsvrc : fresh child of CompiledTsvrcInstance ──────────────────────
+            var tsGo = new GameObject("CompiledTsvrc");
+            tsGo.AddComponent(tsType);
+            tsGo.transform.SetParent(instGo.transform, false);
+            Undo.RegisterCreatedObjectUndo(tsGo, "Create CompiledTsvrc");
             var tsComponent = (Component)tsGo.GetComponent(tsType);
 
+            // ── Singleton + behaviour template fields on CompiledTsvrc ────────────────────
             var tsSerialized = new SerializedObject(tsComponent);
+
             foreach (var group in result.Groups)
                 if (group.Kind == TsvrcGroupKind.Singleton)
                     foreach (var entry in group.Entries)
@@ -114,10 +127,32 @@ namespace Tsvrc.Editor
 
             tsSerialized.ApplyModifiedProperties();
 
+            // ── Instance GO: copy the prefab default from TsvrcConfig.Instance ─────────────
+            Component instanceComponent = null;
+            if (result.SourceConfig.Instance != null)
+            {
+                var sourcePrefabGo = result.SourceConfig.Instance.gameObject;
+
+                GameObject instanceGo;
+                if (PrefabUtility.IsPartOfPrefabAsset(sourcePrefabGo))
+                    instanceGo = (GameObject)PrefabUtility.InstantiatePrefab(sourcePrefabGo, instGo.transform);
+                else
+                    instanceGo = UnityEngine.Object.Instantiate(sourcePrefabGo, instGo.transform);
+
+                instanceGo.name = sourcePrefabGo.name;
+                Undo.RegisterCreatedObjectUndo(instanceGo, "Create Instance GO");
+                instanceComponent = (Component)instanceGo.GetComponent(result.InstanceType);
+            }
+            else
+            {
+                Debug.LogWarning("[TsvrcSceneWirer] TsvrcConfig.Instance is null — _instance will not be wired.");
+            }
+
             // ── CompiledTsvrcInstance : wire _ts and _instance ────────────────────────────
             var instSerialized = new SerializedObject(instComponent);
             SetField(instSerialized, "_ts", tsComponent);
-            SetField(instSerialized, "_instance", result.SourceConfig.Instance);
+            if (instanceComponent != null)
+                SetField(instSerialized, "_instance", instanceComponent);
             instSerialized.ApplyModifiedProperties();
 
             // ── Summary log ───────────────────────────────────────────────────────────────
@@ -130,30 +165,18 @@ namespace Tsvrc.Editor
                     foreach (var e in group.Entries) { if (e.FactoryUsed) factoryCount++; }
             }
 
-            string instanceInfo = result.InstanceType.Name == "TsvrcInstance"
-                ? "(base TsvrcInstance)"
-                : $"({result.InstanceType.Name})";
+            string instanceInfo = instanceComponent != null
+                ? result.InstanceType.Name
+                : "none";
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
 
             Debug.Log($"[TsvrcSceneWirer] Wired {singletonCount} singleton(s) → CompiledTsvrc, " +
                       $"{factoryCount} factory template(s) → CompiledTsvrc, " +
-                      $"instance {instanceInfo} → CompiledTsvrcInstance.");
+                      $"instance ({instanceInfo}) copied → CompiledTsvrcInstance.");
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────────────────────
-
-        private static GameObject FindOrCreateGameObject(string goName, Type componentType)
-        {
-            var found = UnityEngine.Object.FindObjectsOfType(componentType);
-            if (found != null && found.Length > 0)
-                return ((Component)found[0]).gameObject;
-
-            var go = new GameObject(goName);
-            go.AddComponent(componentType);
-            Undo.RegisterCreatedObjectUndo(go, $"Create {goName}");
-            return go;
-        }
 
         private static UnityEngine.Object ResolveComponent(TsvrcEntry entry)
         {

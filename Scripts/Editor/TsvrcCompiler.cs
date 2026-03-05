@@ -30,6 +30,11 @@ namespace Tsvrc.Editor
             EditorPrefs.SetBool(PendingWireKey, true);
             AssetDatabase.Refresh();
 
+            // If the generated files were unchanged Unity skips recompile — [DidReloadScripts]
+            // never fires and WireScene never runs. Schedule it here unconditionally so
+            // re-running Compile always rewires the scene even without a recompile.
+            EditorApplication.delayCall += TsvrcSceneWirer.WireScene;
+
             Debug.Log($"[TsvrcCompiler] Wrote '{AccessorPath}' + '{InstancePath}' — {result.TotalEntries()} entries. Scene objects will be wired after Unity recompiles.");
         }
 
