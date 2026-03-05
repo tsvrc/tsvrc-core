@@ -134,8 +134,15 @@ namespace Tsvrc.Editor
                     }
                 }
 
-                // De-duplicate field names across all groups
-                string baseName = type.Name;
+                // De-duplicate field names across all groups.
+                // If the GameObject is named __CustomName__, use that as the field name.
+                // For Animator: always derive from the GameObject name (e.g. "Player" + "Animator" → "PlayerAnimator").
+                string goName = obj is GameObject g ? g.name : obj is Component c2 ? c2.gameObject.name : null;
+                string baseName;
+                if (type == typeof(UnityEngine.Animator))
+                    baseName = (CustomFieldName(goName) ?? goName) + "Animator";
+                else
+                    baseName = CustomFieldName(goName) ?? type.Name;
                 string fieldName = baseName;
                 int suffix = 2;
                 while (usedNames.Contains(fieldName))
@@ -155,6 +162,17 @@ namespace Tsvrc.Editor
         }
 
         // ── Usage detection ──────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// If <paramref name="goName"/> matches <c>__Name__</c>, returns <c>Name</c>.
+        /// Otherwise returns null, signalling that the type name should be used instead.
+        /// </summary>
+        private static string CustomFieldName(string goName)
+        {
+            if (goName != null && goName.StartsWith("__") && goName.EndsWith("__") && goName.Length > 4)
+                return goName.Substring(2, goName.Length - 4);
+            return null;
+        }
 
         /// <summary>
         /// Returns true if <c>Create{type.Name}()</c> is called anywhere in the project
