@@ -7,6 +7,9 @@ namespace Tsvrc.Core
     {
         [SerializeField] protected TsvrcSingleton _singleton;
 
+        public Object[] Singletons;
+        public TsvrcBehaviour[] Behaviours;
+
         protected virtual void Start()
         {
             _singleton.TsConstruct(instance: this);
