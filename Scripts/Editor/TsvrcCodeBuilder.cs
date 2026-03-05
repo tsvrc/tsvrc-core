@@ -64,7 +64,7 @@ namespace Tsvrc.Editor
             foreach (var entry in group.Entries)
             {
                 sb.AppendLine($"    /// <summary>Tsvrc singleton — auto-assigned by TsvrcInstance.</summary>");
-                sb.AppendLine($"    public {entry.Type.Name} {entry.FieldName};");
+                sb.AppendLine($"    public {entry.Type.Name} {entry.FieldName} {{ get; private set; }}");
             }
             return sb.ToString();
         }
