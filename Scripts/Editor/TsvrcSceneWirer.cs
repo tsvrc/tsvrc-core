@@ -103,13 +103,6 @@ namespace Tsvrc.Editor
             // _ts → CompiledTsvrc
             SetField(instSerialized, "_ts", tsComponent);
 
-            // IsTsvrcBehaviour singletons → _fieldName
-            foreach (var group in result.Groups)
-                if (group.Kind == TsvrcGroupKind.Singleton)
-                    foreach (var entry in group.Entries)
-                        if (entry.IsTsvrcBehaviour)
-                            SetField(instSerialized, "_" + LowerFirst(entry.FieldName), ResolveComponent(entry));
-
             // FactoryUsed behaviour templates → _fieldName
             foreach (var group in result.Groups)
                 if (group.Kind == TsvrcGroupKind.Behaviour)
