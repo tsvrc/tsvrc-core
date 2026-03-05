@@ -14,9 +14,9 @@ namespace Tsvrc.Editor
     {
         public Type Type;
         public string FieldName;
-        public bool FactoryUsed;      // only relevant for Behaviour kind
-        public bool SingletonUsed;    // only relevant for Singleton kind
-        public bool IsTsvrcBehaviour; // true if Type extends TsvrcBehaviour
+        public bool FactoryUsed;       // only relevant for Behaviour kind
+        public bool SingletonUsed;     // only relevant for Singleton kind
+        public bool IsTsvrcBehaviour;  // true if Type extends TsvrcBehaviour
         public UnityEngine.Object SceneObject; // actual scene reference for wiring
     }
 
@@ -29,7 +29,8 @@ namespace Tsvrc.Editor
 
     internal class TsvrcScanResult
     {
-        public TsvrcInstance SourceInstance; // the EditorOnly TsvrcInstance in scene
+        public TsvrcConfig SourceConfig;    // the EditorOnly TsvrcConfig in scene
+        public Type InstanceType;           // TsvrcInstance or its single subclass
         public List<TsvrcGroup> Groups = new List<TsvrcGroup>();
 
         public int TotalEntries()
@@ -42,38 +43,37 @@ namespace Tsvrc.Editor
 
     internal static class TsvrcScanner
     {
-        /// <summary>
-        /// Scans the active scene for a TsvrcInstance and resolves all registered entry groups.
-        /// Returns null and logs an error if validation fails.
-        /// </summary>
         internal static TsvrcScanResult Scan()
         {
-            var instances = UnityEngine.Object.FindObjectsOfType<TsvrcInstance>();
-            if (instances == null || instances.Length == 0)
+            var configs = UnityEngine.Object.FindObjectsOfType<TsvrcConfig>();
+            if (configs == null || configs.Length == 0)
             {
-                Debug.LogError("[TsvrcCompiler] No TsvrcInstance found in the scene.");
+                Debug.LogError("[TsvrcCompiler] No TsvrcConfig found in the scene.");
                 return null;
             }
 
-            if (instances.Length > 1)
+            if (configs.Length > 1)
             {
                 var names = new System.Text.StringBuilder();
-                foreach (var i in instances)
-                    names.Append($"\n  • {i.gameObject.name}");
-                Debug.LogError("[TsvrcCompiler] Multiple TsvrcInstance found — there must be exactly one:" + names);
+                foreach (var c in configs) names.Append($"\n  \u2022 {c.gameObject.name}");
+                Debug.LogError("[TsvrcCompiler] Multiple TsvrcConfig found \u2014 there must be exactly one:" + names);
                 return null;
             }
 
-            var instance = instances[0];
-            var result = new TsvrcScanResult { SourceInstance = instance };
+            var config = configs[0];
 
-            // Each group lives in a separate generated class, so they have independent name spaces.
+            // Detect TsvrcInstance subclass (exactly 0 or 1 allowed)
+            var instanceType = DetectInstanceType();
+            if (instanceType == null) return null;
+
+            var result = new TsvrcScanResult { SourceConfig = config, InstanceType = instanceType };
+
             var singletonGroup = new TsvrcGroup { Label = "Singletons", Kind = TsvrcGroupKind.Singleton };
-            if (!ExtractEntries(instance.Singletons, singletonGroup, new HashSet<string>()))
+            if (!ExtractEntries(config.Singletons, singletonGroup, new HashSet<string>()))
                 return null;
 
             var behaviourGroup = new TsvrcGroup { Label = "Behaviours", Kind = TsvrcGroupKind.Behaviour };
-            if (!ExtractEntries(instance.Behaviours, behaviourGroup, new HashSet<string>()))
+            if (!ExtractEntries(config.Behaviours, behaviourGroup, new HashSet<string>()))
                 return null;
 
             if (singletonGroup.Entries.Count == 0 && behaviourGroup.Entries.Count == 0)
@@ -87,7 +87,7 @@ namespace Tsvrc.Editor
             {
                 entry.SingletonUsed = IsSingletonUsed(entry.FieldName);
                 if (!entry.SingletonUsed)
-                    Debug.LogWarning($"[TsvrcCompiler] '{entry.FieldName}' ({entry.Type.Name}) has no '_ts.{entry.FieldName}' usage — will be hidden in inspector.");
+                    Debug.LogWarning($"[TsvrcCompiler] '{entry.FieldName}' ({entry.Type.Name}) has no '_ts.{entry.FieldName}' usage \u2014 will be hidden in inspector.");
             }
 
             // Resolve factory usage for behaviour entries
@@ -100,7 +100,39 @@ namespace Tsvrc.Editor
             return result;
         }
 
-        // ── Type resolution ──────────────────────────────────────────────────────────────────
+        // ── Instance subclass detection ──────────────────────────────────────────────────────
+
+        private static Type DetectInstanceType()
+        {
+            var baseType = typeof(TsvrcInstance);
+            var subclasses = new List<Type>();
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var asmName = assembly.FullName;
+                if (asmName.StartsWith("Unity") || asmName.StartsWith("System") ||
+                    asmName.StartsWith("mscorlib") || asmName.StartsWith("Mono"))
+                    continue;
+
+                try
+                {
+                    foreach (var type in assembly.GetTypes())
+                        if (type.BaseType == baseType)
+                            subclasses.Add(type);
+                }
+                catch { }
+            }
+
+            if (subclasses.Count == 0) return baseType;
+            if (subclasses.Count == 1) return subclasses[0];
+
+            var list = new System.Text.StringBuilder();
+            foreach (var t in subclasses) list.Append($"\n  \u2022 {t.FullName}");
+            Debug.LogError("[TsvrcCompiler] Multiple TsvrcInstance subclasses found \u2014 only one is allowed:" + list);
+            return null;
+        }
+
+        // ── Entry extraction ─────────────────────────────────────────────────────────────────
 
         private static bool ExtractEntries(
             UnityEngine.Object[] source,
@@ -114,13 +146,12 @@ namespace Tsvrc.Editor
             {
                 if (obj == null)
                 {
-                    Debug.LogWarning($"[TsvrcCompiler] Null entry in {group.Label} — skipped.");
+                    Debug.LogWarning($"[TsvrcCompiler] Null entry in {group.Label} \u2014 skipped.");
                     continue;
                 }
 
                 Type type = obj.GetType();
 
-                // Auto-resolve GameObjects: find the one meaningful component on the object.
                 if (type == typeof(GameObject))
                 {
                     var go = (GameObject)obj;
@@ -135,23 +166,26 @@ namespace Tsvrc.Editor
                     }
                     else
                     {
-                        var names = new List<string>();
-                        foreach (var c in candidates) names.Add(c.GetType().Name);
+                        var cnames = new List<string>();
+                        foreach (var c in candidates) cnames.Add(c.GetType().Name);
                         Debug.LogError($"[TsvrcCompiler] '{go.name}' ({group.Label}) has {candidates.Count} components " +
-                                       $"({string.Join(", ", names)}). Drag the specific component — not the GameObject.");
+                                       $"({string.Join(", ", cnames)}). Drag the specific component \u2014 not the GameObject.");
                         return false;
                     }
                 }
 
-                // De-duplicate field names across all groups.
-                // If the GameObject is named __CustomName__, use that as the field name.
-                // For Animator: always derive from the GameObject name (e.g. "Player" + "Animator" → "PlayerAnimator").
-                string goName = obj is GameObject g ? g.name : obj is Component c2 ? c2.gameObject.name : null;
+                string goName = obj is GameObject gobj
+                    ? gobj.name
+                    : obj is Component comp
+                        ? comp.gameObject.name
+                        : null;
+
                 string baseName;
                 if (type == typeof(UnityEngine.Animator))
                     baseName = (CustomFieldName(goName) ?? goName) + "Animator";
                 else
                     baseName = CustomFieldName(goName) ?? type.Name;
+
                 string fieldName = baseName;
                 int suffix = 2;
                 while (usedNames.Contains(fieldName))
@@ -172,10 +206,6 @@ namespace Tsvrc.Editor
 
         // ── Usage detection ──────────────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// If <paramref name="goName"/> matches <c>__Name__</c>, returns <c>Name</c>.
-        /// Otherwise returns null, signalling that the type name should be used instead.
-        /// </summary>
         private static string CustomFieldName(string goName)
         {
             if (goName != null && goName.StartsWith("__") && goName.EndsWith("__") && goName.Length > 4)
@@ -183,10 +213,6 @@ namespace Tsvrc.Editor
             return null;
         }
 
-        /// <summary>
-        /// Returns true if <c>_ts.FieldName</c> is referenced anywhere in the project
-        /// except the generated output folder.
-        /// </summary>
         private static bool IsSingletonUsed(string fieldName)
         {
             string assetsPath = Application.dataPath;
@@ -209,14 +235,9 @@ namespace Tsvrc.Editor
             return false;
         }
 
-        /// <summary>
-        /// Returns true if <c>Create{type.Name}()</c> is called anywhere in the project
-        /// except the generated output file.
-        /// </summary>
         private static bool IsFactoryUsed(Type type)
         {
             string assetsPath = Application.dataPath;
-            // All generated files live under Assets/TsvrcGenerated — exclude entire folder.
             string generatedFolder = Path.GetFullPath(Path.Combine(assetsPath, "TsvrcGenerated"));
             var callPattern = new Regex(@"\bCreate" + Regex.Escape(type.Name) + @"\s*\(");
 

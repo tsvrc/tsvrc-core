@@ -6,14 +6,11 @@ namespace Tsvrc.Core
 {
     public class TsvrcBehaviour : UdonSharpBehaviour
     {
-        public TsvrcSingleton Singleton { get; private set; }
-        public TsvrcInstance Instance { get; private set; }
-
         protected CompiledTsvrc _ts;
 
         private bool _isCreated = false;
 
-        public void TsConstruct(CompiledTsvrc context)
+        public void TsConstruct(CompiledTsvrc tsvrc)
         {
             if (_isCreated)
             {
@@ -22,17 +19,7 @@ namespace Tsvrc.Core
             }
 
             _isCreated = true;
-            _ts = context;
-            TsStart();
-        }
-
-        public void TsConstruct(TsvrcSingleton singleton, TsvrcInstance instance)
-        {
-            _isCreated = true;
-
-            Instance = instance;
-            Singleton = singleton;
-
+            _ts = tsvrc;
             TsStart();
         }
 
@@ -41,7 +28,7 @@ namespace Tsvrc.Core
         /// </summary>
         public void TsConstruct(TsvrcBehaviour behaviour)
         {
-            TsConstruct(behaviour.Singleton, behaviour.Instance);
+            TsConstruct(behaviour._ts);
         }
 
         #region Virtual Methods

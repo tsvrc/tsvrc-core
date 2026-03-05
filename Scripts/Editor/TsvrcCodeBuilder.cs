@@ -82,6 +82,10 @@ namespace Tsvrc.Editor
             var usings = CollectUsings(result, kindFilter: TsvrcGroupKind.Singleton);
             usings.Add("Tsvrc.Core.Compiled");
 
+            // Add instance type's namespace (may be same as Tsvrc.Core, but add anyway)
+            if (!string.IsNullOrEmpty(result.InstanceType.Namespace))
+                usings.Add(result.InstanceType.Namespace);
+
             var startupLines = new List<string>();
 
             // TsConstruct used TsvrcBehaviour singletons
@@ -91,22 +95,24 @@ namespace Tsvrc.Editor
                         if (entry.IsTsvrcBehaviour && entry.SingletonUsed)
                             startupLines.Add($"_ts.{entry.FieldName}.TsConstruct(_ts);");
 
+            // Wire and start the instance
+            startupLines.Add("_instance.TsConstruct(_ts);");
+            startupLines.Add("_instance.OnInstanceStart();");
+
             var sb = new StringBuilder();
             sb.Append(AutoGenHeader);
             sb.AppendLine();
             AppendUsings(sb, usings);
             sb.AppendLine("namespace Tsvrc.Core.Compiled {");
             sb.AppendLine("public class CompiledTsvrcInstance : UdonSharpBehaviour {");
-            sb.AppendLine("    [SerializeField] private CompiledTsvrc _ts;");
+            sb.AppendLine($"    [SerializeField] private CompiledTsvrc _ts;");
+            sb.AppendLine($"    [SerializeField] private {result.InstanceType.Name} _instance;");
 
-            if (startupLines.Count > 0)
-            {
-                sb.AppendLine();
-                sb.AppendLine("    protected void Start() {");
-                foreach (var line in startupLines)
-                    sb.AppendLine($"        {line}");
-                sb.AppendLine("    }");
-            }
+            sb.AppendLine();
+            sb.AppendLine("    protected void Start() {");
+            foreach (var line in startupLines)
+                sb.AppendLine($"        {line}");
+            sb.AppendLine("    }");
 
             sb.AppendLine("} }");
             return sb.ToString();

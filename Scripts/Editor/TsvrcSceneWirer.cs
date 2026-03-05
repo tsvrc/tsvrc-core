@@ -13,6 +13,9 @@ namespace Tsvrc.Editor
     /// After Tsvrc/Compile rewrites the generated .cs files and Unity recompiles,
     /// creates UdonSharpProgramAssets for both generated scripts, then wires the
     /// CompiledTsvrc + CompiledTsvrcInstance scene objects.
+    ///
+    /// Hierarchy: CompiledTsvrcInstance (root, index 0)
+    ///                └── CompiledTsvrc (child)
     /// </summary>
     [InitializeOnLoad]
     public static class TsvrcSceneWirer
@@ -83,8 +86,17 @@ namespace Tsvrc.Editor
                 return;
             }
 
+            // ── CompiledTsvrcInstance : created first so CompiledTsvrc can be parented to it ──
+            var instGo = FindOrCreateGameObject("CompiledTsvrcInstance", instType);
+            instGo.transform.SetSiblingIndex(0);
+            var instComponent = (Component)instGo.GetComponent(instType);
+
             // ── CompiledTsvrc : singleton fields + behaviour template fields ──────────────
             var tsGo = FindOrCreateGameObject("CompiledTsvrc", tsType);
+            // Make CompiledTsvrc a child of CompiledTsvrcInstance
+            if (tsGo.transform.parent != instGo.transform)
+                tsGo.transform.SetParent(instGo.transform, false);
+
             var tsComponent = (Component)tsGo.GetComponent(tsType);
 
             var tsSerialized = new SerializedObject(tsComponent);
@@ -102,27 +114,31 @@ namespace Tsvrc.Editor
 
             tsSerialized.ApplyModifiedProperties();
 
-            // ── CompiledTsvrcInstance : wire _ts only ─────────────────────────────────────
-            var instGo = FindOrCreateGameObject("CompiledTsvrcInstance", instType);
-            var instComponent = (Component)instGo.GetComponent(instType);
-
+            // ── CompiledTsvrcInstance : wire _ts and _instance ────────────────────────────
             var instSerialized = new SerializedObject(instComponent);
             SetField(instSerialized, "_ts", tsComponent);
+            SetField(instSerialized, "_instance", result.SourceConfig.Instance);
             instSerialized.ApplyModifiedProperties();
 
             // ── Summary log ───────────────────────────────────────────────────────────────
             int singletonCount = 0, factoryCount = 0;
             foreach (var group in result.Groups)
             {
-                if (group.Kind == TsvrcGroupKind.Singleton) foreach (var e in group.Entries) { if (e.SingletonUsed) singletonCount++; }
+                if (group.Kind == TsvrcGroupKind.Singleton)
+                    foreach (var e in group.Entries) { if (e.SingletonUsed) singletonCount++; }
                 if (group.Kind == TsvrcGroupKind.Behaviour)
-                    foreach (var entry in group.Entries)
-                        if (entry.FactoryUsed) factoryCount++;
+                    foreach (var e in group.Entries) { if (e.FactoryUsed) factoryCount++; }
             }
+
+            string instanceInfo = result.InstanceType.Name == "TsvrcInstance"
+                ? "(base TsvrcInstance)"
+                : $"({result.InstanceType.Name})";
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
 
-            Debug.Log($"[TsvrcSceneWirer] Wired {singletonCount} singleton(s) → CompiledTsvrc, {factoryCount} factory template(s) → CompiledTsvrcInstance.");
+            Debug.Log($"[TsvrcSceneWirer] Wired {singletonCount} singleton(s) → CompiledTsvrc, " +
+                      $"{factoryCount} factory template(s) → CompiledTsvrc, " +
+                      $"instance {instanceInfo} → CompiledTsvrcInstance.");
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────────────────────
@@ -131,15 +147,10 @@ namespace Tsvrc.Editor
         {
             var found = UnityEngine.Object.FindObjectsOfType(componentType);
             if (found != null && found.Length > 0)
-            {
-                var existing = ((Component)found[0]).gameObject;
-                existing.transform.SetSiblingIndex(0);
-                return existing;
-            }
+                return ((Component)found[0]).gameObject;
 
             var go = new GameObject(goName);
             go.AddComponent(componentType);
-            go.transform.SetSiblingIndex(0);
             Undo.RegisterCreatedObjectUndo(go, $"Create {goName}");
             return go;
         }

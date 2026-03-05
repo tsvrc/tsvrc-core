@@ -1,12 +1,12 @@
-using UdonSharp;
-using UnityEngine;
+﻿using UdonSharp;
 
 namespace Tsvrc.Core
 {
-    // EditorOnly — scanned by TsvrcCompiler, stripped from VRChat build.
-    public class TsvrcInstance : UdonSharpBehaviour
+    public class TsvrcInstance : TsvrcBehaviour
     {
-        public Object[] Singletons;
-        public TsvrcBehaviour[] Behaviours;
+        /// <summary>
+        /// Called when this instance is started. Override this method to perform any initialization logic that requires the instance to be fully constructed.
+        /// </summary>
+        public virtual void OnInstanceStart() { }
     }
 }
