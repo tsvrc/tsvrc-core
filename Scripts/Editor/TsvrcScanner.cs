@@ -65,14 +65,14 @@ namespace Tsvrc.Editor
 
             var instance = instances[0];
             var result = new TsvrcScanResult { SourceInstance = instance };
-            var usedNames = new HashSet<string>();
 
+            // Each group lives in a separate generated class, so they have independent name spaces.
             var singletonGroup = new TsvrcGroup { Label = "Singletons", Kind = TsvrcGroupKind.Singleton };
-            if (!ExtractEntries(instance.Singletons, singletonGroup, usedNames))
+            if (!ExtractEntries(instance.Singletons, singletonGroup, new HashSet<string>()))
                 return null;
 
             var behaviourGroup = new TsvrcGroup { Label = "Behaviours", Kind = TsvrcGroupKind.Behaviour };
-            if (!ExtractEntries(instance.Behaviours, behaviourGroup, usedNames))
+            if (!ExtractEntries(instance.Behaviours, behaviourGroup, new HashSet<string>()))
                 return null;
 
             if (singletonGroup.Entries.Count == 0 && behaviourGroup.Entries.Count == 0)
