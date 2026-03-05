@@ -81,6 +81,14 @@ namespace Tsvrc.Editor
                 return null;
             }
 
+            // Filter singletons with no _ts.FieldName reference in code
+            singletonGroup.Entries.RemoveAll(entry =>
+            {
+                if (IsSingletonUsed(entry.FieldName)) return false;
+                Debug.LogWarning($"[TsvrcCompiler] '{entry.FieldName}' ({entry.Type.Name}) has no '_ts.{entry.FieldName}' usage — excluded from CompiledTsvrc.");
+                return true;
+            });
+
             // Resolve factory usage for behaviour entries
             foreach (var entry in behaviourGroup.Entries)
                 entry.FactoryUsed = IsFactoryUsed(entry.Type);
@@ -172,6 +180,32 @@ namespace Tsvrc.Editor
             if (goName != null && goName.StartsWith("__") && goName.EndsWith("__") && goName.Length > 4)
                 return goName.Substring(2, goName.Length - 4);
             return null;
+        }
+
+        /// <summary>
+        /// Returns true if <c>_ts.FieldName</c> is referenced anywhere in the project
+        /// except the generated output folder.
+        /// </summary>
+        private static bool IsSingletonUsed(string fieldName)
+        {
+            string assetsPath = Application.dataPath;
+            string generatedFolder = Path.GetFullPath(Path.Combine(assetsPath, "TsvrcGenerated"));
+            var pattern = new Regex(@"\b_ts\s*\.\s*" + Regex.Escape(fieldName) + @"\b");
+
+            foreach (var file in Directory.GetFiles(assetsPath, "*.cs", SearchOption.AllDirectories))
+            {
+                if (Path.GetFullPath(file).StartsWith(generatedFolder, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string src = File.ReadAllText(file);
+                src = Regex.Replace(src, @"//[^\n]*", "");
+                src = Regex.Replace(src, @"/\*.*?\*/", "", RegexOptions.Singleline);
+
+                if (pattern.IsMatch(src))
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>
