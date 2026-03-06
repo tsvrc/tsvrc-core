@@ -6,12 +6,14 @@ namespace Tsvrc.Core
     // EditorOnly — scanned by TsvrcCompiler, stripped from VRChat build.
     public class TsvrcConfig : UdonSharpBehaviour
     {
-        [Tooltip("Singleton behaviours that will be initialized by Tsvrc. Assign here any object that you want to be a singleton, and assign the TsvrcBehaviour scripts that they should use as a singleton class.")]
+        [Tooltip("Scene objects exposed as named singleton fields on CompiledTsvrc. Drop a GameObject or Component here — each entry becomes a typed _ts.FieldName accessor available to all TsvrcBehaviours.")]
         public Object[] Singletons;
-        [Tooltip("Instance behaviours that will be initialized by Tsvrc. Assign here any object that you want to be an instance, and assign the TsvrcBehaviour scripts that they should use as an instance class.")]
-        public TsvrcBehaviour[] Behaviours;
+        [Tooltip("Prototype TsvrcBehaviours used as templates for runtime instantiation. Each entry generates a Create<TypeName>() factory method on CompiledTsvrc. The prototype is deactivated at start and cloned on demand.")]
+        public TsvrcBehaviour[] TsvrcBehaviourFactory;
+        [Tooltip("TsvrcBehaviours that are constructed directly in the scene (not instantiated). TsConstruct(_ts) is called on each during startup instead of a factory method.")]
+        public TsvrcBehaviour[] TsvrcBehaviourConstruct;
 
-        [Tooltip("Internal behaviours that will be initialized by Tsvrc. These are used internally by Tsvrc and should not be assigned manually.")]
-        public TsvrcBehaviour[] InternalBehaviours;
+        [Tooltip("Internal Tsvrc behaviours registered as factory templates. Managed automatically by the Tsvrc compiler — do not assign manually.")]
+        public TsvrcBehaviour[] InternalTsvrcBehaviourFactory;
     }
 }

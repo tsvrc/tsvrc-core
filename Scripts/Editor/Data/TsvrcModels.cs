@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    internal enum TsvrcGroupKind { Singleton, Behaviour }
+    internal enum TsvrcGroupKind { Singleton, Behaviour, Construct }
 
     internal class TsvrcEntry
     {

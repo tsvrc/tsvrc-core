@@ -24,6 +24,12 @@ namespace Tsvrc.Editor
                 if (result.InstanceType != null)
                     w.Line($"[SerializeField] private {result.InstanceType.Name} _instance;");
 
+                // Serialized fields for each construct behaviour.
+                foreach (var group in result.Groups)
+                    if (group.Kind == TsvrcGroupKind.Construct)
+                        foreach (var entry in group.Entries)
+                            w.Line($"[SerializeField] private {entry.Type.Name} _{LowerFirst(entry.FieldName)};");
+
                 w.BlankLine();
 
                 using (w.Block("protected void Start()"))
@@ -40,9 +46,9 @@ namespace Tsvrc.Editor
         {
             var usings = new SortedSet<string> { "UdonSharp", "UnityEngine", "Tsvrc.Core.Compiled" };
 
-            // Singleton namespaces only — instance file doesn't need behaviour namespaces.
+            // Singleton + construct namespaces.
             foreach (var group in result.Groups)
-                if (group.Kind == TsvrcGroupKind.Singleton)
+                if (group.Kind == TsvrcGroupKind.Singleton || group.Kind == TsvrcGroupKind.Construct)
                     foreach (var entry in group.Entries)
                         if (!string.IsNullOrEmpty(entry.Type.Namespace))
                             usings.Add(entry.Type.Namespace);
@@ -54,6 +60,9 @@ namespace Tsvrc.Editor
             return usings;
         }
 
+        private static string LowerFirst(string s) =>
+            string.IsNullOrEmpty(s) ? s : char.ToLowerInvariant(s[0]) + s.Substring(1);
+
         private static List<string> BuildStartupLines(TsvrcScanResult result)
         {
             var lines = new List<string>();
@@ -64,6 +73,12 @@ namespace Tsvrc.Editor
                     foreach (var entry in group.Entries)
                         if (entry.IsTsvrcBehaviour && entry.SingletonUsed)
                             lines.Add($"_ts.{entry.FieldName}.TsConstruct(_ts);");
+
+            // TsConstruct all construct behaviours.
+            foreach (var group in result.Groups)
+                if (group.Kind == TsvrcGroupKind.Construct)
+                    foreach (var entry in group.Entries)
+                        lines.Add($"_{LowerFirst(entry.FieldName)}.TsConstruct(_ts);");
 
             // Wire and start the instance (only when a subclass was detected).
             if (result.InstanceType != null)

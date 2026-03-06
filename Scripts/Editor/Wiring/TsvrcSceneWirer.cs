@@ -64,6 +64,7 @@ namespace Tsvrc.Editor
             SetField(instSerialized, "_ts", tsComponent);
             if (instanceComponent != null)
                 SetField(instSerialized, "_instance", instanceComponent);
+            WireConstructFields(instSerialized, result);
             instSerialized.ApplyModifiedProperties();
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
@@ -96,6 +97,14 @@ namespace Tsvrc.Editor
                     foreach (var entry in group.Entries)
                         if (entry.FactoryUsed)
                             SetField(so, "_" + LowerFirst(entry.FieldName), ResolveComponent(entry));
+        }
+
+        private static void WireConstructFields(SerializedObject so, TsvrcScanResult result)
+        {
+            foreach (var group in result.Groups)
+                if (group.Kind == TsvrcGroupKind.Construct)
+                    foreach (var entry in group.Entries)
+                        SetField(so, "_" + LowerFirst(entry.FieldName), ResolveComponent(entry));
         }
 
         private static Component CreateInstanceGo(TsvrcScanResult result, GameObject parent)

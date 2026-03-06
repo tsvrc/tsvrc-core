@@ -24,17 +24,18 @@ namespace Tsvrc.Editor
             var singletonGroup = TsvrcSingletonScanner.Scan(config, usedNames);
             if (singletonGroup == null) return null;
 
-            var behaviourGroup = TsvrcBehaviourScanner.Scan(config, usedNames);
-            if (behaviourGroup == null) return null;
+            var factoryGroup = TsvrcBehaviourScanner.ScanFactory(config, usedNames);
+            var constructGroup = TsvrcBehaviourScanner.ScanConstruct(config, usedNames);
 
-            if (singletonGroup.Entries.Count == 0 && behaviourGroup.Entries.Count == 0)
+            if (singletonGroup.Entries.Count == 0 && factoryGroup.Entries.Count == 0 && constructGroup.Entries.Count == 0)
             {
                 Debug.LogWarning("[TsvrcCompiler] All arrays are empty. Nothing to generate.");
                 return null;
             }
 
             if (singletonGroup.Entries.Count > 0) result.Groups.Add(singletonGroup);
-            if (behaviourGroup.Entries.Count > 0) result.Groups.Add(behaviourGroup);
+            if (factoryGroup.Entries.Count > 0) result.Groups.Add(factoryGroup);
+            if (constructGroup.Entries.Count > 0) result.Groups.Add(constructGroup);
 
             return result;
         }
