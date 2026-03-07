@@ -52,9 +52,13 @@ namespace Tsvrc.Editor
             Undo.RegisterCreatedObjectUndo(tsGo, "Create CompiledTsvrc");
             var tsComponent = (Component)tsGo.GetComponent(tsType);
 
+            var factoryGo = new GameObject("Factory");
+            factoryGo.transform.SetParent(tsGo.transform, false);
+            Undo.RegisterCreatedObjectUndo(factoryGo, "Create Factory GO");
+
             var tsSerialized = new SerializedObject(tsComponent);
             WireSingletonFields(tsSerialized, result);
-            WireBehaviourTemplateFields(tsSerialized, result);
+            WireBehaviourTemplateFields(tsSerialized, result, factoryGo);
             WireConstructFields(tsSerialized, result);
 
             var instanceComponent = CreateInstanceGo(result, tsGo);
@@ -86,13 +90,35 @@ namespace Tsvrc.Editor
                             SetField(so, entry.FieldName, ResolveComponent(entry));
         }
 
-        private static void WireBehaviourTemplateFields(SerializedObject so, TsvrcScanResult result)
+        private static void WireBehaviourTemplateFields(SerializedObject so, TsvrcScanResult result, GameObject parent)
         {
             foreach (var group in result.Groups)
-                if (group.Kind == TsvrcGroupKind.Behaviour)
-                    foreach (var entry in group.Entries)
-                        if (entry.FactoryUsed || entry.IsCore)
-                            SetField(so, "_" + LowerFirst(entry.FieldName), ResolveComponent(entry));
+            {
+                if (group.Kind != TsvrcGroupKind.Behaviour) continue;
+                foreach (var entry in group.Entries)
+                {
+                    if (!entry.FactoryUsed) continue;
+                    if (entry.SceneObject == null) continue;
+
+                    var sourceGo = entry.SceneObject is Component c
+                        ? c.gameObject
+                        : entry.SceneObject as GameObject;
+
+                    if (sourceGo == null) continue;
+
+                    GameObject templateGo;
+                    if (EditorUtility.IsPersistent(sourceGo))
+                        templateGo = (GameObject)PrefabUtility.InstantiatePrefab(sourceGo, parent.transform);
+                    else
+                        templateGo = UnityEngine.Object.Instantiate(sourceGo, parent.transform);
+
+                    templateGo.name = sourceGo.name;
+                    templateGo.SetActive(false);
+                    Undo.RegisterCreatedObjectUndo(templateGo, "Create Factory Template GO");
+                    SetField(so, "_" + LowerFirst(entry.FieldName), templateGo.GetComponent(entry.Type));
+                    Debug.Log($"[TsvrcSceneWirer] Added factory template GO '{sourceGo.name}' under '{parent.name}'.");
+                }
+            }
         }
 
         private static void WireConstructFields(SerializedObject so, TsvrcScanResult result)
