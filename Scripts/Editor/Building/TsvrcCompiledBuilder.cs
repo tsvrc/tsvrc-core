@@ -82,7 +82,8 @@ namespace Tsvrc.Editor
             {
                 // Deactivate factory templates.
                 foreach (var entry in behaviourEntries)
-                    w.Line($"_{LowerFirst(entry.FieldName)}.gameObject.SetActive(false);");
+                    if (entry.FactoryUsed)
+                        w.Line($"_{LowerFirst(entry.FieldName)}.gameObject.SetActive(false);");
 
                 // TsConstruct singleton TsvrcBehaviours.
                 foreach (var group in result.Groups)

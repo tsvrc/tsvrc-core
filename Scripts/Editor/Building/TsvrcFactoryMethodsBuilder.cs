@@ -15,6 +15,7 @@ namespace Tsvrc.Editor
             bool? currentRegion = null;
             foreach (var entry in entries)
             {
+                if (!entry.FactoryUsed) continue;
                 if (currentRegion == null || currentRegion != entry.IsCore)
                 {
                     if (currentRegion != null) { w.EndRegion(); w.BlankLine(); }
