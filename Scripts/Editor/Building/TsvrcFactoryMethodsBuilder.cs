@@ -52,9 +52,10 @@ namespace Tsvrc.Editor
 
             if (entry.FactoryUsed)
             {
-                using (w.Block($"public {name} Create{field}(Transform parent)"))
+                using (w.Block($"public {name} Create{field}(Transform parent, string goName)"))
                 {
                     w.Line("var go = Instantiate(_{lower}.gameObject, parent);".Replace("{lower}", lower));
+                    w.Line("go.name = goName;");
                     w.Line("go.SetActive(true);");
                     w.Line($"var b = go.GetComponent<{name}>();");
                     w.Line("b.TsConstruct(this);");
@@ -63,7 +64,7 @@ namespace Tsvrc.Editor
             }
             else
             {
-                using (w.Block($"public {name} Create{field}(Transform parent)"))
+                using (w.Block($"public {name} Create{field}(Transform parent, string goName)"))
                 {
                     w.Line($"Debug.LogError(\"[CompiledTsvrc] {name} has no Create{name}() call site.\");");
                     w.Line("return null;");
