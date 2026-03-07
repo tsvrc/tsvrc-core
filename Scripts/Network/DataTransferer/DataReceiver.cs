@@ -4,9 +4,9 @@ using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
 
-namespace Tsvrc.TsNetworking.Utils
+namespace Tsvrc.Network
 {
-    public class TsvrcDataReceiver : TsvrcDataSender
+    public class DataReceiver : DataSender
     {
         protected string[] _receivedChunks = new string[0];
 

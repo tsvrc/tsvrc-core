@@ -1,13 +1,14 @@
 using Tsvrc.Player;
+using Tsvrc.TsNetworking;
 using Tsvrc.Utils;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
 
-namespace Tsvrc.TsNetworking.Utils
+namespace Tsvrc.Network
 {
-    public class TsvrcDataSender : TsvrcPlayerReadyChecker
+    public class DataSender : TsvrcPlayerReadyChecker
     {
         protected const int CHUNK_SIZE = 15000;
         protected const int MAX_MESSAGE_SIZE = 500000;
