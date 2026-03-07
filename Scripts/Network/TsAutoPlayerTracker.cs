@@ -2,10 +2,10 @@ using Tsvrc.Player;
 using UdonSharp;
 using VRC.SDKBase;
 
-namespace Tsvrc.TsNetworking
+namespace Tsvrc.Network
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsvrcAutoPlayerListTracker : TsvrcPlayerListTracker
+    public class TsAutoPlayerTracker : TsPlayerTracker
     {
         #region VRChat Callbacks
 

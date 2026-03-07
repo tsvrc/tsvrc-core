@@ -5,9 +5,9 @@ using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
 
-namespace Tsvrc.TsNetworking
+namespace Tsvrc.Network
 {
-    public class TsvrcPlayerReadyChecker : TsvrcPlayerListTracker
+    public class TsReadyCheckProcess : TsPlayerTracker
     {
         [UdonSynced] private string[] _readyPlayerIds = new string[0];
 
