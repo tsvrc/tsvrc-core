@@ -15,9 +15,9 @@ namespace Tsvrc.Core
         [UdonSynced] private bool _useProcessUpdate = false;
         [UdonSynced] private float _processUpdateInterval = 0.5f;
 
-        #region Unity Lifecycle
+        #region Tsvrc Lifecycle
 
-        protected virtual void Start()
+        protected override void TsStart()
         {
             if (IsProcessOwner())
             {
@@ -30,9 +30,7 @@ namespace Tsvrc.Core
 
         #region VRChat Callbacks
 
-#pragma warning disable
         public override void OnPlayerLeft(VRCPlayerApi player)
-#pragma warning restore
         {
             /* UdonSharp transfers the master before invoking OnPlayerLeft,
              so its safe to check only for master here. */
@@ -46,9 +44,7 @@ namespace Tsvrc.Core
             }
         }
 
-#pragma warning disable
         public override void OnOwnershipTransferred(VRCPlayerApi player)
-#pragma warning restore
         {
             base.OnOwnershipTransferred(player);
 
@@ -62,9 +58,6 @@ namespace Tsvrc.Core
 
         #region Public Methods
 
-        /// <summary>
-        /// Starts the Tsvrc Process.
-        /// </summary>
         public virtual void StartProcess(bool useProcessUpdate = false)
         {
             if (_isRunning)
@@ -138,9 +131,6 @@ namespace Tsvrc.Core
             OnProcessCleanup(true);
         }
 
-        /// <summary>
-        /// Checks if Tsvrc the process is currently running.
-        /// </summary>
         public bool IsProcessRunning()
         {
             return _isRunning;
@@ -203,7 +193,7 @@ namespace Tsvrc.Core
 
         /// <summary>
         /// Called when the process owner leaves the instance and the process is still running.
-        /// Only invoked on the new owner (typically the master client).
+        /// Only invoked on the new owner.
         /// </summary>
         protected virtual void OnOwnerAbandonedProcess() { }
 

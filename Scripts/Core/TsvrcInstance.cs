@@ -1,6 +1,4 @@
-﻿using UdonSharp;
-
-namespace Tsvrc.Core
+﻿namespace Tsvrc.Core
 {
     public class TsvrcInstance : TsvrcBehaviour
     {

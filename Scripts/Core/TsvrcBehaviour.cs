@@ -1,6 +1,5 @@
 using Tsvrc.Core.Compiled;
 using UdonSharp;
-using UnityEngine;
 
 namespace Tsvrc.Core
 {
@@ -41,11 +40,6 @@ namespace Tsvrc.Core
         #region Virtual Methods
 
         protected virtual void TsStart() { }
-
-        #endregion
-
-        #region UdonSharp Callbacks
-
 
         #endregion
     }
