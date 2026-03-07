@@ -3,7 +3,7 @@ using UdonSharp;
 namespace Tsvrc.Network
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class DataTransferer : DataReceiver
+    public class TsDataTransferer : TsDataReceiver
     {
         #region TsvrcProcess Callbacks
 

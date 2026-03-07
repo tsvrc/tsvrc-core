@@ -8,7 +8,7 @@ using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Network
 {
-    public class DataSender : TsvrcPlayerReadyChecker
+    public class TsDataSender : TsvrcPlayerReadyChecker
     {
         protected const int CHUNK_SIZE = 15000;
         protected const int MAX_MESSAGE_SIZE = 500000;

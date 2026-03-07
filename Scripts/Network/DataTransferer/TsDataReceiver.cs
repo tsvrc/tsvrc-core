@@ -6,7 +6,7 @@ using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Network
 {
-    public class DataReceiver : DataSender
+    public class TsDataReceiver : TsDataSender
     {
         protected string[] _receivedChunks = new string[0];
 
