@@ -163,12 +163,6 @@ namespace Tsvrc.Core
             return _ownerId == TsPlayer.GetPlayerID(Networking.LocalPlayer);
         }
 
-        /// <summary>
-        /// Called at regular intervals if the process is running and the local player is the owner.
-        /// Only invoked on the process owner.
-        /// </summary>
-        protected virtual void OnProcessUpdate() { }
-
         #endregion
 
         #region Virtual Methods
@@ -203,6 +197,12 @@ namespace Tsvrc.Core
         /// </summary>
         /// <param name="isCompleted">True if cleanup is after successful completion, false if after stop/abort.</param>
         protected virtual void OnProcessCleanup(bool isCompleted) { }
+
+        /// <summary>
+        /// Called at regular intervals if the process is running and the local player is the owner.
+        /// Only invoked on the process owner.
+        /// </summary>
+        protected virtual void OnProcessUpdate() { }
 
         #endregion
 
