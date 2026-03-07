@@ -31,6 +31,16 @@ namespace Tsvrc.Core
             TsConstruct(behaviour._ts);
         }
 
+        public void TsDestroy()
+        {
+            SendCustomEventDelayedFrames(nameof(_TsDestroyDelayed), 1);
+        }
+
+        public void _TsDestroyDelayed()
+        {
+            Destroy(gameObject);
+        }
+
         #region Virtual Methods
 
         protected virtual void TsStart() { }
