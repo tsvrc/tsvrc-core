@@ -1,5 +1,6 @@
 using Tsvrc.Player;
 using Tsvrc.Utils;
+using UdonSharp;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
@@ -10,31 +11,83 @@ namespace Tsvrc.Network
     {
         protected string[] _receivedChunks = new string[0];
 
-        #region TsvrcDataSender Callbacks
+        public string LastData { get; private set; } = "";
+        public int LastChunkIndex { get; private set; } = 0;
+        public int LastTotalChunks { get; private set; } = 0;
 
-        protected override void OnDataTransferStartedAsTrackedPlayer(string[] playerIds)
+        private UdonSharpBehaviour _dataReceiverListener;
+        private string _onDataReceptionStartedEvent = "OnDataReceptionStarted";
+        private string _onDataReceptionStoppedEvent = "OnDataReceptionStopped";
+        private string _onDataReceptionCompletedEvent = "OnDataReceptionCompleted";
+        private string _onDataChunkReceivedEvent = "OnDataChunkReceived";
+
+        /// <summary>
+        /// Initializes the TsDataReceiver with a listener and event method names.
+        /// On each reception event, SendCustomEvent is called on the listener using the corresponding name.
+        /// Use nameof() for event names to avoid magic strings and get refactor safety.
+        /// Read event data from the Last* properties inside the listener's callback methods:
+        /// <list type="bullet">
+        /// <item><term>onDataReceptionStartedEvent</term><description>LastPlayerIds</description></item>
+        /// <item><term>onDataReceptionStoppedEvent</term><description>LastPlayerIds</description></item>
+        /// <item><term>onDataReceptionCompletedEvent</term><description>LastData, LastPlayerIds</description></item>
+        /// <item><term>onDataChunkReceivedEvent</term><description>LastChunkIndex, LastTotalChunks</description></item>
+        /// </list>
+        /// <example>
+        /// <code>
+        /// receiver.TsConstruct(
+        ///     this,
+        ///     nameof(_OnDataReceptionStartedMethod),
+        ///     nameof(_OnDataReceptionStoppedMethod),
+        ///     nameof(_OnDataReceptionCompletedMethod),
+        ///     nameof(_OnDataChunkReceivedMethod)
+        /// );
+        /// </code>
+        /// </example>
+        /// </summary>
+        protected void TsConstructDataReceiver(
+            UdonSharpBehaviour listener,
+            string onDataReceptionStartedEvent,
+            string onDataReceptionStoppedEvent,
+            string onDataReceptionCompletedEvent,
+            string onDataChunkReceivedEvent
+        )
         {
-            base.OnDataTransferStartedAsTrackedPlayer(playerIds);
+            _dataReceiverListener = listener;
+            _onDataReceptionStartedEvent = onDataReceptionStartedEvent;
+            _onDataReceptionStoppedEvent = onDataReceptionStoppedEvent;
+            _onDataReceptionCompletedEvent = onDataReceptionCompletedEvent;
+            _onDataChunkReceivedEvent = onDataChunkReceivedEvent;
 
-            _receivedChunks = new string[0];
-            OnDataReceptionStartedAsTrackedPlayer(playerIds);
+            base.TsConstructDataSender(
+                this,
+                nameof(_OnDataTransferStarted),
+                nameof(_OnDataTransferStopped),
+                nameof(_OnDataTransferCompleted)
+            );
         }
 
-        protected override void OnDataTransferStoppedAsTrackedPlayer(string[] playerIds)
-        {
-            base.OnDataTransferStoppedAsTrackedPlayer(playerIds);
+        #region TsDataSender Callbacks
 
+        public void _OnDataTransferStarted()
+        {
             _receivedChunks = new string[0];
-            OnDataReceptionStoppedAsTrackedPlayer(playerIds);
+
+            _dataReceiverListener.SendCustomEvent(_onDataReceptionStartedEvent);
         }
 
-        protected override void OnDataTransferCompletedAsTrackedPlayer(string[] playerIds)
+        public void _OnDataTransferStopped()
         {
-            base.OnDataTransferCompletedAsTrackedPlayer(playerIds);
-
-            string completeMessage = ReassembleMessage(_receivedChunks);
             _receivedChunks = new string[0];
-            OnDataReceptionCompletedAsTrackedPlayer(completeMessage, playerIds);
+
+            _dataReceiverListener.SendCustomEvent(_onDataReceptionStoppedEvent);
+        }
+
+        public void _OnDataTransferCompleted()
+        {
+            LastData = ReassembleMessage(_receivedChunks);
+            _receivedChunks = new string[0];
+
+            _dataReceiverListener.SendCustomEvent(_onDataReceptionCompletedEvent);
         }
 
         protected override void OnDataChunkSendRequested(string dataChunk, int chunkIndex, int totalChunks, string[] playerIds)
@@ -71,43 +124,6 @@ namespace Tsvrc.Network
 
         #endregion
 
-        #region Virtual Methods
-
-        /// <summary>
-        /// Called when data reception starts on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// This fires once at the beginning of the reception (first chunk).
-        /// For owner-only logic, override OnProcessStarted() from the base class.
-        /// </summary>
-        protected virtual void OnDataReceptionStartedAsTrackedPlayer(string[] playerIds) { }
-
-        /// <summary>
-        /// Called when data reception is stopped on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// For owner-only logic, override OnProcessStopped() from the base class.
-        /// </summary>
-        protected virtual void OnDataReceptionStoppedAsTrackedPlayer(string[] playerIds) { }
-
-        /// <summary>
-        /// Called when data reception completes on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// This fires once at the end when all chunks are received.
-        /// For owner-only logic, override OnProcessCompleted() from the base class.
-        /// </summary>
-        /// <param name="data">The complete reassembled data.</param>
-        /// <param name="playerIds">The player IDs involved in the reception.</param>
-        protected virtual void OnDataReceptionCompletedAsTrackedPlayer(string data, string[] playerIds) { }
-
-        /// <summary>
-        /// Called when a data chunk is received on tracked players.
-        /// This fires for each chunk received.
-        /// </summary>
-        /// <param name="chunkIndex">The index of the received chunk (1-based).</param>
-        /// <param name="totalChunks">The total number of chunks to receive.</param>
-        protected virtual void OnDataChunkReceivedAsTrackedPlayer(int chunkIndex, int totalChunks) { }
-
-        #endregion
-
         #region Network Events
 
         /// <summary>
@@ -126,9 +142,12 @@ namespace Tsvrc.Network
             }
 
             _receivedChunks[chunkIndex - 1] = dataChunk;
+            LastChunkIndex = chunkIndex;
+            LastTotalChunks = totalChunks;
 
             NotifyChunkReceived();
-            OnDataChunkReceivedAsTrackedPlayer(chunkIndex, totalChunks);
+
+            _dataReceiverListener.SendCustomEvent(_onDataChunkReceivedEvent);
         }
 
         #endregion

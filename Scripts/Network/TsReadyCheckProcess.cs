@@ -42,7 +42,7 @@ namespace Tsvrc.Network
         /// </code>
         /// </example>
         /// </summary>
-        public void TsConstruct(
+        public void TsConstructReadyCheckProcess(
             UdonSharpBehaviour listener,
             string onReadyCheckStartedEvent,
             string onReadyCheckStoppedEvent,
@@ -54,7 +54,7 @@ namespace Tsvrc.Network
             _onReadyCheckStoppedEvent = onReadyCheckStoppedEvent;
             _onReadyCheckCompletedEvent = onReadyCheckCompletedEvent;
 
-            base.TsConstruct(
+            base.TsConstructPlayerTracker(
                 this,
                 nameof(_OnTrackingStarted),
                 nameof(_OnTrackingStopped),

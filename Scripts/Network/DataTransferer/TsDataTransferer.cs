@@ -5,16 +5,11 @@ namespace Tsvrc.Network
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsDataTransferer : TsDataReceiver
     {
-        private UdonSharpBehaviour _listener;
+        private UdonSharpBehaviour _transfererListener;
         private string _onStartedEvent = "OnTransferStarted";
         private string _onStoppedEvent = "OnTransferStopped";
         private string _onCompletedEvent = "OnTransferCompleted";
         private string _onChunkEvent = "OnTransferChunk";
-
-        public string LastData { get; private set; } = "";
-        public string[] LastPlayerIds { get; private set; } = new string[0];
-        public int LastChunkIndex { get; private set; } = 0;
-        public int LastTotalChunks { get; private set; } = 0;
 
         /// <summary>
         /// Initializes the TsDataTransferer with a listener and event method names.
@@ -44,7 +39,7 @@ namespace Tsvrc.Network
         /// </code>
         /// </example>
         /// </summary>
-        public void TsConstruct(
+        public void TsConstructDataTransferer(
             UdonSharpBehaviour listener,
             string onStartedEvent,
             string onStoppedEvent,
@@ -52,11 +47,19 @@ namespace Tsvrc.Network
             string onChunkEvent
         )
         {
-            _listener = listener;
+            _transfererListener = listener;
             _onStartedEvent = onStartedEvent;
             _onStoppedEvent = onStoppedEvent;
             _onCompletedEvent = onCompletedEvent;
             _onChunkEvent = onChunkEvent;
+
+            base.TsConstructDataReceiver(
+                this,
+                nameof(_OnDataReceptionStarted),
+                nameof(_OnDataReceptionStopped),
+                nameof(_OnDataReceptionCompleted),
+                nameof(_OnDataChunkReceived)
+            );
         }
 
         #region TsvrcProcess Callbacks
@@ -72,38 +75,24 @@ namespace Tsvrc.Network
 
         #region TsDataReceiver Callbacks
 
-        protected override void OnDataReceptionStartedAsTrackedPlayer(string[] playerIds)
+        public void _OnDataReceptionStarted()
         {
-            base.OnDataReceptionStartedAsTrackedPlayer(playerIds);
-
-            LastPlayerIds = playerIds;
-            _listener.SendCustomEvent(_onStartedEvent);
+            _transfererListener.SendCustomEvent(_onStartedEvent);
         }
 
-        protected override void OnDataReceptionStoppedAsTrackedPlayer(string[] playerIds)
+        public void _OnDataReceptionStopped()
         {
-            base.OnDataReceptionStoppedAsTrackedPlayer(playerIds);
-
-            LastPlayerIds = playerIds;
-            _listener.SendCustomEvent(_onStoppedEvent);
+            _transfererListener.SendCustomEvent(_onStoppedEvent);
         }
 
-        protected override void OnDataReceptionCompletedAsTrackedPlayer(string data, string[] playerIds)
+        public void _OnDataReceptionCompleted()
         {
-            base.OnDataReceptionCompletedAsTrackedPlayer(data, playerIds);
-
-            LastData = data;
-            LastPlayerIds = playerIds;
-            _listener.SendCustomEvent(_onCompletedEvent);
+            _transfererListener.SendCustomEvent(_onCompletedEvent);
         }
 
-        protected override void OnDataChunkReceivedAsTrackedPlayer(int chunkIndex, int totalChunks)
+        public void _OnDataChunkReceived()
         {
-            base.OnDataChunkReceivedAsTrackedPlayer(chunkIndex, totalChunks);
-
-            LastChunkIndex = chunkIndex;
-            LastTotalChunks = totalChunks;
-            _listener.SendCustomEvent(_onChunkEvent);
+            _transfererListener.SendCustomEvent(_onChunkEvent);
         }
 
         #endregion

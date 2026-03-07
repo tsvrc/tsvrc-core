@@ -1,5 +1,6 @@
 using Tsvrc.Player;
 using Tsvrc.Utils;
+using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
@@ -19,6 +20,54 @@ namespace Tsvrc.Network
         private int _totalChunks = 0;
 
         private string[] _targetPlayerIds = new string[0];
+
+        private UdonSharpBehaviour _dataSenderListener;
+        private string _onDataTransferStartedEvent = "OnDataTransferStarted";
+        private string _onDataTransferStoppedEvent = "OnDataTransferStopped";
+        private string _onDataTransferCompletedEvent = "OnDataTransferCompleted";
+
+        /// <summary>
+        /// Initializes the TsDataSender with a listener and event method names.
+        /// On each data transfer event, SendCustomEvent is called on the listener using the corresponding name.
+        /// Use nameof() for event names to avoid magic strings and get refactor safety.
+        /// <example>
+        /// <code>
+        /// sender.TsConstruct(
+        ///     this,
+        ///     nameof(_OnDataTransferStartedMethod),
+        ///     nameof(_OnDataTransferStoppedMethod),
+        ///     nameof(_OnDataTransferCompletedMethod)
+        /// );
+        /// </code>
+        /// </example>
+        /// </summary>
+        protected void TsConstructDataSender(
+            UdonSharpBehaviour listener,
+            string onDataTransferStartedEvent,
+            string onDataTransferStoppedEvent,
+            string onDataTransferCompletedEvent
+        )
+        {
+            _dataSenderListener = listener;
+            _onDataTransferStartedEvent = onDataTransferStartedEvent;
+            _onDataTransferStoppedEvent = onDataTransferStoppedEvent;
+            _onDataTransferCompletedEvent = onDataTransferCompletedEvent;
+
+            base.TsConstructReadyCheckProcess(
+                this,
+                nameof(_OnReadyCheckStarted),
+                nameof(_OnReadyCheckStopped),
+                nameof(_OnReadyCheckCompleted)
+            );
+        }
+
+        #region TsReadyCheckProcess Callbacks
+
+        public void _OnReadyCheckStarted() { }
+        public void _OnReadyCheckStopped() { }
+        public void _OnReadyCheckCompleted() { }
+
+        #endregion
 
         #region TsvrcProcess Callbacks
 
@@ -206,29 +255,6 @@ namespace Tsvrc.Network
         #region Virtual Methods
 
         /// <summary>
-        /// Called when the data transfer starts on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// This fires once at the beginning of the transfer (first chunk).
-        /// For owner-only logic, override OnProcessStarted() from the base class.
-        /// </summary>
-        protected virtual void OnDataTransferStartedAsTrackedPlayer(string[] playerIds) { }
-
-        /// <summary>
-        /// Called when the data transfer is stopped on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// For owner-only logic, override OnProcessStopped() from the base class.
-        /// </summary>
-        protected virtual void OnDataTransferStoppedAsTrackedPlayer(string[] playerIds) { }
-
-        /// <summary>
-        /// Called when the data transfer completes on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// This fires once at the end when all chunks are complete.
-        /// For owner-only logic, override OnProcessCompleted() from the base class.
-        /// </summary>
-        protected virtual void OnDataTransferCompletedAsTrackedPlayer(string[] playerIds) { }
-
-        /// <summary>
         /// Called when a data chunk is ready to be sent.
         /// Only invoked on the process owner.
         /// This fires for each chunk.
@@ -253,7 +279,7 @@ namespace Tsvrc.Network
             var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
-            OnDataTransferStartedAsTrackedPlayer(playerIds);
+            _dataSenderListener.SendCustomEvent(_onDataTransferStartedEvent);
         }
 
         /// <summary>
@@ -266,7 +292,7 @@ namespace Tsvrc.Network
             var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
-            OnDataTransferStoppedAsTrackedPlayer(playerIds);
+            _dataSenderListener.SendCustomEvent(_onDataTransferStoppedEvent);
         }
 
         /// <summary>
@@ -279,7 +305,7 @@ namespace Tsvrc.Network
             var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
-            OnDataTransferCompletedAsTrackedPlayer(playerIds);
+            _dataSenderListener.SendCustomEvent(_onDataTransferCompletedEvent);
         }
 
         #endregion

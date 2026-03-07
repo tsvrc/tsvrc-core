@@ -61,7 +61,7 @@ namespace Tsvrc.Network
         /// </code>
         /// </example>
         /// </summary>
-        public void TsConstruct(
+        public void TsConstructPlayerTracker(
             UdonSharpBehaviour listener,
             string onTrackingStartedEvent,
             string onTrackingStoppedEvent,
