@@ -3,6 +3,11 @@ using UdonSharp;
 
 namespace Tsvrc.Core
 {
+    /// <summary>
+    /// Base class for all Tsvrc behaviours.
+    /// Holds a reference to <see cref="Tsvrc.Core.Compiled.CompiledTsvrc"/> and exposes
+    /// <see cref="TsConstruct"/> for dependency injection and <see cref="TsDestroy"/> for safe deferred destruction.
+    /// </summary>
     public class TsvrcBehaviour : UdonSharpBehaviour
     {
         protected CompiledTsvrc _ts;

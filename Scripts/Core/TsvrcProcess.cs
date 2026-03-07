@@ -7,6 +7,11 @@ using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Core
 {
+    /// <summary>
+    /// Base class for networked, owner-driven processes.
+    /// Manages start/stop/complete lifecycle, ownership transfer on player leave,
+    /// and optional periodic update ticks — all scoped to the process owner.
+    /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsvrcProcess : TsvrcBehaviour
     {
