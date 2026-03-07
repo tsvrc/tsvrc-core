@@ -11,6 +11,60 @@ namespace Tsvrc.Network
     {
         [UdonSynced] private string[] _readyPlayerIds = new string[0];
 
+        private UdonSharpBehaviour _readyCheckListener;
+        private string _onReadyCheckStartedEvent = "OnReadyCheckStarted";
+        private string _onReadyCheckStoppedEvent = "OnReadyCheckStopped";
+        private string _onReadyCheckCompletedEvent = "OnReadyCheckCompleted";
+
+        /// <summary>
+        /// Initializes the TsReadyCheckProcess with a listener and event method names.
+        /// On each ready check event, SendCustomEvent is called on the listener using the corresponding name.
+        /// Use nameof() for event names to avoid magic strings and get refactor safety.
+        /// Read event data from the Last* properties inside the listener's callback methods:
+        /// <list type="bullet">
+        /// <item><term>onReadyCheckStartedEvent</term><description>LastPlayerIds</description></item>
+        /// <item><term>onReadyCheckStoppedEvent</term><description>LastPlayerIds</description></item>
+        /// <item><term>onReadyCheckCompletedEvent</term><description>LastPlayerIds</description></item>
+        /// </list>
+        /// <example>
+        /// <code>
+        /// readyCheck.TsConstruct(
+        ///     this,
+        ///     nameof(OnReadyCheckStartedMethod),
+        ///     nameof(OnReadyCheckStoppedMethod),
+        ///     nameof(OnReadyCheckCompletedMethod)
+        /// );
+        ///
+        /// public void OnReadyCheckCompletedMethod()
+        /// {
+        ///     var players = readyCheck.LastPlayerIds;
+        /// }
+        /// </code>
+        /// </example>
+        /// </summary>
+        public void TsConstruct(
+            UdonSharpBehaviour listener,
+            string onReadyCheckStartedEvent,
+            string onReadyCheckStoppedEvent,
+            string onReadyCheckCompletedEvent
+        )
+        {
+            _readyCheckListener = listener;
+            _onReadyCheckStartedEvent = onReadyCheckStartedEvent;
+            _onReadyCheckStoppedEvent = onReadyCheckStoppedEvent;
+            _onReadyCheckCompletedEvent = onReadyCheckCompletedEvent;
+
+            base.TsConstruct(
+                this,
+                nameof(_OnTrackingStarted),
+                nameof(_OnTrackingStopped),
+                nameof(_OnTrackingCompleted),
+                nameof(_OnTrackingDeserialization),
+                nameof(_OnTrackingPlayersAdded),
+                nameof(_OnTrackingPlayersRemoved)
+            );
+        }
+
         #region TsvrcProcess Callbacks
 
         protected override void OnProcessStarted()
@@ -50,29 +104,28 @@ namespace Tsvrc.Network
 
         #region TsvrcPlayerListTracker Callbacks
 
-        protected override void OnProcessStartedAsTrackedPlayer(string[] playerIds)
+        public void _OnTrackingStarted()
         {
-            base.OnProcessStartedAsTrackedPlayer(playerIds);
-            OnReadyCheckStartedAsTrackedPlayer(playerIds);
+            _readyCheckListener.SendCustomEvent(_onReadyCheckStartedEvent);
         }
 
-        protected override void OnProcessStoppedAsTrackedPlayer(string[] playerIds)
+        public void _OnTrackingStopped()
         {
-            base.OnProcessStoppedAsTrackedPlayer(playerIds);
-            OnReadyCheckStoppedAsTrackedPlayer(playerIds);
+            _readyCheckListener.SendCustomEvent(_onReadyCheckStoppedEvent);
         }
 
-        protected override void OnProcessCompletedAsTrackedPlayer(string[] playerIds)
+        public void _OnTrackingCompleted()
         {
-            base.OnProcessCompletedAsTrackedPlayer(playerIds);
-            OnReadyCheckCompletedAsTrackedPlayer(playerIds);
+            _readyCheckListener.SendCustomEvent(_onReadyCheckCompletedEvent);
         }
 
-        protected override void OnPlayersRemovedAsTrackedPlayer(string[] playerIds)
-        {
-            base.OnPlayersRemovedAsTrackedPlayer(playerIds);
+        public void _OnTrackingDeserialization() { }
 
-            foreach (string playerId in playerIds)
+        public void _OnTrackingPlayersAdded() { }
+
+        public void _OnTrackingPlayersRemoved()
+        {
+            foreach (string playerId in LastRemovedPlayerIds)
             {
                 if (IsPlayerReady(playerId))
                 {
@@ -90,7 +143,7 @@ namespace Tsvrc.Network
         /// </summary>
         public virtual void StartReadyCheck(string[] playerIds)
         {
-            base.StartProcessFromTracker(playerIds, useProcessUpdate: true);
+            base.StartPlayerTracking(playerIds, useProcessUpdate: true);
         }
 
         /// <summary>
@@ -98,7 +151,7 @@ namespace Tsvrc.Network
         /// </summary>
         public virtual void StopReadyCheck()
         {
-            base.StopProcessFromTracker();
+            base.StopPlayerTracking();
         }
 
         /// <summary>
@@ -106,7 +159,7 @@ namespace Tsvrc.Network
         /// </summary>
         public virtual void CompleteReadyCheck()
         {
-            base.CompleteProcessFromTracker();
+            base.CompletePlayerTracking();
         }
 
         /// <summary>
@@ -139,31 +192,6 @@ namespace Tsvrc.Network
         {
             return TsArray.Contains(_readyPlayerIds, playerId);
         }
-
-        #endregion
-
-        #region Virtual Methods
-
-        /// <summary>
-        /// Called when a ready check is started on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// For owner-only logic, override OnProcessStarted() from the base class.
-        /// </summary>
-        protected virtual void OnReadyCheckStartedAsTrackedPlayer(string[] playerIds) { }
-
-        /// <summary>
-        /// Called when a ready check is stopped on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// For owner-only logic, override OnProcessStopped() from the base class.
-        /// </summary>
-        protected virtual void OnReadyCheckStoppedAsTrackedPlayer(string[] playerIds) { }
-
-        /// <summary>
-        /// Called when a ready check is completed on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// For owner-only logic, override OnProcessCompleted() from the base class.
-        /// </summary>
-        protected virtual void OnReadyCheckCompletedAsTrackedPlayer(string[] playerIds) { }
 
         #endregion
 

@@ -9,6 +9,7 @@ using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Network
 {
+    [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsPlayerTracker : TsvrcProcess
     {
         [UdonSynced] private string[] _trackedPlayerIds = new string[0];
@@ -16,11 +17,75 @@ namespace Tsvrc.Network
         // Temporary storage for initial player IDs during process start.
         protected string[] _initialTrackerPlayerIds = new string[0];
 
+        private UdonSharpBehaviour _listener;
+        private string _onTrackingStartedEvent = "OnTrackingStarted";
+        private string _onTrackingStoppedEvent = "OnTrackingStopped";
+        private string _onTrackingCompletedEvent = "OnTrackingCompleted";
+        private string _onTrackingDeserializationEvent = "OnTrackingDeserialization";
+        private string _onTrackingPlayersAddedEvent = "OnTrackingPlayersAdded";
+        private string _onTrackingPlayersRemovedEvent = "OnTrackingPlayersRemoved";
+
+        public string[] LastPlayerIds { get; private set; } = new string[0];
+        public string[] LastAddedPlayerIds { get; private set; } = new string[0];
+        public string[] LastRemovedPlayerIds { get; private set; } = new string[0];
+
+        /// <summary>
+        /// Initializes the TsPlayerTracker with a listener and event method names.
+        /// On each tracker event, SendCustomEvent is called on the listener using the corresponding name.
+        /// Use nameof() for event names to avoid magic strings and get refactor safety.
+        /// Read event data from the Last* properties inside the listener's callback methods:
+        /// <list type="bullet">
+        /// <item><term>onTrackingStartedEvent</term><description>LastPlayerIds</description></item>
+        /// <item><term>onTrackingStoppedEvent</term><description>LastPlayerIds</description></item>
+        /// <item><term>onTrackingCompletedEvent</term><description>LastPlayerIds</description></item>
+        /// <item><term>onTrackingDeserializationEvent</term><description>LastPlayerIds</description></item>
+        /// <item><term>onTrackingPlayersAddedEvent</term><description>LastAddedPlayerIds</description></item>
+        /// <item><term>onTrackingPlayersRemovedEvent</term><description>LastRemovedPlayerIds</description></item>
+        /// </list>
+        /// <example>
+        /// <code>
+        /// tracker.TsConstruct(
+        ///     this,
+        ///     nameof(OnTrackingStartedMethod),
+        ///     nameof(OnTrackingStoppedMethod),
+        ///     nameof(OnTrackingCompletedMethod),
+        ///     nameof(OnTrackingDeserializationMethod),
+        ///     nameof(OnTrackingPlayersAddedMethod),
+        ///     nameof(OnTrackingPlayersRemovedMethod)
+        /// );
+        ///
+        /// public void OnTrackingPlayersAddedMethod()
+        /// {
+        ///     var added = tracker.LastAddedPlayerIds;
+        /// }
+        /// </code>
+        /// </example>
+        /// </summary>
+        public void TsConstruct(
+            UdonSharpBehaviour listener,
+            string onTrackingStartedEvent,
+            string onTrackingStoppedEvent,
+            string onTrackingCompletedEvent,
+            string onTrackingDeserializationEvent,
+            string onTrackingPlayersAddedEvent,
+            string onTrackingPlayersRemovedEvent
+        )
+        {
+            _listener = listener;
+            _onTrackingStartedEvent = onTrackingStartedEvent;
+            _onTrackingStoppedEvent = onTrackingStoppedEvent;
+            _onTrackingCompletedEvent = onTrackingCompletedEvent;
+            _onTrackingDeserializationEvent = onTrackingDeserializationEvent;
+            _onTrackingPlayersAddedEvent = onTrackingPlayersAddedEvent;
+            _onTrackingPlayersRemovedEvent = onTrackingPlayersRemovedEvent;
+        }
+
         #region VRChat Callbacks
 
         public override void OnDeserialization()
         {
-            HandleTrackedPlayersDeserialization(_trackedPlayerIds);
+            LastPlayerIds = _trackedPlayerIds;
+            _listener.SendCustomEvent(_onTrackingDeserializationEvent);
         }
 
         public override void OnPlayerLeft(VRCPlayerApi player)
@@ -80,7 +145,7 @@ namespace Tsvrc.Network
         /// <summary>
         /// Starts the process from the tracker with the specified player IDs.
         /// </summary>
-        public virtual void StartProcessFromTracker(string[] playerIds, bool useProcessUpdate = false)
+        public virtual void StartPlayerTracking(string[] playerIds, bool useProcessUpdate = false)
         {
             _initialTrackerPlayerIds = playerIds;
 
@@ -90,7 +155,7 @@ namespace Tsvrc.Network
         /// <summary>
         /// Stops the process from the tracker before completion.
         /// </summary>
-        public virtual void StopProcessFromTracker()
+        public virtual void StopPlayerTracking()
         {
             base.StopProcess();
         }
@@ -98,7 +163,7 @@ namespace Tsvrc.Network
         /// <summary>
         /// Completes the process from the tracker.
         /// </summary>
-        public virtual void CompleteProcessFromTracker()
+        public virtual void CompletePlayerTracking()
         {
             base.CompleteProcess();
         }
@@ -152,50 +217,6 @@ namespace Tsvrc.Network
 
         #endregion
 
-        #region Virtual Methods
-
-        /// <summary>
-        /// Called when the process is started on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// For owner-only logic, override OnProcessStarted() from the base class.
-        /// </summary>
-        protected virtual void OnProcessStartedAsTrackedPlayer(string[] playerIds) { }
-
-        /// <summary>
-        /// Called when the process is stopped on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// For owner-only logic, override OnProcessStopped() from the base class.
-        /// </summary>
-        protected virtual void OnProcessStoppedAsTrackedPlayer(string[] playerIds) { }
-
-        /// <summary>
-        /// Called when the process is completed on tracked players.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// For owner-only logic, override OnProcessCompleted() from the base class.
-        /// </summary>
-        protected virtual void OnProcessCompletedAsTrackedPlayer(string[] playerIds) { }
-
-        /// <summary>
-        /// Called when the tracker's synced data is received.
-        /// Invoked via OnDeserialization when the tracked player list is updated.
-        /// For individual player add/remove events, use OnPlayersAddedAsTrackedPlayer() and OnPlayersRemovedAsTrackedPlayer().
-        /// </summary>
-        protected virtual void HandleTrackedPlayersDeserialization(string[] playerIds) { }
-
-        /// <summary>
-        /// Called when players are added to the tracked list.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// </summary>
-        protected virtual void OnPlayersAddedAsTrackedPlayer(string[] playerIds) { }
-
-        /// <summary>
-        /// Called when players are removed from the tracked list.
-        /// Invoked via network event on all tracked players (non-owners).
-        /// </summary>
-        protected virtual void OnPlayersRemovedAsTrackedPlayer(string[] playerIds) { }
-
-        #endregion
-
         #region  Network Events
 
         /// <summary>
@@ -208,7 +229,8 @@ namespace Tsvrc.Network
             var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
-            OnProcessStartedAsTrackedPlayer(playerIds);
+            LastPlayerIds = playerIds;
+            _listener.SendCustomEvent(_onTrackingStartedEvent);
         }
 
         /// <summary>
@@ -221,7 +243,8 @@ namespace Tsvrc.Network
             var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
-            OnProcessStoppedAsTrackedPlayer(playerIds);
+            LastPlayerIds = playerIds;
+            _listener.SendCustomEvent(_onTrackingStoppedEvent);
         }
 
         /// <summary>
@@ -234,7 +257,8 @@ namespace Tsvrc.Network
             var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
-            OnProcessCompletedAsTrackedPlayer(playerIds);
+            LastPlayerIds = playerIds;
+            _listener.SendCustomEvent(_onTrackingCompletedEvent);
         }
 
         /// <summary>
@@ -247,7 +271,8 @@ namespace Tsvrc.Network
             var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(notifyPlayerIds, playerId)) return;
 
-            OnPlayersAddedAsTrackedPlayer(addedPlayerIds);
+            LastAddedPlayerIds = addedPlayerIds;
+            _listener.SendCustomEvent(_onTrackingPlayersAddedEvent);
         }
 
         /// <summary>
@@ -260,7 +285,8 @@ namespace Tsvrc.Network
             var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(notifyPlayerIds, playerId)) return;
 
-            OnPlayersRemovedAsTrackedPlayer(removedPlayerIds);
+            LastRemovedPlayerIds = removedPlayerIds;
+            _listener.SendCustomEvent(_onTrackingPlayersRemovedEvent);
         }
 
         /// <summary>
