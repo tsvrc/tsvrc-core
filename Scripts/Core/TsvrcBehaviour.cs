@@ -12,23 +12,20 @@ namespace Tsvrc.Core
 
         public void TsConstruct(CompiledTsvrc tsvrc)
         {
-            if (_isCreated)
-            {
-                Debug.LogWarning($"[TsvrcBehaviour] {name} is already constructed. Ignoring duplicate construction.");
-                return;
-            }
+            if (_isCreated) return;
 
             _isCreated = true;
             _ts = tsvrc;
             TsStart();
         }
 
-        /// <summary>
-        /// Constructs this behavious from another behaviour.
-        /// </summary>
-        public void TsConstruct(TsvrcBehaviour behaviour)
+        public void TsConstruct(TsvrcBehaviour parent)
         {
-            TsConstruct(behaviour._ts);
+            if (_isCreated) return;
+
+            _isCreated = true;
+            _ts = parent._ts;
+            TsStart();
         }
 
         public void TsDestroy()
@@ -44,6 +41,11 @@ namespace Tsvrc.Core
         #region Virtual Methods
 
         protected virtual void TsStart() { }
+
+        #endregion
+
+        #region UdonSharp Callbacks
+
 
         #endregion
     }
