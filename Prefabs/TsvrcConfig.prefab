@@ -144,6 +144,7 @@ MonoBehaviour:
   Singletons: []
   TsvrcBehaviourFactory:
   - {fileID: -3083329989026124594, guid: ecd96f90cad7074449bd47c032bcfb6a, type: 3}
+  - {fileID: -1197653813904076162, guid: 4e9f3cdbd4eebf1408aea8c85707d3f3, type: 3}
 --- !u!114 &5322347720468676817
 MonoBehaviour:
   m_ObjectHideFlags: 0
