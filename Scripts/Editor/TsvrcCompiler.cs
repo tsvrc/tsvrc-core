@@ -1,7 +1,9 @@
 #if UNITY_EDITOR
 using System.IO;
 using System.Text;
+using Tsvrc.Core;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Tsvrc.Editor
@@ -13,9 +15,13 @@ namespace Tsvrc.Editor
         private const string GeneratedFolder = "Assets/TsvrcGenerated";
         private const string AccessorPath = "Assets/TsvrcGenerated/CompiledTsvrc.cs";
 
+        private const string TsvrcConfigPrefabPath = "Assets/Tsvrc/Prefabs/TsvrcConfig.prefab";
+
         [MenuItem("Tsvrc/Compile")]
         public static void Compile()
         {
+            EnsureTsvrcConfigInScene();
+
             var result = TsvrcScanner.Scan();
             if (result == null) return;
 
@@ -53,6 +59,33 @@ namespace Tsvrc.Editor
 
         private static string ToAbsolutePath(string root, string assetPath) =>
             Path.Combine(root, assetPath.Replace('/', Path.DirectorySeparatorChar));
+
+        private static void EnsureTsvrcConfigInScene()
+        {
+            var existing = UnityEngine.Object.FindObjectsOfType<TsvrcConfig>();
+
+            if (existing.Length > 1)
+            {
+                Debug.LogError("[TsvrcCompiler] Multiple TsvrcConfig found in the scene \u2014 remove the duplicates and compile again.");
+                return;
+            }
+
+            if (existing.Length == 1)
+                return; // already present
+
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(TsvrcConfigPrefabPath);
+            if (prefab == null)
+            {
+                Debug.LogError($"[TsvrcCompiler] TsvrcConfig prefab not found at '{TsvrcConfigPrefabPath}'.");
+                return;
+            }
+
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            go.transform.SetSiblingIndex(0);
+            Undo.RegisterCreatedObjectUndo(go, "Add TsvrcConfig");
+            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            Debug.Log($"[TsvrcCompiler] TsvrcConfig prefab added to scene.");
+        }
     }
 }
 #endif
