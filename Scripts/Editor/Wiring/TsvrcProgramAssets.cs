@@ -35,7 +35,6 @@ namespace Tsvrc.Editor
         internal static void EnsureBothAssets()
         {
             EnsureAsset(AccessorCsPath, AccessorAssetPath);
-            EnsureAsset(InstanceCsPath, InstanceAssetPath);
         }
 
         // Ensures a program asset exists for type before AddComponent is called.

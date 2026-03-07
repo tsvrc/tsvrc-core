@@ -40,14 +40,6 @@ namespace Tsvrc.Editor
                 EmitFactoryMethod(w, entry);
             }
             if (currentRegion != null) w.EndRegion();
-
-            // Deactivate templates so they cost nothing at runtime.
-            w.BlankLine();
-            using (w.Block("protected void Start()"))
-            {
-                foreach (var entry in entries)
-                    w.Line($"_{LowerFirst(entry.FieldName)}.gameObject.SetActive(false);");
-            }
         }
 
         private static void EmitFactoryMethod(CsWriter w, TsvrcEntry entry)

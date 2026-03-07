@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Tsvrc.Editor
 {
     // Wires the generated scene hierarchy after compile.
-    // Hierarchy: CompiledTsvrcConfig (root) > CompiledTsvrc + [InstanceGO]
+    // Hierarchy: CompiledTsvrc (root) > [InstanceGO]
     [InitializeOnLoad]
     public static class TsvrcSceneWirer
     {
@@ -35,37 +35,33 @@ namespace Tsvrc.Editor
             TsvrcProgramAssets.EnsureBothAssets();
 
             var tsType = ResolveType("Tsvrc.Core.Compiled.CompiledTsvrc", "CompiledTsvrc");
-            var instType = ResolveType("Tsvrc.Core.Compiled.CompiledTsvrcConfig", "CompiledTsvrcConfig");
-            if (tsType == null || instType == null) return;
+            if (tsType == null) return;
 
-            foreach (var obj in UnityEngine.Object.FindObjectsOfType(instType))
+            // Destroy existing CompiledTsvrc GOs.
+            foreach (var obj in UnityEngine.Object.FindObjectsOfType(tsType))
                 Undo.DestroyObjectImmediate(((Component)obj).gameObject);
 
-            var instGo = new GameObject("CompiledTsvrcConfig");
-            instGo.AddComponent(instType);
-            instGo.transform.SetSiblingIndex(0);
-            Undo.RegisterCreatedObjectUndo(instGo, "Create CompiledTsvrcConfig");
-            var instComponent = (Component)instGo.GetComponent(instType);
+            // Clean up legacy CompiledTsvrcConfig root GO (one-time transition).
+            var oldConfigGo = GameObject.Find("CompiledTsvrcConfig");
+            if (oldConfigGo != null)
+                Undo.DestroyObjectImmediate(oldConfigGo);
 
             var tsGo = new GameObject("CompiledTsvrc");
             tsGo.AddComponent(tsType);
-            tsGo.transform.SetParent(instGo.transform, false);
+            tsGo.transform.SetSiblingIndex(0);
             Undo.RegisterCreatedObjectUndo(tsGo, "Create CompiledTsvrc");
             var tsComponent = (Component)tsGo.GetComponent(tsType);
 
             var tsSerialized = new SerializedObject(tsComponent);
             WireSingletonFields(tsSerialized, result);
             WireBehaviourTemplateFields(tsSerialized, result);
-            tsSerialized.ApplyModifiedProperties();
+            WireConstructFields(tsSerialized, result);
 
-            var instanceComponent = CreateInstanceGo(result, instGo);
-
-            var instSerialized = new SerializedObject(instComponent);
-            SetField(instSerialized, "_ts", tsComponent);
+            var instanceComponent = CreateInstanceGo(result, tsGo);
             if (instanceComponent != null)
-                SetField(instSerialized, "_instance", instanceComponent);
-            WireConstructFields(instSerialized, result);
-            instSerialized.ApplyModifiedProperties();
+                SetField(tsSerialized, "_instance", instanceComponent);
+
+            tsSerialized.ApplyModifiedProperties();
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
 
@@ -95,7 +91,7 @@ namespace Tsvrc.Editor
             foreach (var group in result.Groups)
                 if (group.Kind == TsvrcGroupKind.Behaviour)
                     foreach (var entry in group.Entries)
-                        if (entry.FactoryUsed)
+                        if (entry.FactoryUsed || entry.IsCore)
                             SetField(so, "_" + LowerFirst(entry.FieldName), ResolveComponent(entry));
         }
 
@@ -155,9 +151,9 @@ namespace Tsvrc.Editor
                 : "none";
 
             Debug.Log(
-                $"[TsvrcSceneWirer] Wired {singletons} singleton(s) \u2192 CompiledTsvrc, " +
-                $"{factories} factory template(s) \u2192 CompiledTsvrc, " +
-                $"instance ({instanceInfo}) copied \u2192 CompiledTsvrcConfig.");
+                $"[TsvrcSceneWirer] Wired {singletons} singleton(s), " +
+                $"{factories} factory template(s), " +
+                $"instance ({instanceInfo}) \u2192 CompiledTsvrc.");
         }
 
         private static string LowerFirst(string s) =>
