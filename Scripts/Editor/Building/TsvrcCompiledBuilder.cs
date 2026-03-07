@@ -52,7 +52,7 @@ namespace Tsvrc.Editor
             foreach (var group in result.Groups)
                 if (group.Kind == TsvrcGroupKind.Behaviour)
                     foreach (var entry in group.Entries)
-                        if (entry.FactoryUsed)
+                        if (entry.FactoryUsed || entry.IsCore)
                             list.Add(entry);
             return list;
         }

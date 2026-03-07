@@ -14,6 +14,7 @@ namespace Tsvrc.Editor
         public bool SingletonUsed;    // any _ts.FieldName reference found in code
         public bool FactoryUsed;      // any Create{TypeName}() call found in code
         public bool IsTsvrcBehaviour; // type extends TsvrcBehaviour
+        public bool IsCore;           // sourced from InternalTsvrcConfig (core/internal)
         public UnityEngine.Object SceneObject;
     }
 

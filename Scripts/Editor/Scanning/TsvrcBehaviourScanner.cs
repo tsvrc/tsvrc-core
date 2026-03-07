@@ -6,36 +6,33 @@ namespace Tsvrc.Editor
 {
     internal static class TsvrcBehaviourScanner
     {
-        // Merges TsvrcBehaviourFactory + InternalTsvrcBehaviourFactory into one factory group.
-        internal static TsvrcGroup ScanFactory(TsvrcConfig config, HashSet<string> usedNames)
+        // Scans a factory array tagged with isCore.
+        internal static TsvrcGroup ScanFactory(TsvrcBehaviour[] source, bool isCore, HashSet<string> usedNames)
         {
-            var group = new TsvrcGroup { Label = "Factories", Kind = TsvrcGroupKind.Behaviour };
-            var source = MergeArrays(config.TsvrcBehaviourFactory, config.InternalTsvrcBehaviourFactory);
-            TsvrcEntryResolver.Resolve(source, group, usedNames);
+            string label = isCore ? "Core Factories" : "Factories";
+            var group = new TsvrcGroup { Label = label, Kind = TsvrcGroupKind.Behaviour };
+            TsvrcEntryResolver.Resolve(BoxArray(source), group, usedNames);
 
             foreach (var entry in group.Entries)
+            {
+                entry.IsCore = isCore;
                 entry.FactoryUsed = TsvrcUsageAnalyzer.IsFactoryUsed(entry.Type);
+            }
 
             return group;
         }
 
-        // Builds a Construct group from TsvrcBehaviourConstruct — wired by scene, TsConstruct called at start.
-        internal static TsvrcGroup ScanConstruct(TsvrcConfig config, HashSet<string> usedNames)
+        // Builds a Construct group from a behaviour array tagged with isCore.
+        internal static TsvrcGroup ScanConstruct(TsvrcBehaviour[] source, bool isCore, HashSet<string> usedNames)
         {
-            var group = new TsvrcGroup { Label = "Constructs", Kind = TsvrcGroupKind.Construct };
-            var source = BoxArray(config.TsvrcBehaviourConstruct);
-            TsvrcEntryResolver.Resolve(source, group, usedNames);
-            return group;
-        }
+            string label = isCore ? "Core Constructs" : "Constructs";
+            var group = new TsvrcGroup { Label = label, Kind = TsvrcGroupKind.Construct };
+            TsvrcEntryResolver.Resolve(BoxArray(source), group, usedNames);
 
-        private static UnityEngine.Object[] MergeArrays(TsvrcBehaviour[] a, TsvrcBehaviour[] b)
-        {
-            int aLen = a?.Length ?? 0;
-            int bLen = b?.Length ?? 0;
-            var merged = new UnityEngine.Object[aLen + bLen];
-            for (int i = 0; i < aLen; i++) merged[i] = a[i];
-            for (int i = 0; i < bLen; i++) merged[aLen + i] = b[i];
-            return merged;
+            foreach (var entry in group.Entries)
+                entry.IsCore = isCore;
+
+            return group;
         }
 
         private static UnityEngine.Object[] BoxArray(TsvrcBehaviour[] arr)

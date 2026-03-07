@@ -54,6 +54,12 @@ namespace Tsvrc.Editor
         internal void Summary(string text)
             => Line($"/// <summary>{text}</summary>");
 
+        internal void Region(string name)
+            => _sb.AppendLine($"{Indent()}#region {name}");
+
+        internal void EndRegion()
+            => _sb.AppendLine($"{Indent()}#endregion");
+
         public override string ToString() => _sb.ToString();
 
         private void Raw(string line)

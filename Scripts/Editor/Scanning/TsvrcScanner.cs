@@ -20,22 +20,35 @@ namespace Tsvrc.Editor
             };
 
             var usedNames = new HashSet<string>();
+            var internalConfig = config.InternalTsvrcConfig;
 
-            var singletonGroup = TsvrcSingletonScanner.Scan(config, usedNames);
+            // ── Core groups (InternalTsvrcConfig) — added first so they appear before user entries ──
+            if (internalConfig != null)
+            {
+                var coreSingletons = TsvrcSingletonScanner.Scan(internalConfig.Singletons, true, usedNames);
+                if (coreSingletons == null) return null;
+                if (coreSingletons.Entries.Count > 0) result.Groups.Add(coreSingletons);
+
+                var coreFactory = TsvrcBehaviourScanner.ScanFactory(internalConfig.TsvrcBehaviourFactory, true, usedNames);
+                if (coreFactory.Entries.Count > 0) result.Groups.Add(coreFactory);
+            }
+
+            // ── User groups (TsvrcConfig) ──
+            var singletonGroup = TsvrcSingletonScanner.Scan(config.Singletons, false, usedNames);
             if (singletonGroup == null) return null;
 
-            var factoryGroup = TsvrcBehaviourScanner.ScanFactory(config, usedNames);
-            var constructGroup = TsvrcBehaviourScanner.ScanConstruct(config, usedNames);
-
-            if (singletonGroup.Entries.Count == 0 && factoryGroup.Entries.Count == 0 && constructGroup.Entries.Count == 0)
-            {
-                Debug.LogWarning("[TsvrcCompiler] All arrays are empty. Nothing to generate.");
-                return null;
-            }
+            var factoryGroup = TsvrcBehaviourScanner.ScanFactory(config.TsvrcBehaviourFactory, false, usedNames);
+            var constructGroup = TsvrcBehaviourScanner.ScanConstruct(config.TsvrcBehaviourConstruct, false, usedNames);
 
             if (singletonGroup.Entries.Count > 0) result.Groups.Add(singletonGroup);
             if (factoryGroup.Entries.Count > 0) result.Groups.Add(factoryGroup);
             if (constructGroup.Entries.Count > 0) result.Groups.Add(constructGroup);
+
+            if (result.Groups.Count == 0)
+            {
+                Debug.LogWarning("[TsvrcCompiler] All arrays are empty. Nothing to generate.");
+                return null;
+            }
 
             return result;
         }

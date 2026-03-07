@@ -10,15 +10,36 @@ namespace Tsvrc.Editor
             if (entries == null || entries.Count == 0)
                 return;
 
+            // ── Template fields ──
             w.BlankLine();
-            foreach (var entry in entries)
-                w.Line($"[SerializeField] private {entry.Type.Name} _{LowerFirst(entry.FieldName)};");
-
+            bool? currentRegion = null;
             foreach (var entry in entries)
             {
+                if (currentRegion == null || currentRegion != entry.IsCore)
+                {
+                    if (currentRegion != null) { w.EndRegion(); w.BlankLine(); }
+                    w.Region(entry.IsCore ? "Core — factory templates (internal)" : "User — factory templates");
+                    currentRegion = entry.IsCore;
+                }
+                w.Line($"[HideInInspector] [SerializeField] private {entry.Type.Name} _{LowerFirst(entry.FieldName)};");
+            }
+            if (currentRegion != null) w.EndRegion();
+
+            // ── Factory methods ──
+            currentRegion = null;
+            foreach (var entry in entries)
+            {
+                if (currentRegion == null || currentRegion != entry.IsCore)
+                {
+                    if (currentRegion != null) { w.EndRegion(); }
+                    w.BlankLine();
+                    w.Region(entry.IsCore ? "Core — factory methods (internal)" : "User — factory methods");
+                    currentRegion = entry.IsCore;
+                }
                 w.BlankLine();
                 EmitFactoryMethod(w, entry);
             }
+            if (currentRegion != null) w.EndRegion();
 
             // Deactivate templates so they cost nothing at runtime.
             w.BlankLine();
@@ -39,9 +60,9 @@ namespace Tsvrc.Editor
 
             if (entry.FactoryUsed)
             {
-                using (w.Block($"public {name} Create{field}()"))
+                using (w.Block($"public {name} Create{field}(Transform parent)"))
                 {
-                    w.Line("var go = Instantiate(_{lower}.gameObject);".Replace("{lower}", lower));
+                    w.Line("var go = Instantiate(_{lower}.gameObject, parent);".Replace("{lower}", lower));
                     w.Line("go.SetActive(true);");
                     w.Line($"var b = go.GetComponent<{name}>();");
                     w.Line("b.TsConstruct(this);");
@@ -50,7 +71,7 @@ namespace Tsvrc.Editor
             }
             else
             {
-                using (w.Block($"public {name} Create{field}()"))
+                using (w.Block($"public {name} Create{field}(Transform parent)"))
                 {
                     w.Line($"Debug.LogError(\"[CompiledTsvrc] {name} has no Create{name}() call site.\");");
                     w.Line("return null;");
