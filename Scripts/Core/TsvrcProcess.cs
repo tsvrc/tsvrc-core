@@ -174,38 +174,38 @@ namespace Tsvrc.Core
 
         /// <summary>
         /// Called when the process is started.
-        /// Only invoked on the process owner.
+        /// <b>Only invoked on the process owner.</b>
         /// </summary>
         protected virtual void OnProcessStarted() { }
 
         /// <summary>
         /// Called when the process is stopped before completion.
-        /// Only invoked on the process owner.
+        /// <b>Only invoked on the process owner.</b>
         /// </summary>
         protected virtual void OnProcessStopped() { }
 
         /// <summary>
         /// Called when the process is completed successfully.
-        /// Only invoked on the process owner.
+        /// <b>Only invoked on the process owner.</b>
         /// </summary>
         protected virtual void OnProcessCompleted() { }
 
         /// <summary>
         /// Called when the process owner leaves the instance and the process is still running.
-        /// Only invoked on the new owner.
+        /// <b>Only invoked on the new owner.</b>
         /// </summary>
         protected virtual void OnOwnerAbandonedProcess() { }
 
         /// <summary>
         /// Called when a cleanup of the process data is requested.
-        /// Only invoked on the process owner.
+        /// <b>Only invoked on the process owner.</b>
         /// </summary>
         /// <param name="isCompleted">True if cleanup is after successful completion, false if after stop/abort.</param>
         protected virtual void OnProcessCleanup(bool isCompleted) { }
 
         /// <summary>
         /// Called at regular intervals if the process is running and the local player is the owner.
-        /// Only invoked on the process owner.
+        /// <b>Only invoked on the process owner.</b>
         /// </summary>
         protected virtual void OnProcessUpdate() { }
 
