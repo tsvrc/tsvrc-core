@@ -5,21 +5,34 @@ namespace Tsvrc.State
     public class StateManager : TsvrcBehaviour
     {
         protected int currentState = -1;
+        protected int[] states = new int[0];
 
-        protected int CurrentState
+        protected void SetState(int newState)
         {
-            get { return currentState; }
-        }
+            if (currentState == newState)
+                return;
 
-        public void SetState(int newState)
-        {
+            int oldState = currentState;
+            OnExitState(oldState);
             currentState = newState;
-            OnStateChanged(newState);
+            OnEnterState(newState);
         }
 
-        protected virtual void OnStateChanged(int newState)
+        public int GetCurrentState()
         {
-            // Handle state change logic here (e.g., notify other components)
+            return currentState;
         }
+
+        /// <summary>
+        /// Called when exiting the old state
+        /// </summary>
+        protected virtual void OnExitState(int oldState)
+        { }
+
+        /// <summary>
+        /// Called when entering the new state
+        /// </summary>
+        protected virtual void OnEnterState(int newState)
+        { }
     }
 }
