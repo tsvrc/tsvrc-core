@@ -1,4 +1,5 @@
 using TMPro;
+using Tsvrc.Player;
 using Tsvrc.TsNetworking;
 using Tsvrc.TsNetworking.Utils;
 using UnityEngine;
@@ -14,7 +15,7 @@ namespace Tsvrc.Example
 
         public override void Interact()
         {
-            string[] playerIds = TsPlayerUtils.GetAllPlayerIDs();
+            string[] playerIds = TsPlayer.GetAllPlayerIDs();
 
             _statusText.text = $"Generating message for {playerIds.Length} players...";
 
@@ -27,7 +28,7 @@ namespace Tsvrc.Example
 
         public void GenerateAndSendMessage()
         {
-            string[] playerIds = TsPlayerUtils.GetAllPlayerIDs();
+            string[] playerIds = TsPlayer.GetAllPlayerIDs();
 
             // Parse length from input field, default to 1000 if invalid
             int messageLength = 1000;

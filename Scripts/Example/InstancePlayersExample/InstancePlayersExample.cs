@@ -1,3 +1,4 @@
+using Tsvrc.Player;
 using Tsvrc.TsNetworking;
 using Tsvrc.TsNetworking.Utils;
 using UnityEngine;
@@ -18,7 +19,7 @@ namespace Tsvrc.Example
 
             if (Networking.IsMaster)
             {
-                var allPlayerIds = TsPlayerUtils.GetAllPlayerIDs();
+                var allPlayerIds = TsPlayer.GetAllPlayerIDs();
                 StartProcessFromTracker(allPlayerIds);
             }
         }
@@ -38,7 +39,7 @@ namespace Tsvrc.Example
             {
                 var slotObj = Instantiate(InstancePlayersExampleSlot, ContentParent);
                 var slot = slotObj.GetComponent<InstancePlayersExampleSlot>();
-                var player = TsPlayerUtils.FindPlayerByID(playerId);
+                var player = TsPlayer.FindPlayerByID(playerId);
                 slot.SetPlayerName(player.displayName);
                 slotObj.SetActive(true);
             }
@@ -50,7 +51,7 @@ namespace Tsvrc.Example
             {
                 var slotObj = Instantiate(InstancePlayersExampleSlot, ContentParent);
                 var slot = slotObj.GetComponent<InstancePlayersExampleSlot>();
-                var player = TsPlayerUtils.FindPlayerByID(playerId);
+                var player = TsPlayer.FindPlayerByID(playerId);
                 slot.SetPlayerName(player.displayName);
                 slotObj.SetActive(true);
             }
@@ -62,7 +63,7 @@ namespace Tsvrc.Example
             {
                 var slotObj = Instantiate(InstancePlayersExampleSlot, ContentParent);
                 var slot = slotObj.GetComponent<InstancePlayersExampleSlot>();
-                var player = TsPlayerUtils.FindPlayerByID(playerId);
+                var player = TsPlayer.FindPlayerByID(playerId);
                 slot.SetPlayerName(player.displayName);
                 slotObj.SetActive(true);
             }
@@ -76,7 +77,7 @@ namespace Tsvrc.Example
                 {
                     var child = ContentParent.GetChild(i);
                     var slot = child.GetComponent<InstancePlayersExampleSlot>();
-                    var player = TsPlayerUtils.FindPlayerByID(playerId);
+                    var player = TsPlayer.FindPlayerByID(playerId);
                     if (slot != null && slot.GetPlayerName() == player.displayName)
                     {
                         Destroy(child.gameObject);

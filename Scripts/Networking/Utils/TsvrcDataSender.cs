@@ -1,4 +1,5 @@
-using Tsvrc.List.Utils;
+using Tsvrc.Player;
+using Tsvrc.Utils;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
@@ -249,7 +250,7 @@ namespace Tsvrc.TsNetworking.Utils
         [NetworkCallable]
         public void NotifyTrackedPlayersDataTransferStarted(string[] playerIds)
         {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             OnDataTransferStartedAsTrackedPlayer(playerIds);
@@ -262,7 +263,7 @@ namespace Tsvrc.TsNetworking.Utils
         [NetworkCallable]
         public void NotifyTrackedPlayersDataTransferStopped(string[] playerIds)
         {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             OnDataTransferStoppedAsTrackedPlayer(playerIds);
@@ -275,7 +276,7 @@ namespace Tsvrc.TsNetworking.Utils
         [NetworkCallable]
         public void NotifyTrackedPlayersDataTransferCompleted(string[] playerIds)
         {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             OnDataTransferCompletedAsTrackedPlayer(playerIds);

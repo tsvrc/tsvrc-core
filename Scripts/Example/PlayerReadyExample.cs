@@ -1,4 +1,5 @@
 using TMPro;
+using Tsvrc.Player;
 using Tsvrc.TsNetworking;
 using Tsvrc.TsNetworking.Utils;
 using UnityEngine;
@@ -15,7 +16,7 @@ namespace Tsvrc.Example
         {
             if (IsProcessRunning()) return;
 
-            string[] playerIds = TsPlayerUtils.GetAllPlayerIDs();
+            string[] playerIds = TsPlayer.GetAllPlayerIDs();
 
             _statusText.text = $"Starting ready check for: {string.Join(", ", playerIds)}";
 

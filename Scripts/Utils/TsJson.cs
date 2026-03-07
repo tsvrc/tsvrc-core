@@ -1,9 +1,9 @@
 using UnityEngine;
 using VRC.SDK3.Data;
 
-namespace Tsvrc.Core
+namespace Tsvrc.Utils
 {
-    public static class TsvrcJson
+    public static class TsJson
     {
         /// <summary>Serializes a <see cref="DataDictionary"/> to a minified JSON string.</summary>
         public static string Serialize(DataDictionary dict)

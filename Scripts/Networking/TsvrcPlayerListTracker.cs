@@ -1,6 +1,6 @@
 using Tsvrc.Core;
-using Tsvrc.List.Utils;
-using Tsvrc.TsNetworking.Utils;
+using Tsvrc.Player;
+using Tsvrc.Utils;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
@@ -29,8 +29,8 @@ namespace Tsvrc.TsNetworking
 
             if (!IsProcessRunning() || !IsProcessOwner()) return;
 
-            var playerId = TsPlayerUtils.GetPlayerID(player);
-            var players = TsPlayerUtils.ToArray(playerId);
+            var playerId = TsPlayer.GetPlayerID(player);
+            var players = TsPlayer.ToArray(playerId);
             RemoveTrackedPlayers(players);
         }
 
@@ -205,7 +205,7 @@ namespace Tsvrc.TsNetworking
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessStarted(string[] playerIds)
         {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             OnProcessStartedAsTrackedPlayer(playerIds);
@@ -218,7 +218,7 @@ namespace Tsvrc.TsNetworking
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessStopped(string[] playerIds)
         {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             OnProcessStoppedAsTrackedPlayer(playerIds);
@@ -231,7 +231,7 @@ namespace Tsvrc.TsNetworking
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessCompleted(string[] playerIds)
         {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             OnProcessCompletedAsTrackedPlayer(playerIds);
@@ -244,7 +244,7 @@ namespace Tsvrc.TsNetworking
         [NetworkCallable]
         public void NotifyTrackedPlayersAdded(string[] addedPlayerIds, string[] notifyPlayerIds)
         {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(notifyPlayerIds, playerId)) return;
 
             OnPlayersAddedAsTrackedPlayer(addedPlayerIds);
@@ -257,7 +257,7 @@ namespace Tsvrc.TsNetworking
         [NetworkCallable]
         public void NotifyTrackedPlayersRemoved(string[] removedPlayerIds, string[] notifyPlayerIds)
         {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(notifyPlayerIds, playerId)) return;
 
             OnPlayersRemovedAsTrackedPlayer(removedPlayerIds);

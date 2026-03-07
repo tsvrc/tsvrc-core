@@ -1,4 +1,4 @@
-using Tsvrc.TsNetworking.Utils;
+using Tsvrc.Player;
 using UdonSharp;
 using VRC.SDKBase;
 
@@ -13,8 +13,8 @@ namespace Tsvrc.TsNetworking
         {
             if (!IsProcessRunning() || !IsProcessOwner()) return;
 
-            var playerId = TsPlayerUtils.GetPlayerID(player);
-            var players = TsPlayerUtils.ToArray(playerId);
+            var playerId = TsPlayer.GetPlayerID(player);
+            var players = TsPlayer.ToArray(playerId);
             AddTrackedPlayers(players);
         }
 

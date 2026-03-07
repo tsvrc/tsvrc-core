@@ -1,3 +1,4 @@
+using Tsvrc.Player;
 using Tsvrc.TsNetworking.Utils;
 using UdonSharp;
 using UnityEngine;
@@ -38,7 +39,7 @@ namespace Tsvrc.Core
              so its safe to check only for master here. */
             if (!IsProcessRunning() || !Networking.IsMaster) return;
 
-            var playerId = TsPlayerUtils.GetPlayerID(player);
+            var playerId = TsPlayer.GetPlayerID(player);
             if (playerId == _ownerId)
             {
                 SetProcessOwner(Networking.Master);
@@ -157,7 +158,7 @@ namespace Tsvrc.Core
         /// </summary>
         protected void SetProcessOwner(VRCPlayerApi newOwner)
         {
-            _ownerId = TsPlayerUtils.GetPlayerID(newOwner);
+            _ownerId = TsPlayer.GetPlayerID(newOwner);
             Networking.SetOwner(newOwner, gameObject);
             RequestSerialization();
         }
@@ -170,7 +171,7 @@ namespace Tsvrc.Core
         /// </summary>
         protected bool IsProcessOwner()
         {
-            return _ownerId == TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            return _ownerId == TsPlayer.GetPlayerID(Networking.LocalPlayer);
         }
 
         /// <summary>

@@ -1,4 +1,5 @@
-using Tsvrc.List.Utils;
+using Tsvrc.Player;
+using Tsvrc.Utils;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
@@ -116,7 +117,7 @@ namespace Tsvrc.TsNetworking.Utils
         [NetworkCallable]
         public void BroadcastDataChunkReceived(string dataChunk, int chunkIndex, int totalChunks, string[] playerIds)
         {
-            var playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             if (_receivedChunks.Length != totalChunks)

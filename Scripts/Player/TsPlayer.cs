@@ -1,8 +1,8 @@
 using VRC.SDKBase;
 
-namespace Tsvrc.TsNetworking.Utils
+namespace Tsvrc.Player
 {
-    public class TsPlayerUtils
+    public static class TsPlayer
     {
         /// <summary>
         /// Gets a unique identifier for the player.

@@ -1,5 +1,5 @@
-using Tsvrc.List.Utils;
-using Tsvrc.TsNetworking.Utils;
+using Tsvrc.Player;
+using Tsvrc.Utils;
 using UdonSharp;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
@@ -114,7 +114,7 @@ namespace Tsvrc.TsNetworking
         /// </summary>
         public void SetReady(bool ready = true)
         {
-            string playerId = TsPlayerUtils.GetPlayerID(Networking.LocalPlayer);
+            string playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
 
             if (ready)
             {
@@ -180,7 +180,7 @@ namespace Tsvrc.TsNetworking
             if (!IsProcessRunning()) return;
             if (!IsProcessOwner()) return;
 
-            string[] playerIds = TsPlayerUtils.ToArray(playerId);
+            string[] playerIds = TsPlayer.ToArray(playerId);
             _readyPlayerIds = TsArray.Add(_readyPlayerIds, playerIds);
             RequestSerialization();
         }
@@ -195,7 +195,7 @@ namespace Tsvrc.TsNetworking
             if (!IsProcessRunning()) return;
             if (!IsProcessOwner()) return;
 
-            string[] playerIds = TsPlayerUtils.ToArray(playerId);
+            string[] playerIds = TsPlayer.ToArray(playerId);
             _readyPlayerIds = TsArray.Remove(_readyPlayerIds, playerIds);
             RequestSerialization();
         }

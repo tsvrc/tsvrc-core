@@ -1,4 +1,4 @@
-namespace Tsvrc.List.Utils
+namespace Tsvrc.Utils
 {
     public class TsArray
     {
