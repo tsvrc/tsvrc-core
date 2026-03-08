@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using UnityEngine;
@@ -18,17 +19,33 @@ namespace Tsvrc.Editor
             return AnyFileMatches(pattern);
         }
 
-        internal static bool IsFactoryUsed(Type type)
+        // Returns one TsvrcCallSite per physical call site of Create{TypeName}() in user code.
+        // Call site count determines the size of the pre-allocated pool.
+        internal static List<TsvrcCallSite> FindFactoryCallSites(Type type)
         {
             var pattern = new Regex(@"\bCreate" + Regex.Escape(type.Name) + @"\s*\(");
-            bool used = AnyFileMatches(pattern);
+            var callSites = new List<TsvrcCallSite>();
 
-            if (!used)
+            foreach (var file in Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories))
+            {
+                if (Path.GetFullPath(file).StartsWith(GeneratedFolder, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string src = File.ReadAllText(file);
+                src = StripComments(src);
+
+                var matches = pattern.Matches(src);
+                string className = Path.GetFileNameWithoutExtension(file);
+                for (int i = 0; i < matches.Count; i++)
+                    callSites.Add(new TsvrcCallSite { ClassName = className, FileName = file });
+            }
+
+            if (callSites.Count == 0)
                 Debug.LogWarning(
                     $"[TsvrcCompiler] Create{type.Name}() is never called. " +
                     "The Create method will log an error at runtime.");
 
-            return used;
+            return callSites;
         }
 
         private static bool AnyFileMatches(Regex pattern)

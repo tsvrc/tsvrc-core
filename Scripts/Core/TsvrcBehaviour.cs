@@ -13,6 +13,7 @@ namespace Tsvrc.Core
         protected CompiledTsvrc _ts;
 
         private bool _isCreated = false;
+        public bool IsCreated => _isCreated;
 
         public void TsConstruct(CompiledTsvrc tsvrc)
         {
@@ -32,6 +33,8 @@ namespace Tsvrc.Core
             TsStart();
         }
 
+        // Releases this behaviour back to its pool: deactivates the GameObject and resets
+        // the constructed state so TsConstruct() can be called again on the next activation.
         public void TsDestroy()
         {
             SendCustomEventDelayedFrames(nameof(_TsDestroyDelayed), 1);
@@ -39,7 +42,8 @@ namespace Tsvrc.Core
 
         public void _TsDestroyDelayed()
         {
-            Destroy(gameObject);
+            _isCreated = false;
+            gameObject.SetActive(false);
         }
 
         #region Virtual Methods

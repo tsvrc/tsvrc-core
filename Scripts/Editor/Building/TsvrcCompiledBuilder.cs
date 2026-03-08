@@ -59,9 +59,7 @@ namespace Tsvrc.Editor
             var list = new List<TsvrcEntry>();
             foreach (var group in result.Groups)
                 if (group.Kind == TsvrcGroupKind.Behaviour)
-                    foreach (var entry in group.Entries)
-                        if (entry.FactoryUsed || entry.IsCore)
-                            list.Add(entry);
+                    list.AddRange(group.Entries);
             return list;
         }
 
@@ -83,10 +81,10 @@ namespace Tsvrc.Editor
             w.BlankLine();
             using (w.Block("protected void Start()"))
             {
-                // Deactivate factory templates.
+                // Ensure all pool slots start inactive.
                 foreach (var entry in behaviourEntries)
-                    if (entry.FactoryUsed)
-                        w.Line($"_{LowerFirst(entry.FieldName)}.gameObject.SetActive(false);");
+                    for (int i = 0; i < entry.CallSites.Count; i++)
+                        w.Line($"_{LowerFirst(entry.FieldName)}_{i}.gameObject.SetActive(false);");
 
                 // TsConstruct singleton TsvrcBehaviours.
                 foreach (var group in result.Groups)

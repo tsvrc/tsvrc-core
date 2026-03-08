@@ -16,7 +16,8 @@ namespace Tsvrc.Editor
             foreach (var entry in group.Entries)
             {
                 entry.IsCore = isCore;
-                entry.FactoryUsed = TsvrcUsageAnalyzer.IsFactoryUsed(entry.Type);
+                entry.CallSites = TsvrcUsageAnalyzer.FindFactoryCallSites(entry.Type);
+                entry.FactoryUsed = entry.CallSites.Count > 0;
             }
 
             return group;

@@ -7,6 +7,13 @@ namespace Tsvrc.Editor
 {
     internal enum TsvrcGroupKind { Singleton, Behaviour, Construct }
 
+    // Represents one physical call site of Create{TypeName}() found in user code.
+    internal class TsvrcCallSite
+    {
+        public string ClassName; // class that contains the call (file stem)
+        public string FileName;  // full path (for diagnostics)
+    }
+
     internal class TsvrcEntry
     {
         public Type Type;
@@ -16,6 +23,8 @@ namespace Tsvrc.Editor
         public bool IsTsvrcBehaviour; // type extends TsvrcBehaviour
         public bool IsCore;           // sourced from InternalTsvrcConfig (core/internal)
         public UnityEngine.Object SceneObject;
+        // One entry per physical call site — drives pool slot count.
+        public List<TsvrcCallSite> CallSites = new List<TsvrcCallSite>();
     }
 
     internal class TsvrcGroup

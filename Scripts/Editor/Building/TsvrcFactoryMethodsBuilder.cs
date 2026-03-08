@@ -10,7 +10,7 @@ namespace Tsvrc.Editor
             if (entries == null || entries.Count == 0)
                 return;
 
-            // ── Template fields ──
+            // ── Pool fields (one per call site) ──
             w.BlankLine();
             bool? currentRegion = null;
             foreach (var entry in entries)
@@ -19,10 +19,12 @@ namespace Tsvrc.Editor
                 if (currentRegion == null || currentRegion != entry.IsCore)
                 {
                     if (currentRegion != null) { w.EndRegion(); w.BlankLine(); }
-                    w.Region(entry.IsCore ? "Core — factory templates (internal)" : "User — factory templates");
+                    w.Region(entry.IsCore ? "Core — factory pool slots (internal)" : "User — factory pool slots");
                     currentRegion = entry.IsCore;
                 }
-                w.Line($"[HideInInspector] [SerializeField] private {entry.Type.Name} _{LowerFirst(entry.FieldName)};");
+                string lower = LowerFirst(entry.FieldName);
+                for (int i = 0; i < entry.CallSites.Count; i++)
+                    w.Line($"[HideInInspector] [SerializeField] private {entry.Type.Name} _{lower}_{i};");
             }
             if (currentRegion != null) w.EndRegion();
 
@@ -49,23 +51,28 @@ namespace Tsvrc.Editor
             string field = entry.FieldName;
             string lower = LowerFirst(field);
 
-            w.Summary($"Instantiates a new <see cref=\"{name}\"/> from its inactive template.");
+            w.Summary($"Returns a pre-allocated <see cref=\"{name}\"/> pool slot. Errors if all {entry.CallSites.Count} slot(s) are active.");
 
             if (entry.FactoryUsed)
             {
-                using (w.Block($"public {name} Create{field}(Transform parent, string goName)"))
+                using (w.Block($"public {name} Create{field}()"))
                 {
-                    w.Line("var go = Instantiate(_{lower}.gameObject, parent);".Replace("{lower}", lower));
-                    w.Line("go.name = goName;");
-                    w.Line("go.SetActive(true);");
-                    w.Line($"var b = go.GetComponent<{name}>();");
-                    w.Line("b.TsConstruct(this);");
-                    w.Line("return b;");
+                    for (int i = 0; i < entry.CallSites.Count; i++)
+                    {
+                        using (w.Block($"if (!_{lower}_{i}.IsCreated)"))
+                        {
+                            w.Line($"_{lower}_{i}.gameObject.SetActive(true);");
+                            w.Line($"_{lower}_{i}.TsConstruct(this);");
+                            w.Line($"return _{lower}_{i};");
+                        }
+                    }
+                    w.Line($"Debug.LogError(\"[CompiledTsvrc] {name}: all {entry.CallSites.Count} pool slot(s) are already active.\");");
+                    w.Line("return null;");
                 }
             }
             else
             {
-                using (w.Block($"public {name} Create{field}(Transform parent, string goName)"))
+                using (w.Block($"public {name} Create{field}()"))
                 {
                     w.Line($"Debug.LogError(\"[CompiledTsvrc] {name} has no Create{name}() call site.\");");
                     w.Line("return null;");

@@ -128,17 +128,22 @@ namespace Tsvrc.Editor
 
                     if (sourceGo == null) continue;
 
-                    GameObject templateGo;
-                    if (EditorUtility.IsPersistent(sourceGo))
-                        templateGo = (GameObject)PrefabUtility.InstantiatePrefab(sourceGo, parent.transform);
-                    else
-                        templateGo = UnityEngine.Object.Instantiate(sourceGo, parent.transform);
+                    // Create one pre-allocated pool slot per call site.
+                    for (int i = 0; i < entry.CallSites.Count; i++)
+                    {
+                        GameObject poolGo;
+                        if (EditorUtility.IsPersistent(sourceGo))
+                            poolGo = (GameObject)PrefabUtility.InstantiatePrefab(sourceGo, parent.transform);
+                        else
+                            poolGo = UnityEngine.Object.Instantiate(sourceGo, parent.transform);
 
-                    templateGo.name = sourceGo.name;
-                    templateGo.SetActive(false);
-                    Undo.RegisterCreatedObjectUndo(templateGo, "Create Factory Template GO");
-                    SetField(so, "_" + LowerFirst(entry.FieldName), templateGo.GetComponent(entry.Type));
-                    Debug.Log($"[TsvrcSceneWirer] Added factory template GO '{sourceGo.name}' under '{parent.name}'.");
+                        poolGo.name = sourceGo.name + "_" + i;
+                        poolGo.SetActive(false);
+                        Undo.RegisterCreatedObjectUndo(poolGo, "Create Factory Pool GO");
+                        string fieldName = "_" + LowerFirst(entry.FieldName) + "_" + i;
+                        SetField(so, fieldName, poolGo.GetComponent(entry.Type));
+                        Debug.Log($"[TsvrcSceneWirer] Created pool slot [{i}] '{poolGo.name}' for {entry.Type.Name} ({entry.CallSites[i].ClassName}).");
+                    }
                 }
             }
         }
