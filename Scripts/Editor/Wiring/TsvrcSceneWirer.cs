@@ -57,7 +57,7 @@ namespace Tsvrc.Editor
             Undo.RegisterCreatedObjectUndo(factoryGo, "Create Factory GO");
 
             var tsSerialized = new SerializedObject(tsComponent);
-            WireSingletonFields(tsSerialized, result);
+            WireSingletonFields(tsSerialized, result, tsGo);
             WireBehaviourTemplateFields(tsSerialized, result, factoryGo);
             WireConstructFields(tsSerialized, result);
 
@@ -81,13 +81,35 @@ namespace Tsvrc.Editor
             return type;
         }
 
-        private static void WireSingletonFields(SerializedObject so, TsvrcScanResult result)
+        private static void WireSingletonFields(SerializedObject so, TsvrcScanResult result, GameObject parent)
         {
             foreach (var group in result.Groups)
-                if (group.Kind == TsvrcGroupKind.Singleton)
-                    foreach (var entry in group.Entries)
-                        if (entry.SingletonUsed)
-                            SetField(so, entry.FieldName, ResolveComponent(entry));
+            {
+                if (group.Kind != TsvrcGroupKind.Singleton) continue;
+                foreach (var entry in group.Entries)
+                {
+                    if (!entry.SingletonUsed) continue;
+
+                    if (entry.SceneObject != null && EditorUtility.IsPersistent(entry.SceneObject))
+                    {
+                        var sourceGo = entry.SceneObject is Component c
+                            ? c.gameObject
+                            : entry.SceneObject as GameObject;
+
+                        if (sourceGo != null)
+                        {
+                            var instance = (GameObject)PrefabUtility.InstantiatePrefab(sourceGo, parent.transform);
+                            instance.name = sourceGo.name;
+                            Undo.RegisterCreatedObjectUndo(instance, "Create Singleton GO");
+                            SetField(so, entry.FieldName, instance.GetComponent(entry.Type));
+                            Debug.Log($"[TsvrcSceneWirer] Instantiated singleton prefab '{sourceGo.name}' under '{parent.name}'.");
+                            continue;
+                        }
+                    }
+
+                    SetField(so, entry.FieldName, ResolveComponent(entry));
+                }
+            }
         }
 
         private static void WireBehaviourTemplateFields(SerializedObject so, TsvrcScanResult result, GameObject parent)

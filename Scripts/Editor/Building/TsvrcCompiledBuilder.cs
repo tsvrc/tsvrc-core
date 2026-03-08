@@ -19,12 +19,15 @@ namespace Tsvrc.Editor
             w.Usings(usings);
 
             using (w.Namespace("Tsvrc.Core.Compiled"))
-            using (w.Class("public", "CompiledTsvrc", "UdonSharpBehaviour"))
             {
-                TsvrcSingletonFieldsBuilder.Emit(w, singletonEntries);
-                TsvrcFactoryMethodsBuilder.Emit(w, behaviourEntries);
-                EmitBootstrapFields(w, result, constructEntries);
-                EmitStartMethod(w, result, behaviourEntries, constructEntries);
+                w.Line("[UdonBehaviourSyncMode(BehaviourSyncMode.None)]");
+                using (w.Class("public", "CompiledTsvrc", "UdonSharpBehaviour"))
+                {
+                    TsvrcSingletonFieldsBuilder.Emit(w, singletonEntries);
+                    TsvrcFactoryMethodsBuilder.Emit(w, behaviourEntries);
+                    EmitBootstrapFields(w, result, constructEntries);
+                    EmitStartMethod(w, result, behaviourEntries, constructEntries);
+                }
             }
 
             return w.ToString();

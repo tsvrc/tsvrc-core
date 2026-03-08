@@ -27,6 +27,22 @@ namespace Tsvrc.Editor
             {
                 var coreSingletons = TsvrcSingletonScanner.Scan(internalConfig.Singletons, true, usedNames);
                 if (coreSingletons == null) return null;
+
+                // Inject Network as first core singleton with a fixed field name.
+                if (internalConfig.Network != null)
+                {
+                    coreSingletons.Entries.Insert(0, new TsvrcEntry
+                    {
+                        Type = typeof(Tsvrc.Network.TsvrcNetwork),
+                        FieldName = "Network",
+                        IsCore = true,
+                        SingletonUsed = true,
+                        IsTsvrcBehaviour = true,
+                        SceneObject = internalConfig.Network
+                    });
+                    usedNames.Add("Network");
+                }
+
                 if (coreSingletons.Entries.Count > 0) result.Groups.Add(coreSingletons);
 
                 var coreFactory = TsvrcBehaviourScanner.ScanFactory(internalConfig.TsvrcBehaviourFactory, true, usedNames);
