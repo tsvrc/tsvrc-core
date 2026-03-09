@@ -6,7 +6,7 @@ namespace Tsvrc.Core
     /// <summary>
     /// Base class for all Tsvrc behaviours.
     /// Holds a reference to <see cref="Tsvrc.Core.Compiled.CompiledTsvrc"/> and exposes
-    /// <see cref="TsConstruct"/> for dependency injection and <see cref="TsDestroy"/> for safe deferred destruction.
+    /// <see cref="TsConstruct"/> for dependency injection and <see cref="TsRelease"/> for returning a slot to the pool.
     /// </summary>
     public class TsvrcBehaviour : UdonSharpBehaviour
     {
@@ -36,12 +36,12 @@ namespace Tsvrc.Core
         // Releases this behaviour back to its pool: deactivates the GameObject and resets
         // the constructed state so TsConstruct() can be called again on the next Get.
         // The GameObject stays in the scene so its VRChat network ID is preserved.
-        public void TsDestroy()
+        public void TsRelease()
         {
-            SendCustomEventDelayedFrames(nameof(_TsDestroyDelayed), 1);
+            SendCustomEventDelayedFrames(nameof(_TsReleaseDelayed), 1);
         }
 
-        public void _TsDestroyDelayed()
+        public void _TsReleaseDelayed()
         {
             _isCreated = false;
             gameObject.SetActive(false);
