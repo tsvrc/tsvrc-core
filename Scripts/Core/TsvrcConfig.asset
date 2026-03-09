@@ -233,9 +233,11 @@ MonoBehaviour:
       Data: 15|UnityEngine.TooltipAttribute, UnityEngine.CoreModule
     - Name: tooltip
       Entry: 1
-      Data: Prototype TsvrcBehaviours held in a pre-allocated pool. Each entry generates
-        a Get<TypeName>() pool method on CompiledTsvrc. The prototype slot is deactivated
-        at start and returned via Get on demand.
+      Data: "TsvrcBehaviours placed in the scene at compile time as pool slots. Because
+        they exist in the scene before play, VRChat assigns them network IDs so they
+        can receive UdonSharp network events \u2014 unlike runtime-instantiated objects.
+        Each entry generates a Get<TypeName>() method on CompiledTsvrc that activates
+        and returns an available slot."
     - Name: 
       Entry: 8
       Data: 
@@ -292,8 +294,8 @@ MonoBehaviour:
       Data: 18|UnityEngine.TooltipAttribute, UnityEngine.CoreModule
     - Name: tooltip
       Entry: 1
-      Data: TsvrcBehaviours that are constructed directly in the scene (not pooled).
-        TsConstruct(_ts) is called on each during startup instead of a pool Get method.
+      Data: TsvrcBehaviours that are constructed directly in the scene (always active,
+        not pooled). TsConstruct(_ts) is called on each during startup.
     - Name: 
       Entry: 8
       Data: 

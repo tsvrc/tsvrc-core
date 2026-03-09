@@ -58,7 +58,7 @@ MonoBehaviour:
   _udonSharpBackingUdonBehaviour: {fileID: 7565039970548749720}
   InternalTsvrcConfig: {fileID: 5044544883298333791}
   Singletons: []
-  TsvrcBehaviourFactory: []
+  TsvrcBehaviourPool: []
   TsvrcBehaviourConstruct: []
 --- !u!114 &7565039970548749720
 MonoBehaviour:
@@ -141,15 +141,10 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   _udonSharpBackingUdonBehaviour: {fileID: 5322347720468676817}
-  Network: {fileID: -1110619049521754441, guid: c26fd406fc1825946a6ce7121fc7f12f,
-    type: 3}
   Singletons: []
-  TsvrcBehaviourFactory:
-  - {fileID: -3083329989026124594, guid: ecd96f90cad7074449bd47c032bcfb6a, type: 3}
+  TsvrcBehaviourPool:
   - {fileID: -1197653813904076162, guid: 4e9f3cdbd4eebf1408aea8c85707d3f3, type: 3}
-  - {fileID: -8422451999444563390, guid: b48a2040f97bddd4fbaef83d8386149d, type: 3}
-  - {fileID: 6105096152705169628, guid: d3017005a095a4b4898c4ba2885a9839, type: 3}
-  - {fileID: -9092729703651741013, guid: 4a39ae8ed67ac1d45bc5907497be584f, type: 3}
+  - {fileID: -3083329989026124594, guid: ecd96f90cad7074449bd47c032bcfb6a, type: 3}
 --- !u!114 &5322347720468676817
 MonoBehaviour:
   m_ObjectHideFlags: 0

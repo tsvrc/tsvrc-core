@@ -163,8 +163,10 @@ MonoBehaviour:
       Data: 10|UnityEngine.TooltipAttribute, UnityEngine.CoreModule
     - Name: tooltip
       Entry: 1
-      Data: Core prototype TsvrcBehaviours held in a pre-allocated pool. Each entry
-        generates a Get<TypeName>() pool method on CompiledTsvrc (core section).
+      Data: "Core TsvrcBehaviours placed in the scene at compile time as pool slots
+        (core section). Scene-placed so VRChat assigns network IDs \u2014 enabling
+        UdonSharp network events. Each entry generates a Get<TypeName>() method on
+        CompiledTsvrc."
     - Name: 
       Entry: 8
       Data: 
