@@ -19,11 +19,11 @@ namespace Tsvrc.Editor
             return AnyFileMatches(pattern);
         }
 
-        // Returns one TsvrcCallSite per physical call site of Create{TypeName}() in user code.
+        // Returns one TsvrcCallSite per physical call site of Get{TypeName}() in user code.
         // Call site count determines the size of the pre-allocated pool.
-        internal static List<TsvrcCallSite> FindFactoryCallSites(Type type)
+        internal static List<TsvrcCallSite> FindGetCallSites(Type type)
         {
-            var pattern = new Regex(@"\bCreate" + Regex.Escape(type.Name) + @"\s*\(");
+            var pattern = new Regex(@"\bGet" + Regex.Escape(type.Name) + @"\s*\(");
             var callSites = new List<TsvrcCallSite>();
 
             foreach (var file in Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories))
@@ -42,8 +42,8 @@ namespace Tsvrc.Editor
 
             if (callSites.Count == 0)
                 Debug.LogWarning(
-                    $"[TsvrcCompiler] Create{type.Name}() is never called. " +
-                    "The Create method will log an error at runtime.");
+                    $"[TsvrcCompiler] Get{type.Name}() is never called. " +
+                    "The Get method will log an error at runtime.");
 
             return callSites;
         }

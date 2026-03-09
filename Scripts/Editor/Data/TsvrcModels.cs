@@ -5,9 +5,9 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    internal enum TsvrcGroupKind { Singleton, Behaviour, Construct }
+    internal enum TsvrcGroupKind { Singleton, Pool, Construct }
 
-    // Represents one physical call site of Create{TypeName}() found in user code.
+    // Represents one physical call site of Get{TypeName}() found in user code.
     internal class TsvrcCallSite
     {
         public string ClassName; // class that contains the call (file stem)
@@ -19,7 +19,7 @@ namespace Tsvrc.Editor
         public Type Type;
         public string FieldName;
         public bool SingletonUsed;    // any _ts.FieldName reference found in code
-        public bool FactoryUsed;      // any Create{TypeName}() call found in code
+        public bool GetterUsed;       // any Get{TypeName}() call found in code
         public bool IsTsvrcBehaviour; // type extends TsvrcBehaviour
         public bool IsCore;           // sourced from InternalTsvrcConfig (core/internal)
         public UnityEngine.Object SceneObject;

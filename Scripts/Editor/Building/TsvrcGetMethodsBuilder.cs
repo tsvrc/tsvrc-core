@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Tsvrc.Editor
 {
-    internal static class TsvrcFactoryMethodsBuilder
+    internal static class TsvrcGetMethodsBuilder
     {
         internal static void Emit(CsWriter w, IList<TsvrcEntry> entries)
         {
@@ -15,11 +15,11 @@ namespace Tsvrc.Editor
             bool? currentRegion = null;
             foreach (var entry in entries)
             {
-                if (!entry.FactoryUsed) continue;
+                if (!entry.GetterUsed) continue;
                 if (currentRegion == null || currentRegion != entry.IsCore)
                 {
                     if (currentRegion != null) { w.EndRegion(); w.BlankLine(); }
-                    w.Region(entry.IsCore ? "Core — factory pool slots (internal)" : "User — factory pool slots");
+                    w.Region(entry.IsCore ? "Core — pool slots (internal)" : "User — pool slots");
                     currentRegion = entry.IsCore;
                 }
                 string lower = LowerFirst(entry.FieldName);
@@ -28,7 +28,7 @@ namespace Tsvrc.Editor
             }
             if (currentRegion != null) w.EndRegion();
 
-            // ── Factory methods ──
+            // ── Get methods ──
             currentRegion = null;
             foreach (var entry in entries)
             {
@@ -36,26 +36,26 @@ namespace Tsvrc.Editor
                 {
                     if (currentRegion != null) { w.EndRegion(); }
                     w.BlankLine();
-                    w.Region(entry.IsCore ? "Core — factory methods (internal)" : "User — factory methods");
+                    w.Region(entry.IsCore ? "Core — get methods (internal)" : "User — get methods");
                     currentRegion = entry.IsCore;
                 }
                 w.BlankLine();
-                EmitFactoryMethod(w, entry);
+                EmitGetMethod(w, entry);
             }
             if (currentRegion != null) w.EndRegion();
         }
 
-        private static void EmitFactoryMethod(CsWriter w, TsvrcEntry entry)
+        private static void EmitGetMethod(CsWriter w, TsvrcEntry entry)
         {
             string name = entry.Type.Name;
             string field = entry.FieldName;
             string lower = LowerFirst(field);
 
-            w.Summary($"Returns a pre-allocated <see cref=\"{name}\"/> pool slot. Errors if all {entry.CallSites.Count} slot(s) are active.");
+            w.Summary($"Activates and returns a scene-placed <see cref=\"{name}\"/> pool slot (preserves VRChat network ID). Errors if all {entry.CallSites.Count} slot(s) are active.");
 
-            if (entry.FactoryUsed)
+            if (entry.GetterUsed)
             {
-                using (w.Block($"public {name} Create{field}()"))
+                using (w.Block($"public {name} Get{field}()"))
                 {
                     for (int i = 0; i < entry.CallSites.Count; i++)
                     {
@@ -72,9 +72,9 @@ namespace Tsvrc.Editor
             }
             else
             {
-                using (w.Block($"public {name} Create{field}()"))
+                using (w.Block($"public {name} Get{field}()"))
                 {
-                    w.Line($"Debug.LogError(\"[CompiledTsvrc] {name} has no Create{name}() call site.\");");
+                    w.Line($"Debug.LogError(\"[CompiledTsvrc] {name} has no Get{name}() call site.\");");
                     w.Line("return null;");
                 }
             }

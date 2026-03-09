@@ -4,20 +4,20 @@ using Tsvrc.Core;
 
 namespace Tsvrc.Editor
 {
-    internal static class TsvrcBehaviourScanner
+    internal static class TsvrcPoolScanner
     {
-        // Scans a factory array tagged with isCore.
-        internal static TsvrcGroup ScanFactory(TsvrcBehaviour[] source, bool isCore, HashSet<string> usedNames)
+        // Scans a pool array tagged with isCore.
+        internal static TsvrcGroup ScanPool(TsvrcBehaviour[] source, bool isCore, HashSet<string> usedNames)
         {
-            string label = isCore ? "Core Factories" : "Factories";
-            var group = new TsvrcGroup { Label = label, Kind = TsvrcGroupKind.Behaviour };
+            string label = isCore ? "Core Pool" : "Pool";
+            var group = new TsvrcGroup { Label = label, Kind = TsvrcGroupKind.Pool };
             TsvrcEntryResolver.Resolve(BoxArray(source), group, usedNames);
 
             foreach (var entry in group.Entries)
             {
                 entry.IsCore = isCore;
-                entry.CallSites = TsvrcUsageAnalyzer.FindFactoryCallSites(entry.Type);
-                entry.FactoryUsed = entry.CallSites.Count > 0;
+                entry.CallSites = TsvrcUsageAnalyzer.FindGetCallSites(entry.Type);
+                entry.GetterUsed = entry.CallSites.Count > 0;
             }
 
             return group;

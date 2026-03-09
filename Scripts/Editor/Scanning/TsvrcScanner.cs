@@ -30,19 +30,20 @@ namespace Tsvrc.Editor
 
                 if (coreSingletons.Entries.Count > 0) result.Groups.Add(coreSingletons);
 
-                var coreFactory = TsvrcBehaviourScanner.ScanFactory(internalConfig.TsvrcBehaviourFactory, true, usedNames);
-                if (coreFactory.Entries.Count > 0) result.Groups.Add(coreFactory);
+                var corePool = TsvrcPoolScanner.ScanPool(internalConfig.TsvrcBehaviourPool, true, usedNames);
+
+                if (corePool.Entries.Count > 0) result.Groups.Add(corePool);
             }
 
             // ── User groups (TsvrcConfig) ──
             var singletonGroup = TsvrcSingletonScanner.Scan(config.Singletons, false, usedNames);
             if (singletonGroup == null) return null;
 
-            var factoryGroup = TsvrcBehaviourScanner.ScanFactory(config.TsvrcBehaviourFactory, false, usedNames);
-            var constructGroup = TsvrcBehaviourScanner.ScanConstruct(config.TsvrcBehaviourConstruct, false, usedNames);
+            var poolGroup = TsvrcPoolScanner.ScanPool(config.TsvrcBehaviourPool, false, usedNames);
+            var constructGroup = TsvrcPoolScanner.ScanConstruct(config.TsvrcBehaviourConstruct, false, usedNames);
 
             if (singletonGroup.Entries.Count > 0) result.Groups.Add(singletonGroup);
-            if (factoryGroup.Entries.Count > 0) result.Groups.Add(factoryGroup);
+            if (poolGroup.Entries.Count > 0) result.Groups.Add(poolGroup);
             if (constructGroup.Entries.Count > 0) result.Groups.Add(constructGroup);
 
             if (result.Groups.Count == 0)

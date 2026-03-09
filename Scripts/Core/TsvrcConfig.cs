@@ -11,9 +11,9 @@ namespace Tsvrc.Core
 
         [Tooltip("Scene objects exposed as named singleton fields on CompiledTsvrc. Drop a GameObject or Component here — each entry becomes a typed _ts.FieldName accessor available to all TsvrcBehaviours.")]
         public Object[] Singletons;
-        [Tooltip("Prototype TsvrcBehaviours used as templates for runtime instantiation. Each entry generates a Create<TypeName>() factory method on CompiledTsvrc. The prototype is deactivated at start and cloned on demand.")]
-        public TsvrcBehaviour[] TsvrcBehaviourFactory;
-        [Tooltip("TsvrcBehaviours that are constructed directly in the scene (not instantiated). TsConstruct(_ts) is called on each during startup instead of a factory method.")]
+        [Tooltip("TsvrcBehaviours placed in the scene at compile time as pool slots. Because they exist in the scene before play, VRChat assigns them network IDs so they can receive UdonSharp network events — unlike runtime-instantiated objects. Each entry generates a Get<TypeName>() method on CompiledTsvrc that activates and returns an available slot.")]
+        public TsvrcBehaviour[] TsvrcBehaviourPool;
+        [Tooltip("TsvrcBehaviours that are constructed directly in the scene (always active, not pooled). TsConstruct(_ts) is called on each during startup.")]
         public TsvrcBehaviour[] TsvrcBehaviourConstruct;
     }
 }

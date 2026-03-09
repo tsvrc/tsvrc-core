@@ -185,13 +185,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: TsvrcBehaviourFactory
+      Data: TsvrcBehaviourPool
     - Name: $v
       Entry: 7
       Data: 11|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: TsvrcBehaviourFactory
+      Data: TsvrcBehaviourPool
     - Name: <UserType>k__BackingField
       Entry: 7
       Data: 12|System.RuntimeType, mscorlib
@@ -233,9 +233,9 @@ MonoBehaviour:
       Data: 15|UnityEngine.TooltipAttribute, UnityEngine.CoreModule
     - Name: tooltip
       Entry: 1
-      Data: Prototype TsvrcBehaviours used as templates for runtime instantiation.
-        Each entry generates a Create<TypeName>() factory method on CompiledTsvrc.
-        The prototype is deactivated at start and cloned on demand.
+      Data: Prototype TsvrcBehaviours held in a pre-allocated pool. Each entry generates
+        a Get<TypeName>() pool method on CompiledTsvrc. The prototype slot is deactivated
+        at start and returned via Get on demand.
     - Name: 
       Entry: 8
       Data: 
@@ -292,8 +292,8 @@ MonoBehaviour:
       Data: 18|UnityEngine.TooltipAttribute, UnityEngine.CoreModule
     - Name: tooltip
       Entry: 1
-      Data: TsvrcBehaviours that are constructed directly in the scene (not instantiated).
-        TsConstruct(_ts) is called on each during startup instead of a factory method.
+      Data: TsvrcBehaviours that are constructed directly in the scene (not pooled).
+        TsConstruct(_ts) is called on each during startup instead of a pool Get method.
     - Name: 
       Entry: 8
       Data: 

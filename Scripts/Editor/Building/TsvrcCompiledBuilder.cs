@@ -10,7 +10,7 @@ namespace Tsvrc.Editor
         {
             var usings = CollectUsings(result);
             var singletonEntries = GetEntries(result, TsvrcGroupKind.Singleton);
-            var behaviourEntries = GetUsedBehaviourEntries(result);
+            var poolEntries = GetPoolEntries(result);
             var constructEntries = GetEntries(result, TsvrcGroupKind.Construct);
 
             var w = new CsWriter();
@@ -24,9 +24,9 @@ namespace Tsvrc.Editor
                 using (w.Class("public", "CompiledTsvrc", "UdonSharpBehaviour"))
                 {
                     TsvrcSingletonFieldsBuilder.Emit(w, singletonEntries);
-                    TsvrcFactoryMethodsBuilder.Emit(w, behaviourEntries);
+                    TsvrcGetMethodsBuilder.Emit(w, poolEntries);
                     EmitBootstrapFields(w, result, constructEntries);
-                    EmitStartMethod(w, result, behaviourEntries, constructEntries);
+                    EmitStartMethod(w, result, poolEntries, constructEntries);
                 }
             }
 
@@ -54,11 +54,11 @@ namespace Tsvrc.Editor
             return list;
         }
 
-        private static List<TsvrcEntry> GetUsedBehaviourEntries(TsvrcScanResult result)
+        private static List<TsvrcEntry> GetPoolEntries(TsvrcScanResult result)
         {
             var list = new List<TsvrcEntry>();
             foreach (var group in result.Groups)
-                if (group.Kind == TsvrcGroupKind.Behaviour)
+                if (group.Kind == TsvrcGroupKind.Pool)
                     list.AddRange(group.Entries);
             return list;
         }
@@ -76,13 +76,13 @@ namespace Tsvrc.Editor
             w.EndRegion();
         }
 
-        private static void EmitStartMethod(CsWriter w, TsvrcScanResult result, List<TsvrcEntry> behaviourEntries, List<TsvrcEntry> constructEntries)
+        private static void EmitStartMethod(CsWriter w, TsvrcScanResult result, List<TsvrcEntry> poolEntries, List<TsvrcEntry> constructEntries)
         {
             w.BlankLine();
             using (w.Block("protected void Start()"))
             {
                 // Ensure all pool slots start inactive.
-                foreach (var entry in behaviourEntries)
+                foreach (var entry in poolEntries)
                     for (int i = 0; i < entry.CallSites.Count; i++)
                         w.Line($"_{LowerFirst(entry.FieldName)}_{i}.gameObject.SetActive(false);");
 

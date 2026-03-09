@@ -9,7 +9,7 @@ namespace Tsvrc.Core
     {
         [Tooltip("Core scene objects exposed as named singleton fields on CompiledTsvrc (core section). Drop a GameObject or Component here — each entry becomes a typed _ts.FieldName accessor available to all TsvrcBehaviours.")]
         public Object[] Singletons;
-        [Tooltip("Core prototype TsvrcBehaviours used as templates for runtime instantiation. Each entry generates a Create<TypeName>() factory method on CompiledTsvrc (core section).")]
-        public TsvrcBehaviour[] TsvrcBehaviourFactory;
+        [Tooltip("Core TsvrcBehaviours placed in the scene at compile time as pool slots (core section). Scene-placed so VRChat assigns network IDs — enabling UdonSharp network events. Each entry generates a Get<TypeName>() method on CompiledTsvrc.")]
+        public TsvrcBehaviour[] TsvrcBehaviourPool;
     }
 }

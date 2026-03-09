@@ -52,13 +52,13 @@ namespace Tsvrc.Editor
             Undo.RegisterCreatedObjectUndo(tsGo, "Create CompiledTsvrc");
             var tsComponent = (Component)tsGo.GetComponent(tsType);
 
-            var factoryGo = new GameObject("Factory");
-            factoryGo.transform.SetParent(tsGo.transform, false);
-            Undo.RegisterCreatedObjectUndo(factoryGo, "Create Factory GO");
+            var poolGo = new GameObject("Pool");
+            poolGo.transform.SetParent(tsGo.transform, false);
+            Undo.RegisterCreatedObjectUndo(poolGo, "Create Pool GO");
 
             var tsSerialized = new SerializedObject(tsComponent);
             WireSingletonFields(tsSerialized, result, tsGo);
-            WireBehaviourTemplateFields(tsSerialized, result, factoryGo);
+            WirePoolFields(tsSerialized, result, poolGo);
             WireConstructFields(tsSerialized, result);
 
             var instanceComponent = CreateInstanceGo(result, tsGo);
@@ -112,14 +112,14 @@ namespace Tsvrc.Editor
             }
         }
 
-        private static void WireBehaviourTemplateFields(SerializedObject so, TsvrcScanResult result, GameObject parent)
+        private static void WirePoolFields(SerializedObject so, TsvrcScanResult result, GameObject parent)
         {
             foreach (var group in result.Groups)
             {
-                if (group.Kind != TsvrcGroupKind.Behaviour) continue;
+                if (group.Kind != TsvrcGroupKind.Pool) continue;
                 foreach (var entry in group.Entries)
                 {
-                    if (!entry.FactoryUsed) continue;
+                    if (!entry.GetterUsed) continue;
                     if (entry.SceneObject == null) continue;
 
                     var sourceGo = entry.SceneObject is Component c
@@ -128,7 +128,9 @@ namespace Tsvrc.Editor
 
                     if (sourceGo == null) continue;
 
-                    // Create one pre-allocated pool slot per call site.
+                    // Create one scene-placed pool slot per call site.
+                    // Being in the scene at load time means VRChat assigns each slot a
+                    // network ID, allowing UdonSharp network events to work on them.
                     for (int i = 0; i < entry.CallSites.Count; i++)
                     {
                         GameObject poolGo;
@@ -139,7 +141,7 @@ namespace Tsvrc.Editor
 
                         poolGo.name = sourceGo.name + "_" + i;
                         poolGo.SetActive(false);
-                        Undo.RegisterCreatedObjectUndo(poolGo, "Create Factory Pool GO");
+                        Undo.RegisterCreatedObjectUndo(poolGo, "Create Pool Slot GO");
                         string fieldName = "_" + LowerFirst(entry.FieldName) + "_" + i;
                         SetField(so, fieldName, poolGo.GetComponent(entry.Type));
                         Debug.Log($"[TsvrcSceneWirer] Created pool slot [{i}] '{poolGo.name}' for {entry.Type.Name} ({entry.CallSites[i].ClassName}).");
@@ -190,13 +192,13 @@ namespace Tsvrc.Editor
 
         private static void LogSummary(TsvrcScanResult result, Component instanceComponent)
         {
-            int singletons = 0, factories = 0;
+            int singletons = 0, pools = 0;
             foreach (var group in result.Groups)
             {
                 if (group.Kind == TsvrcGroupKind.Singleton)
                     foreach (var e in group.Entries) { if (e.SingletonUsed) singletons++; }
-                if (group.Kind == TsvrcGroupKind.Behaviour)
-                    foreach (var e in group.Entries) { if (e.FactoryUsed) factories++; }
+                if (group.Kind == TsvrcGroupKind.Pool)
+                    foreach (var e in group.Entries) { if (e.GetterUsed) pools++; }
             }
 
             string instanceInfo = instanceComponent != null
@@ -205,7 +207,7 @@ namespace Tsvrc.Editor
 
             Debug.Log(
                 $"[TsvrcSceneWirer] Wired {singletons} singleton(s), " +
-                $"{factories} factory template(s), " +
+                $"{pools} pool slot(s), " +
                 $"instance ({instanceInfo}) \u2192 CompiledTsvrc.");
         }
 

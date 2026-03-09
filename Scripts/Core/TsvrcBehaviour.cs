@@ -34,7 +34,8 @@ namespace Tsvrc.Core
         }
 
         // Releases this behaviour back to its pool: deactivates the GameObject and resets
-        // the constructed state so TsConstruct() can be called again on the next activation.
+        // the constructed state so TsConstruct() can be called again on the next Get.
+        // The GameObject stays in the scene so its VRChat network ID is preserved.
         public void TsDestroy()
         {
             SendCustomEventDelayedFrames(nameof(_TsDestroyDelayed), 1);
