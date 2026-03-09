@@ -36,12 +36,7 @@ namespace Tsvrc.Core
         // Releases this behaviour back to its pool: deactivates the GameObject and resets
         // the constructed state so TsConstruct() can be called again on the next Get.
         // The GameObject stays in the scene so its VRChat network ID is preserved.
-        public void TsRelease()
-        {
-            SendCustomEventDelayedFrames(nameof(_TsReleaseDelayed), 1);
-        }
-
-        public void _TsReleaseDelayed()
+        public virtual void TsRelease()
         {
             _isCreated = false;
             gameObject.SetActive(false);

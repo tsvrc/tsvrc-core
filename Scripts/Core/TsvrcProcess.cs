@@ -31,6 +31,12 @@ namespace Tsvrc.Core
             }
         }
 
+        public override void TsRelease()
+        {
+            OnProcessCleanup(false);
+            base.TsRelease();
+        }
+
         #endregion
 
         #region VRChat Callbacks
@@ -201,7 +207,15 @@ namespace Tsvrc.Core
         /// <b>Only invoked on the process owner.</b>
         /// </summary>
         /// <param name="isCompleted">True if cleanup is after successful completion, false if after stop/abort.</param>
-        protected virtual void OnProcessCleanup(bool isCompleted) { }
+        protected virtual void OnProcessCleanup(bool isCompleted)
+        {
+            // Reset process state on release to ensure clean start on next TsConstruct
+            _isRunning = false;
+            _ownerId = "";
+            _useProcessUpdate = false;
+            _processUpdateInterval = 0.5f;
+
+        }
 
         /// <summary>
         /// Called at regular intervals if the process is running and the local player is the owner.
