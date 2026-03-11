@@ -1,13 +1,12 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
-using Tsvrc.Core;
 using UnityEngine;
 
 namespace Tsvrc.Editor
 {
     internal static class TsvrcSingletonScanner
     {
-        internal static TsvrcGroup Scan(UnityEngine.Object[] singletons, bool isCore, HashSet<string> usedNames)
+        internal static TsvrcGroup Scan(Object[] singletons, bool isCore, HashSet<string> usedNames)
         {
             string label = isCore ? "Core Singletons" : "Singletons";
             var group = new TsvrcGroup { Label = label, Kind = TsvrcGroupKind.Singleton };
