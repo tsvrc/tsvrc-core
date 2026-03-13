@@ -5,9 +5,67 @@ using Tsvrc.Core;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Tsvrc.Editor
 {
+
+    public static class TsvrcCompilerV2
+    {
+        private const string GeneratedFolder = "Assets/CompiledTsvrc";
+        private const string AccessorPath = "Assets/CompiledTsvrc/CompiledTsvrc.cs";
+        private const string TsvrcConfigPrefabPath = "Assets/Tsvrc/Prefabs/TsvrcConfig.prefab";
+
+        [MenuItem("Tsvrc/Compile V2")]
+        public static void Compile()
+        {
+            EnsureTsvrcConfigInScene();
+
+            string root = Path.GetDirectoryName(Application.dataPath);
+            string folderFull = ToAbsolutePath(root, GeneratedFolder);
+            string accessorFull = ToAbsolutePath(root, AccessorPath);
+
+            if (Directory.Exists(folderFull))
+                Directory.Delete(folderFull, true);
+
+            Directory.CreateDirectory(folderFull);
+
+            AssetDatabase.Refresh();
+        }
+
+        private static string ToAbsolutePath(string root, string assetPath)
+        {
+            return Path.Combine(root, assetPath.Replace('/', Path.DirectorySeparatorChar));
+        }
+
+        private static void EnsureTsvrcConfigInScene()
+        {
+            var existing = Object.FindObjectsOfType<TsvrcConfig>();
+
+            if (existing.Length > 1)
+            {
+                Debug.LogError("[TsvrcCompiler] Multiple TsvrcConfig found in the scene. Remove the duplicates and compile again.");
+                return;
+            }
+
+            if (existing.Length == 1)
+                return; // already present
+
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(TsvrcConfigPrefabPath);
+            if (prefab == null)
+            {
+                Debug.LogError($"[TsvrcCompiler] TsvrcConfig prefab not found at '{TsvrcConfigPrefabPath}'.");
+                return;
+            }
+
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            go.transform.SetSiblingIndex(0);
+            Undo.RegisterCreatedObjectUndo(go, "Add TsvrcConfig");
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+            Debug.Log($"[TsvrcCompiler] TsvrcConfig prefab added to scene.");
+        }
+    }
+
     public static class TsvrcCompiler
     {
         internal const string PendingWireKey = "TsvrcPendingWire";
