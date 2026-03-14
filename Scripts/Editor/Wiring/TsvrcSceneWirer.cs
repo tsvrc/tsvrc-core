@@ -29,7 +29,7 @@ namespace Tsvrc.Editor
 
         internal static void WireScene()
         {
-            var result = TsvrcScanner.Scan();
+            var result = TsvrcScannerOld.Scan();
             if (result == null) return;
 
             TsvrcProgramAssets.EnsureBothAssets();

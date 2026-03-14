@@ -1,10 +1,26 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
+using Tsvrc.Core;
 using UnityEngine;
 
 namespace Tsvrc.Editor
 {
     internal static class TsvrcScanner
+    {
+        internal static List<ScanResult> Scan(TsvrcConfig config)
+        {
+            var singletonResult = SingletonScanner.Scan(config);
+
+            var results = new List<ScanResult>
+            {
+                singletonResult
+            };
+
+            return results;
+        }
+    }
+
+    internal static class TsvrcScannerOld
     {
         internal static TsvrcScanResult Scan()
         {
