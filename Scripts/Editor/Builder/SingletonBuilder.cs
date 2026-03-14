@@ -6,7 +6,13 @@ namespace Tsvrc.Editor
 {
     internal class SingletonBuilder : Builder
     {
-        //internal abstract void Build(TsvrcConfig config);
+        internal override void BuildFields(CsWriter w, TsvrcConfig config, ScanResult result)
+        {
+            w.Region("Singletons");
+            foreach (var type in result.Types)
+                w.Line($"[SerializeField] public {type} _{type.ToLower()};");
+            w.EndRegion();
+        }
     }
 }
 

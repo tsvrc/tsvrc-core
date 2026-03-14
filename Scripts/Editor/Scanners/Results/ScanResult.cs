@@ -5,7 +5,9 @@ namespace Tsvrc.Editor
 {
     internal class ScanResult
     {
-        public SortedSet<string> Namespaces = new SortedSet<string>();
+        internal SortedSet<string> Namespaces = new SortedSet<string>();
+        internal SortedSet<string> Types = new SortedSet<string>();
+        internal Builder Builder;
     }
 }
 #endif

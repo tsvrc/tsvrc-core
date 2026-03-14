@@ -4,9 +4,9 @@ using Tsvrc.Core;
 
 namespace Tsvrc.Editor
 {
-    internal class Builder
+    internal abstract class Builder
     {
-        //internal abstract void Build(TsvrcConfig config);
+        internal abstract void BuildFields(CsWriter w, TsvrcConfig config, ScanResult result);
     }
 }
 
