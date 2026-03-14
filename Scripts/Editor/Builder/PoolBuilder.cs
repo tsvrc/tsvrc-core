@@ -4,13 +4,13 @@ using Tsvrc.Core;
 
 namespace Tsvrc.Editor
 {
-    internal class SingletonBuilder : Builder
+    internal class PoolBuilder : Builder
     {
         internal override void BuildFields(CsWriter w, TsvrcConfig config, ScanResult result)
         {
-            w.Region("Singletons");
+            w.Region("Pools");
             foreach (var field in result.Fields)
-                w.Line($"[SerializeField] public {field.Type} {field.Name};");
+                w.Line($"[SerializeField] private {field.Type} _{field.Name};");
             w.EndRegion();
         }
     }

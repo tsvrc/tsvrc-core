@@ -10,10 +10,12 @@ namespace Tsvrc.Editor
         internal static List<ScanResult> Scan(TsvrcConfig config)
         {
             var singletonResult = SingletonScanner.Scan(config);
+            var poolResult = PoolScanner.Scan(config);
 
             var results = new List<ScanResult>
             {
-                singletonResult
+                singletonResult,
+                poolResult
             };
 
             return results;

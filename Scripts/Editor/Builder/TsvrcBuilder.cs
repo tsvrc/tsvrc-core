@@ -31,8 +31,8 @@ namespace Tsvrc.Editor
             usings.UnionWith(defaultUsings);
 
             foreach (var result in scanResults)
-                foreach (var ns in result.Namespaces)
-                    usings.Add(ns);
+                foreach (var field in result.Fields)
+                    usings.Add(field.Namespace);
             return usings;
         }
     }

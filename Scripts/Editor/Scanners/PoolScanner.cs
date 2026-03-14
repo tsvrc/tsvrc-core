@@ -5,23 +5,23 @@ using Tsvrc.Core;
 
 namespace Tsvrc.Editor
 {
-    internal static class SingletonScanner
+    internal static class PoolScanner
     {
         internal static ScanResult Scan(TsvrcConfig config)
         {
             ScanResult result = new ScanResult();
 
-            var singletons = config.Singletons;
-            var internalSingletons = config.InternalTsvrcConfig.Singletons;
+            var pools = config.TsvrcBehaviourPool;
+            var internalPools = config.InternalTsvrcConfig.TsvrcBehaviourPool;
 
             var usedNames = new HashSet<string>();
-            var objects = singletons.Union(internalSingletons).ToHashSet();
+            var objects = pools.Union(internalPools).Cast<UnityEngine.Object>().ToHashSet();
 
             var fields = TsvrcResolver.Resolve(objects, usedNames);
 
             result.Fields = fields;
 
-            var builder = new SingletonBuilder();
+            var builder = new PoolBuilder();
             result.Builder = builder;
             return result;
         }
