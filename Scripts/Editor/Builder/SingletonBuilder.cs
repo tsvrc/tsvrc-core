@@ -10,7 +10,14 @@ namespace Tsvrc.Editor
         {
             w.Region("Singletons");
             foreach (var field in result.Fields)
+            {
+                if (field.CallSites.Count == 0)
+                {
+                    w.Line($"[HideInInspector] public {field.Type} {field.Name} {{ get; private set; }}");
+                    continue;
+                }
                 w.Line($"[SerializeField] public {field.Type} {field.Name};");
+            }
             w.EndRegion();
         }
     }
