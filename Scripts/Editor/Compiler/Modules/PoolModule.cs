@@ -23,7 +23,7 @@ namespace Tsvrc.Editor
             var resolved = ResolveFields(config);
 
             foreach (var field in resolved)
-                field.SlotCount = Math.Max(1, new HashSet<string>(field.CallSites.Select(cs => cs.ClassName)).Count);
+                field.SlotCount = new HashSet<string>(field.CallSites.Select(cs => cs.ClassName)).Count;
 
             _fields = resolved.OrderBy(f => f.Name).ToList();
         }
@@ -83,6 +83,13 @@ namespace Tsvrc.Editor
             w.Region("Core \u2014 get methods (internal)");
             foreach (var field in _fields)
             {
+                if (field.SlotCount == 0)
+                {
+                    using (w.Method($"public {field.Type} Get{field.Type}()"))
+                        w.Line("return null;");
+                    continue;
+                }
+
                 w.Summary($"Activates and returns a scene-placed <see cref=\"{field.Type}\"/> pool slot (preserves VRChat network ID). Errors if all {field.SlotCount} slot(s) are active.");
                 using (w.Method($"public {field.Type} Get{field.Type}()"))
                 {
