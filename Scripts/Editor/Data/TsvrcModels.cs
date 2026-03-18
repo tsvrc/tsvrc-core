@@ -13,40 +13,5 @@ namespace Tsvrc.Editor
         public string ClassName; // class that contains the call (file stem)
         public string FileName;  // full path (for diagnostics)
     }
-
-    internal class TsvrcEntry
-    {
-        public Type Type;
-        public string FieldName;
-        public bool SingletonUsed;    // any _ts.FieldName reference found in code
-        public bool GetterUsed;       // any Get{TypeName}() call found in code
-        public bool IsTsvrcBehaviour; // type extends TsvrcBehaviour
-        public bool IsCore;           // sourced from InternalTsvrcConfig (core/internal)
-        public UnityEngine.Object SceneObject;
-        // One entry per physical call site — drives pool slot count.
-        public List<TsvrcCallSite> CallSites = new List<TsvrcCallSite>();
-    }
-
-    internal class TsvrcGroup
-    {
-        public string Label;
-        public TsvrcGroupKind Kind;
-        public List<TsvrcEntry> Entries = new List<TsvrcEntry>();
-    }
-
-    // Scan result passed between scanning, building, and wiring layers.
-    internal class TsvrcScanResult
-    {
-        public Tsvrc.Core.TsvrcConfig SourceConfig;
-        public Type InstanceType; // null when no TsvrcInstance subclass exists
-        public List<TsvrcGroup> Groups = new List<TsvrcGroup>();
-
-        public int TotalEntries()
-        {
-            int count = 0;
-            foreach (var g in Groups) count += g.Entries.Count;
-            return count;
-        }
-    }
 }
 #endif
