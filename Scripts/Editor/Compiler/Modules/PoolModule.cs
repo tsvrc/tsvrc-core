@@ -83,16 +83,15 @@ namespace Tsvrc.Editor
             w.Region("Core \u2014 get methods (internal)");
             foreach (var field in _fields)
             {
-                if (field.SlotCount == 0)
-                {
-                    using (w.Method($"public {field.Type} Get{field.Type}()"))
-                        w.Line("return null;");
-                    continue;
-                }
-
                 w.Summary($"Activates and returns a scene-placed <see cref=\"{field.Type}\"/> pool slot (preserves VRChat network ID). Errors if all {field.SlotCount} slot(s) are active.");
                 using (w.Method($"public {field.Type} Get{field.Type}()"))
                 {
+                    if (field.SlotCount == 0)
+                    {
+                        w.Line("return null;");
+                        continue;
+                    }
+
                     for (int i = 0; i < field.SlotCount; i++)
                     {
                         string slot = SlotFieldName(field, i);
