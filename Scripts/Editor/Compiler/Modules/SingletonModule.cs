@@ -36,7 +36,7 @@ namespace Tsvrc.Editor
         internal override void WriteFields(CsWriter w)
         {
             if (_fields.Count == 0) return;
-            w.Region("User");
+            w.Region("Singletons");
             foreach (var field in _fields)
             {
                 w.Summary("Tsvrc singleton — wired by TsvrcWirer.");

@@ -33,7 +33,7 @@ namespace Tsvrc.Editor
         internal override void WriteFields(CsWriter w)
         {
             if (_fields.Count == 0) return;
-            w.Region("Bootstrap");
+            w.Region("Constructs");
             foreach (var field in _fields)
                 w.Line($"[SerializeField] private {field.Type} {PrivateFieldName(field)};");
             w.EndRegion();

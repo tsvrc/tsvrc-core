@@ -70,7 +70,7 @@ namespace Tsvrc.Editor
         internal override void WriteFields(CsWriter w)
         {
             if (_fields.Count == 0) return;
-            w.Region("Core \u2014 pool slots (internal)");
+            w.Region("Pool Slots");
             foreach (var field in _fields)
                 for (int i = 0; i < field.SlotCount; i++)
                     w.Line($"[HideInInspector] [SerializeField] private {field.Type} {SlotFieldName(field, i)};");
@@ -80,7 +80,7 @@ namespace Tsvrc.Editor
         internal override void WriteMethods(CsWriter w)
         {
             if (_fields.Count == 0) return;
-            w.Region("Core \u2014 get methods (internal)");
+            w.Region("Pool Accessors");
             foreach (var field in _fields)
             {
                 w.Summary($"Activates and returns a scene-placed <see cref=\"{field.Type}\"/> pool slot (preserves VRChat network ID). Errors if all {field.SlotCount} slot(s) are active.");
