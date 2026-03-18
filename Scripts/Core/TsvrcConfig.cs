@@ -9,7 +9,7 @@ namespace Tsvrc.Core
         [Tooltip("The single TsvrcInstance for this world. If set, TsConstruct(_ts) and OnInstanceStart() are called on it after all other constructs.")]
         public TsvrcInstance Instance;
         [Tooltip("Required. Internal core config — do NOT modify or reassign. Provides framework-level entries compiled into the Core region of CompiledTsvrc.")]
-        public InternalTsvrcConfig InternalTsvrcConfig;
+        [HideInInspector][SerializeField] public InternalTsvrcConfig InternalTsvrcConfig;
 
         [Tooltip("Scene objects exposed as named singleton fields on CompiledTsvrc. Drop a GameObject or Component here — each entry becomes a typed _ts.FieldName accessor available to all TsvrcBehaviours.")]
         public Object[] Singletons;
