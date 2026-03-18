@@ -1,7 +1,6 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
-using Tsvrc.Core;
 using UnityEngine;
 
 namespace Tsvrc.Editor

@@ -5,9 +5,9 @@ using Tsvrc.Core;
 
 namespace Tsvrc.Editor
 {
-    internal static class PoolScanner
+    internal class PoolScanner : Scanner
     {
-        internal static ScanResult Scan(TsvrcConfig config)
+        internal override ScanResult Scan(TsvrcConfig config)
         {
             ScanResult result = new ScanResult();
 

@@ -9,11 +9,11 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    internal static class SingletonScanner
+    internal class SingletonScanner : Scanner
     {
         private const string GeneratedFolder = "Assets/CompiledTsvrc";
 
-        internal static ScanResult Scan(TsvrcConfig config)
+        internal override ScanResult Scan(TsvrcConfig config)
         {
             ScanResult result = new ScanResult();
 
