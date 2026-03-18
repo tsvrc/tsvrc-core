@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Tsvrc.Core;
 using UnityEditor;
 using UnityEngine;
@@ -26,14 +25,7 @@ namespace Tsvrc.Editor
                 .Union(internalSingletons)
                 .ToHashSet();
 
-            var resolved = TsvrcResolver.Resolve(objects, usedNames);
-
-            foreach (var field in resolved)
-                field.CallSites = SourceScanner.FindCallSites(
-                    new Regex(@"\b_ts\s*\.\s*" + Regex.Escape(field.Name) + @"\b"));
-
-            _fields = resolved
-                .Where(f => f.CallSites.Count > 0)
+            _fields = TsvrcResolver.Resolve(objects, usedNames)
                 .OrderBy(f => f.Name)
                 .ToList();
         }
@@ -42,14 +34,8 @@ namespace Tsvrc.Editor
         {
             var internalSingletons = config.InternalTsvrcConfig?.Singletons ?? Array.Empty<UnityEngine.Object>();
             var objects = config.Singletons.Union(internalSingletons).ToHashSet();
-            var resolved = TsvrcResolver.Resolve(objects, new HashSet<string>());
 
-            // Only wire fields that were actually emitted (usage-filtered during Compile).
-            var emitted = new HashSet<string>(compiledType
-                .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-                .Select(f => f.Name));
-
-            _fields = resolved.Where(f => emitted.Contains(f.Name)).OrderBy(f => f.Name).ToList();
+            _fields = TsvrcResolver.Resolve(objects, new HashSet<string>()).OrderBy(f => f.Name).ToList();
         }
 
         internal override IEnumerable<string> GetUsings() =>

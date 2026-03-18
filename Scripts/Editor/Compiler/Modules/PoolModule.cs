@@ -34,11 +34,10 @@ namespace Tsvrc.Editor
             {
                 var pattern = new Regex(@"\b_ts\s*\.\s*Get" + Regex.Escape(field.Type) + @"\s*\(\s*\)");
                 field.CallSites = SourceScanner.FindCallSites(pattern);
-                field.SlotCount = new HashSet<string>(field.CallSites.Select(cs => cs.ClassName)).Count;
+                field.SlotCount = Math.Max(1, new HashSet<string>(field.CallSites.Select(cs => cs.ClassName)).Count);
             }
 
             _fields = resolved
-                .Where(f => f.SlotCount > 0)
                 .OrderBy(f => f.Name)
                 .ToList();
         }
