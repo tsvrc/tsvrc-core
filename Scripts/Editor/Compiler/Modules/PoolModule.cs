@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using Tsvrc.Core;
 using UnityEditor;
+using UnityEngine;
 
 namespace Tsvrc.Editor
 {
@@ -40,6 +41,30 @@ namespace Tsvrc.Editor
                 .Where(f => f.SlotCount > 0)
                 .OrderBy(f => f.Name)
                 .ToList();
+        }
+
+        internal override void ScanForWire(TsvrcConfig config, Type compiledType)
+        {
+            var internalPool = config.InternalTsvrcConfig?.TsvrcBehaviourPool ?? Array.Empty<TsvrcBehaviour>();
+            var objects = config.TsvrcBehaviourPool
+                .Union(internalPool)
+                .Cast<UnityEngine.Object>()
+                .ToHashSet();
+
+            var resolved = TsvrcResolver.Resolve(objects, new HashSet<string>());
+
+            // Derive SlotCount from the fields that were emitted during Compile.
+            var typeFieldNames = new HashSet<string>(compiledType
+                .GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .Select(f => f.Name));
+
+            foreach (var field in resolved)
+            {
+                string prefix = "_" + ToCamelCase(field.Name) + "_";
+                field.SlotCount = typeFieldNames.Count(f => f.StartsWith(prefix));
+            }
+
+            _fields = resolved.Where(f => f.SlotCount > 0).OrderBy(f => f.Name).ToList();
         }
 
         internal override IEnumerable<string> GetUsings() =>
@@ -90,7 +115,31 @@ namespace Tsvrc.Editor
 
         internal override void Wire(SerializedObject target)
         {
-            // Pool slots need prefab instantiation — handled by TsvrcWirer.
+            if (_fields.Count == 0) return;
+
+            var compiledGo = ((Component)target.targetObject).gameObject;
+
+            foreach (var field in _fields)
+            {
+                var source = field.SourceObject as Component;
+                if (source == null) continue;
+
+                bool isPrefab = PrefabUtility.IsPartOfPrefabAsset(source.gameObject);
+
+                for (int i = 0; i < field.SlotCount; i++)
+                {
+                    var prop = target.FindProperty(SlotFieldName(field, i));
+                    if (prop == null) continue;
+
+                    var instance = isPrefab
+                        ? (GameObject)PrefabUtility.InstantiatePrefab(source.gameObject, compiledGo.transform)
+                        : UnityEngine.Object.Instantiate(source.gameObject, compiledGo.transform);
+
+                    instance.name = $"{field.Name}_{i}";
+                    Undo.RegisterCreatedObjectUndo(instance, $"Create {field.Name} pool slot {i}");
+                    prop.objectReferenceValue = instance.GetComponent(source.GetType());
+                }
+            }
         }
 
         internal static string SlotFieldName(TsvrcField field, int index)

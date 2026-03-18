@@ -38,6 +38,20 @@ namespace Tsvrc.Editor
                 .ToList();
         }
 
+        internal override void ScanForWire(TsvrcConfig config, Type compiledType)
+        {
+            var internalSingletons = config.InternalTsvrcConfig?.Singletons ?? Array.Empty<UnityEngine.Object>();
+            var objects = config.Singletons.Union(internalSingletons).ToHashSet();
+            var resolved = TsvrcResolver.Resolve(objects, new HashSet<string>());
+
+            // Only wire fields that were actually emitted (usage-filtered during Compile).
+            var emitted = new HashSet<string>(compiledType
+                .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                .Select(f => f.Name));
+
+            _fields = resolved.Where(f => emitted.Contains(f.Name)).OrderBy(f => f.Name).ToList();
+        }
+
         internal override IEnumerable<string> GetUsings() =>
             _fields.Select(f => f.Namespace).Where(n => !string.IsNullOrEmpty(n));
 

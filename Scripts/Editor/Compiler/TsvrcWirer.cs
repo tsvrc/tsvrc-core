@@ -48,7 +48,7 @@ namespace Tsvrc.Editor
 
             var modules = TsvrcCompiler.CreateModules();
             foreach (var module in modules)
-                module.Scan(config);
+                module.ScanForWire(config, compiledType);
 
             var so = new SerializedObject(compiled);
             foreach (var module in modules)

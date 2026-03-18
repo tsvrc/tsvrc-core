@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Tsvrc.Core;
@@ -11,6 +12,10 @@ namespace Tsvrc.Editor
     {
         /// <summary>Read config + scan source files. Called once before any Write or Wire.</summary>
         internal abstract void Scan(TsvrcConfig config);
+
+        // Called in RunWire after domain reload. Uses reflection on the compiled type instead of
+        // re-scanning source files, since we only need to know what fields already exist.
+        internal virtual void ScanForWire(TsvrcConfig config, Type compiledType) => Scan(config);
 
         internal virtual IEnumerable<string> GetUsings() => Enumerable.Empty<string>();
         internal virtual void WriteFields(CsWriter w) { }
