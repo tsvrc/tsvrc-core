@@ -29,6 +29,8 @@ namespace Tsvrc.Editor
             var config = RequireTsvrcConfig();
             if (config == null) return;
 
+            CleanPrevious();
+
             var modules = CreateModules();
 
             SourceScanner.ExcludeFolder = GeneratedFolder;
@@ -46,6 +48,24 @@ namespace Tsvrc.Editor
 
             TsvrcWirer.ScheduleWire();
             AssetDatabase.Refresh();
+        }
+
+        private static void CleanPrevious()
+        {
+            // Remove CompiledTsvrc GameObject from scene
+            var existing = Object.FindObjectsOfType<Component>();
+            foreach (var c in existing)
+            {
+                if (c != null && c.GetType().FullName == "Tsvrc.Core.Compiled.CompiledTsvrc")
+                {
+                    Undo.DestroyObjectImmediate(c.gameObject);
+                    break;
+                }
+            }
+
+            // Delete the generated folder from disk and from AssetDatabase
+            if (AssetDatabase.IsValidFolder(GeneratedFolder))
+                AssetDatabase.DeleteAsset(GeneratedFolder);
         }
 
         private static string ToAbsolutePath(string root, string assetPath)
