@@ -20,39 +20,18 @@ namespace Tsvrc.Editor
 
         internal override void Scan(TsvrcConfig config)
         {
-            var internalPool = config.InternalTsvrcConfig?.TsvrcBehaviourPool ?? Array.Empty<TsvrcBehaviour>();
-
-            var usedNames = new HashSet<string>();
-            var objects = config.TsvrcBehaviourPool
-                .Union(internalPool)
-                .Cast<UnityEngine.Object>()
-                .ToHashSet();
-
-            var resolved = TsvrcResolver.Resolve(objects, usedNames);
+            var resolved = ResolveFields(config);
 
             foreach (var field in resolved)
-            {
-                var pattern = new Regex(@"\b_ts\s*\.\s*Get" + Regex.Escape(field.Type) + @"\s*\(\s*\)");
-                field.CallSites = SourceScanner.FindCallSites(pattern);
                 field.SlotCount = Math.Max(1, new HashSet<string>(field.CallSites.Select(cs => cs.ClassName)).Count);
-            }
 
-            _fields = resolved
-                .OrderBy(f => f.Name)
-                .ToList();
+            _fields = resolved.OrderBy(f => f.Name).ToList();
         }
 
         internal override void ScanForWire(TsvrcConfig config, Type compiledType)
         {
-            var internalPool = config.InternalTsvrcConfig?.TsvrcBehaviourPool ?? Array.Empty<TsvrcBehaviour>();
-            var objects = config.TsvrcBehaviourPool
-                .Union(internalPool)
-                .Cast<UnityEngine.Object>()
-                .ToHashSet();
+            var resolved = ResolveFields(config);
 
-            var resolved = TsvrcResolver.Resolve(objects, new HashSet<string>());
-
-            // Derive SlotCount from the fields that were emitted during Compile.
             var typeFieldNames = new HashSet<string>(compiledType
                 .GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
                 .Select(f => f.Name));
@@ -64,6 +43,25 @@ namespace Tsvrc.Editor
             }
 
             _fields = resolved.Where(f => f.SlotCount > 0).OrderBy(f => f.Name).ToList();
+        }
+
+        private HashSet<TsvrcField> ResolveFields(TsvrcConfig config)
+        {
+            var internalPool = config.InternalTsvrcConfig?.TsvrcBehaviourPool ?? Array.Empty<TsvrcBehaviour>();
+            var objects = config.TsvrcBehaviourPool
+                .Union(internalPool)
+                .Cast<UnityEngine.Object>()
+                .ToHashSet();
+
+            var resolved = TsvrcResolver.Resolve(objects, new HashSet<string>());
+
+            foreach (var field in resolved)
+            {
+                var pattern = new Regex(@"\b_ts\s*\.\s*Get" + Regex.Escape(field.Type) + @"\s*\(\s*\)");
+                field.CallSites = SourceScanner.FindCallSites(pattern);
+            }
+
+            return resolved;
         }
 
         internal override IEnumerable<string> GetUsings() =>
@@ -91,7 +89,7 @@ namespace Tsvrc.Editor
                     for (int i = 0; i < field.SlotCount; i++)
                     {
                         string slot = SlotFieldName(field, i);
-                        using (w.Block($"if (!{slot}.IsCreated)"))
+                        using (w.Block($"if ({slot} != null && !{slot}.IsCreated)"))
                         {
                             w.Line($"{slot}.gameObject.SetActive(true);");
                             w.Line($"{slot}.TsConstruct(this);");
@@ -109,7 +107,7 @@ namespace Tsvrc.Editor
         {
             foreach (var field in _fields)
                 for (int i = 0; i < field.SlotCount; i++)
-                    w.Line($"{SlotFieldName(field, i)}.gameObject.SetActive(false);");
+                    w.Line($"if ({SlotFieldName(field, i)} != null) {SlotFieldName(field, i)}.gameObject.SetActive(false);");
         }
 
         internal override void Wire(SerializedObject target)
@@ -120,6 +118,8 @@ namespace Tsvrc.Editor
 
             foreach (var field in _fields)
             {
+                if (field.CallSites.Count == 0) continue;
+
                 var source = field.SourceObject as Component;
                 if (source == null) continue;
 

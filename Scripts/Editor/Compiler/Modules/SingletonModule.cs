@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Tsvrc.Core;
 using UnityEditor;
 using UnityEngine;
@@ -19,23 +20,14 @@ namespace Tsvrc.Editor
         internal override void Scan(TsvrcConfig config)
         {
             var internalSingletons = config.InternalTsvrcConfig?.Singletons ?? Array.Empty<UnityEngine.Object>();
-
-            var usedNames = new HashSet<string>();
-            var objects = config.Singletons
-                .Union(internalSingletons)
-                .ToHashSet();
-
-            _fields = TsvrcResolver.Resolve(objects, usedNames)
-                .OrderBy(f => f.Name)
-                .ToList();
-        }
-
-        internal override void ScanForWire(TsvrcConfig config, Type compiledType)
-        {
-            var internalSingletons = config.InternalTsvrcConfig?.Singletons ?? Array.Empty<UnityEngine.Object>();
             var objects = config.Singletons.Union(internalSingletons).ToHashSet();
+            var resolved = TsvrcResolver.Resolve(objects, new HashSet<string>());
 
-            _fields = TsvrcResolver.Resolve(objects, new HashSet<string>()).OrderBy(f => f.Name).ToList();
+            foreach (var field in resolved)
+                field.CallSites = SourceScanner.FindCallSites(
+                    new Regex(@"\b_ts\s*\.\s*" + Regex.Escape(field.Name) + @"\b"));
+
+            _fields = resolved.OrderBy(f => f.Name).ToList();
         }
 
         internal override IEnumerable<string> GetUsings() =>
@@ -56,7 +48,7 @@ namespace Tsvrc.Editor
         internal override void WriteStartBody(CsWriter w)
         {
             foreach (var field in _fields)
-                if (field.SourceObject is TsvrcBehaviour)
+                if (field.SourceObject is TsvrcBehaviour && field.CallSites.Count > 0)
                     w.Line($"{field.Name}.TsConstruct(this);");
         }
 
@@ -65,10 +57,12 @@ namespace Tsvrc.Editor
             foreach (var field in _fields)
             {
                 var prop = target.FindProperty(field.Name);
-                if (prop != null)
-                    prop.objectReferenceValue = field.SourceObject;
-                else
+                if (prop == null)
+                {
                     Debug.LogWarning($"[TsvrcWirer] Singleton property '{field.Name}' not found on CompiledTsvrc.");
+                    continue;
+                }
+                prop.objectReferenceValue = field.CallSites.Count > 0 ? field.SourceObject : null;
             }
         }
     }
