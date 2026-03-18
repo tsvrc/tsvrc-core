@@ -113,7 +113,7 @@ namespace Tsvrc.Editor
         {
             foreach (var field in _fields)
                 for (int i = 0; i < field.SlotCount; i++)
-                    w.Line($"if ({SlotFieldName(field, i)} != null) {SlotFieldName(field, i)}.gameObject.SetActive(false);");
+                    w.Line($"{SlotFieldName(field, i)}.gameObject.SetActive(false);");
         }
 
         internal override void Wire(SerializedObject target)
