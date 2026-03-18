@@ -6,6 +6,8 @@ namespace Tsvrc.Core
     // EditorOnly — scanned by TsvrcCompiler, stripped from VRChat build.
     public class TsvrcConfig : UdonSharpBehaviour
     {
+        [Tooltip("The single TsvrcInstance for this world. If set, TsConstruct(_ts) and OnInstanceStart() are called on it after all other constructs.")]
+        public TsvrcInstance Instance;
         [Tooltip("Required. Internal core config — do NOT modify or reassign. Provides framework-level entries compiled into the Core region of CompiledTsvrc.")]
         public InternalTsvrcConfig InternalTsvrcConfig;
 

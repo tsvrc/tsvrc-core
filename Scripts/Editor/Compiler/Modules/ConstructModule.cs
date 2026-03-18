@@ -9,8 +9,7 @@ namespace Tsvrc.Editor
 {
     /// <summary>
     /// Scans config.TsvrcBehaviourConstruct and emits the Bootstrap region.
-    /// All entries receive TsConstruct(this) in Start(). Entries that are TsvrcInstance
-    /// subclasses are deferred to the end and also receive OnInstanceStart().
+    /// All entries receive TsConstruct(this) in Start().
     /// </summary>
     internal class ConstructModule : TsvrcModule
     {
@@ -42,21 +41,8 @@ namespace Tsvrc.Editor
 
         internal override void WriteStartBody(CsWriter w)
         {
-            // Emit TsConstruct for all entries; defer TsvrcInstance to last.
-            TsvrcField instanceField = null;
             foreach (var field in _fields)
-            {
-                if (field.SourceObject is TsvrcInstance)
-                    instanceField = field;
-                else
-                    w.Line($"{PrivateFieldName(field)}.TsConstruct(this);");
-            }
-
-            if (instanceField != null)
-            {
-                w.Line($"{PrivateFieldName(instanceField)}.TsConstruct(this);");
-                w.Line($"{PrivateFieldName(instanceField)}.OnInstanceStart();");
-            }
+                w.Line($"{PrivateFieldName(field)}.TsConstruct(this);");
         }
 
         internal override void Wire(SerializedObject target)

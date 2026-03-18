@@ -21,6 +21,7 @@ namespace Tsvrc.Editor
             new SingletonModule(),
             new PoolModule(),
             new ConstructModule(),
+            new InstanceModule(),
         };
 
         [MenuItem("Tsvrc/Compile")]
