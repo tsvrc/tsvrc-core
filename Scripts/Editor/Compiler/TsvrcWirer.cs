@@ -56,7 +56,7 @@ namespace Tsvrc.Editor
             so.ApplyModifiedProperties();
 
             EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
-            Debug.Log("[TsvrcWirer] Scene wired successfully.");
+            TsvrcCompiler.LogSuccess();
         }
 
         // UdonSharp requires a .asset program file to exist alongside the .cs before a component can be added.

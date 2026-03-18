@@ -51,6 +51,11 @@ namespace Tsvrc.Editor
             AssetDatabase.Refresh();
         }
 
+        internal static void LogSuccess()
+        {
+            Debug.Log("[Tsvrc Compiler] Tsvrc has been successfully compiled. CompiledTsvrc has been generated and wired into the scene.");
+        }
+
         private static void CleanPrevious()
         {
             // Remove CompiledTsvrc GameObject from scene
