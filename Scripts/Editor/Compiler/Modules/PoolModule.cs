@@ -12,7 +12,7 @@ namespace Tsvrc.Editor
     /// <summary>
     /// Scans config.TsvrcBehaviourPool and emits per-slot private fields plus Get{Type}() accessor methods.
     /// Slots are instantiated in the scene by the compiler so VRChat assigns them fixed network IDs.
-    /// Slot count equals the number of unique classes that call _ts.Get{Type}().
+    /// Slot count is the total number of Get{Type}() call sites across all classes, so each caller can hold its slots simultaneously.
     /// </summary>
     internal class PoolModule : TsvrcModule
     {
@@ -23,7 +23,9 @@ namespace Tsvrc.Editor
             var resolved = ResolveFields(config);
 
             foreach (var field in resolved)
-                field.SlotCount = new HashSet<string>(field.CallSites.Select(cs => cs.ClassName)).Count;
+                field.SlotCount = field.CallSites
+                    .GroupBy(cs => cs.ClassName)
+                    .Sum(g => g.Count());
 
             _fields = resolved.OrderBy(f => f.Name).ToList();
         }
@@ -83,9 +85,10 @@ namespace Tsvrc.Editor
             w.Region("Pool Accessors");
             foreach (var field in _fields)
             {
-                w.Summary($"Returns an available <see cref=\"{field.Type}\"/> pool slot ({field.SlotCount} compiled). " +
-                          $"Slots are automatically placed in the scene by the Tsvrc compiler so VRChat assigns them fixed network IDs, enabling network events without manual scene setup. " +
-                          $"Call <see cref=\"Tsvrc.Core.TsvrcBehaviour.TsRelease\"/> to return a slot. Logs an error if all {field.SlotCount} slot(s) are already active.");
+                w.Summary($"Gets a <see cref=\"{field.Type}\"/> at runtime. " +
+                          $"Pooled objects have stable VRChat network IDs and can send and receive network events. " +
+                          $"Call <see cref=\"Tsvrc.Core.TsvrcBehaviour.TsRelease\"/> when done to return it for reuse. " +
+                          $"Logs an error if all {field.SlotCount} slot(s) are already in use.");
                 using (w.Method($"public {field.Type} Get{field.Type}()"))
                 {
                     if (field.SlotCount == 0)
