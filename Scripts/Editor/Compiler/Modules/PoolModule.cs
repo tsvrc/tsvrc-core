@@ -11,8 +11,8 @@ namespace Tsvrc.Editor
 {
     /// <summary>
     /// Scans config.TsvrcBehaviourPool and emits per-slot private fields plus Get{Type}() accessor methods.
-    /// Only entries called via _ts.Get{Type}() somewhere in user code are included.
-    /// Slot count equals the number of unique calling classes.
+    /// Slots are instantiated in the scene by the compiler so VRChat assigns them fixed network IDs.
+    /// Slot count equals the number of unique classes that call _ts.Get{Type}().
     /// </summary>
     internal class PoolModule : TsvrcModule
     {
@@ -83,7 +83,9 @@ namespace Tsvrc.Editor
             w.Region("Pool Accessors");
             foreach (var field in _fields)
             {
-                w.Summary($"Activates and returns a scene-placed <see cref=\"{field.Type}\"/> pool slot (preserves VRChat network ID). Errors if all {field.SlotCount} slot(s) are active.");
+                w.Summary($"Returns an available <see cref=\"{field.Type}\"/> pool slot ({field.SlotCount} compiled). " +
+                          $"Slots are automatically placed in the scene by the Tsvrc compiler so VRChat assigns them fixed network IDs, enabling network events without manual scene setup. " +
+                          $"Call <see cref=\"Tsvrc.Core.TsvrcBehaviour.TsRelease\"/> to return a slot. Logs an error if all {field.SlotCount} slot(s) are already active.");
                 using (w.Method($"public {field.Type} Get{field.Type}()"))
                 {
                     if (field.SlotCount == 0)
