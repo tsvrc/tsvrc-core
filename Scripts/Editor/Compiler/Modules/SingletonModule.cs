@@ -38,7 +38,7 @@ namespace Tsvrc.Editor
             w.Region("Singletons");
             foreach (var field in _fields)
             {
-                w.Summary("Tsvrc singleton — wired by TsvrcWirer.");
+                w.Summary("Tsvrc singleton.");
                 if (field.CallSites.Count == 0)
                     w.Line($"public {field.Type} {field.Name} {{ get {{ Debug.LogError(\"{TsvrcCodeGen.NullFieldMessage(field.Name)}\"); return null; }} }}");
                 else
