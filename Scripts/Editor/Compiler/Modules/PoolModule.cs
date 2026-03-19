@@ -88,6 +88,7 @@ namespace Tsvrc.Editor
                 {
                     if (field.SlotCount == 0)
                     {
+                        w.Line($"Debug.LogError(\"{TsvrcCodeGen.NullFieldMessage($"Get{field.Type}")}\");");
                         w.Line("return null;");
                         continue;
                     }
