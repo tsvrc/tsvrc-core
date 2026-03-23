@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: TsvrcOverlay
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: 8d34115e20a3a9f4c8b62866575221c6,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: 7b6632e30834d724ba80f5d5a6bd7af6,
     type: 2}
   udonAssembly: 
   assemblyError: 

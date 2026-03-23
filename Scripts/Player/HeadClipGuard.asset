@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: HeadClipGuard
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: 3dce4e99196baee4da5bd6a559f6754f,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: fa8d4823c83305d4882e3ee3fe7de984,
     type: 2}
   udonAssembly: 
   assemblyError: 

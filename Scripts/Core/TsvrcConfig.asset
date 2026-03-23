@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: TsvrcConfig
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: e4d1cad1c236be44a9392cb9a8a5941e,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: 73dd9cba5594c314c8e389f5cb64bebe,
     type: 2}
   udonAssembly: 
   assemblyError: 
