@@ -146,15 +146,16 @@ namespace Tsvrc.Editor
             string absPath = EditorUtility.SaveFilePanel("Create Sample Language JSON", Application.dataPath, "language_en", "json");
             if (string.IsNullOrEmpty(absPath)) return;
 
-            File.WriteAllText(absPath, @"{
-                ""key"": ""en"",
-                ""label"": ""English"",
-                ""entries"": {
-                    ""_welcome_"": ""Welcome!"",
-                    ""_start_"": ""Start"",
-                    ""_exit_"": ""Exit""
-                }
-                }", System.Text.Encoding.UTF8);
+            File.WriteAllText(absPath,
+@"{
+    ""key"": ""en"",
+    ""label"": ""English"",
+    ""entries"": {
+        ""_welcome_"": ""Welcome!"",
+        ""_start_"": ""Start"",
+        ""_exit_"": ""Exit""
+    }
+}", System.Text.Encoding.UTF8);
 
             string relPath = FileUtil.GetProjectRelativePath(absPath);
             AssetDatabase.ImportAsset(relPath);
