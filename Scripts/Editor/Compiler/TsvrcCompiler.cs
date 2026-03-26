@@ -22,6 +22,7 @@ namespace Tsvrc.Editor
             new PoolModule(),
             new ConstructModule(),
             new InstanceModule(),
+            new TranslationModule(),
         };
 
         [MenuItem("Tsvrc/Compile")]
@@ -69,9 +70,16 @@ namespace Tsvrc.Editor
                 }
             }
 
-            // Delete the generated folder from disk and from AssetDatabase
-            if (AssetDatabase.IsValidFolder(GeneratedFolder))
-                AssetDatabase.DeleteAsset(GeneratedFolder);
+            // Delete only the auto-generated files — never wipe the whole folder so that
+            // user assets (TranslationConfig.asset, MolInstance.asset, …) are preserved.
+            DeleteGeneratedAsset(GeneratedFilePath);
+            DeleteGeneratedAsset(GeneratedFolder + "/translations.txt");
+        }
+
+        private static void DeleteGeneratedAsset(string assetPath)
+        {
+            if (AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null)
+                AssetDatabase.DeleteAsset(assetPath);
         }
 
         private static string ToAbsolutePath(string root, string assetPath)

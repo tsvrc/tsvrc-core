@@ -18,6 +18,8 @@ namespace Tsvrc.Editor
         internal virtual void ScanForWire(TsvrcConfig config, Type compiledType) => Scan(config);
 
         internal virtual IEnumerable<string> GetUsings() => Enumerable.Empty<string>();
+        /// <summary>Emit plain C# types at namespace scope, before the generated class.</summary>
+        internal virtual void WriteBeforeClass(CsWriter w) { }
         internal virtual void WriteFields(CsWriter w) { }
         internal virtual void WriteMethods(CsWriter w) { }
         internal virtual void WriteStartBody(CsWriter w) { }

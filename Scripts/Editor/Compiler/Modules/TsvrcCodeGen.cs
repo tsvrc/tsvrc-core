@@ -24,15 +24,22 @@ namespace Tsvrc.Editor
             w.Usings(CollectUsings(moduleList));
 
             using (w.Namespace(CompiledNamespace))
-            using (w.Class("public", CompiledClassName, "UdonSharpBehaviour", UdonSyncAttribute))
             {
                 foreach (var module in moduleList)
-                    module.WriteFields(w);
+                {
+                    module.WriteBeforeClass(w);
+                }
 
-                foreach (var module in moduleList)
-                    module.WriteMethods(w);
+                using (w.Class("public", CompiledClassName, "UdonSharpBehaviour", UdonSyncAttribute))
+                {
+                    foreach (var module in moduleList)
+                        module.WriteFields(w);
 
-                WriteStart(w, moduleList);
+                    foreach (var module in moduleList)
+                        module.WriteMethods(w);
+
+                    WriteStart(w, moduleList);
+                }
             }
 
             return w.ToString();
