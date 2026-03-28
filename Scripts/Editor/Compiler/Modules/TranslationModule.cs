@@ -98,7 +98,17 @@ namespace Tsvrc.Editor
 
                 var entries = new Dictionary<string, string>();
                 foreach (var kv in jEntries)
-                    entries[kv.Key] = kv.Value?.ToString() ?? "";
+                {
+                    if (kv.Value is Newtonsoft.Json.Linq.JObject entryObj)
+                    {
+                        var labelToken = entryObj["label"];
+                        entries[kv.Key] = labelToken?.ToString() ?? "";
+                    }
+                    else
+                    {
+                        entries[kv.Key] = kv.Value?.ToString() ?? "";
+                    }
+                }
 
                 return new LanguageEntry
                 {

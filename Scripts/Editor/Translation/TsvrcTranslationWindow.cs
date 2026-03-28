@@ -72,7 +72,7 @@ namespace Tsvrc.Editor
             EditorGUILayout.Space(6);
             EditorGUILayout.LabelField("Language Files", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "One JSON per language. Required fields: \"key\" (e.g. \"en\"), \"label\" (e.g. \"English\"), \"entries\" (key/value pairs).",
+                "One JSON per language. Required fields: \"key\" (e.g. \"en\"), \"label\" (e.g. \"English\"), \"entries\" (key/value pairs).\n\nEach entry can be a plain string or an object with \"label\" (the translated text) and an optional \"description\" (notes for translators — never included in the build).",
                 MessageType.None);
             EditorGUILayout.Space(4);
 
@@ -152,7 +152,10 @@ namespace Tsvrc.Editor
     ""label"": ""English"",
     ""entries"": {
         ""_welcome_"": ""Welcome!"",
-        ""_start_"": ""Start"",
+        ""_start_"": {
+            ""label"": ""Start"",
+            ""description"": ""Button label to start the experience.""
+        },
         ""_exit_"": ""Exit""
     }
 }", System.Text.Encoding.UTF8);
