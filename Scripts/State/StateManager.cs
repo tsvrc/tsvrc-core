@@ -15,11 +15,11 @@ namespace Tsvrc.State
         /// Register a state with the method names to call on this behaviour when entering/exiting.
         /// Use nameof() at the call site for rename-safety.
         /// </summary>
-        public void RegisterState(int state, string loadMethod, string unloadMethod)
+        public void RegisterState(int state, string loadMethod = null, string unloadMethod = null)
         {
             var entry = new DataDictionary();
-            entry["load"] = loadMethod;
-            entry["unload"] = unloadMethod;
+            entry["load"] = loadMethod ?? string.Empty;
+            entry["unload"] = unloadMethod ?? string.Empty;
             _stateData[state] = entry;
         }
 
@@ -44,7 +44,8 @@ namespace Tsvrc.State
             if (_currentState != -1 && _stateData.ContainsKey(_currentState))
             {
                 string unloadMethod = _stateData[_currentState].DataDictionary["unload"].String;
-                SendCustomEvent(unloadMethod);
+                if (!string.IsNullOrEmpty(unloadMethod))
+                    SendCustomEvent(unloadMethod);
             }
 
             int oldState = _currentState;
@@ -54,7 +55,8 @@ namespace Tsvrc.State
             if (_stateData.ContainsKey(newState))
             {
                 string loadMethod = _stateData[newState].DataDictionary["load"].String;
-                SendCustomEvent(loadMethod);
+                if (!string.IsNullOrEmpty(loadMethod))
+                    SendCustomEvent(loadMethod);
             }
 
             // Notify subclass after the transition is fully committed
