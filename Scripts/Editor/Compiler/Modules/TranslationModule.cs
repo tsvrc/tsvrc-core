@@ -126,7 +126,7 @@ namespace Tsvrc.Editor
 
         private void CollectTMPTargets()
         {
-            foreach (var tmp in Object.FindObjectsOfType<TextMeshProUGUI>())
+            foreach (var tmp in Object.FindObjectsOfType<TextMeshProUGUI>(true))
                 if (TargetPattern.IsMatch(tmp.gameObject.name))
                     _targets.Add(tmp);
         }

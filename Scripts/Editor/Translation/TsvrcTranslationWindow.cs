@@ -123,7 +123,7 @@ namespace Tsvrc.Editor
             EditorGUILayout.LabelField("Detected TMP Targets in Scene", EditorStyles.boldLabel);
 
             int textElementsCount = 0;
-            foreach (var t in FindObjectsOfType<TMPro.TextMeshProUGUI>())
+            foreach (var t in FindObjectsOfType<TMPro.TextMeshProUGUI>(true))
                 if (TargetPattern.IsMatch(t.gameObject.name)) textElementsCount++;
 
             EditorGUILayout.LabelField($"TextMeshProUGUI (UI):   {textElementsCount}", EditorStyles.miniLabel);
