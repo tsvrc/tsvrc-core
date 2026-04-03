@@ -110,7 +110,11 @@ namespace Tsvrc.Editor
                     var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(TsvrcConfigPrefabPath);
                     if (prefab == null)
                     {
-                        Debug.LogError($"[TsvrcCompiler] TsvrcConfig prefab not found at '{TsvrcConfigPrefabPath}'.");
+                        Debug.LogError(
+                            $"[TsvrcCompiler] TsvrcConfig prefab not found at '{TsvrcConfigPrefabPath}'.\n" +
+                            "To fix: create a GameObject in your scene, add the 'Tsvrc Config' component (via Add Component > Tsvrc > Tsvrc Config), " +
+                            "set its tag to 'EditorOnly', then drag it into Assets/Tsvrc/Prefabs/ and name it 'TsvrcConfig'. " +
+                            "Alternatively, add a TsvrcConfig component to any scene GameObject manually and compile again without a prefab.");
                         return null;
                     }
 
