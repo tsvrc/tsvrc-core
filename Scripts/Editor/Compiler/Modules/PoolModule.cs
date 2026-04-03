@@ -49,7 +49,8 @@ namespace Tsvrc.Editor
 
         private HashSet<TsvrcField> ResolveFields(TsvrcConfig config)
         {
-            var internalPool = config.InternalTsvrcConfig?.TsvrcBehaviourPool ?? Array.Empty<TsvrcBehaviour>();
+            var internalConfig = TsvrcCompiler.LoadInternalConfig();
+            var internalPool = internalConfig?.PoolPrefabs ?? Array.Empty<TsvrcBehaviour>();
             var objects = config.TsvrcBehaviourPool
                 .Union(internalPool)
                 .Cast<UnityEngine.Object>()

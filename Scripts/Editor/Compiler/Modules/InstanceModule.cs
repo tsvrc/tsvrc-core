@@ -117,7 +117,7 @@ namespace Tsvrc.Editor
             var monoScript = AssetDatabase.LoadAssetAtPath<MonoScript>(scriptAssetPath);
             if (monoScript == null)
             {
-                Debug.LogWarning($"[TsvrcWirer] Script not found at '{scriptAssetPath}' — cannot create program asset.");
+                Debug.LogWarning($"[TsvrcWirer] Script not found at '{scriptAssetPath}'. Cannot create program asset.");
                 return;
             }
 

@@ -19,7 +19,8 @@ namespace Tsvrc.Editor
 
         internal override void Scan(TsvrcConfig config)
         {
-            var internalSingletons = config.InternalTsvrcConfig?.Singletons ?? Array.Empty<UnityEngine.Object>();
+            var internalConfig = TsvrcCompiler.LoadInternalConfig();
+            var internalSingletons = internalConfig?.Singletons ?? Array.Empty<UnityEngine.Object>();
             var objects = config.Singletons.Union(internalSingletons).ToHashSet();
             var resolved = TsvrcResolver.Resolve(objects, new HashSet<string>());
 

@@ -60,7 +60,7 @@ namespace Tsvrc.Editor
             var translationConfig = AssetDatabase.LoadAssetAtPath<TranslationConfig>(TranslationConfigAssetPath);
             if (translationConfig == null)
             {
-                Debug.Log($"[TranslationModule] No TranslationConfig asset found at '{TranslationConfigAssetPath}' — skipping translation generation.");
+                Debug.Log($"[TranslationModule] No TranslationConfig asset found at '{TranslationConfigAssetPath}'. Skipping translation generation.");
                 return;
             }
 
@@ -173,7 +173,7 @@ namespace Tsvrc.Editor
 
             using (w.Method("public void SetLanguage(Language lang)"))
             {
-                w.Line("if (_translationsAsset == null) { Debug.LogError(\"[CompiledTsvrc] Translation asset is missing — recompile Tsvrc.\"); return; }");
+                w.Line("if (_translationsAsset == null) { Debug.LogError(\"[CompiledTsvrc] Translation asset is missing. Recompile Tsvrc to fix it.\"); return; }");
                 w.Line("VRC.SDK3.Data.DataToken _tsRoot;");
                 w.Line("if (!VRC.SDK3.Data.VRCJson.TryDeserializeFromJson(_translationsAsset.text, out _tsRoot)) { Debug.LogError(\"[CompiledTsvrc] Failed to parse translation data.\"); return; }");
                 w.Line("VRC.SDK3.Data.DataToken _tsLang;");

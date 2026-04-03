@@ -24,8 +24,8 @@ namespace Tsvrc.Editor
 
         private SerializedProperty LanguageFiles => _so?.FindProperty("LanguageFiles");
 
-        [MenuItem("Tsvrc/Setup Translation")]
-        private static void Open() => GetWindow<TsvrcTranslationWindow>("Tsvrc Translation").Show();
+        [MenuItem("Tsvrc/Localization")]
+        private static void Open() => GetWindow<TsvrcTranslationWindow>("Tsvrc Localization").Show();
 
         private void OnEnable() => Reload();
 
@@ -37,7 +37,7 @@ namespace Tsvrc.Editor
 
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("Tsvrc Translation", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Tsvrc Localization", EditorStyles.boldLabel);
             EditorGUILayout.Space(4);
 
             if (_config == null)
@@ -72,7 +72,7 @@ namespace Tsvrc.Editor
             EditorGUILayout.Space(6);
             EditorGUILayout.LabelField("Language Files", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "One JSON per language. Required fields: \"key\" (e.g. \"en\"), \"label\" (e.g. \"English\"), \"entries\" (key/value pairs).\n\nEach entry can be a plain string or an object with \"label\" (the translated text) and an optional \"description\" (notes for translators — never included in the build).",
+                "One JSON per language. Required fields: \"key\" (e.g. \"en\"), \"label\" (e.g. \"English\"), \"entries\" (key/value pairs).\n\nEach entry can be a plain string or an object with \"label\" (the translated text) and an optional \"description\" field (notes for translators, never included in the build).",
                 MessageType.None);
             EditorGUILayout.Space(4);
 

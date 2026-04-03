@@ -13,7 +13,11 @@ namespace Tsvrc.Editor
     {
         internal const string GeneratedFolder = "Assets/CompiledTsvrc";
         private const string GeneratedFilePath = "Assets/CompiledTsvrc/CompiledTsvrc.cs";
-        private const string TsvrcConfigPrefabPath = "Assets/Tsvrc/Prefabs/TsvrcConfig.prefab";
+        internal const string TsvrcConfigPrefabPath = "Assets/Tsvrc/Prefabs/TsvrcConfig.prefab";
+        internal const string InternalConfigPath = "Assets/Tsvrc/InternalConfig.asset";
+
+        internal static InternalTsvrcConfig LoadInternalConfig()
+            => AssetDatabase.LoadAssetAtPath<InternalTsvrcConfig>(InternalConfigPath);
 
         // Add new modules here to extend the compiler.
         internal static List<TsvrcModule> CreateModules() => new List<TsvrcModule>
@@ -31,6 +35,9 @@ namespace Tsvrc.Editor
         {
             var config = RequireTsvrcConfig();
             if (config == null) return;
+
+            if (config.tag != "EditorOnly")
+                Debug.LogWarning("[TsvrcCompiler] TsvrcConfig GameObject is not tagged 'EditorOnly'. It will be included in the VRChat build. Set the tag to 'EditorOnly' in the Inspector.");
 
             CleanPrevious();
 
@@ -71,7 +78,7 @@ namespace Tsvrc.Editor
                 }
             }
 
-            // Delete only the auto-generated files — never wipe the whole folder so that
+            // Delete only the auto-generated files; never wipe the whole folder so that
             // user assets (TranslationConfig.asset, MolInstance.asset, …) are preserved.
             DeleteGeneratedAsset(GeneratedFilePath);
             DeleteGeneratedAsset(GeneratedFolder + "/translations.txt");
@@ -93,7 +100,7 @@ namespace Tsvrc.Editor
             switch (all.Length)
             {
                 case > 1:
-                    Debug.LogError("[TsvrcCompiler] Multiple TsvrcConfig found — remove duplicates and recompile.");
+                    Debug.LogError("[TsvrcCompiler] Multiple TsvrcConfig found. Remove duplicates and recompile.");
                     return null;
 
                 case 1:
@@ -108,6 +115,7 @@ namespace Tsvrc.Editor
                     }
 
                     var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                    go.tag = "EditorOnly";
                     go.transform.SetSiblingIndex(0);
                     Undo.RegisterCreatedObjectUndo(go, "Add TsvrcConfig");
                     EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());

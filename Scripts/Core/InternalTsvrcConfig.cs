@@ -1,15 +1,17 @@
-using UdonSharp;
 using UnityEngine;
 
 namespace Tsvrc.Core
 {
-    // EditorOnly — scanned by TsvrcCompiler as the *core* config, stripped from VRChat build.
-    // Not intended to be modified by end users. Place this as a child of TsvrcConfig.
-    public class InternalTsvrcConfig : UdonSharpBehaviour
+    // Library-internal config stored as a ScriptableObject asset at a fixed path.
+    // Not intended to be modified by end users. Edit via the Unity Inspector on the asset directly.
+    // Loaded by the compiler at Assets/Tsvrc/InternalConfig.asset.
+    [CreateAssetMenu(menuName = "Tsvrc/Internal Config", fileName = "InternalConfig")]
+    public class InternalTsvrcConfig : ScriptableObject
     {
-        [Tooltip("Core scene objects exposed as named singleton fields on CompiledTsvrc (core section). Drop a GameObject or Component here — each entry becomes a typed _ts.FieldName accessor available to all TsvrcBehaviours.")]
+        [Tooltip("Library-internal objects exposed as named fields on CompiledTsvrc. These are framework-level references used by the core behaviour layer.")]
         public Object[] Singletons;
-        [Tooltip("Core TsvrcBehaviours placed in the scene at compile time as pool slots (core section). Scene-placed so VRChat assigns network IDs — enabling UdonSharp network events. Each entry generates a Get<TypeName>() method on CompiledTsvrc.")]
-        public TsvrcBehaviour[] TsvrcBehaviourPool;
+        [Tooltip("Library-internal TsvrcBehaviour prefabs registered as pool slots. The compiler places instances in the scene before play so VRChat assigns them stable network IDs, enabling network events.")]
+        public TsvrcBehaviour[] PoolPrefabs;
     }
 }
+

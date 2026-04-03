@@ -60,7 +60,7 @@ namespace Tsvrc.Editor
         }
 
         // UdonSharp requires a .asset program file to exist alongside the .cs before a component can be added.
-        // Creates it if missing — mirrors what the UdonSharp script creation wizard does.
+        // Creates it if missing, mirroring what the UdonSharp script creation wizard does.
         private static void EnsureProgramAsset()
         {
             string assetPath = TsvrcCompiler.GeneratedFolder + "/CompiledTsvrc.asset";
@@ -98,7 +98,7 @@ namespace Tsvrc.Editor
             var all = UnityEngine.Object.FindObjectsOfType<TsvrcConfig>();
             if (all.Length == 1) return all[0];
             if (all.Length > 1)
-                Debug.LogError("[TsvrcWirer] Multiple TsvrcConfig found — remove duplicates.");
+                Debug.LogError("[TsvrcWirer] Multiple TsvrcConfig found. Remove duplicates.");
             else
                 Debug.LogError("[TsvrcWirer] No TsvrcConfig found in the active scene.");
             return null;

@@ -8,7 +8,7 @@ namespace Tsvrc.Player
     /// <summary>
     /// Prevents VR head clipping through geometry by teleporting the player back to
     /// their last safe position when the head enters any registered solid OBB.
-    /// All collider data is baked at setup time — PostLateUpdate performs only arithmetic.
+    /// All collider data is baked at setup time; PostLateUpdate performs only arithmetic.
     /// Usage: Setup(colliders, count) → Activate(). Call Deactivate() to stop.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
@@ -18,7 +18,7 @@ namespace Tsvrc.Player
         [SerializeField, Tooltip("Margin (metres) added to solid OBB half-extents. Prevents head from grazing surfaces.")]
         private float _margin = 0.05f;
 
-        // Baked solid OBB data — head must stay OUTSIDE these
+        // Baked solid OBB data: head must stay OUTSIDE these
         private Vector3[] _centers;
         private Quaternion[] _invRotations;
         private Vector3[] _halfExtents;
@@ -44,7 +44,7 @@ namespace Tsvrc.Player
         #region VRChat Callbacks
 
         /// <summary>
-        /// Runs after all IK/camera updates — authoritative head position for this frame.
+        /// Runs after all IK/camera updates, providing the authoritative head position for this frame.
         /// </summary>
         public override void PostLateUpdate()
         {
@@ -75,7 +75,7 @@ namespace Tsvrc.Player
 
         /// <summary>
         /// Bakes world-space OBB + AABB data for solid colliders (head must stay outside).
-        /// Only the first <paramref name="count"/> entries are baked — supports over-allocated buffers.
+        /// Only the first <paramref name="count"/> entries are baked; supports over-allocated buffers.
         /// Replaces any previously registered colliders.
         /// </summary>
         public void Setup(BoxCollider[] solidColliders, int count)

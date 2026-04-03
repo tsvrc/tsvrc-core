@@ -66,7 +66,7 @@ namespace Tsvrc.Editor
 
         // Emits the standard runtime error for a field that exists in CompiledTsvrc but has no scene reference.
         internal static string NullFieldMessage(string fieldName)
-            => $"[Tsvrc] '{fieldName}' is null — it was not in use when Tsvrc was last compiled. Recompile Tsvrc to activate it.";
+            => $"[Tsvrc] '{fieldName}' is null. It was not in use when Tsvrc was last compiled. Recompile Tsvrc to activate it.";
     }
 }
 #endif

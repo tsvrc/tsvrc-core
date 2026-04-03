@@ -5,7 +5,7 @@ namespace Tsvrc.Core
 {
     /// <summary>
     /// Editor-only config asset for the Tsvrc Translation system.
-    /// Create via Tsvrc > Translation — do not create manually.
+    /// Create via Tsvrc > Localization. Do not create manually.
     /// Consumed at compile time by TranslationModule; never included in the VRChat build.
     /// </summary>
     public class TranslationConfig : ScriptableObject

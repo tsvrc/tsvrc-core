@@ -23,7 +23,7 @@ namespace Tsvrc.Editor
     /// are NOT assigned a VRChat network ID.  They cannot send or receive any VRC network
     /// events (e.g. <c>OnDeserialization</c>, <c>SendCustomNetworkEvent</c>,
     /// <c>OnPlayerJoined</c>).  If you need networked objects, register them in the Pool
-    /// instead — pool slots exist in the scene before play and therefore receive stable
+    /// instead; pool slots exist in the scene before play and therefore receive stable
     /// network IDs from VRChat.
     /// </para>
     /// </summary>

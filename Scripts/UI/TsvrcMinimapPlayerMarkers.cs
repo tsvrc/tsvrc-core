@@ -119,7 +119,7 @@ namespace Tsvrc.UI
 
         /// <summary>
         /// Periodic update loop. Called via SendCustomEventDelayedSeconds.
-        /// Do not call directly — use Initialize() to start.
+        /// Do not call directly. Use Initialize() to start.
         /// </summary>
         public void _UpdateLoop()
         {
