@@ -22,6 +22,7 @@ namespace Tsvrc.Editor
             new PoolModule(),
             new ConstructModule(),
             new InstanceModule(),
+            new FactoryModule(),
             new TranslationModule(),
         };
 
