@@ -9,13 +9,13 @@ using UnityEngine;
 namespace Tsvrc.Editor
 {
     /// <summary>
-    /// Scans <see cref="TsvrcConfig.FactoryPrefabs"/> and emits per-prefab private
-    /// <c>GameObject</c> fields plus <c>Create{Name}(Transform parent)</c> factory methods
-    /// on <c>CompiledTsvrc</c>.
+    /// Scans all <see cref="TsvrcFactoryGroup"/> children of <see cref="TsvrcConfig"/> and emits
+    /// per-prefab private <c>GameObject</c> fields plus <c>Create{GroupName}{PrefabName}(Transform parent)</c>
+    /// factory methods on <c>CompiledTsvrc</c>.
     ///
     /// <para>
     /// Factory prefabs are never placed in the scene at compile time.
-    /// At runtime, each call to <c>Create{Name}</c> instantiates a brand-new scene object.
+    /// At runtime, each call to <c>Create*</c> instantiates a brand-new scene object.
     /// </para>
     ///
     /// <para>
@@ -23,7 +23,7 @@ namespace Tsvrc.Editor
     /// are NOT assigned a VRChat network ID.  They cannot send or receive any VRC network
     /// events (e.g. <c>OnDeserialization</c>, <c>SendCustomNetworkEvent</c>,
     /// <c>OnPlayerJoined</c>).  If you need networked objects, register them in the Pool
-    /// instead, pool slots exist in the scene before play and therefore receive stable
+    /// instead — pool slots exist in the scene before play and therefore receive stable
     /// network IDs from VRChat.
     /// </para>
     /// </summary>
@@ -33,49 +33,62 @@ namespace Tsvrc.Editor
 
         internal override void Scan(TsvrcConfig config)
         {
-            if (config.FactoryPrefabs == null || config.FactoryPrefabs.Length == 0)
-            {
-                _fields.Clear();
-                return;
-            }
+            _fields.Clear();
+
+            var groups = config.GetComponentsInChildren<TsvrcFactoryGroup>();
+            if (groups.Length == 0) return;
 
             var usedNames = new HashSet<string>();
             var fields = new List<TsvrcField>();
 
-            foreach (var prefab in config.FactoryPrefabs)
+            foreach (var group in groups)
             {
-                if (prefab == null) continue;
+                if (group.Prefabs == null) continue;
 
-                var behaviour = prefab.GetComponent<TsvrcBehaviour>();
-                var type = behaviour != null ? behaviour.GetType() : null;
+                string groupPrefix = string.IsNullOrEmpty(group.GroupName)
+                    ? string.Empty
+                    : Sanitize(group.GroupName);
 
-                string name = DeriveUniqueName(prefab.name, usedNames);
-                usedNames.Add(name);
-
-                var pattern = new Regex(@"\b_ts\s*\.\s*Create" + Regex.Escape(name) + @"\s*\(");
-
-                fields.Add(new TsvrcField
+                foreach (var prefab in group.Prefabs)
                 {
-                    Name = name,
-                    Type = type != null ? type.Name : "GameObject",
-                    Namespace = type?.Namespace ?? string.Empty,
-                    SourceObject = (UnityEngine.Object)behaviour ?? prefab,
-                    CallSites = SourceScanner.FindCallSites(pattern),
-                });
+                    if (prefab == null) continue;
+
+                    var behaviour = prefab.GetComponent<TsvrcBehaviour>();
+                    var type = behaviour != null ? behaviour.GetType() : null;
+
+                    string name = DeriveUniqueName(groupPrefix + Sanitize(prefab.name), usedNames);
+                    usedNames.Add(name);
+
+                    var pattern = new Regex(@"\b_ts\s*\.\s*Create" + Regex.Escape(name) + @"\s*\(");
+
+                    fields.Add(new TsvrcField
+                    {
+                        Name = name,
+                        Type = type != null ? type.Name : "GameObject",
+                        Namespace = type?.Namespace ?? string.Empty,
+                        SourceObject = (UnityEngine.Object)behaviour ?? prefab,
+                        CallSites = SourceScanner.FindCallSites(pattern),
+                    });
+                }
             }
 
             _fields = fields.OrderBy(f => f.Name).ToList();
         }
 
-        // Applies the __Alias__ convention, PascalCase, and deduplicates against already-used names.
-        private static string DeriveUniqueName(string prefabName, HashSet<string> usedNames)
+        // Strips whitespace and ensures PascalCase first letter so names are valid C# identifiers.
+        private static string Sanitize(string raw)
         {
-            string baseName = prefabName;
-            if (baseName.StartsWith("__") && baseName.EndsWith("__") && baseName.Length > 4)
-                baseName = baseName.Substring(2, baseName.Length - 4);
-            if (baseName.Length > 0)
-                baseName = char.ToUpper(baseName[0]) + baseName.Substring(1);
+            if (string.IsNullOrEmpty(raw)) return string.Empty;
+            // Strip __Alias__ markers.
+            if (raw.StartsWith("__") && raw.EndsWith("__") && raw.Length > 4)
+                raw = raw.Substring(2, raw.Length - 4);
+            raw = raw.Trim();
+            return raw.Length > 0 ? char.ToUpper(raw[0]) + raw.Substring(1) : string.Empty;
+        }
 
+        // Appends an integer suffix until the name is unique within usedNames.
+        private static string DeriveUniqueName(string baseName, HashSet<string> usedNames)
+        {
             string name = baseName;
             int suffix = 2;
             while (usedNames.Contains(name))

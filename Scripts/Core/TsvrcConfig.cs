@@ -18,9 +18,5 @@ namespace Tsvrc.Core
         [Tooltip("TsvrcBehaviours that are constructed directly in the scene (always active, not pooled). TsConstruct(_ts) is called on each during startup.")]
         public TsvrcBehaviour[] TsvrcBehaviourConstruct;
 
-        [Tooltip("Disk prefab assets to register as factories. For each entry a Create{Name}(Transform parent) method is generated on CompiledTsvrc that instantiates a new copy at runtime. " +
-                 "WARNING: runtime-instantiated objects are NOT assigned a VRChat network ID, they cannot send or receive VRC network events " +
-                 "(e.g. OnDeserialization, SendCustomNetworkEvent, OnPlayerJoined). For networked objects use the Pool instead.")]
-        public GameObject[] FactoryPrefabs;
     }
 }
