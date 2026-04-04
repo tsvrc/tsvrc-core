@@ -7,10 +7,11 @@ namespace Tsvrc.Player
         /// <summary>
         /// Gets a unique identifier for the player.
         /// This is not the playerId used by VRC, but a custom identifier.
+        /// Format: displayName#playerId
         /// </summary>
         public static string GetPlayerID(VRCPlayerApi player)
         {
-            return player.displayName;
+            return player.displayName + "#" + player.playerId;
         }
 
         /// <summary>
