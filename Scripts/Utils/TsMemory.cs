@@ -12,111 +12,65 @@ namespace Tsvrc.Utils
     {
         private DataDictionary _store = new DataDictionary();
 
-        // ---- Write ----
+        #region  Write
 
-        /// <summary>Overwrites the value at <paramref name="key"/> unconditionally.</summary>
+        /// <summary>Writes <paramref name="value"/> at <paramref name="key"/>, overwriting any existing value.</summary>
         public void Set(string key, DataToken value)
         {
             _store[key] = value;
         }
 
-        public void SetString(string key, string value)
-        {
-            _store[key] = new DataToken(value);
-        }
-
-        public void SetInt(string key, int value)
-        {
-            _store[key] = new DataToken(value);
-        }
-
-        public void SetFloat(string key, float value)
-        {
-            _store[key] = new DataToken(value);
-        }
-
-        public void SetBool(string key, bool value)
-        {
-            _store[key] = new DataToken(value);
-        }
-
-        public void SetDict(string key, DataDictionary value)
-        {
-            _store[key] = new DataToken(value);
-        }
-
-        // ---- Register (write-once) ----
-
         /// <summary>
-        /// Registers a new key. Logs an error if the key already exists — use <see cref="Set"/> to overwrite intentionally.
+        /// Writes <paramref name="value"/> at <paramref name="key"/> only if the key does not exist yet.
+        /// Logs an error if the key is already present. Use <see cref="Set"/> to overwrite intentionally.
         /// </summary>
-        public void Register(string key, DataToken value)
+        public void Add(string key, DataToken value)
         {
             if (_store.ContainsKey(key))
             {
-                Debug.LogError($"[TsMemory] Key '{key}' is already registered. Use Set to overwrite.");
+                Debug.LogError($"[TsMemory] Key '{key}' already exists. Use Set to overwrite.");
                 return;
             }
             _store[key] = value;
         }
 
-        public void RegisterDict(string key, DataDictionary value)
-        {
-            Register(key, new DataToken(value));
-        }
+        #endregion
 
-        // ---- Read ----
+        #region Read
 
-        public bool Has(string key)
-        {
-            return _store.ContainsKey(key);
-        }
+        public bool Has(string key) => _store.ContainsKey(key);
 
-        /// <summary>Returns the raw <see cref="DataToken"/>. Check <c>TokenType</c> before accessing a typed property.</summary>
-        public DataToken Get(string key)
-        {
-            return _store[key];
-        }
+        /// <summary>Returns the raw <see cref="DataToken"/>. Check <c>TokenType</c> before using a typed accessor.</summary>
+        public DataToken Get(string key) => _store[key];
 
-        public string GetString(string key, string defaultVal = "")
-        {
-            return Has(key) ? _store[key].String : defaultVal;
-        }
+        /// <summary>Returns the string value at <paramref name="key"/>.</summary>
+        public string GetString(string key) => _store[key].String;
 
-        /// <summary>Reads the value as int. Safe after JSON roundtrip (stored doubles are cast).</summary>
-        public int GetInt(string key, int defaultVal = 0)
-        {
-            return Has(key) ? (int)_store[key].Double : defaultVal;
-        }
+        /// <summary>Returns the value at <paramref name="key"/> as int. Cast-safe after JSON roundtrip.</summary>
+        public int GetInt(string key) => (int)_store[key].Double;
 
-        /// <summary>Reads the value as float. Safe after JSON roundtrip (stored doubles are cast).</summary>
-        public float GetFloat(string key, float defaultVal = 0f)
-        {
-            return Has(key) ? (float)_store[key].Double : defaultVal;
-        }
+        /// <summary>Returns the value at <paramref name="key"/> as float. Cast-safe after JSON roundtrip.</summary>
+        public float GetFloat(string key) => (float)_store[key].Double;
 
-        public bool GetBool(string key, bool defaultVal = false)
-        {
-            return Has(key) ? _store[key].Boolean : defaultVal;
-        }
+        /// <summary>Returns the bool value at <paramref name="key"/>.</summary>
+        public bool GetBool(string key) => _store[key].Boolean;
 
-        /// <summary>Returns the nested <see cref="DataDictionary"/>, or <c>null</c> if the key is absent.</summary>
-        public DataDictionary GetDict(string key)
-        {
-            return Has(key) ? _store[key].DataDictionary : null;
-        }
+        /// <summary>Returns the nested <see cref="DataDictionary"/> at <paramref name="key"/>.</summary>
+        public DataDictionary GetDict(string key) => _store[key].DataDictionary;
 
-        // ---- Manage ----
+        /// <summary>Returns the nested <see cref="DataList"/> at <paramref name="key"/>.</summary>
+        public DataList GetList(string key) => _store[key].DataList;
 
-        public void Remove(string key)
-        {
-            _store.Remove(key);
-        }
+        #endregion
 
-        public void Clear()
-        {
-            _store.Clear();
-        }
+        #region Manage
 
+        /// <summary>Removes the entry at <paramref name="key"/>. No-op if the key does not exist.</summary>
+        public void Remove(string key) => _store.Remove(key);
+
+        /// <summary>Removes all entries from the store.</summary>
+        public void Clear() => _store.Clear();
+
+        #endregion
     }
 }
