@@ -13,6 +13,16 @@ namespace Tsvrc.Utils
     /// Use <see cref="Register"/> before <see cref="Add"/> to declare a key's behavior.
     /// Unregistered keys are ephemeral. Access via <c>_ts.Memory</c>.
     /// </summary>
+    /// <remarks>
+    /// <b>PlayerData size limit:</b> VRChat allows 100 KB of PlayerData per player per world.
+    /// VRChat compresses data before storing it, so easily compressible data may exceed 100 KB uncompressed.
+    /// If the limit is exceeded, VRChat logs an error and the write is silently dropped — no exception is thrown.
+    /// Keep persistent values small and avoid storing large strings, dicts, or lists.<br/><br/>
+    /// <b>OnPlayerLeft restriction:</b> VRChat cannot commit PlayerData writes that happen inside
+    /// <c>OnPlayerLeft</c>. Avoid calling <see cref="Set"/> on persistent keys inside that event.<br/><br/>
+    /// <b>World scope:</b> Persistent data is scoped to this world and cannot be shared between different worlds.<br/><br/>
+    /// <b>Reference:</b> <see href="https://creators.vrchat.com/worlds/udon/persistence/">VRChat Persistence docs</see>
+    /// </remarks>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsMemory : TsvrcBehaviour
     {
