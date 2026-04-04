@@ -25,7 +25,7 @@ namespace Tsvrc.Editor
         {
             w.Region("Memory");
             w.Summary("Built-in local key-value store. Access via <c>_ts.Memory</c>.");
-            w.Line("[SerializeField] public TsMemory Memory;");
+            w.Line("[ReadOnly] [SerializeField] public TsMemory Memory;");
             w.EndRegion();
         }
 

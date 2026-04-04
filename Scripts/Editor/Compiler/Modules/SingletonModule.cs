@@ -43,7 +43,7 @@ namespace Tsvrc.Editor
                 if (field.CallSites.Count == 0)
                     w.Line($"public {field.Type} {field.Name} {{ get {{ Debug.LogError(\"{TsvrcCodeGen.NullFieldMessage(field.Name)}\"); return null; }} }}");
                 else
-                    w.Line($"[SerializeField] public {field.Type} {field.Name};");
+                    w.Line($"[HideInInspector] [SerializeField] public {field.Type} {field.Name};");
             }
             w.EndRegion();
         }

@@ -35,7 +35,7 @@ namespace Tsvrc.Editor
             if (_fields.Count == 0) return;
             w.Region("Constructs");
             foreach (var field in _fields)
-                w.Line($"[SerializeField] private {field.Type} {PrivateFieldName(field)};");
+                w.Line($"[HideInInspector] [SerializeField] private {field.Type} {PrivateFieldName(field)};");
             w.EndRegion();
         }
 

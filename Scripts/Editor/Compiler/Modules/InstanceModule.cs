@@ -60,7 +60,7 @@ namespace Tsvrc.Editor
         internal override void WriteFields(CsWriter w)
         {
             if (_field == null) return;
-            w.Line($"[SerializeField] private {_field.Type} _coreTsvrcInstance;");
+            w.Line($"[ReadOnly] [SerializeField] private {_field.Type} _coreTsvrcInstance;");
         }
 
         internal override void WriteStartBody(CsWriter w)

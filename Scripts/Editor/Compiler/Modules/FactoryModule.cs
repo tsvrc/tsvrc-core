@@ -109,7 +109,7 @@ namespace Tsvrc.Editor
             w.Region("Factories");
             foreach (var field in _fields)
                 if (field.CallSites.Count > 0)
-                    w.Line($"[SerializeField] private GameObject {FieldName(field.Name)};");
+                    w.Line($"[HideInInspector] [SerializeField] private GameObject {FieldName(field.Name)};");
             w.EndRegion();
         }
 

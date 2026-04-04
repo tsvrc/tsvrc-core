@@ -56,7 +56,7 @@ namespace Tsvrc.Editor
 
         private static SortedSet<string> CollectUsings(List<TsvrcModule> modules)
         {
-            var usings = new SortedSet<string> { "UdonSharp", "UnityEngine" };
+            var usings = new SortedSet<string> { "Tsvrc.Utils", "UdonSharp", "UnityEngine" };
             foreach (var module in modules)
                 foreach (var ns in module.GetUsings())
                     if (!string.IsNullOrEmpty(ns))
