@@ -1,75 +1,319 @@
 using Tsvrc.Core;
+using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.Data;
+using VRC.SDK3.Persistence;
+using VRC.SDKBase;
 
 namespace Tsvrc.Utils
 {
     /// <summary>
-    /// Local key-value memory store backed by a <see cref="DataDictionary"/>.
-    /// Register as a Tsvrc singleton to access via <c>_ts.Memory</c>.
+    /// Unified key-value memory store with three isolated tiers: ephemeral, persistent, and synced.
+    /// Tiers are exclusive: a key is either ephemeral, persistent, or synced, never a combination.
+    /// Use <see cref="Register"/> before <see cref="Add"/> to declare a key's behavior.
+    /// Unregistered keys are ephemeral. Access via <c>_ts.Memory</c>.
     /// </summary>
+    [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsMemory : TsvrcBehaviour
     {
+        // Flag values. Stored as double in _registry to survive DataToken roundtrip.
+        private const int FLAG_PERSIST = 1;
+        private const int FLAG_SYNCED = 2;
+
+        // Type codes. Stored as double in _types for the same reason.
+        private const int TYPE_STRING = 1;
+        private const int TYPE_BOOL = 2;
+        private const int TYPE_FLOAT = 3;
+        private const int TYPE_INT = 4;
+        private const int TYPE_DOUBLE = 5;
+        private const int TYPE_DICT = 6;
+        private const int TYPE_LIST = 7;
+
+        /// <summary>Ephemeral store. Local only, cleared on world exit.</summary>
         private DataDictionary _store = new DataDictionary();
 
-        #region  Write
+        /// <summary>Persistent store. Local cache backed by PlayerData.</summary>
+        private DataDictionary _persistStore = new DataDictionary();
 
-        /// <summary>Writes <paramref name="value"/> at <paramref name="key"/>, overwriting any existing value.</summary>
+        /// <summary>
+        /// Synced store. Replicated to all players.
+        /// DataDictionary is not a supported UdonSynced type, so it is serialized to <see cref="_syncedJson"/>.
+        /// </summary>
+        private DataDictionary _syncedStore = new DataDictionary();
+        [UdonSynced] private string _syncedJson = "{}";
+
+        /// <summary>Maps key to flag as double (1=persist, 2=synced). Only registered keys are present.</summary>
+        private DataDictionary _registry = new DataDictionary();
+
+        /// <summary>Maps key to type code as double. Populated for all persist-registered keys.</summary>
+        private DataDictionary _types = new DataDictionary();
+
+        private bool _playerRestored;
+
+        /// <summary>True after the local player's saved data has been loaded via <c>OnPlayerRestored</c>.</summary>
+        public bool IsPlayerRestored => _playerRestored;
+
+        #region Register
+
+        /// <summary>
+        /// Declares the storage tier for <paramref name="key"/>. Must be called before <see cref="Add"/>.
+        /// Tiers are exclusive: a key is either persistent or synced, not both.
+        /// Unregistered keys are ephemeral. Logs an error if the key is already registered.
+        /// </summary>
+        /// <param name="persist">Value survives sessions via PlayerData (local player only).</param>
+        /// <param name="synced">Value is replicated to all players. Mutually exclusive with persist.</param>
+        public void Register(string key, bool persist, bool synced)
+        {
+            if (_registry.ContainsKey(key))
+            {
+                Debug.LogError($"[TsMemory] Key '{key}' is already registered.");
+                return;
+            }
+
+            if (persist && synced)
+            {
+                Debug.LogError($"[TsMemory] Key '{key}': persist and synced are mutually exclusive.");
+                return;
+            }
+
+            if (!persist && !synced)
+            {
+                Debug.LogError($"[TsMemory] Key '{key}': Register called with no tier. Unregistered keys are already ephemeral.");
+                return;
+            }
+
+            int flags = synced ? FLAG_SYNCED : FLAG_PERSIST;
+            _registry[key] = new DataToken((double)flags);
+        }
+
+        #endregion
+
+        #region Write
+
+        /// <summary>
+        /// Writes <paramref name="value"/> at <paramref name="key"/>, overwriting any existing value.
+        /// For synced keys, ownership is transferred to the local player if not already owner.
+        /// </summary>
         public void Set(string key, DataToken value)
         {
-            _store[key] = value;
+            int flags = _Flags(key);
+
+            if (_IsSynced(flags) && !Networking.IsOwner(gameObject))
+                Networking.SetOwner(Networking.LocalPlayer, gameObject);
+
+            _Store(flags)[key] = value;
+            _UpdateType(key, flags, value);
+            if (_IsPersist(flags)) _WriteToPd(key, value);
+            if (_IsSynced(flags)) _Serialize();
         }
 
         /// <summary>
-        /// Writes <paramref name="value"/> at <paramref name="key"/> only if the key does not exist yet.
-        /// Logs an error if the key is already present. Use <see cref="Set"/> to overwrite intentionally.
+        /// Sets the default for <paramref name="key"/> if it has no value yet.
+        /// Logs an error if the key already has a value. Use <see cref="Set"/> to overwrite.
+        /// For synced keys, silently skips if the network has already populated the key.
+        /// Does not write to PlayerData. <c>OnPlayerRestored</c> will override with saved data.
         /// </summary>
         public void Add(string key, DataToken value)
         {
-            if (_store.ContainsKey(key))
+            int flags = _Flags(key);
+            DataDictionary store = _Store(flags);
+            if (store.ContainsKey(key))
             {
-                Debug.LogError($"[TsMemory] Key '{key}' already exists. Use Set to overwrite.");
+                if (!_IsSynced(flags))
+                    Debug.LogError($"[TsMemory] Key '{key}' already exists. Use Set to overwrite.");
                 return;
             }
-            _store[key] = value;
+            store[key] = value;
+            _UpdateType(key, flags, value);
         }
 
         #endregion
 
         #region Read
 
-        public bool Has(string key) => _store.ContainsKey(key);
+        /// <summary>Returns true if the key has a value in its store.</summary>
+        public bool Has(string key) => _Store(_Flags(key)).ContainsKey(key);
 
-        /// <summary>Returns the raw <see cref="DataToken"/>. Check <c>TokenType</c> before using a typed accessor.</summary>
-        public DataToken Get(string key) => _store[key];
+        /// <summary>Returns the raw <see cref="DataToken"/>.</summary>
+        public DataToken Get(string key) => _Store(_Flags(key))[key];
 
         /// <summary>Returns the string value at <paramref name="key"/>.</summary>
-        public string GetString(string key) => _store[key].String;
+        public string GetString(string key) => _Store(_Flags(key))[key].String;
 
-        /// <summary>Returns the value at <paramref name="key"/> as int. Cast-safe after JSON roundtrip.</summary>
-        public int GetInt(string key) => (int)_store[key].Double;
+        /// <summary>Returns the value at <paramref name="key"/> as int.</summary>
+        public int GetInt(string key)
+        {
+            DataToken t = _Store(_Flags(key))[key];
+            return t.TokenType == TokenType.Int ? t.Int : (int)t.Double;
+        }
 
-        /// <summary>Returns the value at <paramref name="key"/> as float. Cast-safe after JSON roundtrip.</summary>
-        public float GetFloat(string key) => (float)_store[key].Double;
+        /// <summary>Returns the value at <paramref name="key"/> as float.</summary>
+        public float GetFloat(string key)
+        {
+            DataToken t = _Store(_Flags(key))[key];
+            return t.TokenType == TokenType.Float ? t.Float : (float)t.Double;
+        }
 
         /// <summary>Returns the bool value at <paramref name="key"/>.</summary>
-        public bool GetBool(string key) => _store[key].Boolean;
+        public bool GetBool(string key) => _Store(_Flags(key))[key].Boolean;
 
         /// <summary>Returns the nested <see cref="DataDictionary"/> at <paramref name="key"/>.</summary>
-        public DataDictionary GetDict(string key) => _store[key].DataDictionary;
+        public DataDictionary GetDict(string key) => _Store(_Flags(key))[key].DataDictionary;
 
         /// <summary>Returns the nested <see cref="DataList"/> at <paramref name="key"/>.</summary>
-        public DataList GetList(string key) => _store[key].DataList;
+        public DataList GetList(string key) => _Store(_Flags(key))[key].DataList;
 
         #endregion
 
         #region Manage
 
-        /// <summary>Removes the entry at <paramref name="key"/>. No-op if the key does not exist.</summary>
-        public void Remove(string key) => _store.Remove(key);
+        /// <summary>
+        /// Removes <paramref name="key"/> from its store.
+        /// The key's registration is preserved, so <see cref="Add"/> can be called again without re-registering.
+        /// For synced keys, ownership is transferred to the local player if not already owner.
+        /// Note: PlayerData keys cannot be deleted. Only the local persist cache is cleared.
+        /// </summary>
+        public void Remove(string key)
+        {
+            int flags = _Flags(key);
 
-        /// <summary>Removes all entries from the store.</summary>
-        public void Clear() => _store.Clear();
+            if (_IsSynced(flags))
+            {
+                if (!_syncedStore.ContainsKey(key)) return;
+                if (!Networking.IsOwner(gameObject))
+                    Networking.SetOwner(Networking.LocalPlayer, gameObject);
+            }
+
+            if (_IsPersist(flags))
+                Debug.LogWarning($"[TsMemory] '{key}' is persistent. PlayerData cannot be deleted; local cache cleared.");
+
+            _Store(flags).Remove(key);
+            _types.Remove(key);
+            if (_IsSynced(flags)) _Serialize();
+        }
+
+        /// <summary>
+        /// Clears all values from all stores. PlayerData is not affected.
+        /// Key registrations in <see cref="Register"/> are preserved after clear.
+        /// </summary>
+        public void Clear()
+        {
+            _store.Clear();
+            _persistStore.Clear();
+            _types.Clear();
+
+            if (_syncedStore.Count == 0) return;
+
+            if (!Networking.IsOwner(gameObject))
+                Networking.SetOwner(Networking.LocalPlayer, gameObject);
+
+            _syncedStore.Clear();
+            _Serialize();
+        }
+
+        #endregion
+
+        #region Sync
+
+        public override void OnDeserialization()
+        {
+            DataToken result = TsJson.DeserializeToken(_syncedJson);
+            if (result.TokenType == TokenType.DataDictionary)
+                _syncedStore = result.DataDictionary;
+        }
+
+        public override void OnPlayerRestored(VRCPlayerApi player)
+        {
+            if (!player.isLocal) return;
+            _playerRestored = true;
+
+            DataList keys = _registry.GetKeys();
+            for (int i = 0; i < keys.Count; i++)
+            {
+                string key = keys[i].String;
+                int flags = (int)_registry[key].Double;
+                if (!_IsPersist(flags) || !PlayerData.HasKey(player, key)) continue;
+
+                if (!_types.ContainsKey(key))
+                {
+                    Debug.LogWarning($"[TsMemory] Cannot restore '{key}' from PlayerData: type unknown. Call Add or Set before OnPlayerRestored.");
+                    continue;
+                }
+
+                _persistStore[key] = _LoadFromPd(player, key);
+            }
+        }
+
+        #endregion
+
+        #region Private
+
+        private int _Flags(string key) =>
+            _registry.ContainsKey(key) ? (int)_registry[key].Double : 0;
+
+        private DataDictionary _Store(int flags) =>
+            _IsPersist(flags) ? _persistStore :
+            _IsSynced(flags) ? _syncedStore :
+            _store;
+
+        private bool _IsPersist(int flags) => flags == FLAG_PERSIST;
+        private bool _IsSynced(int flags) => flags == FLAG_SYNCED;
+
+        private void _UpdateType(string key, int flags, DataToken value)
+        {
+            if (_IsPersist(flags))
+                _types[key] = new DataToken((double)_TypeCode(value));
+        }
+
+        private void _Serialize()
+        {
+            _syncedJson = TsJson.Serialize(_syncedStore);
+            RequestSerialization();
+        }
+
+        private int _TypeCode(DataToken value)
+        {
+            if (value.TokenType == TokenType.String) return TYPE_STRING;
+            if (value.TokenType == TokenType.Boolean) return TYPE_BOOL;
+            if (value.TokenType == TokenType.Float) return TYPE_FLOAT;
+            if (value.TokenType == TokenType.Int) return TYPE_INT;
+            if (value.TokenType == TokenType.DataDictionary) return TYPE_DICT;
+            if (value.TokenType == TokenType.DataList) return TYPE_LIST;
+            return TYPE_DOUBLE;
+        }
+
+        private void _WriteToPd(string key, DataToken value)
+        {
+            if (!_playerRestored)
+            {
+                Debug.LogWarning($"[TsMemory] Set('{key}') before OnPlayerRestored. Value will not be saved to PlayerData.");
+                return;
+            }
+            switch ((int)_types[key].Double)
+            {
+                case TYPE_STRING: PlayerData.SetString(key, value.String); break;
+                case TYPE_BOOL: PlayerData.SetBool(key, value.Boolean); break;
+                case TYPE_FLOAT: PlayerData.SetFloat(key, value.Float); break;
+                case TYPE_INT: PlayerData.SetInt(key, value.Int); break;
+                case TYPE_DICT:
+                case TYPE_LIST: PlayerData.SetString(key, TsJson.SerializeToken(value)); break;
+                default: PlayerData.SetDouble(key, value.Double); break;
+            }
+        }
+
+        private DataToken _LoadFromPd(VRCPlayerApi player, string key)
+        {
+            switch ((int)_types[key].Double)
+            {
+                case TYPE_STRING: return new DataToken(PlayerData.GetString(player, key));
+                case TYPE_BOOL: return new DataToken(PlayerData.GetBool(player, key));
+                case TYPE_FLOAT: return new DataToken(PlayerData.GetFloat(player, key));
+                case TYPE_INT: return new DataToken(PlayerData.GetInt(player, key));
+                case TYPE_DICT:
+                case TYPE_LIST: return TsJson.DeserializeToken(PlayerData.GetString(player, key));
+                default: return new DataToken(PlayerData.GetDouble(player, key));
+            }
+        }
 
         #endregion
     }
