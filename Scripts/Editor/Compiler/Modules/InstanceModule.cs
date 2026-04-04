@@ -60,24 +60,24 @@ namespace Tsvrc.Editor
         internal override void WriteFields(CsWriter w)
         {
             if (_field == null) return;
-            w.Line($"[SerializeField] private {_field.Type} _core_tsvrc_instance;");
+            w.Line($"[SerializeField] private {_field.Type} _coreTsvrcInstance;");
         }
 
         internal override void WriteStartBody(CsWriter w)
         {
             if (_field == null) return;
-            w.Line("_core_tsvrc_instance.TsConstruct(this);");
-            w.Line("_core_tsvrc_instance.OnInstanceStart();");
+            w.Line("_coreTsvrcInstance.TsConstruct(this);");
+            w.Line("_coreTsvrcInstance.OnInstanceStart();");
         }
 
         internal override void Wire(SerializedObject target)
         {
             if (_field == null) return;
 
-            var prop = target.FindProperty("_core_tsvrc_instance");
+            var prop = target.FindProperty("_coreTsvrcInstance");
             if (prop == null)
             {
-                Debug.LogWarning("[TsvrcWirer] '_core_tsvrc_instance' property not found on CompiledTsvrc.");
+                Debug.LogWarning("[TsvrcWirer] '_coreTsvrcInstance' property not found on CompiledTsvrc.");
                 return;
             }
 
