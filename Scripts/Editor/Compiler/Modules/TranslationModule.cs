@@ -164,6 +164,9 @@ namespace Tsvrc.Editor
             if (_targets.Count > 0)
                 w.Line($"[HideInInspector] [SerializeField] private TMPro.TextMeshProUGUI[] _translationTargets;");
 
+            // Cached entries for the active language (used by Translate)
+            w.Line("private VRC.SDK3.Data.DataDictionary _currentEntries;");
+
             w.EndRegion();
         }
 
@@ -179,6 +182,7 @@ namespace Tsvrc.Editor
                 w.Line("VRC.SDK3.Data.DataToken _tsLang;");
                 w.Line("if (!_tsRoot.DataDictionary.TryGetValue(_languageKeys[(int)lang], out _tsLang)) { Debug.LogError($\"[CompiledTsvrc] Language key not found: {_languageKeys[(int)lang]}\"); return; }");
                 w.Line("var _tsEntries = _tsLang.DataDictionary;");
+                w.Line("_currentEntries = _tsEntries;");
                 w.Line("VRC.SDK3.Data.DataToken _tsVal;");
 
                 if (_targets.Count > 0)
@@ -189,6 +193,14 @@ namespace Tsvrc.Editor
                         w.Line("    _tsTmp.text = _tsVal.String;");
                     }
                 }
+            }
+
+            using (w.Method("public string Translate(string key, string param)"))
+            {
+                w.Line("if (_currentEntries == null) { Debug.LogWarning(\"[CompiledTsvrc] Translate called before SetLanguage.\"); return key; }");
+                w.Line("VRC.SDK3.Data.DataToken _tsVal;");
+                w.Line("if (!_currentEntries.TryGetValue(key, out _tsVal)) return key;");
+                w.Line("return _tsVal.String.Replace(\"{value}\", param);");
             }
         }
 
