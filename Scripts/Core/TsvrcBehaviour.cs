@@ -93,6 +93,9 @@ namespace Tsvrc.Core
         public virtual void TsRelease()
         {
             _isConstructed = false;
+            _eventListeners = new UdonSharpBehaviour[0];
+            _eventKeys = new string[0];
+            _eventCallbacks = new string[0];
         }
 
         /// <summary>
