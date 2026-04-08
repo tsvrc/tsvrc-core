@@ -19,6 +19,7 @@ namespace Tsvrc.Editor
 
             foreach (var obj in objects)
             {
+                if (obj == null) { Debug.LogWarning("[TsvrcResolver] Null entry in config — remove the missing-script slot from TsvrcConfig and recompile."); continue; }
                 Type type = obj.GetType();
 
                 string goName = "";

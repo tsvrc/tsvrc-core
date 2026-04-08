@@ -49,8 +49,11 @@ namespace Tsvrc.Editor
                     ? string.Empty
                     : Sanitize(group.GroupName);
 
-                foreach (var prefab in group.Prefabs)
+                foreach (var obj in group.Prefabs)
                 {
+                    if (obj == null) continue;
+
+                    var prefab = obj is Component c ? c.gameObject : obj as GameObject;
                     if (prefab == null) continue;
 
                     var behaviour = prefab.GetComponent<TsvrcBehaviour>();
@@ -144,7 +147,7 @@ namespace Tsvrc.Editor
                     {
                         w.Line($"var go = (GameObject)Instantiate({FieldName(field.Name)}, parent);");
                         w.Line("if (go == null) return null;");
-                        w.Line($"var instance = ({field.Type})go.GetComponent(typeof({field.Type}));");
+                        w.Line($"var instance = go.GetComponent<{field.Type}>();");
                         if (field.SourceObject is TsvrcBehaviour)
                             w.Line("if (instance != null) instance.TsConstruct(this);");
                         w.Line("return instance;");
