@@ -23,6 +23,7 @@ namespace Tsvrc.Core
 
         private UdonSharpBehaviour[] _eventListeners = new UdonSharpBehaviour[0];
         private string[] _eventKeys = new string[0];
+        private string[] _eventCallbacks = new string[0];
 
         /// <summary>
         /// Constructs this behaviour with the given <see cref="CompiledTsvrc"/>.
@@ -53,25 +54,30 @@ namespace Tsvrc.Core
         #region Events
 
         /// <summary>
-        /// Registers <paramref name="target"/> to receive a <see cref="UdonSharpBehaviour.SendCustomEvent"/> call
-        /// with <paramref name="eventName"/> as the method name whenever that event is emitted.
-        /// Use <c>nameof()</c> for <paramref name="eventName"/> to avoid magic strings.
+        /// Registers <paramref name="listener"/> to receive a <see cref="UdonSharpBehaviour.SendCustomEvent"/> call
+        /// with <paramref name="callbackName"/> as the method name whenever <paramref name="eventName"/> is emitted.
+        /// Use <c>nameof()</c> for both parameters to avoid magic strings.
         /// </summary>
-        public void TsSubscribe(UdonSharpBehaviour target, string eventName)
+        public void TsSubscribe(UdonSharpBehaviour listener, string eventName, string callbackName)
         {
-            _eventListeners = TsArray.Add(_eventListeners, new UdonSharpBehaviour[] { target });
+            _eventListeners = TsArray.Add(_eventListeners, new UdonSharpBehaviour[] { listener });
             _eventKeys = TsArray.Add(_eventKeys, new string[] { eventName });
+            _eventCallbacks = TsArray.Add(_eventCallbacks, new string[] { callbackName });
         }
 
         /// <summary>
         /// Emits <paramref name="eventName"/> to all registered listeners via
-        /// <see cref="UdonSharpBehaviour.SendCustomEvent"/>.
+        /// <see cref="UdonSharpBehaviour.SendCustomEvent"/>, invoking each listener's registered callback.
         /// </summary>
         public void TsEmit(string eventName)
         {
-            for (int i = 0; i < _eventListeners.Length; i++)
-                if (_eventKeys[i] == eventName)
-                    _eventListeners[i].SendCustomEvent(eventName);
+            UdonSharpBehaviour[] listeners = _eventListeners;
+            string[] keys = _eventKeys;
+            string[] callbacks = _eventCallbacks;
+            int len = listeners.Length;
+            for (int i = 0; i < len; i++)
+                if (keys[i] == eventName)
+                    listeners[i].SendCustomEvent(callbacks[i]);
         }
 
         #endregion
