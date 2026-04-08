@@ -1,77 +1,102 @@
+using UdonSharp;
+
 namespace Tsvrc.Utils
 {
     public class TsArray
     {
-        public static string[] Add(string[] originalArray, string[] stringsToAdd)
+        public static string[] Add(string[] original, string[] items)
         {
-            string[] result = new string[originalArray.Length + stringsToAdd.Length];
-
-            for (int i = 0; i < originalArray.Length; i++)
-            {
-                result[i] = originalArray[i];
-            }
-
-            for (int i = 0; i < stringsToAdd.Length; i++)
-            {
-                result[originalArray.Length + i] = stringsToAdd[i];
-            }
-
+            int originalLen = original.Length;
+            int itemsLen = items.Length;
+            string[] result = new string[originalLen + itemsLen];
+            for (int i = 0; i < originalLen; i++)
+                result[i] = original[i];
+            for (int i = 0; i < itemsLen; i++)
+                result[originalLen + i] = items[i];
             return result;
         }
 
-        public static string[] Remove(string[] originalArray, string[] stringsToRemove)
+        public static string[] Remove(string[] original, string[] items)
         {
+            int originalLen = original.Length;
+            int itemsLen = items.Length;
             int count = 0;
-
-            for (int i = 0; i < originalArray.Length; i++)
+            bool shouldRemove;
+            string current;
+            for (int i = 0; i < originalLen; i++)
             {
-                bool shouldRemove = false;
-                for (int j = 0; j < stringsToRemove.Length; j++)
-                {
-                    if (originalArray[i] == stringsToRemove[j])
-                    {
-                        shouldRemove = true;
-                        break;
-                    }
-                }
-                if (!shouldRemove)
-                {
-                    count++;
-                }
+                shouldRemove = false;
+                current = original[i];
+                for (int j = 0; j < itemsLen; j++)
+                    if (current == items[j]) { shouldRemove = true; break; }
+                if (!shouldRemove) count++;
             }
-
             string[] result = new string[count];
             int index = 0;
-
-            for (int i = 0; i < originalArray.Length; i++)
+            for (int i = 0; i < originalLen; i++)
             {
-                bool shouldRemove = false;
-                for (int j = 0; j < stringsToRemove.Length; j++)
-                {
-                    if (originalArray[i] == stringsToRemove[j])
-                    {
-                        shouldRemove = true;
-                        break;
-                    }
-                }
-                if (!shouldRemove)
-                {
-                    result[index++] = originalArray[i];
-                }
+                shouldRemove = false;
+                current = original[i];
+                for (int j = 0; j < itemsLen; j++)
+                    if (current == items[j]) { shouldRemove = true; break; }
+                if (!shouldRemove) result[index++] = current;
             }
-
             return result;
         }
 
         public static bool Contains(string[] array, string value)
         {
-            for (int i = 0; i < array.Length; i++)
+            int len = array.Length;
+            for (int i = 0; i < len; i++)
+                if (array[i] == value) return true;
+            return false;
+        }
+
+        public static UdonSharpBehaviour[] Add(UdonSharpBehaviour[] original, UdonSharpBehaviour[] items)
+        {
+            int originalLen = original.Length;
+            int itemsLen = items.Length;
+            UdonSharpBehaviour[] result = new UdonSharpBehaviour[originalLen + itemsLen];
+            for (int i = 0; i < originalLen; i++)
+                result[i] = original[i];
+            for (int i = 0; i < itemsLen; i++)
+                result[originalLen + i] = items[i];
+            return result;
+        }
+
+        public static UdonSharpBehaviour[] Remove(UdonSharpBehaviour[] original, UdonSharpBehaviour[] items)
+        {
+            int originalLen = original.Length;
+            int itemsLen = items.Length;
+            int count = 0;
+            bool shouldRemove;
+            UdonSharpBehaviour current;
+            for (int i = 0; i < originalLen; i++)
             {
-                if (array[i] == value)
-                {
-                    return true;
-                }
+                shouldRemove = false;
+                current = original[i];
+                for (int j = 0; j < itemsLen; j++)
+                    if (current == items[j]) { shouldRemove = true; break; }
+                if (!shouldRemove) count++;
             }
+            UdonSharpBehaviour[] result = new UdonSharpBehaviour[count];
+            int index = 0;
+            for (int i = 0; i < originalLen; i++)
+            {
+                shouldRemove = false;
+                current = original[i];
+                for (int j = 0; j < itemsLen; j++)
+                    if (current == items[j]) { shouldRemove = true; break; }
+                if (!shouldRemove) result[index++] = current;
+            }
+            return result;
+        }
+
+        public static bool Contains(UdonSharpBehaviour[] array, UdonSharpBehaviour value)
+        {
+            int len = array.Length;
+            for (int i = 0; i < len; i++)
+                if (array[i] == value) return true;
             return false;
         }
     }
