@@ -1,4 +1,5 @@
 using Tsvrc.Core.Compiled;
+using Tsvrc.Utils;
 using UdonSharp;
 using UnityEngine;
 
@@ -19,6 +20,9 @@ namespace Tsvrc.Core
 
         private bool _isConstructed = false;
         public bool IsConstructed => _isConstructed;
+
+        private UdonSharpBehaviour[] _eventListeners = new UdonSharpBehaviour[0];
+        private string[] _eventKeys = new string[0];
 
         /// <summary>
         /// Constructs this behaviour with the given <see cref="CompiledTsvrc"/>.
@@ -45,6 +49,32 @@ namespace Tsvrc.Core
         {
             TsConstruct(parent._ts);
         }
+
+        #region Events
+
+        /// <summary>
+        /// Registers <paramref name="target"/> to receive a <see cref="UdonSharpBehaviour.SendCustomEvent"/> call
+        /// with <paramref name="eventName"/> as the method name whenever that event is emitted.
+        /// Use <c>nameof()</c> for <paramref name="eventName"/> to avoid magic strings.
+        /// </summary>
+        public void TsSubscribe(UdonSharpBehaviour target, string eventName)
+        {
+            _eventListeners = TsArray.Add(_eventListeners, new UdonSharpBehaviour[] { target });
+            _eventKeys = TsArray.Add(_eventKeys, new string[] { eventName });
+        }
+
+        /// <summary>
+        /// Emits <paramref name="eventName"/> to all registered listeners via
+        /// <see cref="UdonSharpBehaviour.SendCustomEvent"/>.
+        /// </summary>
+        public void TsEmit(string eventName)
+        {
+            for (int i = 0; i < _eventListeners.Length; i++)
+                if (_eventKeys[i] == eventName)
+                    _eventListeners[i].SendCustomEvent(eventName);
+        }
+
+        #endregion
 
         #region Virtual Lifecycle
 
