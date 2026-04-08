@@ -102,7 +102,7 @@ namespace Tsvrc.Editor
                     for (int i = 0; i < field.SlotCount; i++)
                     {
                         string slot = SlotFieldName(field, i);
-                        using (w.Block($"if ({slot} != null && !{slot}.IsCreated)"))
+                        using (w.Block($"if ({slot} != null && !{slot}.IsConstructed)"))
                         {
                             w.Line($"{slot}.gameObject.SetActive(true);");
                             w.Line($"{slot}.TsConstruct(this);");
