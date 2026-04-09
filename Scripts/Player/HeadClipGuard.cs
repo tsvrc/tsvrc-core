@@ -74,7 +74,7 @@ namespace Tsvrc.Player
         private bool _playerReady;  // set after first IsValid() confirmation; skips that call thereafter
         private bool _lastViolated; // whether last processed frame had a violation; bypasses movement gate
         private VRCPlayerApi _localPlayer;
-        private Vector3 _lastHeadPos;      // head position from the last processed frame; movement gate delta source
+        private Vector3 _lastHeadPos; // head position from the last processed frame; movement gate delta source
         private Vector3 _lastSafePlayerPos; // capsule position from the last non-violated frame; fallback for symmetric-push edge case
 
         #region TsvrcBehaviour Callbacks
@@ -132,28 +132,37 @@ namespace Tsvrc.Player
             Vector3 capsulePos = _localPlayer.GetPosition();
             Vector3 totalPush = Vector3.zero;
             bool violated = false;
-            int cCount = _candidateCount; // cache field to avoid repeated reads in the loop
+
+            // Cache all array references as locals; in Udon each field access is a heap lookup,
+            // so one dereference here avoids one per loop iteration across all six arrays.
+            int cCount = _candidateCount;
+            int[] candidateIndices = _candidateIndices;
+            Vector3[] aabbMin = _aabbMin;
+            Vector3[] aabbMax = _aabbMax;
+            Vector3[] centers = _centers;
+            Quaternion[] invRotations = _invRotations;
+            Vector3[] marginHalfExtents = _marginHalfExtents;
 
             for (int ci = 0; ci < cCount; ci++)
             {
-                int i = _candidateIndices[ci];
+                int i = candidateIndices[ci];
 
                 // Tight AABB pre-reject before the more expensive OBB test.
-                Vector3 mn = _aabbMin[i];
-                Vector3 mx = _aabbMax[i];
+                Vector3 mn = aabbMin[i];
+                Vector3 mx = aabbMax[i];
                 if (headPos.x < mn.x || headPos.x > mx.x ||
                     headPos.y < mn.y || headPos.y > mx.y ||
                     headPos.z < mn.z || headPos.z > mx.z)
                     continue;
 
                 // Cache per-candidate data once after the AABB pass; reused below in the push path.
-                Vector3 center = _centers[i];
-                Quaternion invRot = _invRotations[i];
+                Vector3 center = centers[i];
+                Quaternion invRot = invRotations[i];
 
                 // Full OBB + margin test.
                 // |x| > h  written as  (x > h || x < -h)  to stay within native VM comparisons.
                 Vector3 headLocal = invRot * (headPos - center);
-                Vector3 mHalf = _marginHalfExtents[i];
+                Vector3 mHalf = marginHalfExtents[i];
                 if ((headLocal.x > mHalf.x || headLocal.x < -mHalf.x) ||
                     (headLocal.y > mHalf.y || headLocal.y < -mHalf.y) ||
                     (headLocal.z > mHalf.z || headLocal.z < -mHalf.z))
@@ -322,17 +331,25 @@ namespace Tsvrc.Player
             float hyP = approxHead.y + e, hyN = approxHead.y - e;
             float hzP = approxHead.z + e, hzN = approxHead.z - e;
 
+            Vector3[] aabbMin = _aabbMin;
+            Vector3[] aabbMax = _aabbMax;
+            int[] candidateIndices = _candidateIndices;
+            int[] candidatePos = _candidatePos;
+            int cand = 0;
+
             for (int i = 0; i < _count; i++)
             {
-                Vector3 mn = _aabbMin[i];
-                Vector3 mx = _aabbMax[i];
+                Vector3 mn = aabbMin[i];
+                Vector3 mx = aabbMax[i];
                 if (hxP < mn.x || hxN > mx.x ||
                     hyP < mn.y || hyN > mx.y ||
                     hzP < mn.z || hzN > mx.z) continue;
 
-                _candidateIndices[_candidateCount] = i;
-                _candidatePos[i] = _candidateCount++;
+                candidateIndices[cand] = i;
+                candidatePos[i] = cand++;
             }
+
+            _candidateCount = cand;
         }
 
         /// <summary>
@@ -357,34 +374,43 @@ namespace Tsvrc.Player
             int end = _batchStart + _batchSize;
             if (end > count) end = count;
 
+            // Cache array references and the scalar _candidateCount as locals to avoid
+            // repeated field lookups and a final write-back for the scalar.
+            Vector3[] aabbMin = _aabbMin;
+            Vector3[] aabbMax = _aabbMax;
+            int[] candidatePos = _candidatePos;
+            int[] candidateIndices = _candidateIndices;
+            int cand = _candidateCount;
+
             for (int i = _batchStart; i < end; i++)
             {
-                Vector3 mn = _aabbMin[i];
-                Vector3 mx = _aabbMax[i];
+                Vector3 mn = aabbMin[i];
+                Vector3 mx = aabbMax[i];
                 bool near = hxP >= mn.x && hxN <= mx.x &&
                             hyP >= mn.y && hyN <= mx.y &&
                             hzP >= mn.z && hzN <= mx.z;
 
-                int cp = _candidatePos[i];
+                int cp = candidatePos[i];
                 if (near && cp < 0)
                 {
-                    _candidateIndices[_candidateCount] = i;
-                    _candidatePos[i] = _candidateCount++;
+                    candidateIndices[cand] = i;
+                    candidatePos[i] = cand++;
                 }
                 else if (!near && cp >= 0)
                 {
-                    int last = _candidateIndices[--_candidateCount];
+                    int last = candidateIndices[--cand];
                     // Guard the self-swap: when i is already the last element, last == i and
-                    // _candidatePos[last] must not be written before _candidatePos[i] = -1.
+                    // candidatePos[last] must not be written before candidatePos[i] = -1.
                     if (last != i)
                     {
-                        _candidateIndices[cp] = last;
-                        _candidatePos[last] = cp;
+                        candidateIndices[cp] = last;
+                        candidatePos[last] = cp;
                     }
-                    _candidatePos[i] = -1;
+                    candidatePos[i] = -1;
                 }
             }
 
+            _candidateCount = cand;
             _batchStart = (end >= count) ? 0 : end;
         }
 
