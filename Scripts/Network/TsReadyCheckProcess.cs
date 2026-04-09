@@ -27,15 +27,13 @@ namespace Tsvrc.Network
         /// </summary>
         public void TsConstructReadyCheckProcess()
         {
-            base.TsConstructPlayerTracker(
-                this,
-                nameof(_OnTrackingStarted),
-                nameof(_OnTrackingStopped),
-                nameof(_OnTrackingCompleted),
-                nameof(_OnTrackingDeserialization),
-                nameof(_OnTrackingPlayersAdded),
-                nameof(_OnTrackingPlayersRemoved)
-            );
+            base.TsConstructPlayerTracker();
+            TsSubscribe(this, OnTrackingStartedEvent, nameof(_OnTrackingStarted));
+            TsSubscribe(this, OnTrackingStoppedEvent, nameof(_OnTrackingStopped));
+            TsSubscribe(this, OnTrackingCompletedEvent, nameof(_OnTrackingCompleted));
+            TsSubscribe(this, OnTrackingDeserializationEvent, nameof(_OnTrackingDeserialization));
+            TsSubscribe(this, OnTrackingPlayersAddedEvent, nameof(_OnTrackingPlayersAdded));
+            TsSubscribe(this, OnTrackingPlayersRemovedEvent, nameof(_OnTrackingPlayersRemoved));
         }
 
         #region TsvrcProcess Callbacks

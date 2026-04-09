@@ -12,80 +12,43 @@ namespace Tsvrc.Network
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsPlayerTracker : TsvrcProcess
     {
+        public const string OnTrackingStartedEvent = "OnTrackingStarted";
+        public const string OnTrackingStoppedEvent = "OnTrackingStopped";
+        public const string OnTrackingCompletedEvent = "OnTrackingCompleted";
+        public const string OnTrackingDeserializationEvent = "OnTrackingDeserialization";
+        public const string OnTrackingPlayersAddedEvent = "OnTrackingPlayersAdded";
+        public const string OnTrackingPlayersRemovedEvent = "OnTrackingPlayersRemoved";
+
         [UdonSynced] private string[] _trackedPlayerIds = new string[0];
 
         // Temporary storage for initial player IDs during process start.
         protected string[] _initialTrackerPlayerIds = new string[0];
-
-        private UdonSharpBehaviour _listener;
-        private string _onTrackingStartedEvent = "OnTrackingStarted";
-        private string _onTrackingStoppedEvent = "OnTrackingStopped";
-        private string _onTrackingCompletedEvent = "OnTrackingCompleted";
-        private string _onTrackingDeserializationEvent = "OnTrackingDeserialization";
-        private string _onTrackingPlayersAddedEvent = "OnTrackingPlayersAdded";
-        private string _onTrackingPlayersRemovedEvent = "OnTrackingPlayersRemoved";
 
         public string[] LastPlayerIds { get; private set; } = new string[0];
         public string[] LastAddedPlayerIds { get; private set; } = new string[0];
         public string[] LastRemovedPlayerIds { get; private set; } = new string[0];
 
         /// <summary>
-        /// Initializes the TsPlayerTracker with a listener and event method names.
-        /// On each tracker event, SendCustomEvent is called on the listener using the corresponding name.
-        /// Use nameof() for event names to avoid magic strings and get refactor safety.
-        /// Read event data from the Last* properties inside the listener's callback methods:
+        /// Initializes the TsPlayerTracker. Use <see cref="TsvrcBehaviour.TsSubscribe"/> to register
+        /// listeners for the events defined as constants on this class.
+        /// Read event data from the <c>Last*</c> properties inside your callback methods:
         /// <list type="bullet">
-        /// <item><term>onTrackingStartedEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onTrackingStoppedEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onTrackingCompletedEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onTrackingDeserializationEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onTrackingPlayersAddedEvent</term><description>LastAddedPlayerIds</description></item>
-        /// <item><term>onTrackingPlayersRemovedEvent</term><description>LastRemovedPlayerIds</description></item>
+        /// <item><term><see cref="OnTrackingStartedEvent"/></term><description><c>LastPlayerIds</c></description></item>
+        /// <item><term><see cref="OnTrackingStoppedEvent"/></term><description><c>LastPlayerIds</c></description></item>
+        /// <item><term><see cref="OnTrackingCompletedEvent"/></term><description><c>LastPlayerIds</c></description></item>
+        /// <item><term><see cref="OnTrackingDeserializationEvent"/></term><description><c>LastPlayerIds</c></description></item>
+        /// <item><term><see cref="OnTrackingPlayersAddedEvent"/></term><description><c>LastAddedPlayerIds</c></description></item>
+        /// <item><term><see cref="OnTrackingPlayersRemovedEvent"/></term><description><c>LastRemovedPlayerIds</c></description></item>
         /// </list>
-        /// <example>
-        /// <code>
-        /// tracker.TsConstruct(
-        ///     this,
-        ///     nameof(OnTrackingStartedMethod),
-        ///     nameof(OnTrackingStoppedMethod),
-        ///     nameof(OnTrackingCompletedMethod),
-        ///     nameof(OnTrackingDeserializationMethod),
-        ///     nameof(OnTrackingPlayersAddedMethod),
-        ///     nameof(OnTrackingPlayersRemovedMethod)
-        /// );
-        ///
-        /// public void OnTrackingPlayersAddedMethod()
-        /// {
-        ///     var added = tracker.LastAddedPlayerIds;
-        /// }
-        /// </code>
-        /// </example>
         /// </summary>
-        public void TsConstructPlayerTracker(
-            UdonSharpBehaviour listener,
-            string onTrackingStartedEvent,
-            string onTrackingStoppedEvent,
-            string onTrackingCompletedEvent,
-            string onTrackingDeserializationEvent,
-            string onTrackingPlayersAddedEvent,
-            string onTrackingPlayersRemovedEvent
-        )
-        {
-            _listener = listener;
-            _onTrackingStartedEvent = onTrackingStartedEvent;
-            _onTrackingStoppedEvent = onTrackingStoppedEvent;
-            _onTrackingCompletedEvent = onTrackingCompletedEvent;
-            _onTrackingDeserializationEvent = onTrackingDeserializationEvent;
-            _onTrackingPlayersAddedEvent = onTrackingPlayersAddedEvent;
-            _onTrackingPlayersRemovedEvent = onTrackingPlayersRemovedEvent;
-        }
+        public void TsConstructPlayerTracker() { }
 
         #region VRChat Callbacks
 
         public override void OnDeserialization()
         {
             LastPlayerIds = _trackedPlayerIds;
-            _listener.SendCustomEvent(_onTrackingDeserializationEvent);
+            TsEmit(OnTrackingDeserializationEvent);
         }
 
         public override void OnPlayerLeft(VRCPlayerApi player)
@@ -230,7 +193,7 @@ namespace Tsvrc.Network
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             LastPlayerIds = playerIds;
-            _listener.SendCustomEvent(_onTrackingStartedEvent);
+            TsEmit(OnTrackingStartedEvent);
         }
 
         /// <summary>
@@ -244,7 +207,7 @@ namespace Tsvrc.Network
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             LastPlayerIds = playerIds;
-            _listener.SendCustomEvent(_onTrackingStoppedEvent);
+            TsEmit(OnTrackingStoppedEvent);
         }
 
         /// <summary>
@@ -258,7 +221,7 @@ namespace Tsvrc.Network
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             LastPlayerIds = playerIds;
-            _listener.SendCustomEvent(_onTrackingCompletedEvent);
+            TsEmit(OnTrackingCompletedEvent);
         }
 
         /// <summary>
@@ -272,7 +235,7 @@ namespace Tsvrc.Network
             if (!TsArray.Contains(notifyPlayerIds, playerId)) return;
 
             LastAddedPlayerIds = addedPlayerIds;
-            _listener.SendCustomEvent(_onTrackingPlayersAddedEvent);
+            TsEmit(OnTrackingPlayersAddedEvent);
         }
 
         /// <summary>
@@ -286,7 +249,7 @@ namespace Tsvrc.Network
             if (!TsArray.Contains(notifyPlayerIds, playerId)) return;
 
             LastRemovedPlayerIds = removedPlayerIds;
-            _listener.SendCustomEvent(_onTrackingPlayersRemovedEvent);
+            TsEmit(OnTrackingPlayersRemovedEvent);
         }
 
         /// <summary>

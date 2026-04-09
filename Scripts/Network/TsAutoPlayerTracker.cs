@@ -7,101 +7,45 @@ namespace Tsvrc.Network
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsAutoPlayerTracker : TsPlayerTracker
     {
-        private UdonSharpBehaviour _autoTrackerListener;
-        private string _onAutoTrackingStartedEvent = "OnAutoTrackingStarted";
-        private string _onAutoTrackingStoppedEvent = "OnAutoTrackingStopped";
-        private string _onAutoTrackingCompletedEvent = "OnAutoTrackingCompleted";
-        private string _onAutoTrackingDeserializationEvent = "OnAutoTrackingDeserialization";
-        private string _onAutoTrackingPlayersAddedEvent = "OnAutoTrackingPlayersAdded";
-        private string _onAutoTrackingPlayersRemovedEvent = "OnAutoTrackingPlayersRemoved";
+        public const string OnAutoTrackingStartedEvent = "OnAutoTrackingStarted";
+        public const string OnAutoTrackingStoppedEvent = "OnAutoTrackingStopped";
+        public const string OnAutoTrackingCompletedEvent = "OnAutoTrackingCompleted";
+        public const string OnAutoTrackingDeserializationEvent = "OnAutoTrackingDeserialization";
+        public const string OnAutoTrackingPlayersAddedEvent = "OnAutoTrackingPlayersAdded";
+        public const string OnAutoTrackingPlayersRemovedEvent = "OnAutoTrackingPlayersRemoved";
 
         /// <summary>
-        /// Initializes the TsAutoPlayerTracker with a listener and event method names.
-        /// On each tracking event, SendCustomEvent is called on the listener using the corresponding name.
-        /// Use nameof() for event names to avoid magic strings and get refactor safety.
-        /// Read event data from the Last* properties inside the listener's callback methods:
+        /// Initializes the TsAutoPlayerTracker. Use <see cref="TsvrcBehaviour.TsSubscribe"/> to register
+        /// listeners for the events defined as constants on this class.
+        /// Read event data from the <c>Last*</c> properties inside your callback methods:
         /// <list type="bullet">
-        /// <item><term>onAutoTrackingStartedEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onAutoTrackingStoppedEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onAutoTrackingCompletedEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onAutoTrackingDeserializationEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onAutoTrackingPlayersAddedEvent</term><description>LastAddedPlayerIds</description></item>
-        /// <item><term>onAutoTrackingPlayersRemovedEvent</term><description>LastRemovedPlayerIds</description></item>
+        /// <item><term><see cref="OnAutoTrackingStartedEvent"/></term><description><c>LastPlayerIds</c></description></item>
+        /// <item><term><see cref="OnAutoTrackingStoppedEvent"/></term><description><c>LastPlayerIds</c></description></item>
+        /// <item><term><see cref="OnAutoTrackingCompletedEvent"/></term><description><c>LastPlayerIds</c></description></item>
+        /// <item><term><see cref="OnAutoTrackingDeserializationEvent"/></term><description><c>LastPlayerIds</c></description></item>
+        /// <item><term><see cref="OnAutoTrackingPlayersAddedEvent"/></term><description><c>LastAddedPlayerIds</c></description></item>
+        /// <item><term><see cref="OnAutoTrackingPlayersRemovedEvent"/></term><description><c>LastRemovedPlayerIds</c></description></item>
         /// </list>
-        /// <example>
-        /// <code>
-        /// autoTracker.TsConstructAutoPlayerTracker(
-        ///     this,
-        ///     nameof(_OnAutoTrackingStartedMethod),
-        ///     nameof(_OnAutoTrackingStoppedMethod),
-        ///     nameof(_OnAutoTrackingCompletedMethod),
-        ///     nameof(_OnAutoTrackingDeserializationMethod),
-        ///     nameof(_OnAutoTrackingPlayersAddedMethod),
-        ///     nameof(_OnAutoTrackingPlayersRemovedMethod)
-        /// );
-        /// </code>
-        /// </example>
         /// </summary>
-        public void TsConstructAutoPlayerTracker(
-            UdonSharpBehaviour listener,
-            string onAutoTrackingStartedEvent,
-            string onAutoTrackingStoppedEvent,
-            string onAutoTrackingCompletedEvent,
-            string onAutoTrackingDeserializationEvent,
-            string onAutoTrackingPlayersAddedEvent,
-            string onAutoTrackingPlayersRemovedEvent
-        )
+        public void TsConstructAutoPlayerTracker()
         {
-            _autoTrackerListener = listener;
-            _onAutoTrackingStartedEvent = onAutoTrackingStartedEvent;
-            _onAutoTrackingStoppedEvent = onAutoTrackingStoppedEvent;
-            _onAutoTrackingCompletedEvent = onAutoTrackingCompletedEvent;
-            _onAutoTrackingDeserializationEvent = onAutoTrackingDeserializationEvent;
-            _onAutoTrackingPlayersAddedEvent = onAutoTrackingPlayersAddedEvent;
-            _onAutoTrackingPlayersRemovedEvent = onAutoTrackingPlayersRemovedEvent;
-
-            base.TsConstructPlayerTracker(
-                this,
-                nameof(_OnTrackingStarted),
-                nameof(_OnTrackingStopped),
-                nameof(_OnTrackingCompleted),
-                nameof(_OnTrackingDeserialization),
-                nameof(_OnTrackingPlayersAdded),
-                nameof(_OnTrackingPlayersRemoved)
-            );
+            TsConstructPlayerTracker();
+            TsSubscribe(this, OnTrackingStartedEvent, nameof(_OnTrackingStarted));
+            TsSubscribe(this, OnTrackingStoppedEvent, nameof(_OnTrackingStopped));
+            TsSubscribe(this, OnTrackingCompletedEvent, nameof(_OnTrackingCompleted));
+            TsSubscribe(this, OnTrackingDeserializationEvent, nameof(_OnTrackingDeserialization));
+            TsSubscribe(this, OnTrackingPlayersAddedEvent, nameof(_OnTrackingPlayersAdded));
+            TsSubscribe(this, OnTrackingPlayersRemovedEvent, nameof(_OnTrackingPlayersRemoved));
         }
 
         #region TsPlayerTracker Callbacks
 
-        public void _OnTrackingStarted()
-        {
-            _autoTrackerListener.SendCustomEvent(_onAutoTrackingStartedEvent);
-        }
-
-        public void _OnTrackingStopped()
-        {
-            _autoTrackerListener.SendCustomEvent(_onAutoTrackingStoppedEvent);
-        }
-
-        public void _OnTrackingCompleted()
-        {
-            _autoTrackerListener.SendCustomEvent(_onAutoTrackingCompletedEvent);
-        }
-
-        public void _OnTrackingDeserialization()
-        {
-            _autoTrackerListener.SendCustomEvent(_onAutoTrackingDeserializationEvent);
-        }
-
-        public void _OnTrackingPlayersAdded()
-        {
-            _autoTrackerListener.SendCustomEvent(_onAutoTrackingPlayersAddedEvent);
-        }
-
-        public void _OnTrackingPlayersRemoved()
-        {
-            _autoTrackerListener.SendCustomEvent(_onAutoTrackingPlayersRemovedEvent);
-        }
+        public void _OnTrackingStarted() { TsEmit(OnAutoTrackingStartedEvent); }
+        public void _OnTrackingStopped() { TsEmit(OnAutoTrackingStoppedEvent); }
+        public void _OnTrackingCompleted() { TsEmit(OnAutoTrackingCompletedEvent); }
+        public void _OnTrackingDeserialization() { TsEmit(OnAutoTrackingDeserializationEvent); }
+        public void _OnTrackingPlayersAdded() { TsEmit(OnAutoTrackingPlayersAddedEvent); }
+        public void _OnTrackingPlayersRemoved() { TsEmit(OnAutoTrackingPlayersRemovedEvent); }
 
         #endregion
 
