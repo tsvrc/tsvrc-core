@@ -85,12 +85,10 @@ namespace Tsvrc.Core
         #region Virtual Lifecycle
 
         /// <summary>
-        /// Resets this behaviour to a clean state without destroying it, equivalent to a
-        /// new instance. Deactivates the GameObject and clears the constructed state so
-        /// <see cref="TsConstruct(CompiledTsvrc)"/> can be called again.
-        /// The GameObject remains in the scene so its VRChat network identity is preserved.
+        /// Resets the core <see cref="TsvrcBehaviour"/> state: clears the constructed flag
+        /// and all event subscriptions.
         /// </summary>
-        public virtual void TsRelease()
+        protected void ResetBehaviourState()
         {
             _isConstructed = false;
             _eventListeners = new UdonSharpBehaviour[0];
@@ -99,9 +97,7 @@ namespace Tsvrc.Core
         }
 
         /// <summary>
-        /// Destroys the GameObject, permanently removing it and freeing its position in
-        /// memory. Use this when the behaviour should no longer exist in the scene at all,
-        /// as opposed to <see cref="TsRelease"/> which keeps it for reuse.
+        /// Destroys the GameObject, permanently removing it and freeing its position in memory.
         /// </summary>
         public virtual void TsDestroy()
         {

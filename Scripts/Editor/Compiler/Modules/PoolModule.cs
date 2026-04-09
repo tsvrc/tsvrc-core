@@ -10,9 +10,10 @@ using UnityEngine;
 namespace Tsvrc.Editor
 {
     /// <summary>
-    /// Scans config.TsvrcBehaviourPool and emits per-slot private fields plus Get{Type}() accessor methods.
+    /// Scans config.TsvrcProcessPool and emits per-slot private fields plus Get{Type}() accessor methods.
     /// Slots are instantiated in the scene by the compiler so VRChat assigns them fixed network IDs.
     /// Slot count is the total number of Get{Type}() call sites across all classes, so each caller can hold its slots simultaneously.
+    /// Only <see cref="TsvrcProcess"/> subclasses are valid pool entries.
     /// </summary>
     internal class PoolModule : TsvrcModule
     {
@@ -51,7 +52,7 @@ namespace Tsvrc.Editor
         {
             var internalConfig = TsvrcCompiler.LoadInternalConfig();
             var internalPool = internalConfig?.PoolPrefabs ?? Array.Empty<TsvrcBehaviour>();
-            var objects = config.TsvrcBehaviourPool
+            var objects = config.TsvrcProcessPool
                 .Union(internalPool)
                 .Cast<UnityEngine.Object>()
                 .ToHashSet();
@@ -73,7 +74,7 @@ namespace Tsvrc.Editor
         internal override void WriteFields(CsWriter w)
         {
             if (_fields.Count == 0) return;
-            w.Region("Pool Slots");
+            w.Region("Process Pool Slots");
             foreach (var field in _fields)
                 for (int i = 0; i < field.SlotCount; i++)
                     w.Line($"[HideInInspector] [SerializeField] private {field.Type} {SlotFieldName(field, i)};");
@@ -83,12 +84,12 @@ namespace Tsvrc.Editor
         internal override void WriteMethods(CsWriter w)
         {
             if (_fields.Count == 0) return;
-            w.Region("Pool Accessors");
+            w.Region("Process Pool Accessors");
             foreach (var field in _fields)
             {
                 w.Summary($"Gets a <see cref=\"{field.Type}\"/> at runtime. " +
                           $"Pooled objects have stable VRChat network IDs and can send and receive network events. " +
-                          $"Call <see cref=\"Tsvrc.Core.TsvrcBehaviour.TsRelease\"/> when done to return it for reuse. " +
+                          $"Call <see cref=\"Tsvrc.Core.TsvrcProcess.TsRelease\"/> when done to return it for reuse. " +
                           $"Logs an error if all {field.SlotCount} slot(s) are already in use.");
                 using (w.Method($"public {field.Type} Get{field.Type}()"))
                 {

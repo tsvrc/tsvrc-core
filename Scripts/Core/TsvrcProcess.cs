@@ -33,10 +33,16 @@ namespace Tsvrc.Core
             }
         }
 
-        public override void TsRelease()
+        /// <summary>
+        /// Resets this process to a clean state for reuse. Clears running state,
+        /// event subscriptions, and the constructed flag. Deactivate the GameObject
+        /// and call <see cref="TsvrcBehaviour.TsConstruct(Tsvrc.Core.Compiled.CompiledTsvrc)"/>
+        /// again to reuse it.
+        /// </summary>
+        public virtual void TsRelease()
         {
             OnProcessCleanup(false);
-            base.TsRelease();
+            ResetBehaviourState();
         }
 
         #endregion

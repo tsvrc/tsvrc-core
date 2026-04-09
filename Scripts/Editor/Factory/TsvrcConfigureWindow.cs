@@ -21,7 +21,7 @@ namespace Tsvrc.Editor
         private static readonly string[] TabDescriptions =
         {
             "Register any scene object or component as a named field on _ts. After compiling, access it from any TsvrcBehaviour via _ts.FieldName. Example: drag your GameManager here, then use _ts.GameManager from any behaviour.",
-            "Register TsvrcBehaviours whose slots are placed in the scene before play. VRChat assigns each slot a stable network ID, enabling network events. Use _ts.GetType() to borrow a slot and call TsRelease() when done. Example: add BulletBehaviour here, then call _ts.GetBulletBehaviour() at runtime.",
+            "Register TsvrcProcess behaviours whose slots are placed in the scene before play. VRChat assigns each slot a stable network ID, enabling network events. Use _ts.GetType() to borrow a slot and call TsRelease() when done. Only TsvrcProcess subclasses are valid entries. Example: add DataTransferer here, then call _ts.GetDataTransferer() at runtime.",
             "Register TsvrcBehaviours that are always active in the scene, not pooled. TsConstruct() is called once on each at startup. Example: add your HudManager here and it is initialized automatically when the world loads.",
             "Register prefabs organized into named groups. Generates a Create{Group}{Name}(Transform parent) method for each entry. WARNING: instantiated objects do not receive a VRChat network ID and cannot send or receive network events. Use Pool for networked objects.",
         };
@@ -109,9 +109,9 @@ namespace Tsvrc.Editor
             switch (tab)
             {
                 case Tab.Singletons: DrawObjectArray("Singletons"); break;
-                case Tab.Pool:       DrawObjectArray("TsvrcBehaviourPool"); break;
+                case Tab.Pool: DrawObjectArray("TsvrcProcessPool"); break;
                 case Tab.Constructs: DrawObjectArray("TsvrcBehaviourConstruct"); break;
-                case Tab.Factories:  DrawFactories(); break;
+                case Tab.Factories: DrawFactories(); break;
             }
         }
 
