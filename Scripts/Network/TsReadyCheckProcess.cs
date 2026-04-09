@@ -9,51 +9,24 @@ namespace Tsvrc.Network
 {
     public class TsReadyCheckProcess : TsPlayerTracker
     {
+        public const string OnReadyCheckStartedEvent = "OnReadyCheckStarted";
+        public const string OnReadyCheckStoppedEvent = "OnReadyCheckStopped";
+        public const string OnReadyCheckCompletedEvent = "OnReadyCheckCompleted";
+
         [UdonSynced] private string[] _readyPlayerIds = new string[0];
 
-        private UdonSharpBehaviour _readyCheckListener;
-        private string _onReadyCheckStartedEvent = "OnReadyCheckStarted";
-        private string _onReadyCheckStoppedEvent = "OnReadyCheckStopped";
-        private string _onReadyCheckCompletedEvent = "OnReadyCheckCompleted";
-
         /// <summary>
-        /// Initializes the TsReadyCheckProcess with a listener and event method names.
-        /// On each ready check event, SendCustomEvent is called on the listener using the corresponding name.
-        /// Use nameof() for event names to avoid magic strings and get refactor safety.
-        /// Read event data from the Last* properties inside the listener's callback methods:
+        /// Initializes the TsReadyCheckProcess. Use <see cref="TsvrcBehaviour.TsSubscribe"/> to register
+        /// listeners for the events defined as constants on this class.
+        /// Read event data from the <c>Last*</c> properties inside your callback methods:
         /// <list type="bullet">
-        /// <item><term>onReadyCheckStartedEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onReadyCheckStoppedEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onReadyCheckCompletedEvent</term><description>LastPlayerIds</description></item>
+        /// <item><term><see cref="OnReadyCheckStartedEvent"/></term><description><c>LastPlayerIds</c></description></item>
+        /// <item><term><see cref="OnReadyCheckStoppedEvent"/></term><description><c>LastPlayerIds</c></description></item>
+        /// <item><term><see cref="OnReadyCheckCompletedEvent"/></term><description><c>LastPlayerIds</c></description></item>
         /// </list>
-        /// <example>
-        /// <code>
-        /// readyCheck.TsConstruct(
-        ///     this,
-        ///     nameof(OnReadyCheckStartedMethod),
-        ///     nameof(OnReadyCheckStoppedMethod),
-        ///     nameof(OnReadyCheckCompletedMethod)
-        /// );
-        ///
-        /// public void OnReadyCheckCompletedMethod()
-        /// {
-        ///     var players = readyCheck.LastPlayerIds;
-        /// }
-        /// </code>
-        /// </example>
         /// </summary>
-        public void TsConstructReadyCheckProcess(
-            UdonSharpBehaviour listener,
-            string onReadyCheckStartedEvent,
-            string onReadyCheckStoppedEvent,
-            string onReadyCheckCompletedEvent
-        )
+        public void TsConstructReadyCheckProcess()
         {
-            _readyCheckListener = listener;
-            _onReadyCheckStartedEvent = onReadyCheckStartedEvent;
-            _onReadyCheckStoppedEvent = onReadyCheckStoppedEvent;
-            _onReadyCheckCompletedEvent = onReadyCheckCompletedEvent;
-
             base.TsConstructPlayerTracker(
                 this,
                 nameof(_OnTrackingStarted),
@@ -106,17 +79,17 @@ namespace Tsvrc.Network
 
         public void _OnTrackingStarted()
         {
-            _readyCheckListener.SendCustomEvent(_onReadyCheckStartedEvent);
+            TsEmit(OnReadyCheckStartedEvent);
         }
 
         public void _OnTrackingStopped()
         {
-            _readyCheckListener.SendCustomEvent(_onReadyCheckStoppedEvent);
+            TsEmit(OnReadyCheckStoppedEvent);
         }
 
         public void _OnTrackingCompleted()
         {
-            _readyCheckListener.SendCustomEvent(_onReadyCheckCompletedEvent);
+            TsEmit(OnReadyCheckCompletedEvent);
         }
 
         public void _OnTrackingDeserialization() { }

@@ -30,12 +30,10 @@ namespace Tsvrc.Network
         /// </summary>
         protected void TsConstructDataSender()
         {
-            base.TsConstructReadyCheckProcess(
-                this,
-                nameof(_OnReadyCheckStarted),
-                nameof(_OnReadyCheckStopped),
-                nameof(_OnReadyCheckCompleted)
-            );
+            TsConstructReadyCheckProcess();
+            TsSubscribe(this, OnReadyCheckStartedEvent, nameof(_OnReadyCheckStarted));
+            TsSubscribe(this, OnReadyCheckStoppedEvent, nameof(_OnReadyCheckStopped));
+            TsSubscribe(this, OnReadyCheckCompletedEvent, nameof(_OnReadyCheckCompleted));
         }
 
         #region TsReadyCheckProcess Callbacks
