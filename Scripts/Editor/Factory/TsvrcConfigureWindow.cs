@@ -144,67 +144,67 @@ namespace Tsvrc.Editor
 
         private void DrawFactories()
         {
-            var groups = _config.GetComponentsInChildren<TsvrcFactoryGroup>();
+            var factoriesProp = _so.FindProperty("Factories");
 
-            foreach (var group in groups)
+            for (int i = 0; i < factoriesProp.arraySize; i++)
             {
-                if (group == null) continue;
+                var groupProp = factoriesProp.GetArrayElementAtIndex(i);
+                var groupNameProp = groupProp.FindPropertyRelative("GroupName");
+                var prefabsProp = groupProp.FindPropertyRelative("Prefabs");
 
-                int id = group.GetInstanceID();
-                if (!_foldouts.ContainsKey(id))
-                    _foldouts[id] = false;
-
-                var groupSo = new SerializedObject(group);
-                groupSo.Update();
-
-                int prefabCount = group.Prefabs != null ? group.Prefabs.Length : 0;
-                string foldoutLabel = string.IsNullOrEmpty(group.GroupName)
+                // Use a stable key: group name if set, otherwise fallback to index.
+                // This keeps foldout state when groups are reordered or unnamed groups are added.
+                string groupName = groupNameProp.stringValue;
+                int prefabCount = prefabsProp.arraySize;
+                if (!_foldouts.ContainsKey(i))
+                    _foldouts[i] = false;
+                string foldoutLabel = string.IsNullOrEmpty(groupName)
                     ? $"(unnamed)   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})"
-                    : $"{group.GroupName}   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})";
+                    : $"{groupName}   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})";
 
                 EditorGUILayout.BeginHorizontal();
-                _foldouts[id] = EditorGUILayout.Foldout(_foldouts[id], foldoutLabel, true);
+                _foldouts[i] = EditorGUILayout.Foldout(_foldouts[i], foldoutLabel, true);
                 if (GUILayout.Button("✕", GUILayout.Width(22)))
                 {
-                    groupSo.ApplyModifiedProperties();
-                    Undo.DestroyObjectImmediate(group.gameObject);
+                    factoriesProp.DeleteArrayElementAtIndex(i);
+                    _so.ApplyModifiedProperties();
                     GUIUtility.ExitGUI();
                     return;
                 }
                 EditorGUILayout.EndHorizontal();
 
-                if (_foldouts[id])
+                if (_foldouts[i])
                 {
                     EditorGUI.indentLevel++;
 
-                    EditorGUILayout.PropertyField(groupSo.FindProperty("GroupName"));
+                    EditorGUILayout.PropertyField(groupNameProp, new GUIContent("Group Name"));
 
-                    string preview = string.IsNullOrWhiteSpace(group.GroupName)
-                        ? "Create\u2026"
-                        : $"Create{Sanitize(group.GroupName)}\u2026";
+                    string preview = string.IsNullOrWhiteSpace(groupName)
+                        ? "Create…"
+                        : $"Create{Sanitize(groupName)}…";
                     EditorGUILayout.LabelField($"Prefix:  {preview}", EditorStyles.miniLabel);
 
-                    EditorGUILayout.PropertyField(groupSo.FindProperty("Prefabs"), true);
+                    EditorGUILayout.PropertyField(prefabsProp, new GUIContent("Prefabs"), true);
 
                     EditorGUI.indentLevel--;
                 }
 
-                groupSo.ApplyModifiedProperties();
                 EditorGUILayout.Space(2);
             }
 
+            _so.ApplyModifiedProperties();
+
             EditorGUILayout.Space(4);
             if (GUILayout.Button("+ Add Factory Group"))
-                AddFactoryGroup();
-        }
-
-        private void AddFactoryGroup()
-        {
-            var go = new GameObject("FactoryGroup");
-            go.transform.SetParent(_config.transform, false);
-            Undo.RegisterCreatedObjectUndo(go, "Add Factory Group");
-            go.AddComponent<TsvrcFactoryGroup>();
-            Repaint();
+            {
+                factoriesProp.InsertArrayElementAtIndex(factoriesProp.arraySize);
+                // Clear the newly added element so it doesn't copy the previous one
+                var newGroup = factoriesProp.GetArrayElementAtIndex(factoriesProp.arraySize - 1);
+                newGroup.FindPropertyRelative("GroupName").stringValue = string.Empty;
+                newGroup.FindPropertyRelative("Prefabs").ClearArray();
+                _so.ApplyModifiedProperties();
+                EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+            }
         }
 
         private static string Sanitize(string raw)

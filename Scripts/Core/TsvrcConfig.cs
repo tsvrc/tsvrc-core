@@ -16,5 +16,7 @@ namespace Tsvrc.Core
         public TsvrcProcess[] TsvrcProcessPool;
         [Tooltip("TsvrcBehaviours that are always active in the scene, not pooled. TsConstruct(_ts) is called on each at startup, giving them access to _ts. Example: add your CollisionHandler here to have it initialized when the world loads.")]
         public TsvrcBehaviour[] TsvrcBehaviourConstruct;
+        [Tooltip("Factory groups for runtime-instantiated (non-networked) prefabs. Each group generates Create{GroupName}{PrefabName}(Transform parent) methods on CompiledTsvrc.")]
+        public TsvrcFactoryGroup[] Factories;
     }
 }

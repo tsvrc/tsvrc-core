@@ -9,8 +9,9 @@ namespace Tsvrc.Core
     {
         [Tooltip("Library-internal objects exposed as named fields on CompiledTsvrc. These are framework-level references used by the core behaviour layer.")]
         public Object[] Singletons;
-        [Tooltip("Library-internal TsvrcBehaviour prefabs registered as pool slots. The compiler places instances in the scene before play so VRChat assigns them stable network IDs, enabling network events.")]
-        public TsvrcBehaviour[] PoolPrefabs;
+        [Tooltip("Library-internal TsvrcProcess prefabs registered as process pool slots. The compiler places instances in the scene before play so VRChat assigns them stable network IDs, enabling network events.")]
+        public TsvrcProcess[] PoolPrefabs;
+        [Tooltip("Library-internal factory groups. Each group generates Create{GroupName}{PrefabName}(Transform parent) factory methods on CompiledTsvrc.")]
+        public TsvrcFactoryGroup[] Factories;
     }
 }
-

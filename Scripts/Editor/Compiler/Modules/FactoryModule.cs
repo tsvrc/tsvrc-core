@@ -9,7 +9,7 @@ using UnityEngine;
 namespace Tsvrc.Editor
 {
     /// <summary>
-    /// Scans all <see cref="TsvrcFactoryGroup"/> children of <see cref="TsvrcConfig"/> and emits
+    /// Scans <see cref="TsvrcConfig.Factories"/> and <see cref="InternalTsvrcConfig.Factories"/> and emits
     /// per-prefab private <c>GameObject</c> fields plus <c>Create{GroupName}{PrefabName}(Transform parent)</c>
     /// factory methods on <c>CompiledTsvrc</c>.
     ///
@@ -35,47 +35,59 @@ namespace Tsvrc.Editor
         {
             _fields.Clear();
 
-            var groups = config.GetComponentsInChildren<TsvrcFactoryGroup>();
-            if (groups.Length == 0) return;
-
             var usedNames = new HashSet<string>();
             var fields = new List<TsvrcField>();
 
-            foreach (var group in groups)
-            {
-                if (group.Prefabs == null) continue;
-
-                string groupPrefix = string.IsNullOrEmpty(group.GroupName)
-                    ? string.Empty
-                    : Sanitize(group.GroupName);
-
-                foreach (var obj in group.Prefabs)
+            // User-defined factory groups from TsvrcConfig
+            if (config.Factories != null)
+                foreach (var group in config.Factories)
                 {
-                    if (obj == null) continue;
-
-                    var prefab = obj is Component c ? c.gameObject : obj as GameObject;
-                    if (prefab == null) continue;
-
-                    var behaviour = prefab.GetComponent<TsvrcBehaviour>();
-                    var type = behaviour != null ? behaviour.GetType() : null;
-
-                    string name = DeriveUniqueName(groupPrefix + Sanitize(prefab.name), usedNames);
-                    usedNames.Add(name);
-
-                    var pattern = new Regex(@"\b_ts\s*\.\s*Create" + Regex.Escape(name) + @"\s*\(");
-
-                    fields.Add(new TsvrcField
-                    {
-                        Name = name,
-                        Type = type != null ? type.Name : "GameObject",
-                        Namespace = type?.Namespace ?? string.Empty,
-                        SourceObject = (UnityEngine.Object)behaviour ?? prefab,
-                        CallSites = SourceScanner.FindCallSites(pattern),
-                    });
+                    if (group?.Prefabs == null) continue;
+                    ScanGroup(group.GroupName, group.Prefabs, usedNames, fields);
                 }
-            }
+
+            // Library-internal factory groups from InternalTsvrcConfig
+            var internalConfig = TsvrcCompiler.LoadInternalConfig();
+            if (internalConfig?.Factories != null)
+                foreach (var group in internalConfig.Factories)
+                {
+                    if (group?.Prefabs == null) continue;
+                    ScanGroup(group.GroupName, group.Prefabs, usedNames, fields);
+                }
 
             _fields = fields.OrderBy(f => f.Name).ToList();
+        }
+
+        private void ScanGroup(string groupName, UnityEngine.Object[] prefabs, HashSet<string> usedNames, List<TsvrcField> fields)
+        {
+            string groupPrefix = string.IsNullOrEmpty(groupName)
+                ? string.Empty
+                : Sanitize(groupName);
+
+            foreach (var obj in prefabs)
+            {
+                if (obj == null) continue;
+
+                var prefab = obj is Component c ? c.gameObject : obj as GameObject;
+                if (prefab == null) continue;
+
+                var behaviour = prefab.GetComponent<TsvrcBehaviour>();
+                var type = behaviour != null ? behaviour.GetType() : null;
+
+                string name = DeriveUniqueName(groupPrefix + Sanitize(prefab.name), usedNames);
+                usedNames.Add(name);
+
+                var pattern = new Regex(@"\b_ts\s*\.\s*Create" + Regex.Escape(name) + @"\s*\(");
+
+                fields.Add(new TsvrcField
+                {
+                    Name = name,
+                    Type = type != null ? type.Name : "GameObject",
+                    Namespace = type?.Namespace ?? string.Empty,
+                    SourceObject = (UnityEngine.Object)behaviour ?? prefab,
+                    CallSites = SourceScanner.FindCallSites(pattern),
+                });
+            }
         }
 
         // Strips whitespace and ensures PascalCase first letter so names are valid C# identifiers.
