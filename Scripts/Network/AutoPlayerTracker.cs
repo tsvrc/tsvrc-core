@@ -5,7 +5,7 @@ using VRC.SDKBase;
 namespace Tsvrc.Network
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsAutoPlayerTracker : TsPlayerTracker
+    public class AutoPlayerTracker : PlayerTracker
     {
         /// <summary>
         /// Emitted when auto-tracking starts.
@@ -49,7 +49,7 @@ namespace Tsvrc.Network
             TsSubscribe(this, OnTrackingPlayersRemovedEvent, nameof(_OnTrackingPlayersRemoved));
         }
 
-        #region TsPlayerTracker Callbacks
+        #region PlayerTracker Callbacks
 
         public void _OnTrackingStarted() { TsEmit(OnAutoTrackingStartedEvent); }
         public void _OnTrackingStopped() { TsEmit(OnAutoTrackingStoppedEvent); }

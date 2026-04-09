@@ -1,3 +1,4 @@
+using Tsvrc.Network;
 using Tsvrc.Player;
 using Tsvrc.Utils;
 using UdonSharp;
@@ -5,9 +6,9 @@ using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
 
-namespace Tsvrc.Network
+namespace Tsvrc.Process
 {
-    public class TsReadyCheckProcess : TsPlayerTracker
+    public class ReadyCheckProcess : PlayerTracker
     {
         /// <summary>
         /// Emitted when the ready check starts.

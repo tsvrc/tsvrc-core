@@ -6,7 +6,7 @@ using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Network
 {
-    public class TsDataReceiver : TsDataSender
+    public class DataReceiver : DataSender
     {
         /// <summary>
         /// Emitted when data reception starts.
@@ -43,7 +43,7 @@ namespace Tsvrc.Network
             TsSubscribe(this, OnDataTransferCompletedEvent, nameof(_OnDataTransferCompleted));
         }
 
-        #region TsDataSender Callbacks
+        #region DataSender Callbacks
 
         public void _OnDataTransferStarted()
         {

@@ -3,7 +3,7 @@ using UdonSharp;
 namespace Tsvrc.Network
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsDataTransferer : TsDataReceiver
+    public class DataTransferer : DataReceiver
     {
         /// <summary>
         /// Emitted when the transfer starts.
@@ -46,7 +46,7 @@ namespace Tsvrc.Network
 
         #endregion
 
-        #region TsDataReceiver Callbacks
+        #region DataReceiver Callbacks
 
         public void _OnDataReceptionStarted()
         {

@@ -10,7 +10,7 @@ using VRC.Udon.Common.Interfaces;
 namespace Tsvrc.Network
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsPlayerTracker : TsvrcProcess
+    public class PlayerTracker : TsvrcProcess
     {
         /// <summary>
         /// Emitted when tracking starts.

@@ -1,5 +1,6 @@
 using Tsvrc.Player;
 using Tsvrc.Utils;
+using Tsvrc.Process;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
@@ -7,7 +8,7 @@ using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Network
 {
-    public class TsDataSender : TsReadyCheckProcess
+    public class DataSender : ReadyCheckProcess
     {
         /// <summary>
         /// Emitted when the data transfer starts.
@@ -44,7 +45,7 @@ namespace Tsvrc.Network
             TsSubscribe(this, OnReadyCheckCompletedEvent, nameof(_OnReadyCheckCompleted));
         }
 
-        #region TsReadyCheckProcess Callbacks
+        #region ReadyCheckProcess Callbacks
 
         public void _OnReadyCheckStarted() { }
         public void _OnReadyCheckStopped() { }
