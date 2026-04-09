@@ -120,9 +120,11 @@ namespace Tsvrc.Player
             _lastHeadPos = headPos;
 
             // ── Batch phase ──────────────────────────────────────────────────────
-            AdvanceBatch(headPos);
+            // AdvanceBatch returns the current candidate count, avoiding two extra field reads
+            // (the zero-check and the cCount assignment) on every processed frame.
+            int cCount = AdvanceBatch(headPos);
 
-            if (_candidateCount == 0)
+            if (cCount == 0)
             {
                 _lastViolated = false;
                 return;
@@ -135,7 +137,6 @@ namespace Tsvrc.Player
 
             // Cache all array references as locals; in Udon each field access is a heap lookup,
             // so one dereference here avoids one per loop iteration across all six arrays.
-            int cCount = _candidateCount;
             int[] candidateIndices = _candidateIndices;
             Vector3[] aabbMin = _aabbMin;
             Vector3[] aabbMax = _aabbMax;
@@ -361,17 +362,21 @@ namespace Tsvrc.Player
         ///
         /// Candidates are added (append) and removed (swap-with-last) in O(1).
         /// </summary>
-        private void AdvanceBatch(Vector3 headPos)
+        // Returns the post-scan candidate count so the caller can use it directly,
+        // avoiding a field read for both the zero-check and the loop bound.
+        private int AdvanceBatch(Vector3 headPos)
         {
             int count = _count;
-            if (count == 0) return;
+            if (count == 0) return _candidateCount;
 
             float e = _batchScanExpansion;
             float hxP = headPos.x + e, hxN = headPos.x - e;
             float hyP = headPos.y + e, hyN = headPos.y - e;
             float hzP = headPos.z + e, hzN = headPos.z - e;
 
-            int end = _batchStart + _batchSize;
+            // Cache _batchStart to avoid reading the field twice (end computation + loop init).
+            int start = _batchStart;
+            int end = start + _batchSize;
             if (end > count) end = count;
 
             // Cache array references and the scalar _candidateCount as locals to avoid
@@ -382,7 +387,7 @@ namespace Tsvrc.Player
             int[] candidateIndices = _candidateIndices;
             int cand = _candidateCount;
 
-            for (int i = _batchStart; i < end; i++)
+            for (int i = start; i < end; i++)
             {
                 Vector3 mn = aabbMin[i];
                 Vector3 mx = aabbMax[i];
@@ -412,6 +417,7 @@ namespace Tsvrc.Player
 
             _candidateCount = cand;
             _batchStart = (end >= count) ? 0 : end;
+            return cand;
         }
 
         /// <summary>
