@@ -1,6 +1,5 @@
 using Tsvrc.Player;
 using Tsvrc.Utils;
-using UdonSharp;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
@@ -9,61 +8,34 @@ namespace Tsvrc.Network
 {
     public class TsDataReceiver : TsDataSender
     {
+        public const string OnDataReceptionStartedEvent = "OnDataReceptionStarted";
+        public const string OnDataReceptionStoppedEvent = "OnDataReceptionStopped";
+        public const string OnDataReceptionCompletedEvent = "OnDataReceptionCompleted";
+        public const string OnDataChunkReceivedEvent = "OnDataChunkReceived";
+
         protected string[] _receivedChunks = new string[0];
 
         public string LastData { get; private set; } = "";
         public int LastChunkIndex { get; private set; } = 0;
         public int LastTotalChunks { get; private set; } = 0;
 
-        private UdonSharpBehaviour _dataReceiverListener;
-        private string _onDataReceptionStartedEvent = "OnDataReceptionStarted";
-        private string _onDataReceptionStoppedEvent = "OnDataReceptionStopped";
-        private string _onDataReceptionCompletedEvent = "OnDataReceptionCompleted";
-        private string _onDataChunkReceivedEvent = "OnDataChunkReceived";
-
         /// <summary>
-        /// Initializes the TsDataReceiver with a listener and event method names.
-        /// On each reception event, SendCustomEvent is called on the listener using the corresponding name.
-        /// Use nameof() for event names to avoid magic strings and get refactor safety.
-        /// Read event data from the Last* properties inside the listener's callback methods:
+        /// Initializes the TsDataReceiver. Use <see cref="TsvrcBehaviour.TsSubscribe"/> to register
+        /// listeners for the events defined as constants on this class.
+        /// Read event data from the <c>Last*</c> properties inside your callback methods:
         /// <list type="bullet">
-        /// <item><term>onDataReceptionStartedEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onDataReceptionStoppedEvent</term><description>LastPlayerIds</description></item>
-        /// <item><term>onDataReceptionCompletedEvent</term><description>LastData, LastPlayerIds</description></item>
-        /// <item><term>onDataChunkReceivedEvent</term><description>LastChunkIndex, LastTotalChunks</description></item>
+        /// <item><term><see cref="OnDataReceptionStartedEvent"/></term><description>no data</description></item>
+        /// <item><term><see cref="OnDataReceptionStoppedEvent"/></term><description>no data</description></item>
+        /// <item><term><see cref="OnDataReceptionCompletedEvent"/></term><description><c>LastData</c></description></item>
+        /// <item><term><see cref="OnDataChunkReceivedEvent"/></term><description><c>LastChunkIndex</c>, <c>LastTotalChunks</c></description></item>
         /// </list>
-        /// <example>
-        /// <code>
-        /// receiver.TsConstruct(
-        ///     this,
-        ///     nameof(_OnDataReceptionStartedMethod),
-        ///     nameof(_OnDataReceptionStoppedMethod),
-        ///     nameof(_OnDataReceptionCompletedMethod),
-        ///     nameof(_OnDataChunkReceivedMethod)
-        /// );
-        /// </code>
-        /// </example>
         /// </summary>
-        protected void TsConstructDataReceiver(
-            UdonSharpBehaviour listener,
-            string onDataReceptionStartedEvent,
-            string onDataReceptionStoppedEvent,
-            string onDataReceptionCompletedEvent,
-            string onDataChunkReceivedEvent
-        )
+        protected void TsConstructDataReceiver()
         {
-            _dataReceiverListener = listener;
-            _onDataReceptionStartedEvent = onDataReceptionStartedEvent;
-            _onDataReceptionStoppedEvent = onDataReceptionStoppedEvent;
-            _onDataReceptionCompletedEvent = onDataReceptionCompletedEvent;
-            _onDataChunkReceivedEvent = onDataChunkReceivedEvent;
-
-            base.TsConstructDataSender(
-                this,
-                nameof(_OnDataTransferStarted),
-                nameof(_OnDataTransferStopped),
-                nameof(_OnDataTransferCompleted)
-            );
+            TsConstructDataSender();
+            TsSubscribe(this, OnDataTransferStartedEvent, nameof(_OnDataTransferStarted));
+            TsSubscribe(this, OnDataTransferStoppedEvent, nameof(_OnDataTransferStopped));
+            TsSubscribe(this, OnDataTransferCompletedEvent, nameof(_OnDataTransferCompleted));
         }
 
         #region TsDataSender Callbacks
@@ -72,14 +44,14 @@ namespace Tsvrc.Network
         {
             _receivedChunks = new string[0];
 
-            _dataReceiverListener.SendCustomEvent(_onDataReceptionStartedEvent);
+            TsEmit(OnDataReceptionStartedEvent);
         }
 
         public void _OnDataTransferStopped()
         {
             _receivedChunks = new string[0];
 
-            _dataReceiverListener.SendCustomEvent(_onDataReceptionStoppedEvent);
+            TsEmit(OnDataReceptionStoppedEvent);
         }
 
         public void _OnDataTransferCompleted()
@@ -87,7 +59,7 @@ namespace Tsvrc.Network
             LastData = ReassembleMessage(_receivedChunks);
             _receivedChunks = new string[0];
 
-            _dataReceiverListener.SendCustomEvent(_onDataReceptionCompletedEvent);
+            TsEmit(OnDataReceptionCompletedEvent);
         }
 
         protected override void OnDataChunkSendRequested(string dataChunk, int chunkIndex, int totalChunks, string[] playerIds)
@@ -147,7 +119,7 @@ namespace Tsvrc.Network
 
             NotifyChunkReceived();
 
-            _dataReceiverListener.SendCustomEvent(_onDataChunkReceivedEvent);
+            TsEmit(OnDataChunkReceivedEvent);
         }
 
         #endregion

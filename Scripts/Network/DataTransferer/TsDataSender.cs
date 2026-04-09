@@ -1,6 +1,5 @@
 using Tsvrc.Player;
 using Tsvrc.Utils;
-using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
@@ -10,6 +9,10 @@ namespace Tsvrc.Network
 {
     public class TsDataSender : TsReadyCheckProcess
     {
+        public const string OnDataTransferStartedEvent = "OnDataTransferStarted";
+        public const string OnDataTransferStoppedEvent = "OnDataTransferStopped";
+        public const string OnDataTransferCompletedEvent = "OnDataTransferCompleted";
+
         protected const int CHUNK_SIZE = 15000;
         protected const int MAX_MESSAGE_SIZE = 500000;
 
@@ -21,38 +24,12 @@ namespace Tsvrc.Network
 
         private string[] _targetPlayerIds = new string[0];
 
-        private UdonSharpBehaviour _dataSenderListener;
-        private string _onDataTransferStartedEvent = "OnDataTransferStarted";
-        private string _onDataTransferStoppedEvent = "OnDataTransferStopped";
-        private string _onDataTransferCompletedEvent = "OnDataTransferCompleted";
-
         /// <summary>
-        /// Initializes the TsDataSender with a listener and event method names.
-        /// On each data transfer event, SendCustomEvent is called on the listener using the corresponding name.
-        /// Use nameof() for event names to avoid magic strings and get refactor safety.
-        /// <example>
-        /// <code>
-        /// sender.TsConstruct(
-        ///     this,
-        ///     nameof(_OnDataTransferStartedMethod),
-        ///     nameof(_OnDataTransferStoppedMethod),
-        ///     nameof(_OnDataTransferCompletedMethod)
-        /// );
-        /// </code>
-        /// </example>
+        /// Initializes the TsDataSender. Use <see cref="TsvrcBehaviour.TsSubscribe"/> to register
+        /// listeners for the events defined as constants on this class.
         /// </summary>
-        protected void TsConstructDataSender(
-            UdonSharpBehaviour listener,
-            string onDataTransferStartedEvent,
-            string onDataTransferStoppedEvent,
-            string onDataTransferCompletedEvent
-        )
+        protected void TsConstructDataSender()
         {
-            _dataSenderListener = listener;
-            _onDataTransferStartedEvent = onDataTransferStartedEvent;
-            _onDataTransferStoppedEvent = onDataTransferStoppedEvent;
-            _onDataTransferCompletedEvent = onDataTransferCompletedEvent;
-
             base.TsConstructReadyCheckProcess(
                 this,
                 nameof(_OnReadyCheckStarted),
@@ -279,7 +256,7 @@ namespace Tsvrc.Network
             var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
-            _dataSenderListener.SendCustomEvent(_onDataTransferStartedEvent);
+            TsEmit(OnDataTransferStartedEvent);
         }
 
         /// <summary>
@@ -292,7 +269,7 @@ namespace Tsvrc.Network
             var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
-            _dataSenderListener.SendCustomEvent(_onDataTransferStoppedEvent);
+            TsEmit(OnDataTransferStoppedEvent);
         }
 
         /// <summary>
@@ -305,7 +282,7 @@ namespace Tsvrc.Network
             var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
-            _dataSenderListener.SendCustomEvent(_onDataTransferCompletedEvent);
+            TsEmit(OnDataTransferCompletedEvent);
         }
 
         #endregion

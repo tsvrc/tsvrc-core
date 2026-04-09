@@ -35,13 +35,11 @@ namespace Tsvrc.Network
         /// </summary>
         public void TsConstructDataTransferer()
         {
-            base.TsConstructDataReceiver(
-                this,
-                nameof(_OnDataReceptionStarted),
-                nameof(_OnDataReceptionStopped),
-                nameof(_OnDataReceptionCompleted),
-                nameof(_OnDataChunkReceived)
-            );
+            TsConstructDataReceiver();
+            TsSubscribe(this, OnDataReceptionStartedEvent, nameof(_OnDataReceptionStarted));
+            TsSubscribe(this, OnDataReceptionStoppedEvent, nameof(_OnDataReceptionStopped));
+            TsSubscribe(this, OnDataReceptionCompletedEvent, nameof(_OnDataReceptionCompleted));
+            TsSubscribe(this, OnDataChunkReceivedEvent, nameof(_OnDataChunkReceived));
         }
 
         #region TsvrcProcess Callbacks
