@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEngine;
 
@@ -15,11 +16,12 @@ namespace Tsvrc.Editor
         internal static List<TsvrcCallSite> FindCallSites(Regex pattern)
         {
             var results = new List<TsvrcCallSite>();
-            string excludePrefix = GetExcludePrefix();
+            var excludePrefixes = GetExcludePrefixes();
 
             foreach (var file in Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories))
             {
-                if (Path.GetFullPath(file).StartsWith(excludePrefix, StringComparison.OrdinalIgnoreCase))
+                string fullPath = Path.GetFullPath(file);
+                if (excludePrefixes.Any(p => fullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
                     continue;
 
                 string src = StripComments(File.ReadAllText(file));
@@ -41,10 +43,14 @@ namespace Tsvrc.Editor
             return src;
         }
 
-        private static string GetExcludePrefix()
+        private static List<string> GetExcludePrefixes()
         {
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            return Path.GetFullPath(Path.Combine(projectRoot, ExcludeFolder));
+            return new List<string>
+            {
+                Path.GetFullPath(Path.Combine(projectRoot, ExcludeFolder)),
+                Path.GetFullPath(Path.Combine(projectRoot, "Assets/Tsvrc")),
+            };
         }
 
         // Finds the first class in user code that directly inherits baseTypeName.
@@ -53,11 +59,12 @@ namespace Tsvrc.Editor
         {
             var classPattern = new Regex($@"class\s+(\w+)\s*:\s*{Regex.Escape(baseTypeName)}\b");
             var nsPattern = new Regex(@"namespace\s+([\w.]+)");
-            string excludePrefix = GetExcludePrefix();
+            var excludePrefixes = GetExcludePrefixes();
 
             foreach (var file in Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories))
             {
-                if (Path.GetFullPath(file).StartsWith(excludePrefix, StringComparison.OrdinalIgnoreCase))
+                string fullPath = Path.GetFullPath(file);
+                if (excludePrefixes.Any(p => fullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
                     continue;
 
                 string src = StripComments(File.ReadAllText(file));
