@@ -43,6 +43,20 @@ namespace Tsvrc.Network
             TsSubscribe(this, OnDataTransferCompletedEvent, nameof(_OnDataTransferCompleted));
         }
 
+        #region TsvrcProcess Callbacks
+
+        protected override void OnProcessCleanup(bool isCompleted)
+        {
+            base.OnProcessCleanup(isCompleted);
+
+            _receivedChunks = new string[0];
+            LastData = "";
+            LastChunkIndex = 0;
+            LastTotalChunks = 0;
+        }
+
+        #endregion
+
         #region DataSender Callbacks
 
         public void _OnDataTransferStarted()

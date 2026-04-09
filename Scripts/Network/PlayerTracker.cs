@@ -107,6 +107,10 @@ namespace Tsvrc.Network
             base.OnProcessCleanup(isCompleted);
 
             _trackedPlayerIds = new string[0];
+            _initialTrackerPlayerIds = new string[0];
+            LastPlayerIds = new string[0];
+            LastAddedPlayerIds = new string[0];
+            LastRemovedPlayerIds = new string[0];
             RequestSerialization();
         }
 
