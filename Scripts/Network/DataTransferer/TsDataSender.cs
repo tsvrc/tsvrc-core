@@ -9,8 +9,20 @@ namespace Tsvrc.Network
 {
     public class TsDataSender : TsReadyCheckProcess
     {
+        /// <summary>
+        /// Emitted when the data transfer starts.
+        /// No <c>Last*</c> properties are updated.
+        /// </summary>
         public const string OnDataTransferStartedEvent = "OnDataTransferStarted";
+        /// <summary>
+        /// Emitted when the data transfer is stopped before completion.
+        /// No <c>Last*</c> properties are updated.
+        /// </summary>
         public const string OnDataTransferStoppedEvent = "OnDataTransferStopped";
+        /// <summary>
+        /// Emitted when the data transfer completes.
+        /// No <c>Last*</c> properties are updated.
+        /// </summary>
         public const string OnDataTransferCompletedEvent = "OnDataTransferCompleted";
 
         protected const int CHUNK_SIZE = 15000;
@@ -24,13 +36,9 @@ namespace Tsvrc.Network
 
         private string[] _targetPlayerIds = new string[0];
 
-        /// <summary>
-        /// Initializes the TsDataSender. Use <see cref="TsvrcBehaviour.TsSubscribe"/> to register
-        /// listeners for the events defined as constants on this class.
-        /// </summary>
-        protected void TsConstructDataSender()
+        protected override void TsStart()
         {
-            TsConstructReadyCheckProcess();
+            base.TsStart();
             TsSubscribe(this, OnReadyCheckStartedEvent, nameof(_OnReadyCheckStarted));
             TsSubscribe(this, OnReadyCheckStoppedEvent, nameof(_OnReadyCheckStopped));
             TsSubscribe(this, OnReadyCheckCompletedEvent, nameof(_OnReadyCheckCompleted));

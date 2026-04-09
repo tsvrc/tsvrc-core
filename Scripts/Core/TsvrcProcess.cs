@@ -24,6 +24,8 @@ namespace Tsvrc.Core
 
         protected override void TsStart()
         {
+            base.TsStart();
+
             if (IsProcessOwner())
             {
                 // Ensure synced state is correct on start

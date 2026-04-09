@@ -12,11 +12,35 @@ namespace Tsvrc.Network
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsPlayerTracker : TsvrcProcess
     {
+        /// <summary>
+        /// Emitted when tracking starts.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnTrackingStartedEvent = "OnTrackingStarted";
+        /// <summary>
+        /// Emitted when tracking stops.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnTrackingStoppedEvent = "OnTrackingStopped";
+        /// <summary>
+        /// Emitted when tracking completes.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnTrackingCompletedEvent = "OnTrackingCompleted";
+        /// <summary>
+        /// Emitted on deserialization.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnTrackingDeserializationEvent = "OnTrackingDeserialization";
+        /// <summary>
+        /// Emitted when players are added.
+        /// Read <c>LastAddedPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnTrackingPlayersAddedEvent = "OnTrackingPlayersAdded";
+        /// <summary>
+        /// Emitted when players are removed.
+        /// Read <c>LastRemovedPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnTrackingPlayersRemovedEvent = "OnTrackingPlayersRemoved";
 
         [UdonSynced] private string[] _trackedPlayerIds = new string[0];
@@ -27,21 +51,6 @@ namespace Tsvrc.Network
         public string[] LastPlayerIds { get; private set; } = new string[0];
         public string[] LastAddedPlayerIds { get; private set; } = new string[0];
         public string[] LastRemovedPlayerIds { get; private set; } = new string[0];
-
-        /// <summary>
-        /// Initializes the TsPlayerTracker. Use <see cref="TsvrcBehaviour.TsSubscribe"/> to register
-        /// listeners for the events defined as constants on this class.
-        /// Read event data from the <c>Last*</c> properties inside your callback methods:
-        /// <list type="bullet">
-        /// <item><term><see cref="OnTrackingStartedEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnTrackingStoppedEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnTrackingCompletedEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnTrackingDeserializationEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnTrackingPlayersAddedEvent"/></term><description><c>LastAddedPlayerIds</c></description></item>
-        /// <item><term><see cref="OnTrackingPlayersRemovedEvent"/></term><description><c>LastRemovedPlayerIds</c></description></item>
-        /// </list>
-        /// </summary>
-        public void TsConstructPlayerTracker() { }
 
         #region VRChat Callbacks
 

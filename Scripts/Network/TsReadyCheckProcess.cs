@@ -9,25 +9,27 @@ namespace Tsvrc.Network
 {
     public class TsReadyCheckProcess : TsPlayerTracker
     {
+        /// <summary>
+        /// Emitted when the ready check starts.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnReadyCheckStartedEvent = "OnReadyCheckStarted";
+        /// <summary>
+        /// Emitted when the ready check is stopped before completion.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnReadyCheckStoppedEvent = "OnReadyCheckStopped";
+        /// <summary>
+        /// Emitted when all tracked players are ready.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnReadyCheckCompletedEvent = "OnReadyCheckCompleted";
 
         [UdonSynced] private string[] _readyPlayerIds = new string[0];
 
-        /// <summary>
-        /// Initializes the TsReadyCheckProcess. Use <see cref="TsvrcBehaviour.TsSubscribe"/> to register
-        /// listeners for the events defined as constants on this class.
-        /// Read event data from the <c>Last*</c> properties inside your callback methods:
-        /// <list type="bullet">
-        /// <item><term><see cref="OnReadyCheckStartedEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnReadyCheckStoppedEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnReadyCheckCompletedEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// </list>
-        /// </summary>
-        public void TsConstructReadyCheckProcess()
+        protected override void TsStart()
         {
-            base.TsConstructPlayerTracker();
+            base.TsStart();
             TsSubscribe(this, OnTrackingStartedEvent, nameof(_OnTrackingStarted));
             TsSubscribe(this, OnTrackingStoppedEvent, nameof(_OnTrackingStopped));
             TsSubscribe(this, OnTrackingCompletedEvent, nameof(_OnTrackingCompleted));

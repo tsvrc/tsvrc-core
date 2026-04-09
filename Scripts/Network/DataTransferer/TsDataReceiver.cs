@@ -8,9 +8,25 @@ namespace Tsvrc.Network
 {
     public class TsDataReceiver : TsDataSender
     {
+        /// <summary>
+        /// Emitted when data reception starts.
+        /// No <c>Last*</c> properties are updated.
+        /// </summary>
         public const string OnDataReceptionStartedEvent = "OnDataReceptionStarted";
+        /// <summary>
+        /// Emitted when data reception is stopped before completion.
+        /// No <c>Last*</c> properties are updated.
+        /// </summary>
         public const string OnDataReceptionStoppedEvent = "OnDataReceptionStopped";
+        /// <summary>
+        /// Emitted when data reception completes.
+        /// Read <c>LastData</c> in your callback.
+        /// </summary>
         public const string OnDataReceptionCompletedEvent = "OnDataReceptionCompleted";
+        /// <summary>
+        /// Emitted when a chunk is received.
+        /// Read <c>LastChunkIndex</c> and <c>LastTotalChunks</c> in your callback.
+        /// </summary>
         public const string OnDataChunkReceivedEvent = "OnDataChunkReceived";
 
         protected string[] _receivedChunks = new string[0];
@@ -19,20 +35,9 @@ namespace Tsvrc.Network
         public int LastChunkIndex { get; private set; } = 0;
         public int LastTotalChunks { get; private set; } = 0;
 
-        /// <summary>
-        /// Initializes the TsDataReceiver. Use <see cref="TsvrcBehaviour.TsSubscribe"/> to register
-        /// listeners for the events defined as constants on this class.
-        /// Read event data from the <c>Last*</c> properties inside your callback methods:
-        /// <list type="bullet">
-        /// <item><term><see cref="OnDataReceptionStartedEvent"/></term><description>no data</description></item>
-        /// <item><term><see cref="OnDataReceptionStoppedEvent"/></term><description>no data</description></item>
-        /// <item><term><see cref="OnDataReceptionCompletedEvent"/></term><description><c>LastData</c></description></item>
-        /// <item><term><see cref="OnDataChunkReceivedEvent"/></term><description><c>LastChunkIndex</c>, <c>LastTotalChunks</c></description></item>
-        /// </list>
-        /// </summary>
-        protected void TsConstructDataReceiver()
+        protected override void TsStart()
         {
-            TsConstructDataSender();
+            base.TsStart();
             TsSubscribe(this, OnDataTransferStartedEvent, nameof(_OnDataTransferStarted));
             TsSubscribe(this, OnDataTransferStoppedEvent, nameof(_OnDataTransferStopped));
             TsSubscribe(this, OnDataTransferCompletedEvent, nameof(_OnDataTransferCompleted));

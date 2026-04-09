@@ -5,37 +5,30 @@ namespace Tsvrc.Network
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsDataTransferer : TsDataReceiver
     {
+        /// <summary>
+        /// Emitted when the transfer starts.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnTransferStartedEvent = "OnTransferStarted";
+        /// <summary>
+        /// Emitted when the transfer is stopped before completion.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnTransferStoppedEvent = "OnTransferStopped";
+        /// <summary>
+        /// Emitted when the transfer completes.
+        /// Read <c>LastData</c> and <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnTransferCompletedEvent = "OnTransferCompleted";
+        /// <summary>
+        /// Emitted when a chunk is transferred.
+        /// Read <c>LastChunkIndex</c> and <c>LastTotalChunks</c> in your callback.
+        /// </summary>
         public const string OnTransferChunkEvent = "OnTransferChunk";
 
-        /// <summary>
-        /// Initializes the TsDataTransferer. After calling this, use <see cref="TsvrcBehaviour.TsSubscribe"/>
-        /// to register listeners for the transfer events defined as constants on this class.
-        /// Read event data from the <c>Last*</c> properties inside your callback methods:
-        /// <list type="bullet">
-        /// <item><term><see cref="OnTransferStartedEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnTransferStoppedEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnTransferCompletedEvent"/></term><description><c>LastData</c>, <c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnTransferChunkEvent"/></term><description><c>LastChunkIndex</c>, <c>LastTotalChunks</c></description></item>
-        /// </list>
-        /// <example>
-        /// <code>
-        /// transferer.TsConstructDataTransferer();
-        /// transferer.TsSubscribe(this, TsDataTransferer.OnTransferCompletedEvent, nameof(_OnTransferCompleted));
-        /// transferer.TsSubscribe(this, TsDataTransferer.OnTransferChunkEvent, nameof(_OnTransferChunk));
-        ///
-        /// public void _OnTransferCompleted()
-        /// {
-        ///     var data = transferer.LastData;
-        /// }
-        /// </code>
-        /// </example>
-        /// </summary>
-        public void TsConstructDataTransferer()
+        protected override void TsStart()
         {
-            TsConstructDataReceiver();
+            base.TsStart();
             TsSubscribe(this, OnDataReceptionStartedEvent, nameof(_OnDataReceptionStarted));
             TsSubscribe(this, OnDataReceptionStoppedEvent, nameof(_OnDataReceptionStopped));
             TsSubscribe(this, OnDataReceptionCompletedEvent, nameof(_OnDataReceptionCompleted));

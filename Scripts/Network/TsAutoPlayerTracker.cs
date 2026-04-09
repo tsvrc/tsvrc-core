@@ -7,29 +7,40 @@ namespace Tsvrc.Network
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsAutoPlayerTracker : TsPlayerTracker
     {
+        /// <summary>
+        /// Emitted when auto-tracking starts.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnAutoTrackingStartedEvent = "OnAutoTrackingStarted";
+        /// <summary>
+        /// Emitted when auto-tracking stops.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnAutoTrackingStoppedEvent = "OnAutoTrackingStopped";
+        /// <summary>
+        /// Emitted when auto-tracking completes.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnAutoTrackingCompletedEvent = "OnAutoTrackingCompleted";
+        /// <summary>
+        /// Emitted on deserialization.
+        /// Read <c>LastPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnAutoTrackingDeserializationEvent = "OnAutoTrackingDeserialization";
+        /// <summary>
+        /// Emitted when players are added.
+        /// Read <c>LastAddedPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnAutoTrackingPlayersAddedEvent = "OnAutoTrackingPlayersAdded";
+        /// <summary>
+        /// Emitted when players are removed.
+        /// Read <c>LastRemovedPlayerIds</c> in your callback.
+        /// </summary>
         public const string OnAutoTrackingPlayersRemovedEvent = "OnAutoTrackingPlayersRemoved";
 
-        /// <summary>
-        /// Initializes the TsAutoPlayerTracker. Use <see cref="TsvrcBehaviour.TsSubscribe"/> to register
-        /// listeners for the events defined as constants on this class.
-        /// Read event data from the <c>Last*</c> properties inside your callback methods:
-        /// <list type="bullet">
-        /// <item><term><see cref="OnAutoTrackingStartedEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnAutoTrackingStoppedEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnAutoTrackingCompletedEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnAutoTrackingDeserializationEvent"/></term><description><c>LastPlayerIds</c></description></item>
-        /// <item><term><see cref="OnAutoTrackingPlayersAddedEvent"/></term><description><c>LastAddedPlayerIds</c></description></item>
-        /// <item><term><see cref="OnAutoTrackingPlayersRemovedEvent"/></term><description><c>LastRemovedPlayerIds</c></description></item>
-        /// </list>
-        /// </summary>
-        public void TsConstructAutoPlayerTracker()
+        protected override void TsStart()
         {
-            TsConstructPlayerTracker();
+            base.TsStart();
             TsSubscribe(this, OnTrackingStartedEvent, nameof(_OnTrackingStarted));
             TsSubscribe(this, OnTrackingStoppedEvent, nameof(_OnTrackingStopped));
             TsSubscribe(this, OnTrackingCompletedEvent, nameof(_OnTrackingCompleted));
