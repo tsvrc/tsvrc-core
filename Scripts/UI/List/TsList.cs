@@ -1,18 +1,10 @@
 using Tsvrc.Core;
 using UdonSharp;
 using UnityEngine;
-using UnityEngine.UI;
 using VRC.SDK3.Data;
 
 namespace Tsvrc.UI
 {
-    /// <summary>
-    /// Scrollable list driven by a <see cref="DataList"/> of <see cref="DataDictionary"/> entries.
-    /// Items are Instantiated from a prefab when they enter the viewport and Destroyed when they leave.
-    /// Scroll direction (vertical or horizontal) is detected automatically from the <see cref="ScrollRect"/>.
-    /// When both axes are enabled the list virtualizes on the vertical axis.
-    /// Item size is read from the prefab's <see cref="RectTransform"/> on the scroll axis at startup.
-    /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class TsList : TsvrcBehaviour
     {
@@ -21,53 +13,42 @@ namespace Tsvrc.UI
         protected const int STATE_POPULATED = 2;
 
         [Header("References")]
-        [SerializeField] private ScrollRect _scrollRect;
-        [SerializeField] private RectTransform _content;
+        [Tooltip("Parent transform where item GameObjects are instantiated.\n" +
+                 "Typically the Content of a ScrollRect.")]
+        [SerializeField] private Transform _itemContainer;
+        [Tooltip("Prefab with a TsListItem component that represents a single list entry.")]
         [SerializeField] private GameObject _itemPrefab;
 
+        [Header("Pagination")]
+        [Tooltip("Number of items per page. Set to -1 to load all items at once with no pagination.")]
+        [SerializeField] private int _pageSize = -1;
+
         [Header("Visual States (optional)")]
+        [Tooltip("Shown while the list is in the loading state.")]
         [SerializeField] private GameObject _loadingIndicator;
+        [Tooltip("Shown when SetData is called with null or an empty list.")]
         [SerializeField] private GameObject _emptyIndicator;
 
         private DataList _data = null;
-        // pool[i] corresponds to data index (_firstVisible + i)
         private TsListItem[] _pool = new TsListItem[0];
         private int _listState = STATE_LOADING;
         private int _selectedIndex = -1;
-        private float _itemSize = 0f;
-        private bool _isHorizontal = false;
-        private int _firstVisible = 0;
-        private int _lastVisible = -1;
-        private float _lastScrollNorm = -1f;
-        private float _lastViewportSize = -1f;
+        private int _currentPage = 0;
 
         public int ListState => _listState;
         public int SelectedIndex => _selectedIndex;
-
-        protected override void TsStart()
-        {
-            if (_scrollRect != null)
-                _isHorizontal = _scrollRect.horizontal && !_scrollRect.vertical;
-
-            if (_itemPrefab != null)
-            {
-                var rt = (RectTransform)_itemPrefab.transform;
-                _itemSize = _isHorizontal ? rt.rect.width : rt.rect.height;
-            }
-            SetLoadingState();
-        }
+        public int CurrentPage => _currentPage;
+        public int PageCount => (_data != null && _pageSize > 0) ? Mathf.CeilToInt((float)_data.Count / _pageSize) : 1;
+        public bool HasNextPage => _currentPage < PageCount - 1;
+        public bool HasPreviousPage => _currentPage > 0;
 
         #region Public API
 
-        /// <summary>Loads data and populates the list from the top.</summary>
+        /// <summary>Loads data and resets to the first page.</summary>
         public void SetData(DataList data)
         {
             _data = data;
-            if (_scrollRect != null)
-            {
-                if (_isHorizontal) _scrollRect.horizontalNormalizedPosition = 0f;
-                else _scrollRect.verticalNormalizedPosition = 1f;
-            }
+            _currentPage = 0;
             _SetState(data != null && data.Count > 0 ? STATE_POPULATED : STATE_EMPTY);
         }
 
@@ -77,31 +58,45 @@ namespace Tsvrc.UI
             _SetState(STATE_LOADING);
         }
 
-        /// <summary>Called by <see cref="TsListItem._OnItemPressed"/>.</summary>
+        /// <summary>Destroys current items and instantiates items for the given page.</summary>
+        public void SetPage(int page)
+        {
+            if (_listState != STATE_POPULATED || _data == null) return;
+            _currentPage = Mathf.Clamp(page, 0, PageCount - 1);
+            _RebuildPool();
+        }
+
+        public void NextPage()
+        {
+            if (HasNextPage) SetPage(_currentPage + 1);
+        }
+
+        public void PreviousPage()
+        {
+            if (HasPreviousPage) SetPage(_currentPage - 1);
+        }
+
+        /// <summary>Called by TsListItem when pressed.</summary>
         public void OnItemSelected(int dataIndex)
         {
             _selectedIndex = dataIndex;
             TsEmit("OnItemSelected");
         }
 
-        /// <summary>Resets the selected index to -1 without emitting an event.</summary>
         public void ClearSelection()
         {
             _selectedIndex = -1;
         }
 
-        /// <summary>
-        /// Re-runs _OnBind on all currently visible items without destroying or repositioning them.
-        /// Call this after changing shared state that items read during binding (e.g. SelectedIndex).
-        /// </summary>
+        /// <summary>Re-binds all live items. Call after shared state changes (e.g. SelectedIndex).</summary>
         public void RefreshItems()
         {
             if (_listState != STATE_POPULATED) return;
-            int len = _pool.Length;
-            for (int i = 0; i < len; i++)
+            int start = _pageSize > 0 ? _currentPage * _pageSize : 0;
+            for (int i = 0; i < _pool.Length; i++)
             {
                 if (_pool[i] == null) continue;
-                int di = _firstVisible + i;
+                int di = start + i;
                 DataToken token = _data[di];
                 DataDictionary data = token.TokenType == TokenType.DataDictionary
                     ? token.DataDictionary
@@ -114,138 +109,38 @@ namespace Tsvrc.UI
 
         #region Private
 
-        private void Update()
-        {
-            if (_listState != STATE_POPULATED || _scrollRect == null) return;
-
-            float scrollNorm = _isHorizontal
-                ? _scrollRect.horizontalNormalizedPosition
-                : _scrollRect.verticalNormalizedPosition;
-            float viewportSize = _GetViewportSize();
-            if (scrollNorm == _lastScrollNorm && viewportSize == _lastViewportSize) return;
-            _lastScrollNorm = scrollNorm;
-            _lastViewportSize = viewportSize;
-
-            int newFirst = _ComputeFirstVisible(viewportSize);
-            int newLast = _ComputeLastVisible(newFirst, viewportSize);
-            if (newFirst != _firstVisible || newLast != _lastVisible)
-                _SyncPool(newFirst, newLast);
-        }
-
         private void _SetState(int state)
         {
             _listState = state;
             _ClearPool();
             _UpdateVisualState();
             if (state == STATE_POPULATED)
-            {
-                float viewportSize = _scrollRect != null ? _GetViewportSize() : 0f;
-                int first = _ComputeFirstVisible(viewportSize);
-                _SyncPool(first, _ComputeLastVisible(first, viewportSize));
-            }
+                _RebuildPool();
         }
 
         private void _UpdateVisualState()
         {
             if (_loadingIndicator != null) _loadingIndicator.SetActive(_listState == STATE_LOADING);
             if (_emptyIndicator != null) _emptyIndicator.SetActive(_listState == STATE_EMPTY);
-
-            if (_content != null)
-            {
-                var size = _content.sizeDelta;
-                float total = (_listState == STATE_POPULATED && _data != null && _itemSize > 0f)
-                    ? _data.Count * _itemSize
-                    : 0f;
-                if (_isHorizontal) size.x = total;
-                else size.y = total;
-                _content.sizeDelta = size;
-            }
         }
 
-        // Returns the viewport size on the scroll axis. Falls back to the ScrollRect's own
-        // transform if the viewport field is not assigned in the inspector.
-        private float _GetViewportSize()
+        private void _RebuildPool()
         {
-            RectTransform vp = _scrollRect.viewport != null
-                ? _scrollRect.viewport
-                : (RectTransform)_scrollRect.transform;
-            return _isHorizontal ? vp.rect.width : vp.rect.height;
-        }
+            _ClearPool();
+            if (_data == null || _itemPrefab == null || _itemContainer == null) return;
 
-        private int _ComputeFirstVisible(float viewportSize)
-        {
-            if (_scrollRect == null || _itemSize <= 0f || _data == null || _data.Count == 0) return 0;
-            float contentSize = _data.Count * _itemSize;
-            float norm = _isHorizontal ? _scrollRect.horizontalNormalizedPosition : (1f - _scrollRect.verticalNormalizedPosition);
-            float offset = norm * Mathf.Max(0f, contentSize - viewportSize);
-            return Mathf.Clamp(Mathf.FloorToInt(offset / _itemSize), 0, _data.Count - 1);
-        }
+            int start = _currentPage * (_pageSize > 0 ? _pageSize : int.MaxValue);
+            int end = _pageSize > 0 ? Mathf.Min(start + _pageSize, _data.Count) : _data.Count;
+            int count = end - start;
+            if (count <= 0) return;
 
-        private int _ComputeLastVisible(int firstVisible, float viewportSize)
-        {
-            if (_itemSize <= 0f || _data == null || _data.Count == 0) return -1;
-            return Mathf.Min(firstVisible + Mathf.CeilToInt(viewportSize / _itemSize), _data.Count - 1);
-        }
-
-        private void _SyncPool(int newFirst, int newLast)
-        {
-            int oldLen = _pool.Length;
-
-            // Unbind and destroy items that left the visible range
-            for (int i = 0; i < oldLen; i++)
+            _pool = new TsListItem[count];
+            for (int i = 0; i < count; i++)
             {
-                if (_pool[i] == null) continue;
-                int di = _firstVisible + i;
-                if (di < newFirst || di > newLast)
-                {
-                    _pool[i].Unbind();
-                    Destroy(_pool[i].gameObject);
-                    _pool[i] = null;
-                }
-            }
-
-            int needed = newFirst <= newLast ? newLast - newFirst + 1 : 0;
-            if (needed == 0)
-            {
-                _pool = new TsListItem[0];
-                _firstVisible = newFirst;
-                _lastVisible = newLast;
-                return;
-            }
-
-            TsListItem[] newPool = new TsListItem[needed];
-
-            for (int di = newFirst; di <= newLast; di++)
-            {
-                int newSlot = di - newFirst;
-                int oldSlot = di - _firstVisible;
-
-                // O(1) reuse: pool[i] always maps to data index (_firstVisible + i)
-                if (oldSlot >= 0 && oldSlot < oldLen && _pool[oldSlot] != null)
-                {
-                    newPool[newSlot] = _pool[oldSlot];
-                    continue;
-                }
-
-                GameObject go = Instantiate(_itemPrefab, _content);
+                int di = start + i;
+                GameObject go = Instantiate(_itemPrefab, _itemContainer);
                 TsListItem item = go.GetComponent<TsListItem>();
                 if (item == null) { Destroy(go); continue; }
-
-                RectTransform rt = (RectTransform)go.transform;
-                if (_isHorizontal)
-                {
-                    rt.anchorMin = new Vector2(0f, 0f);
-                    rt.anchorMax = new Vector2(0f, 1f);
-                    rt.pivot = new Vector2(0f, 0.5f);
-                    rt.anchoredPosition = new Vector2(di * _itemSize, 0f);
-                }
-                else
-                {
-                    rt.anchorMin = new Vector2(0f, 1f);
-                    rt.anchorMax = new Vector2(1f, 1f);
-                    rt.pivot = new Vector2(0.5f, 1f);
-                    rt.anchoredPosition = new Vector2(0f, -di * _itemSize);
-                }
 
                 DataToken token = _data[di];
                 DataDictionary data = token.TokenType == TokenType.DataDictionary
@@ -254,26 +149,19 @@ namespace Tsvrc.UI
 
                 item.TsConstruct(this);
                 item.Bind(this, di, data);
-                newPool[newSlot] = item;
+                _pool[i] = item;
             }
-
-            _pool = newPool;
-            _firstVisible = newFirst;
-            _lastVisible = newLast;
         }
 
         private void _ClearPool()
         {
-            int len = _pool.Length;
-            for (int i = 0; i < len; i++)
+            for (int i = 0; i < _pool.Length; i++)
             {
                 if (_pool[i] == null) continue;
                 _pool[i].Unbind();
                 Destroy(_pool[i].gameObject);
             }
             _pool = new TsListItem[0];
-            _firstVisible = 0;
-            _lastVisible = -1;
         }
 
         #endregion
