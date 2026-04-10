@@ -84,6 +84,32 @@ namespace Tsvrc.UI
             TsEmit("OnItemSelected");
         }
 
+        /// <summary>Resets the selected index to -1 without emitting an event.</summary>
+        public void ClearSelection()
+        {
+            _selectedIndex = -1;
+        }
+
+        /// <summary>
+        /// Re-runs _OnBind on all currently visible items without destroying or repositioning them.
+        /// Call this after changing shared state that items read during binding (e.g. SelectedIndex).
+        /// </summary>
+        public void RefreshItems()
+        {
+            if (_listState != STATE_POPULATED) return;
+            int len = _pool.Length;
+            for (int i = 0; i < len; i++)
+            {
+                if (_pool[i] == null) continue;
+                int di = _firstVisible + i;
+                DataToken token = _data[di];
+                DataDictionary data = token.TokenType == TokenType.DataDictionary
+                    ? token.DataDictionary
+                    : new DataDictionary();
+                _pool[i].Bind(this, di, data);
+            }
+        }
+
         #endregion
 
         #region Private
