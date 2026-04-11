@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -12,20 +13,19 @@ using UnityEngine;
 namespace Tsvrc.Editor
 {
     /// <summary>
-    /// Compiler module that bakes all language JSON files into a single TextAsset and wires
-    /// pre-resolved TMP text targets into CompiledTsvrc.
+    /// Compiler module that bakes all language data directly into the generated C# source as flat
+    /// parallel string arrays — no JSON asset loaded, no DataDictionary, zero GC pressure at runtime.
     ///
-    /// Combined asset format (minified JSON stored at Assets/CompiledTsvrc/translations.txt):
-    /// <code>
-    /// {"en":{"_key_":"Value"},"jp":{"_key_":"値"}}
-    /// </code>
-    ///
-    /// Runtime-generated members on CompiledTsvrc:
+    /// Generated members on CompiledTsvrc:
     ///   - public enum Language  { … }
-    ///   - private TextAsset _translationsAsset
-    ///   - private TextMeshProUGUI[] _translationTargets
-    ///   - private string[] _languageKeys  (parallel with enum ordinals)
-    ///   - public void SetLanguage(Language lang)
+    ///   - private string[] _tsKeys_{lang}, _tsVals_{lang}  — one pair per language, baked as literals
+    ///   - private string[] _tsCurrentKeys, _tsCurrentVals  — pointers to the active language arrays
+    ///   - private int _tsCurrentLang                       — guard against redundant SetLanguage calls
+    ///   - private TextMeshProUGUI[] _translationTargets    — scene-wired TMPs (serialized)
+    ///   - public void SetLanguage(Language lang)           — switches pointers; starts batched target update
+    ///   - public string Translate(string key)              — O(n) scan, n ≈ number of keys (small)
+    ///   - public string Translate(string key, string param)— same with {value} substitution
+    ///   - public void _TsApplyTranslationBatch()           — batched per-frame update of static targets
     /// </summary>
     internal class TranslationModule : TsvrcModule
     {
@@ -41,14 +41,13 @@ namespace Tsvrc.Editor
         }
 
         private List<LanguageEntry> _languages = new List<LanguageEntry>();
-        private List<(string name, bool isUI)> _targetNames = new List<(string, bool)>();
-
         private List<TextMeshProUGUI> _targets = new List<TextMeshProUGUI>();
+
+        private const int BatchSize = 20;
 
         internal override void Scan(TsvrcConfig config)
         {
             _languages.Clear();
-            _targetNames.Clear();
             _targets.Clear();
 
             LoadLanguages();
@@ -117,7 +116,7 @@ namespace Tsvrc.Editor
                     Entries = entries,
                 };
             }
-            catch (JsonException ex)
+            catch (Exception ex)
             {
                 Debug.LogError($"[TranslationModule] Failed to parse language file '{assetName}': {ex.Message}");
                 return null;
@@ -126,7 +125,7 @@ namespace Tsvrc.Editor
 
         private void CollectTMPTargets()
         {
-            foreach (var tmp in Object.FindObjectsOfType<TextMeshProUGUI>(true))
+            foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TextMeshProUGUI>(true))
                 if (TargetPattern.IsMatch(tmp.gameObject.name))
                     _targets.Add(tmp);
         }
@@ -135,7 +134,6 @@ namespace Tsvrc.Editor
         {
             if (_languages.Count == 0) yield break;
             yield return "TMPro";
-            yield return "VRC.SDK3.Data";
         }
 
         internal override void WriteBeforeClass(CsWriter w)
@@ -151,21 +149,36 @@ namespace Tsvrc.Editor
 
             w.Region("Translation");
 
-            // Language-key lookup array (parallel with enum ordinals)
-            var keyLiterals = new List<string>();
+            // Bake key/value pairs per language as flat parallel arrays.
+            // All data is known at compile time — no TextAsset, no DataDictionary, no JSON parsing at runtime.
             foreach (var lang in _languages)
-                keyLiterals.Add($"\"{EscapeString(lang.Key)}\"");
-            w.Line($"private string[] _languageKeys = new string[] {{ {string.Join(", ", keyLiterals)} }};");
+            {
+                var id = SanitizeIdentifier(lang.Key);
+                var keyLits = new List<string>();
+                var valLits = new List<string>();
+                foreach (var kv in lang.Entries)
+                {
+                    keyLits.Add($"\"{EscapeString(kv.Key)}\"");
+                    valLits.Add($"\"{EscapeString(kv.Value)}\"");
+                }
+                w.Line($"private string[] _tsKeys_{id} = new string[] {{ {string.Join(", ", keyLits)} }};");
+                w.Line($"private string[] _tsVals_{id} = new string[] {{ {string.Join(", ", valLits)} }};");
+            }
 
-            // Baked text asset
-            w.Line("[HideInInspector] [SerializeField] private TextAsset _translationsAsset;");
+            // Active language — just two pointers, switched in O(1) by SetLanguage.
+            w.Line("private string[] _tsCurrentKeys;");
+            w.Line("private string[] _tsCurrentVals;");
+            // Guard against redundant SetLanguage calls (-1 = none set).
+            w.Line("private int _tsCurrentLang = -1;");
 
-            // TMP target array
             if (_targets.Count > 0)
-                w.Line($"[HideInInspector] [SerializeField] private TMPro.TextMeshProUGUI[] _translationTargets;");
-
-            // Cached entries for the active language (used by Translate)
-            w.Line("private VRC.SDK3.Data.DataDictionary _currentEntries;");
+            {
+                // Scene-wired TMP targets — serialized references baked at compile time.
+                w.Line("[HideInInspector] [SerializeField] private TMPro.TextMeshProUGUI[] _translationTargets;");
+                // Batched visual update state.
+                w.Line("private int _tsBatchIndex;");
+                w.Line("private bool _tsBatchRunning;");
+            }
 
             w.EndRegion();
         }
@@ -174,50 +187,84 @@ namespace Tsvrc.Editor
         {
             if (_languages.Count == 0) return;
 
+            // SetLanguage — switches active array pointers; O(1), no allocation.
             using (w.Method("public void SetLanguage(Language lang)"))
             {
-                w.Line("if (_translationsAsset == null) { Debug.LogError(\"[CompiledTsvrc] Translation asset is missing. Recompile Tsvrc to fix it.\"); return; }");
-                w.Line("VRC.SDK3.Data.DataToken _tsRoot;");
-                w.Line("if (!VRC.SDK3.Data.VRCJson.TryDeserializeFromJson(_translationsAsset.text, out _tsRoot)) { Debug.LogError(\"[CompiledTsvrc] Failed to parse translation data.\"); return; }");
-                w.Line("VRC.SDK3.Data.DataToken _tsLang;");
-                w.Line("if (!_tsRoot.DataDictionary.TryGetValue(_languageKeys[(int)lang], out _tsLang)) { Debug.LogError($\"[CompiledTsvrc] Language key not found: {_languageKeys[(int)lang]}\"); return; }");
-                w.Line("var _tsEntries = _tsLang.DataDictionary;");
-                w.Line("_currentEntries = _tsEntries;");
-                w.Line("VRC.SDK3.Data.DataToken _tsVal;");
+                w.Line("int _tsIdx = (int)lang;");
+                w.Line("if (_tsIdx == _tsCurrentLang) return;");
+
+                // Emit if/else chain to assign the correct baked arrays.
+                for (int i = 0; i < _languages.Count; i++)
+                {
+                    var id = SanitizeIdentifier(_languages[i].Key);
+                    string prefix = i == 0 ? "if" : "else if";
+                    w.Line($"{prefix} (_tsIdx == {i}) {{ _tsCurrentKeys = _tsKeys_{id}; _tsCurrentVals = _tsVals_{id}; }}");
+                }
+                w.Line($"else {{ Debug.LogError($\"[CompiledTsvrc] Language index {{_tsIdx}} is not available.\"); return; }}");
+                w.Line("_tsCurrentLang = _tsIdx;");
 
                 if (_targets.Count > 0)
                 {
-                    using (w.Block("foreach (var _tsTmp in _translationTargets)"))
-                    {
-                        w.Line("if (_tsEntries.TryGetValue(_tsTmp.gameObject.name, out _tsVal))");
-                        w.Line("    _tsTmp.text = _tsVal.String;");
-                    }
+                    w.Line("_tsBatchIndex = 0;");
+                    w.Line("_tsBatchRunning = true;");
+                    w.Line("_TsApplyTranslationBatch();");
                 }
             }
 
+            // Translate — linear scan across baked keys. With ~20 keys this is negligible.
+            using (w.Method("public string Translate(string key)"))
+            {
+                w.Line("if (_tsCurrentKeys == null) { Debug.LogWarning(\"[CompiledTsvrc] Translate called before SetLanguage.\"); return key; }");
+                using (w.Block("for (int _tsI = 0; _tsI < _tsCurrentKeys.Length; _tsI++)"))
+                    w.Line("if (_tsCurrentKeys[_tsI] == key) return _tsCurrentVals[_tsI];");
+                w.Line("return key;");
+            }
+
+            // Translate with {value} substitution.
             using (w.Method("public string Translate(string key, string param)"))
             {
-                w.Line("if (_currentEntries == null) { Debug.LogWarning(\"[CompiledTsvrc] Translate called before SetLanguage.\"); return key; }");
-                w.Line("VRC.SDK3.Data.DataToken _tsVal;");
-                w.Line("if (!_currentEntries.TryGetValue(key, out _tsVal)) return key;");
-                w.Line("return _tsVal.String.Replace(\"{value}\", param);");
+                w.Line("if (_tsCurrentKeys == null) { Debug.LogWarning(\"[CompiledTsvrc] Translate called before SetLanguage.\"); return key; }");
+                using (w.Block("for (int _tsI = 0; _tsI < _tsCurrentKeys.Length; _tsI++)"))
+                    w.Line("if (_tsCurrentKeys[_tsI] == key) return _tsCurrentVals[_tsI].Replace(\"{value}\", param);");
+                w.Line("return key;");
+            }
+
+            // Batched scene-target update — only generated when there are static targets.
+            if (_targets.Count > 0)
+            {
+                using (w.Method("public void _TsApplyTranslationBatch()"))
+                {
+                    w.Line("if (!_tsBatchRunning || _tsCurrentKeys == null) return;");
+                    w.Line($"int _tsEnd = Mathf.Min(_tsBatchIndex + {BatchSize}, _translationTargets.Length);");
+                    using (w.Block("for (int _tsI = _tsBatchIndex; _tsI < _tsEnd; _tsI++)"))
+                    {
+                        w.Line("if (_translationTargets[_tsI] == null) continue;");
+                        w.Line("string _tsName = _translationTargets[_tsI].gameObject.name;");
+                        using (w.Block("for (int _tsJ = 0; _tsJ < _tsCurrentKeys.Length; _tsJ++)"))
+                        {
+                            using (w.Block("if (_tsCurrentKeys[_tsJ] == _tsName)"))
+                            {
+                                w.Line("_translationTargets[_tsI].text = _tsCurrentVals[_tsJ];");
+                                w.Line("break;");
+                            }
+                        }
+                    }
+                    w.Line("_tsBatchIndex = _tsEnd;");
+                    using (w.Block("if (_tsBatchIndex < _translationTargets.Length)"))
+                        w.Line("SendCustomEventDelayedFrames(\"_TsApplyTranslationBatch\", 1);");
+                    w.Line("else _tsBatchRunning = false;");
+                }
             }
         }
 
-        internal override void WriteStartBody(CsWriter w) { /* nothing to construct */ }
+        internal override void WriteStartBody(CsWriter w) { /* arrays are baked — no runtime init needed */ }
 
         internal override void Wire(SerializedObject target)
         {
             if (_languages.Count == 0) return;
 
+            // Still bake the combined JSON for developer reference / debugging only — not used at runtime.
             BakeCombinedAsset();
-
-            var assetProp = target.FindProperty("_translationsAsset");
-            if (assetProp != null)
-            {
-                var ta = AssetDatabase.LoadAssetAtPath<TextAsset>(TranslationAssetRelPath);
-                assetProp.objectReferenceValue = ta;
-            }
 
             if (_targets.Count > 0)
             {
@@ -254,7 +301,9 @@ namespace Tsvrc.Editor
 
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string absPath = Path.Combine(projectRoot, TranslationAssetRelPath.Replace('/', Path.DirectorySeparatorChar));
-            Directory.CreateDirectory(Path.GetDirectoryName(absPath));
+            string absDir = Path.GetDirectoryName(absPath);
+            if (!string.IsNullOrEmpty(absDir))
+                Directory.CreateDirectory(absDir);
             File.WriteAllText(absPath, sb.ToString(), Encoding.UTF8);
             AssetDatabase.ImportAsset(TranslationAssetRelPath);
         }
@@ -266,11 +315,19 @@ namespace Tsvrc.Editor
             foreach (var lang in _languages)
             {
                 var baseName = SanitizeIdentifier(lang.Label);
-                var name = seen.Contains(baseName)
-                    ? baseName + "_" + SanitizeIdentifier(lang.Key)
-                    : baseName;
-                seen.Add(baseName); // prevent future labels from colliding with this base
-                seen.Add(name);     // prevent duplicate after suffix
+                string name;
+                if (!seen.Contains(baseName))
+                {
+                    name = baseName;
+                }
+                else
+                {
+                    name = baseName + "_" + SanitizeIdentifier(lang.Key);
+                    int counter = 2;
+                    while (seen.Contains(name))
+                        name = baseName + "_" + SanitizeIdentifier(lang.Key) + counter++;
+                }
+                seen.Add(name);
                 names.Add(name);
             }
             return names;
@@ -287,7 +344,7 @@ namespace Tsvrc.Editor
             }
             if (sb.Length == 0) return "_";
             if (char.IsDigit(sb[0])) sb.Insert(0, '_');
-            return sb.ToString().Trim('_');
+            return sb.ToString();
         }
 
         private static string EscapeString(string s)
