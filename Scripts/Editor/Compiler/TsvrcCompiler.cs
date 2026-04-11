@@ -83,7 +83,6 @@ namespace Tsvrc.Editor
             // Delete only the auto-generated files; never wipe the whole folder so that
             // user assets (TranslationConfig.asset, MolInstance.asset, …) are preserved.
             DeleteGeneratedAsset(GeneratedFilePath);
-            DeleteGeneratedAsset(GeneratedFolder + "/translations.txt");
         }
 
         private static void DeleteGeneratedAsset(string assetPath)

@@ -1,7 +1,6 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
@@ -29,7 +28,6 @@ namespace Tsvrc.Editor
     /// </summary>
     internal class TranslationModule : TsvrcModule
     {
-        private const string TranslationAssetRelPath = "Assets/CompiledTsvrc/translations.txt";
         private const string TranslationConfigAssetPath = "Assets/CompiledTsvrc/TranslationConfig.asset";
         private static readonly Regex TargetPattern = new Regex(@"^_[^_].*[^_]_$|^_[^_]_$", RegexOptions.Compiled);
 
@@ -263,9 +261,6 @@ namespace Tsvrc.Editor
         {
             if (_languages.Count == 0) return;
 
-            // Still bake the combined JSON for developer reference / debugging only — not used at runtime.
-            BakeCombinedAsset();
-
             if (_targets.Count > 0)
             {
                 var targetsProp = target.FindProperty("_translationTargets");
@@ -276,36 +271,6 @@ namespace Tsvrc.Editor
                         targetsProp.GetArrayElementAtIndex(i).objectReferenceValue = _targets[i];
                 }
             }
-        }
-
-        private void BakeCombinedAsset()
-        {
-            var sb = new StringBuilder("{");
-            bool firstLang = true;
-            foreach (var lang in _languages)
-            {
-                if (!firstLang) sb.Append(',');
-                firstLang = false;
-
-                sb.Append($"\"{EscapeString(lang.Key)}\":{{");
-                bool firstEntry = true;
-                foreach (var kv in lang.Entries)
-                {
-                    if (!firstEntry) sb.Append(',');
-                    firstEntry = false;
-                    sb.Append($"\"{EscapeString(kv.Key)}\":\"{EscapeString(kv.Value)}\"");
-                }
-                sb.Append('}');
-            }
-            sb.Append('}');
-
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            string absPath = Path.Combine(projectRoot, TranslationAssetRelPath.Replace('/', Path.DirectorySeparatorChar));
-            string absDir = Path.GetDirectoryName(absPath);
-            if (!string.IsNullOrEmpty(absDir))
-                Directory.CreateDirectory(absDir);
-            File.WriteAllText(absPath, sb.ToString(), Encoding.UTF8);
-            AssetDatabase.ImportAsset(TranslationAssetRelPath);
         }
 
         private List<string> BuildEnumNames()
