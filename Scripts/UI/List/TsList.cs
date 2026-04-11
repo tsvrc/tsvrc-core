@@ -17,7 +17,7 @@ namespace Tsvrc.UI
                  "Typically the Content of a ScrollRect.")]
         [SerializeField] private Transform _itemContainer;
         [Tooltip("Prefab with a TsListItem component that represents a single list entry.")]
-        [SerializeField] private GameObject _itemPrefab;
+        [SerializeField] private TsListItem _itemPrefab;
 
         [Header("Pagination")]
         [Tooltip("Number of items per page. Set to -1 to load all items at once with no pagination.")]
@@ -138,7 +138,7 @@ namespace Tsvrc.UI
             for (int i = 0; i < count; i++)
             {
                 int di = start + i;
-                GameObject go = Instantiate(_itemPrefab, _itemContainer);
+                GameObject go = Instantiate(_itemPrefab.gameObject, _itemContainer);
                 TsListItem item = go.GetComponent<TsListItem>();
                 if (item == null) { Destroy(go); continue; }
 
