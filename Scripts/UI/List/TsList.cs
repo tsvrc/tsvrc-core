@@ -50,6 +50,7 @@ namespace Tsvrc.UI
         {
             _data = data;
             _currentPage = 0;
+            if (data == null) _selectedIndex = -1;
             _SetState(data != null && data.Count > 0 ? STATE_POPULATED : STATE_EMPTY);
         }
 
