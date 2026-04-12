@@ -8,6 +8,7 @@ namespace Tsvrc.UI
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class TsList : TsvrcBehaviour
     {
+        public const string OnItemSelectedEvent = "OnItemSelected";
         protected const int STATE_LOADING = 0;
         protected const int STATE_EMPTY = 1;
         protected const int STATE_POPULATED = 2;
@@ -80,29 +81,12 @@ namespace Tsvrc.UI
         public void OnItemSelected(int dataIndex)
         {
             _selectedIndex = dataIndex;
-            TsEmit("OnItemSelected");
+            TsEmit(OnItemSelectedEvent);
         }
 
         public void ClearSelection()
         {
             _selectedIndex = -1;
-        }
-
-        /// <summary>Re-binds all live items. Call after shared state changes (e.g. SelectedIndex).</summary>
-        public void RefreshItems()
-        {
-            if (_listState != STATE_POPULATED) return;
-            int start = _pageSize > 0 ? _currentPage * _pageSize : 0;
-            for (int i = 0; i < _pool.Length; i++)
-            {
-                if (_pool[i] == null) continue;
-                int di = start + i;
-                DataToken token = _data[di];
-                DataDictionary data = token.TokenType == TokenType.DataDictionary
-                    ? token.DataDictionary
-                    : new DataDictionary();
-                _pool[i].Bind(this, di, data);
-            }
         }
 
         #endregion
