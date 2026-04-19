@@ -48,16 +48,14 @@ namespace Tsvrc.Editor
             _fields = resolved.Where(f => f.SlotCount > 0).OrderBy(f => f.Name).ToList();
         }
 
-        private HashSet<TsvrcField> ResolveFields(TsvrcConfig config)
+        private List<TsvrcField> ResolveFields(TsvrcConfig config)
         {
             var internalConfig = TsvrcCompiler.LoadInternalConfig();
             var internalPool = internalConfig?.PoolPrefabs ?? Array.Empty<TsvrcProcess>();
-            var objects = config.TsvrcProcessPool
-                .Union(internalPool)
-                .Cast<UnityEngine.Object>()
-                .ToHashSet();
-
-            var resolved = TsvrcResolver.Resolve(objects, new HashSet<string>());
+            var resolved = TsvrcResolver.Resolve(
+                (config.TsvrcProcessPool ?? Array.Empty<TsvrcProcess>())
+                    .Union(internalPool)
+                    .Cast<UnityEngine.Object>());
 
             foreach (var field in resolved)
             {

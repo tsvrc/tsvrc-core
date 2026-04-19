@@ -21,8 +21,8 @@ namespace Tsvrc.Editor
         {
             var internalConfig = TsvrcCompiler.LoadInternalConfig();
             var internalSingletons = internalConfig?.Singletons ?? Array.Empty<UnityEngine.Object>();
-            var objects = config.Singletons.Union(internalSingletons).ToHashSet();
-            var resolved = TsvrcResolver.Resolve(objects, new HashSet<string>());
+            var resolved = TsvrcResolver.Resolve(
+                (config.Singletons ?? Array.Empty<UnityEngine.Object>()).Union(internalSingletons));
 
             foreach (var field in resolved)
                 field.CallSites = SourceScanner.FindCallSites(

@@ -35,67 +35,25 @@ namespace Tsvrc.Editor
 
         internal override void Scan(TsvrcConfig config)
         {
-            _fields.Clear();
-
             var usedNames = new HashSet<string>();
             var fields = new List<TsvrcField>();
 
-            // User-defined factory groups from TsvrcConfig
             if (config.Factories != null)
                 foreach (var group in config.Factories)
                 {
                     if (group?.Prefabs == null) continue;
-                    ScanGroup(group.GroupName, group.Prefabs, usedNames, fields);
+                    ScanGroup(group.GroupName, group.Prefabs, usedNames, fields, activeFieldNames: null);
                 }
 
-            // Library-internal factory groups from InternalTsvrcConfig
             var internalConfig = TsvrcCompiler.LoadInternalConfig();
             if (internalConfig?.Factories != null)
                 foreach (var group in internalConfig.Factories)
                 {
                     if (group?.Prefabs == null) continue;
-                    ScanGroup(group.GroupName, group.Prefabs, usedNames, fields);
+                    ScanGroup(group.GroupName, group.Prefabs, usedNames, fields, activeFieldNames: null);
                 }
 
             _fields = fields.OrderBy(f => f.Name).ToList();
-        }
-
-        private void ScanGroup(string groupName, UnityEngine.Object[] prefabs, HashSet<string> usedNames, List<TsvrcField> fields)
-        {
-            string groupPrefix = string.IsNullOrEmpty(groupName)
-                ? string.Empty
-                : Sanitize(groupName);
-
-            foreach (var obj in prefabs)
-            {
-                if (obj == null) continue;
-
-                var prefab = obj is Component c ? c.gameObject : obj as GameObject;
-                if (prefab == null) continue;
-
-                if (!EditorUtility.IsPersistent(prefab))
-                {
-                    Debug.LogWarning($"[Tsvrc] Factory entry '{prefab.name}' is a scene object, not a prefab asset. Drag a prefab asset from the Project window instead. Skipping.");
-                    continue;
-                }
-
-                var behaviour = prefab.GetComponent<TsvrcBehaviour>();
-                var type = behaviour != null ? behaviour.GetType() : null;
-
-                string name = DeriveUniqueName(groupPrefix + Sanitize(prefab.name), usedNames);
-                usedNames.Add(name);
-
-                var pattern = new Regex(@"\b_ts\s*\.\s*Create" + Regex.Escape(name) + @"\s*\(");
-
-                fields.Add(new TsvrcField
-                {
-                    Name = name,
-                    Type = type != null ? type.Name : "GameObject",
-                    Namespace = type?.Namespace ?? string.Empty,
-                    SourceObject = (UnityEngine.Object)behaviour ?? prefab,
-                    CallSites = SourceScanner.FindCallSites(pattern),
-                });
-            }
         }
 
         // Strips whitespace and ensures PascalCase first letter so names are valid C# identifiers.
@@ -127,24 +85,16 @@ namespace Tsvrc.Editor
             // Read directly from config — _fields is only populated after Scan(), which is not
             // guaranteed to have run when the watcher calls this at import time.
             var config = UnityEngine.Object.FindObjectOfType<Tsvrc.Core.TsvrcConfig>();
-            if (config?.Factories == null) yield break;
+            foreach (var path in FactoryPrefabPaths(config?.Factories))
+                yield return path;
+            foreach (var path in FactoryPrefabPaths(TsvrcCompiler.LoadInternalConfig()?.Factories))
+                yield return path;
+        }
 
-            foreach (var group in config.Factories)
-            {
-                if (group?.Prefabs == null) continue;
-                foreach (var obj in group.Prefabs)
-                {
-                    if (obj == null) continue;
-                    var path = AssetDatabase.GetAssetPath(obj);
-                    if (!string.IsNullOrEmpty(path))
-                        yield return path;
-                }
-            }
-
-            var internalConfig = TsvrcCompiler.LoadInternalConfig();
-            if (internalConfig?.Factories == null) yield break;
-
-            foreach (var group in internalConfig.Factories)
+        private static IEnumerable<string> FactoryPrefabPaths(TsvrcFactoryGroup[] groups)
+        {
+            if (groups == null) yield break;
+            foreach (var group in groups)
             {
                 if (group?.Prefabs == null) continue;
                 foreach (var obj in group.Prefabs)
@@ -158,9 +108,8 @@ namespace Tsvrc.Editor
         }
 
         /// <summary>
-        /// Wire-only scan: resolves factory fields from config without scanning source files for
-        /// call sites. Uses reflection on the compiled type to determine which fields are active
-        /// (were generated during the last full compile, meaning they had call sites at that time).
+        /// Wire-only scan: uses reflection on the compiled type to include only factory fields that
+        /// were generated during the last full compile (i.e. had call sites at that time).
         /// </summary>
         internal override void ScanForWire(TsvrcConfig config, Type compiledType)
         {
@@ -175,7 +124,7 @@ namespace Tsvrc.Editor
                 foreach (var group in config.Factories)
                 {
                     if (group?.Prefabs == null) continue;
-                    ScanGroupForWire(group.GroupName, group.Prefabs, usedNames, fields, activeFieldNames);
+                    ScanGroup(group.GroupName, group.Prefabs, usedNames, fields, activeFieldNames);
                 }
 
             var internalConfig = TsvrcCompiler.LoadInternalConfig();
@@ -183,13 +132,26 @@ namespace Tsvrc.Editor
                 foreach (var group in internalConfig.Factories)
                 {
                     if (group?.Prefabs == null) continue;
-                    ScanGroupForWire(group.GroupName, group.Prefabs, usedNames, fields, activeFieldNames);
+                    ScanGroup(group.GroupName, group.Prefabs, usedNames, fields, activeFieldNames);
                 }
 
             _fields = fields.OrderBy(f => f.Name).ToList();
         }
 
-        private void ScanGroupForWire(string groupName, UnityEngine.Object[] prefabs, HashSet<string> usedNames, List<TsvrcField> fields, HashSet<string> activeFieldNames)
+        /// <summary>
+        /// Scans a factory group and adds fields to <paramref name="fields"/>.
+        /// <para>
+        /// When <paramref name="activeFieldNames"/> is <c>null</c> (full compile): all prefabs are
+        /// included and <c>CallSites</c> is populated by scanning user source files.
+        /// </para>
+        /// <para>
+        /// When <paramref name="activeFieldNames"/> is provided (wire-only): only prefabs whose
+        /// serialized field already exists in the compiled type are included, and
+        /// <c>CallSites</c> is set to <c>null</c> to signal to <see cref="Wire"/> that the field
+        /// must be wired unconditionally (it was active at the last full compile).
+        /// </para>
+        /// </summary>
+        private void ScanGroup(string groupName, UnityEngine.Object[] prefabs, HashSet<string> usedNames, List<TsvrcField> fields, HashSet<string> activeFieldNames)
         {
             string groupPrefix = string.IsNullOrEmpty(groupName) ? string.Empty : Sanitize(groupName);
 
@@ -199,7 +161,13 @@ namespace Tsvrc.Editor
 
                 var prefab = obj is Component c ? c.gameObject : obj as GameObject;
                 if (prefab == null) continue;
-                if (!EditorUtility.IsPersistent(prefab)) continue;
+
+                if (!EditorUtility.IsPersistent(prefab))
+                {
+                    if (activeFieldNames == null) // Only warn during full compile.
+                        Debug.LogWarning($"[Tsvrc] Factory entry '{prefab.name}' is a scene object, not a prefab asset. Drag a prefab asset from the Project window instead. Skipping.");
+                    continue;
+                }
 
                 var behaviour = prefab.GetComponent<TsvrcBehaviour>();
                 var type = behaviour != null ? behaviour.GetType() : null;
@@ -207,9 +175,8 @@ namespace Tsvrc.Editor
                 string name = DeriveUniqueName(groupPrefix + Sanitize(prefab.name), usedNames);
                 usedNames.Add(name);
 
-                // Only include fields that exist in the compiled type — meaning they had call sites
-                // during the last full compile and a serialized field was generated for them.
-                if (!activeFieldNames.Contains(FieldName(name))) continue;
+                // Wire-only: skip fields not present in the compiled type.
+                if (activeFieldNames != null && !activeFieldNames.Contains(FieldName(name))) continue;
 
                 fields.Add(new TsvrcField
                 {
@@ -217,7 +184,11 @@ namespace Tsvrc.Editor
                     Type = type != null ? type.Name : "GameObject",
                     Namespace = type?.Namespace ?? string.Empty,
                     SourceObject = (UnityEngine.Object)behaviour ?? prefab,
-                    CallSites = null, // Wire-only path — reflection filtering above replaces call-site scanning.
+                    // Full compile: scan call sites. Wire-only (activeFieldNames != null): null
+                    // signals Wire() to include this field unconditionally.
+                    CallSites = activeFieldNames == null
+                        ? SourceScanner.FindCallSites(new Regex(@"\b_ts\s*\.\s*Create" + Regex.Escape(name) + @"\s*\("))
+                        : null,
                 });
             }
         }
@@ -231,7 +202,7 @@ namespace Tsvrc.Editor
 
             w.Region("Factories");
             foreach (var field in _fields)
-                if (field.CallSites.Count > 0)
+                if (field.CallSites?.Count > 0)
                     w.Line($"[HideInInspector] [SerializeField] private GameObject {FieldName(field.Name)};");
             w.EndRegion();
         }
@@ -252,7 +223,7 @@ namespace Tsvrc.Editor
 
                 using (w.Method($"public {field.Type} Create{field.Name}(Transform parent)"))
                 {
-                    if (field.CallSites.Count == 0)
+                    if (field.CallSites?.Count == 0)
                     {
                         w.Line($"Debug.LogError(\"{TsvrcCodeGen.NullFieldMessage($"Create{field.Name}")}\");");
                         w.Line("return null;");
@@ -298,9 +269,9 @@ namespace Tsvrc.Editor
 
             foreach (var field in _fields)
             {
-                // Full-compile path: CallSites is set — skip fields with no call sites (they get stubs).
+                // Full-compile path: CallSites is non-null — skip fields with no call sites (they get stubs).
                 // Wire-only path: CallSites is null — field was filtered via reflection and must be wired.
-                if (field.CallSites != null && field.CallSites.Count == 0) continue;
+                if (field.CallSites?.Count == 0) continue;
 
                 var prop = target.FindProperty(FieldName(field.Name));
                 if (prop == null)

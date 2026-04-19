@@ -26,9 +26,7 @@ namespace Tsvrc.Editor
         {
             if (config.Instance != null)
             {
-                var resolved = TsvrcResolver.Resolve(
-                    new HashSet<UnityEngine.Object> { config.Instance },
-                    new HashSet<string>());
+                var resolved = TsvrcResolver.Resolve(new[] { (UnityEngine.Object)config.Instance });
                 _field = resolved.FirstOrDefault();
                 _autoDetected = false;
                 return;

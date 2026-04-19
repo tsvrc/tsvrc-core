@@ -1,6 +1,8 @@
 #if UNITY_EDITOR
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Tsvrc.Core;
 using UnityEditor;
 using UnityEngine;
@@ -8,8 +10,9 @@ using UnityEngine;
 namespace Tsvrc.Editor
 {
     /// <summary>
-    /// Scans config.TsvrcBehaviourConstruct and emits the Bootstrap region.
+    /// Scans config.TsvrcBehaviourConstruct and emits the Constructs region.
     /// All entries receive TsConstruct(this) in Start().
+    /// Unlike singletons, constructs are always wired — no call-site scanning is required.
     /// </summary>
     internal class ConstructModule : TsvrcModule
     {
@@ -17,13 +20,21 @@ namespace Tsvrc.Editor
 
         internal override void Scan(TsvrcConfig config)
         {
-            var usedNames = new HashSet<string>();
-            var objects = config.TsvrcBehaviourConstruct
-                .Cast<Object>()
-                .ToHashSet();
+            _fields = ResolveFields(config);
+        }
 
-            _fields = TsvrcResolver.Resolve(objects, usedNames)
-                .OrderBy(f => f.Name)
+        /// <summary>
+        /// Wire-only scan: uses reflection to skip any construct whose field was not generated
+        /// during the last full compile (e.g. a new entry added without recompiling).
+        /// </summary>
+        internal override void ScanForWire(TsvrcConfig config, Type compiledType)
+        {
+            var activeFieldNames = new HashSet<string>(
+                compiledType.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Select(f => f.Name));
+
+            _fields = ResolveFields(config)
+                .Where(f => activeFieldNames.Contains(FieldName(f)))
                 .ToList();
         }
 
@@ -35,30 +46,42 @@ namespace Tsvrc.Editor
             if (_fields.Count == 0) return;
             w.Region("Constructs");
             foreach (var field in _fields)
-                w.Line($"[HideInInspector] [SerializeField] private {field.Type} {PrivateFieldName(field)};");
+                w.Line($"[HideInInspector] [SerializeField] private {field.Type} {FieldName(field)};");
             w.EndRegion();
         }
 
         internal override void WriteStartBody(CsWriter w)
         {
             foreach (var field in _fields)
-                w.Line($"{PrivateFieldName(field)}.TsConstruct(this);");
+                w.Line($"{FieldName(field)}.TsConstruct(this);");
         }
 
         internal override void Wire(SerializedObject target)
         {
             foreach (var field in _fields)
             {
-                var prop = target.FindProperty(PrivateFieldName(field));
+                if (field.SourceObject == null)
+                {
+                    Debug.LogWarning($"[TsvrcWirer] Construct '{field.Name}' source object is null — remove the missing entry from TsvrcConfig and recompile.");
+                    continue;
+                }
+
+                var prop = target.FindProperty(FieldName(field));
                 if (prop != null)
                     prop.objectReferenceValue = field.SourceObject;
                 else
-                    Debug.LogWarning($"[TsvrcWirer] Bootstrap property '{PrivateFieldName(field)}' not found on CompiledTsvrc.");
+                    Debug.LogWarning($"[TsvrcWirer] Construct property '{FieldName(field)}' not found on CompiledTsvrc.");
             }
         }
 
-        private static string PrivateFieldName(TsvrcField field)
-            => $"_{char.ToLower(field.Name[0])}{field.Name.Substring(1)}";
+        private static List<TsvrcField> ResolveFields(TsvrcConfig config)
+        {
+            return TsvrcResolver.Resolve(config.TsvrcBehaviourConstruct)
+                .OrderBy(f => f.Name)
+                .ToList();
+        }
+
+        private static string FieldName(TsvrcField field) => $"_construct{field.Name}";
     }
 }
 #endif
