@@ -31,7 +31,6 @@ namespace Tsvrc.Editor
             new InstanceModule(),
             new FactoryModule(),
             new TranslationModule(),
-            new UiUtilitiesModule(),
         };
 
         [MenuItem("Tsvrc/Tools/Force Compile")]
