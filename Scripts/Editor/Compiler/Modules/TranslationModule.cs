@@ -13,14 +13,19 @@ namespace Tsvrc.Editor
 {
     /// <summary>
     /// Compiler module that bakes all language data directly into the generated C# source as flat
-    /// parallel string arrays — no JSON asset loaded, no DataDictionary, zero GC pressure at runtime.
+    /// parallel string arrays. Strings are interned by Mono at load time — zero extra RAM, zero
+    /// CPU work in Start(). This is the best achievable runtime profile.
+    ///
+    /// The tradeoff: any JSON value edit triggers a full recompile (CompiledTsvrc.cs regenerated,
+    /// domain reload, CompiledTsvrc GameObject recreated). Adding/removing/renaming a language
+    /// also requires a full recompile because the enum members and field names change.
     ///
     /// Generated members on CompiledTsvrc:
     ///   - public enum Language  { … }
-    ///   - private string[] _tsKeys_{lang}, _tsVals_{lang}  — one pair per language, baked as literals
+    ///   - private string[] _tsKeys_{id}, _tsVals_{id}  — one pair per language, baked as literals
     ///   - private string[] _tsCurrentKeys, _tsCurrentVals  — pointers to the active language arrays
     ///   - private int _tsCurrentLang                       — guard against redundant SetLanguage calls
-    ///   - private TextMeshProUGUI[] _translationTargets    — scene-wired TMPs (serialized)
+    ///   - [SerializeField] private TextMeshProUGUI[] _translationTargets  — scene-wired TMPs
     ///   - public void SetLanguage(Language lang)           — switches pointers; starts batched target update
     ///   - public string Translate(string key)              — O(n) scan, n ≈ number of keys (small)
     ///   - public string Translate(string key, string param)— same with {value} substitution
@@ -52,34 +57,46 @@ namespace Tsvrc.Editor
             CollectTMPTargets();
         }
 
-        internal override IEnumerable<string> GetTrackedAssetPaths()
+        // Any change to the config or any JSON file requires regenerating the baked literals.
+        internal override IEnumerable<string> GetFullCompileAssetPaths()
         {
-            // Always track the config asset itself so adding/removing language files triggers a recompile.
             yield return TranslationConfigAssetPath;
+            foreach (var path in ResolveLanguageFilePaths())
+                yield return path;
+        }
 
-            var translationConfig = AssetDatabase.LoadAssetAtPath<TranslationConfig>(TranslationConfigAssetPath);
-            if (translationConfig?.LanguageFiles == null) yield break;
-
-            foreach (var asset in translationConfig.LanguageFiles)
+        // Returns the asset paths of all language JSON files.
+        // If a TranslationConfig asset exists, uses its explicit list.
+        // Otherwise falls back to discovering all language_*.json TextAssets under Assets/.
+        private static IEnumerable<string> ResolveLanguageFilePaths()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<TranslationConfig>(TranslationConfigAssetPath);
+            if (config?.LanguageFiles != null)
             {
-                if (asset == null) continue;
-                var path = AssetDatabase.GetAssetPath(asset);
-                if (!string.IsNullOrEmpty(path))
-                    yield return path;
+                foreach (var asset in config.LanguageFiles)
+                {
+                    if (asset == null) continue;
+                    var p = AssetDatabase.GetAssetPath(asset);
+                    if (!string.IsNullOrEmpty(p)) yield return p;
+                }
+                yield break;
+            }
+
+            // No config — discover all language_*.json TextAssets in the project.
+            foreach (var guid in AssetDatabase.FindAssets("t:TextAsset", new[] { "Assets" }))
+            {
+                var p = AssetDatabase.GUIDToAssetPath(guid);
+                if (p.EndsWith(".json", System.StringComparison.OrdinalIgnoreCase)
+                    && System.IO.Path.GetFileName(p).StartsWith("language_", System.StringComparison.OrdinalIgnoreCase))
+                    yield return p;
             }
         }
 
         private void LoadLanguages()
         {
-            var translationConfig = AssetDatabase.LoadAssetAtPath<TranslationConfig>(TranslationConfigAssetPath);
-            if (translationConfig == null)
+            foreach (var path in ResolveLanguageFilePaths())
             {
-                Debug.Log($"[TranslationModule] No TranslationConfig asset found at '{TranslationConfigAssetPath}'. Skipping translation generation.");
-                return;
-            }
-
-            foreach (var asset in translationConfig.LanguageFiles)
-            {
+                var asset = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
                 if (asset == null) continue;
                 var entry = ParseLanguageJson(asset.name, asset.text);
                 if (entry.HasValue)
@@ -164,8 +181,8 @@ namespace Tsvrc.Editor
 
             w.Region("Translation");
 
-            // Bake key/value pairs per language as flat parallel arrays.
-            // All data is known at compile time — no TextAsset, no DataDictionary, no JSON parsing at runtime.
+            // Bake key/value pairs as flat parallel arrays — literals interned by Mono, zero
+            // runtime allocation beyond the array objects themselves, nothing in Start().
             foreach (var lang in _languages)
             {
                 var id = SanitizeIdentifier(lang.Key);
@@ -173,8 +190,8 @@ namespace Tsvrc.Editor
                 var valLits = new List<string>();
                 foreach (var kv in lang.Entries)
                 {
-                    keyLits.Add($"\"{EscapeString(kv.Key)}\"");
-                    valLits.Add($"\"{EscapeString(kv.Value)}\"");
+                    keyLits.Add($"\"{ EscapeString(kv.Key)}\"");
+                    valLits.Add($"\"{ EscapeString(kv.Value)}\"");
                 }
                 w.Line($"private string[] _tsKeys_{id} = new string[] {{ {string.Join(", ", keyLits)} }};");
                 w.Line($"private string[] _tsVals_{id} = new string[] {{ {string.Join(", ", valLits)} }};");
@@ -272,7 +289,7 @@ namespace Tsvrc.Editor
             }
         }
 
-        internal override void WriteStartBody(CsWriter w) { /* arrays are baked — no runtime init needed */ }
+        internal override void WriteStartBody(CsWriter w) { /* arrays are baked as literals — no runtime init needed */ }
 
         internal override void Wire(SerializedObject target)
         {
@@ -330,13 +347,11 @@ namespace Tsvrc.Editor
         }
 
         private static string EscapeString(string s)
-        {
-            return s.Replace("\\", "\\\\")
-                    .Replace("\"", "\\\"")
-                    .Replace("\n", "\\n")
-                    .Replace("\r", "\\r")
-                    .Replace("\t", "\\t");
-        }
+            => s.Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r")
+                .Replace("\t", "\\t");
     }
 }
 #endif

@@ -1,6 +1,8 @@
 #if UNITY_EDITOR
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Tsvrc.Core;
 using UnityEditor;
@@ -120,7 +122,7 @@ namespace Tsvrc.Editor
             return name;
         }
 
-        internal override IEnumerable<string> GetTrackedAssetPaths()
+        internal override IEnumerable<string> GetWireOnlyAssetPaths()
         {
             // Read directly from config — _fields is only populated after Scan(), which is not
             // guaranteed to have run when the watcher calls this at import time.
@@ -152,6 +154,71 @@ namespace Tsvrc.Editor
                     if (!string.IsNullOrEmpty(path))
                         yield return path;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Wire-only scan: resolves factory fields from config without scanning source files for
+        /// call sites. Uses reflection on the compiled type to determine which fields are active
+        /// (were generated during the last full compile, meaning they had call sites at that time).
+        /// </summary>
+        internal override void ScanForWire(TsvrcConfig config, Type compiledType)
+        {
+            var activeFieldNames = new HashSet<string>(
+                compiledType.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Select(f => f.Name));
+
+            var usedNames = new HashSet<string>();
+            var fields = new List<TsvrcField>();
+
+            if (config.Factories != null)
+                foreach (var group in config.Factories)
+                {
+                    if (group?.Prefabs == null) continue;
+                    ScanGroupForWire(group.GroupName, group.Prefabs, usedNames, fields, activeFieldNames);
+                }
+
+            var internalConfig = TsvrcCompiler.LoadInternalConfig();
+            if (internalConfig?.Factories != null)
+                foreach (var group in internalConfig.Factories)
+                {
+                    if (group?.Prefabs == null) continue;
+                    ScanGroupForWire(group.GroupName, group.Prefabs, usedNames, fields, activeFieldNames);
+                }
+
+            _fields = fields.OrderBy(f => f.Name).ToList();
+        }
+
+        private void ScanGroupForWire(string groupName, UnityEngine.Object[] prefabs, HashSet<string> usedNames, List<TsvrcField> fields, HashSet<string> activeFieldNames)
+        {
+            string groupPrefix = string.IsNullOrEmpty(groupName) ? string.Empty : Sanitize(groupName);
+
+            foreach (var obj in prefabs)
+            {
+                if (obj == null) continue;
+
+                var prefab = obj is Component c ? c.gameObject : obj as GameObject;
+                if (prefab == null) continue;
+                if (!EditorUtility.IsPersistent(prefab)) continue;
+
+                var behaviour = prefab.GetComponent<TsvrcBehaviour>();
+                var type = behaviour != null ? behaviour.GetType() : null;
+
+                string name = DeriveUniqueName(groupPrefix + Sanitize(prefab.name), usedNames);
+                usedNames.Add(name);
+
+                // Only include fields that exist in the compiled type — meaning they had call sites
+                // during the last full compile and a serialized field was generated for them.
+                if (!activeFieldNames.Contains(FieldName(name))) continue;
+
+                fields.Add(new TsvrcField
+                {
+                    Name = name,
+                    Type = type != null ? type.Name : "GameObject",
+                    Namespace = type?.Namespace ?? string.Empty,
+                    SourceObject = (UnityEngine.Object)behaviour ?? prefab,
+                    CallSites = null, // Wire-only path — reflection filtering above replaces call-site scanning.
+                });
             }
         }
 
@@ -231,7 +298,9 @@ namespace Tsvrc.Editor
 
             foreach (var field in _fields)
             {
-                if (field.CallSites.Count == 0) continue;
+                // Full-compile path: CallSites is set — skip fields with no call sites (they get stubs).
+                // Wire-only path: CallSites is null — field was filtered via reflection and must be wired.
+                if (field.CallSites != null && field.CallSites.Count == 0) continue;
 
                 var prop = target.FindProperty(FieldName(field.Name));
                 if (prop == null)

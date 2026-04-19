@@ -28,11 +28,17 @@ namespace Tsvrc.Editor
         internal virtual void Wire(SerializedObject target) { }
 
         /// <summary>
-        /// Return asset paths (relative to project root, e.g. "Assets/Foo/bar.json") that this
-        /// module depends on. TsvrcWatcher uses this to trigger an auto-compile when any of these
-        /// assets are imported, modified, or deleted.
+        /// Asset paths whose change requires regenerating CompiledTsvrc.cs (full compile + domain reload).
+        /// Use when the change affects the generated code structure — e.g. adding a language adds new fields.
         /// </summary>
-        internal virtual IEnumerable<string> GetTrackedAssetPaths() => Enumerable.Empty<string>();
+        internal virtual IEnumerable<string> GetFullCompileAssetPaths() => Enumerable.Empty<string>();
+
+        /// <summary>
+        /// Asset paths whose change only requires re-running the wire pass — no code regeneration or
+        /// domain reload. Use when the generated field structure is stable and only scene references
+        /// or serialized data need updating — e.g. editing translation string values or prefab content.
+        /// </summary>
+        internal virtual IEnumerable<string> GetWireOnlyAssetPaths() => Enumerable.Empty<string>();
     }
 }
 #endif

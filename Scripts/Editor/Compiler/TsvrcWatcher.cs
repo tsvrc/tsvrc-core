@@ -5,17 +5,25 @@ using UnityEditor;
 namespace Tsvrc.Editor
 {
     /// <summary>
-    /// Watches for asset changes that would invalidate the compiled output and schedules a
-    /// recompile by setting a persistent flag that <see cref="TsvrcAutoCompile"/> reads after
-    /// the next domain reload.
+    /// Watches for asset changes that would invalidate the compiled output.
+    ///
+    /// Three response levels:
+    ///   FullCompile — regenerates CompiledTsvrc.cs, triggers domain reload, then wires.
+    ///                 Required when call sites or baked data may have changed.
+    ///   WireOnly    — skips code gen and domain reload; just re-runs the wire pass.
+    ///                 Safe when only scene-reference assets changed (e.g. prefab content).
+    ///   None        — no relevant change detected.
     ///
     /// Tracked assets are collected from every <see cref="TsvrcModule"/> via
-    /// <see cref="TsvrcModule.GetTrackedAssetPaths"/>. The TsvrcConfig asset path is always tracked.
-    /// Any .cs file change under Assets/ is tracked because call-site scanning depends on user code.
+    /// <see cref="TsvrcModule.GetTrackedAssetPaths"/>. The TsvrcConfig asset path always forces
+    /// a FullCompile. Any .cs file change under Assets/ also forces a FullCompile because
+    /// call-site scanning depends on user code.
     /// </summary>
     internal class TsvrcWatcher : AssetPostprocessor
     {
         internal const string NeedsCompileKey = "Tsvrc.NeedsCompile";
+
+        private enum CompileScope { None, WireOnly, FullCompile }
 
         static void OnPostprocessAllAssets(
             string[] importedAssets,
@@ -44,15 +52,21 @@ namespace Tsvrc.Editor
             foreach (var p in movedAssets) changed.Add(p);
             foreach (var p in movedFromAssetPaths) changed.Add(p);
 
-            if (AnyTrackedAssetChanged(changed))
+            // Non-.cs changes don't trigger a domain reload, so schedule work directly.
+            switch (GetRequiredScope(changed))
             {
-                // Non-.cs changes don't trigger a domain reload, so TsvrcAutoCompile won't run.
-                // Schedule the compile directly on this editor tick instead.
-                EditorApplication.delayCall += () =>
-                {
-                    EditorPrefs.DeleteKey(NeedsCompileKey);
-                    TsvrcCompiler.Compile();
-                };
+                case CompileScope.FullCompile:
+                    EditorApplication.delayCall += () =>
+                    {
+                        EditorPrefs.DeleteKey(NeedsCompileKey);
+                        TsvrcCompiler.Compile();
+                    };
+                    break;
+
+                case CompileScope.WireOnly:
+                    // No code change — skip code gen and domain reload, just re-wire.
+                    EditorApplication.delayCall += TsvrcWirer.WireNow;
+                    break;
             }
         }
 
@@ -65,21 +79,26 @@ namespace Tsvrc.Editor
             return false;
         }
 
-        private static bool AnyTrackedAssetChanged(HashSet<string> changed)
+        private static CompileScope GetRequiredScope(HashSet<string> changed)
         {
-            if (changed.Count == 0) return false;
+            if (changed.Count == 0) return CompileScope.None;
 
+            // TsvrcConfig structure changes always require full code regeneration.
             if (changed.Contains(TsvrcCompiler.TsvrcConfigPrefabPath))
-                return true;
+                return CompileScope.FullCompile;
 
-            // Assets tracked by individual modules (prefabs, translation JSON, etc.)
-            var modules = TsvrcCompiler.CreateModules();
-            foreach (var module in modules)
-                foreach (var trackedPath in module.GetTrackedAssetPaths())
-                    if (changed.Contains(trackedPath))
-                        return true;
+            var scope = CompileScope.None;
+            foreach (var module in TsvrcCompiler.CreateModules())
+            {
+                foreach (var path in module.GetFullCompileAssetPaths())
+                    if (changed.Contains(path)) return CompileScope.FullCompile;
 
-            return false;
+                if (scope < CompileScope.WireOnly)
+                    foreach (var path in module.GetWireOnlyAssetPaths())
+                        if (changed.Contains(path)) { scope = CompileScope.WireOnly; break; }
+            }
+
+            return scope;
         }
     }
 }
