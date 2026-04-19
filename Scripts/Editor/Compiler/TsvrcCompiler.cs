@@ -73,16 +73,10 @@ namespace Tsvrc.Editor
 
         private static void CleanPrevious()
         {
-            // Remove CompiledTsvrc GameObject from scene
-            var existing = Object.FindObjectsOfType<Component>();
-            foreach (var c in existing)
-            {
-                if (c != null && c.GetType().FullName == "Tsvrc.Core.Compiled.CompiledTsvrc")
-                {
-                    Undo.DestroyObjectImmediate(c.gameObject);
-                    break;
-                }
-            }
+            // Remove CompiledTsvrc GameObject from scene by name — avoids iterating all components.
+            var existing = GameObject.Find("CompiledTsvrc");
+            if (existing != null)
+                Undo.DestroyObjectImmediate(existing);
 
             // Delete only the auto-generated files; never wipe the whole folder so that
             // user assets (TranslationConfig.asset, MolInstance.asset, …) are preserved.
