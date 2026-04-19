@@ -13,29 +13,6 @@ namespace Tsvrc.Editor
         // Set by TsvrcCompiler before any scan pass.
         internal static string ExcludeFolder = "Assets/CompiledTsvrc";
 
-        internal static List<TsvrcCallSite> FindCallSites(Regex pattern)
-        {
-            var results = new List<TsvrcCallSite>();
-            var excludePrefixes = GetExcludePrefixes();
-
-            foreach (var file in Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories))
-            {
-                string fullPath = Path.GetFullPath(file);
-                if (excludePrefixes.Any(p => fullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
-                    continue;
-
-                string src = StripComments(File.ReadAllText(file));
-                var matches = pattern.Matches(src);
-                if (matches.Count == 0) continue;
-
-                string className = Path.GetFileNameWithoutExtension(file);
-                for (int i = 0; i < matches.Count; i++)
-                    results.Add(new TsvrcCallSite { ClassName = className, FileName = file });
-            }
-
-            return results;
-        }
-
         // Scans all user .cs files once and distributes call sites to all provided patterns.
         // Returns one list per key; keys with no matches get an empty list.
         internal static Dictionary<string, List<TsvrcCallSite>> FindCallSitesBatch(Dictionary<string, Regex> patterns)

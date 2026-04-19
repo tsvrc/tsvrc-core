@@ -69,7 +69,7 @@ namespace Tsvrc.Editor
                     f => new Regex(@"\b_ts\s*\.\s*Create" + Regex.Escape(f.Name) + @"\s*\("));
                 var callSiteMap = SourceScanner.FindCallSitesBatch(patterns);
                 foreach (var field in sorted)
-                    field.CallSites = callSiteMap.TryGetValue(field.Name, out var sites) ? sites : field.CallSites;
+                    field.CallSites = callSiteMap[field.Name];
             }
 
             return sorted;
@@ -89,21 +89,6 @@ namespace Tsvrc.Editor
             if (internalConfig?.Factories != null)
                 foreach (var group in internalConfig.Factories)
                     if (group?.Prefabs != null) yield return group;
-        }
-
-        internal override IEnumerable<string> GetWireOnlyAssetPaths()
-        {
-            // Read directly from config — _fields is only populated after Scan(), which is not
-            // guaranteed to have run when the watcher calls this at import time.
-            var config = UnityEngine.Object.FindObjectOfType<TsvrcConfig>();
-            foreach (var group in AllFactoryGroups(config))
-                foreach (var obj in group.Prefabs)
-                {
-                    if (obj == null) continue;
-                    var path = AssetDatabase.GetAssetPath(obj);
-                    if (!string.IsNullOrEmpty(path))
-                        yield return path;
-                }
         }
 
         /// <summary>

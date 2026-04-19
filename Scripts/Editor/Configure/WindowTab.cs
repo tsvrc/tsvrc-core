@@ -9,7 +9,6 @@ namespace Tsvrc.Editor
     /// </summary>
     internal abstract class WindowTab
     {
-        internal abstract string Label { get; }
         internal abstract string Description { get; }
         internal abstract void OnGUI(SerializedObject so);
     }

@@ -65,14 +65,28 @@ namespace Tsvrc.Editor
         }
 
         // Returns resolved field descriptors from config without scanning source files.
+        // Only prefab assets are accepted — scene objects are skipped with a warning.
         private List<TsvrcField> ResolveDescriptors(TsvrcConfig config)
         {
             var internalConfig = TsvrcCompiler.LoadInternalConfig();
             var internalPool = internalConfig?.PoolPrefabs ?? Array.Empty<TsvrcProcess>();
-            return TsvrcResolver.Resolve(
-                (config.TsvrcProcessPool ?? Array.Empty<TsvrcProcess>())
-                    .Union(internalPool)
-                    .Cast<UnityEngine.Object>());
+            var all = (config.TsvrcProcessPool ?? Array.Empty<TsvrcProcess>())
+                .Union(internalPool)
+                .Cast<UnityEngine.Object>();
+
+            var prefabsOnly = new List<UnityEngine.Object>();
+            foreach (var obj in all)
+            {
+                if (obj == null) continue;
+                if (!EditorUtility.IsPersistent(obj))
+                {
+                    Debug.LogWarning($"[TsvrcPool] '{obj.name}' is a scene object. Pool entries must be prefab assets from the Project window. Skipping.");
+                    continue;
+                }
+                prefabsOnly.Add(obj);
+            }
+
+            return TsvrcResolver.Resolve(prefabsOnly);
         }
 
         internal override IEnumerable<string> GetUsings() =>
@@ -159,35 +173,16 @@ namespace Tsvrc.Editor
                 var source = field.SourceObject as Component;
                 if (source == null) continue;
 
-                bool isPrefab = PrefabUtility.IsPartOfPrefabAsset(source.gameObject);
-
                 for (int i = 0; i < field.SlotCount; i++)
                 {
                     var prop = target.FindProperty(SlotFieldName(field, i));
                     if (prop == null) continue;
 
-                    var instance = isPrefab
-                        ? (GameObject)PrefabUtility.InstantiatePrefab(source.gameObject, poolContainer.transform)
-                        : UnityEngine.Object.Instantiate(source.gameObject, poolContainer.transform);
-
+                    var instance = (GameObject)PrefabUtility.InstantiatePrefab(source.gameObject, poolContainer.transform);
                     instance.name = $"{field.Name}_{i}";
                     Undo.RegisterCreatedObjectUndo(instance, $"Create {field.Name} pool slot {i}");
                     prop.objectReferenceValue = instance.GetComponent(source.GetType());
                 }
-            }
-        }
-
-        internal override IEnumerable<string> GetWireOnlyAssetPaths()
-        {
-            // Pool prefab content changes (not slot count) only need a wire pass to re-instantiate slots.
-            var config = UnityEngine.Object.FindObjectOfType<TsvrcConfig>();
-            var internalConfig = TsvrcCompiler.LoadInternalConfig();
-            var internalPool = internalConfig?.PoolPrefabs ?? Array.Empty<TsvrcProcess>();
-            foreach (var process in (config?.TsvrcProcessPool ?? Array.Empty<TsvrcProcess>()).Union(internalPool))
-            {
-                if (process == null) continue;
-                var path = AssetDatabase.GetAssetPath(process);
-                if (!string.IsNullOrEmpty(path)) yield return path;
             }
         }
 

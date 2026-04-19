@@ -32,13 +32,6 @@ namespace Tsvrc.Editor
         /// Use when the change affects the generated code structure — e.g. adding a language adds new fields.
         /// </summary>
         internal virtual IEnumerable<string> GetFullCompileAssetPaths() => Enumerable.Empty<string>();
-
-        /// <summary>
-        /// Asset paths whose change only requires re-running the wire pass — no code regeneration or
-        /// domain reload. Use when the generated field structure is stable and only scene references
-        /// or serialized data need updating — e.g. editing translation string values or prefab content.
-        /// </summary>
-        internal virtual IEnumerable<string> GetWireOnlyAssetPaths() => Enumerable.Empty<string>();
     }
 }
 #endif

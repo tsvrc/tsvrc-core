@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using Tsvrc.Core;
@@ -9,7 +10,7 @@ namespace Tsvrc.Editor
 {
     /// <summary>
     /// Editor window for managing Tsvrc translation language files.
-    /// Open via Tsvrc > Setup Translation
+    /// Open via Tsvrc > Translation
     /// </summary>
     internal class TsvrcTranslationWindow : EditorWindow
     {
@@ -21,23 +22,48 @@ namespace Tsvrc.Editor
         private TranslationConfig _config;
         private SerializedObject _so;
         private Vector2 _scroll;
+        private int _tmpTargetCount = -1; // -1 = stale; invalidated by hierarchy changes
+        // Caches PeekKeyLabel results per TextAsset instanceID — avoids re-running two regex
+        // matches per entry per repaint. Cleared when the config is reloaded.
+        private readonly Dictionary<int, (string key, string label)> _peekCache =
+            new Dictionary<int, (string key, string label)>();
 
         private SerializedProperty LanguageFiles => _so?.FindProperty("LanguageFiles");
 
-        [MenuItem("Tsvrc/Localization")]
-        private static void Open() => GetWindow<TsvrcTranslationWindow>("Tsvrc Localization").Show();
+        [MenuItem("Tsvrc/Translation")]
+        private static void Open() => GetWindow<TsvrcTranslationWindow>("Tsvrc Translation").Show();
 
-        private void OnEnable() => Reload();
+        private void OnEnable()
+        {
+            Reload();
+            EditorApplication.hierarchyChanged += InvalidateTmpCount;
+            EditorApplication.projectChanged += _peekCache.Clear;
+        }
+
+        private void OnDisable()
+        {
+            EditorApplication.hierarchyChanged -= InvalidateTmpCount;
+            EditorApplication.projectChanged -= _peekCache.Clear;
+        }
+
+        private void InvalidateTmpCount() => _tmpTargetCount = -1;
+
+        private void OnFocus()
+        {
+            if (_config == null)
+                Reload();
+        }
 
         private void Reload()
         {
             _config = AssetDatabase.LoadAssetAtPath<TranslationConfig>(ConfigAssetPath);
             _so = _config != null ? new SerializedObject(_config) : null;
+            _peekCache.Clear();
         }
 
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("Tsvrc Localization", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Tsvrc Translation", EditorStyles.boldLabel);
             EditorGUILayout.Space(4);
 
             if (_config == null)
@@ -61,10 +87,6 @@ namespace Tsvrc.Editor
             _so.ApplyModifiedProperties();
 
             DrawScenePreview();
-
-            EditorGUILayout.Space(10);
-            if (GUILayout.Button("Compile Tsvrc"))
-                TsvrcCompiler.Compile();
         }
 
         private void DrawLanguageList()
@@ -77,32 +99,53 @@ namespace Tsvrc.Editor
             EditorGUILayout.Space(4);
 
             var prop = LanguageFiles;
+            int toDelete = -1;
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             for (int i = 0; i < prop.arraySize; i++)
             {
-                var element = _languageFileElement(prop, i);
+                var element = prop.GetArrayElementAtIndex(i);
                 EditorGUILayout.BeginHorizontal();
 
                 EditorGUI.BeginChangeCheck();
                 var newAsset = (TextAsset)EditorGUILayout.ObjectField(element.objectReferenceValue as TextAsset, typeof(TextAsset), false);
                 if (EditorGUI.EndChangeCheck())
+                {
+                    // Evict the replaced asset from the peek cache so stale entries don't accumulate.
+                    if (element.objectReferenceValue is TextAsset replaced)
+                        _peekCache.Remove(replaced.GetInstanceID());
                     element.objectReferenceValue = newAsset;
+                }
 
                 if (newAsset != null)
                 {
-                    var (key, label) = PeekKeyLabel(newAsset.text);
-                    EditorGUILayout.LabelField(key != null ? $"{key}  –  {label}" : "⚠ Invalid File",
+                    int id = newAsset.GetInstanceID();
+                    if (!_peekCache.TryGetValue(id, out var peek))
+                    {
+                        peek = PeekKeyLabel(newAsset.text);
+                        _peekCache[id] = peek;
+                    }
+                    EditorGUILayout.LabelField(peek.key != null ? $"{peek.key}  –  {peek.label}" : "⚠ Invalid File",
                         EditorStyles.miniLabel, GUILayout.Width(180));
                 }
 
                 if (GUILayout.Button("✕", GUILayout.Width(22)))
-                {
-                    prop.DeleteArrayElementAtIndex(i);
-                    break;
-                }
+                    toDelete = i;
+
                 EditorGUILayout.EndHorizontal();
             }
             EditorGUILayout.EndScrollView();
+
+            // Deferred outside the draw loop — deleting inside BeginHorizontal would leak the layout group.
+            // Two-step removal required for UnityEngine.Object arrays: Unity clears the reference
+            // on the first call, then actually removes the slot on the second.
+            if (toDelete >= 0)
+            {
+                var slot = prop.GetArrayElementAtIndex(toDelete);
+                if (slot.objectReferenceValue is TextAsset removed)
+                    _peekCache.Remove(removed.GetInstanceID());
+                slot.objectReferenceValue = null;
+                prop.DeleteArrayElementAtIndex(toDelete);
+            }
 
             EditorGUILayout.Space(4);
             EditorGUILayout.BeginHorizontal();
@@ -114,19 +157,19 @@ namespace Tsvrc.Editor
             EditorGUILayout.EndHorizontal();
         }
 
-        private static SerializedProperty _languageFileElement(SerializedProperty prop, int i)
-            => prop.GetArrayElementAtIndex(i);
-
         private void DrawScenePreview()
         {
             EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("Detected TMP Targets in Scene", EditorStyles.boldLabel);
 
-            int textElementsCount = 0;
-            foreach (var t in FindObjectsOfType<TMPro.TextMeshProUGUI>(true))
-                if (TargetPattern.IsMatch(t.gameObject.name)) textElementsCount++;
+            if (_tmpTargetCount < 0)
+            {
+                _tmpTargetCount = 0;
+                foreach (var t in FindObjectsOfType<TMPro.TextMeshProUGUI>(true))
+                    if (TargetPattern.IsMatch(t.gameObject.name)) _tmpTargetCount++;
+            }
 
-            EditorGUILayout.LabelField($"TextMeshProUGUI (UI):   {textElementsCount}", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField($"TextMeshProUGUI (UI):   {_tmpTargetCount}", EditorStyles.miniLabel);
         }
 
         private void CreateConfig()
@@ -135,10 +178,10 @@ namespace Tsvrc.Editor
             if (!AssetDatabase.IsValidFolder(dir))
                 AssetDatabase.CreateFolder(Path.GetDirectoryName(dir), Path.GetFileName(dir));
 
-            _config = CreateInstance<TranslationConfig>();
-            AssetDatabase.CreateAsset(_config, ConfigAssetPath);
+            var instance = CreateInstance<TranslationConfig>();
+            AssetDatabase.CreateAsset(instance, ConfigAssetPath);
             AssetDatabase.SaveAssets();
-            _so = new SerializedObject(_config);
+            Reload();
         }
 
         private void ShowCreateSampleDialog()

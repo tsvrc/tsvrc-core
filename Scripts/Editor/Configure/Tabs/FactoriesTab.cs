@@ -11,7 +11,9 @@ namespace Tsvrc.Editor
         // the user is typing — the foldout never collapses mid-edit.
         private readonly Dictionary<int, bool> _foldouts = new Dictionary<int, bool>();
 
-        internal override string Label => "Factories";
+        private static readonly GUIContent LabelGroupName = new GUIContent("Group Name");
+        private static readonly GUIContent LabelPrefabs = new GUIContent("Prefabs");
+
         internal override string Description =>
             "Register prefabs organized into named groups. Generates a Create{Group}{Name}(Transform parent) method for each entry. WARNING: instantiated objects do not receive a VRChat network ID and cannot send or receive network events. Use Pool for networked objects.";
 
@@ -45,12 +47,12 @@ namespace Tsvrc.Editor
                 if (_foldouts[i])
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(groupNameProp, new GUIContent("Group Name"));
+                    EditorGUILayout.PropertyField(groupNameProp, LabelGroupName);
                     string preview = string.IsNullOrWhiteSpace(groupName)
                         ? "Create…"
                         : $"Create{FactoryModule.Sanitize(groupName)}…";
                     EditorGUILayout.LabelField($"Prefix:  {preview}", EditorStyles.miniLabel);
-                    EditorGUILayout.PropertyField(prefabsProp, new GUIContent("Prefabs"), true);
+                    EditorGUILayout.PropertyField(prefabsProp, LabelPrefabs, true);
                     EditorGUI.indentLevel--;
                 }
 

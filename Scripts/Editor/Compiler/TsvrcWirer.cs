@@ -27,13 +27,6 @@ namespace Tsvrc.Editor
             EditorPrefs.SetBool(PendingWireKey, true);
         }
 
-        /// <summary>
-        /// Runs the wire pass immediately without requiring a domain reload.
-        /// Called by TsvrcWatcher for wire-only asset changes (prefab content edits where the
-        /// generated CompiledTsvrc.cs structure has not changed).
-        /// </summary>
-        internal static void WireNow() => RunWire();
-
         private static void RunWire()
         {
             EditorPrefs.DeleteKey(PendingWireKey);

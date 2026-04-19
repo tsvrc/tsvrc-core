@@ -25,11 +25,66 @@ namespace Tsvrc.Editor
         private Vector2 _scroll;
         private TsvrcConfig _config;
         private SerializedObject _so;
+        private bool _isDirty;
+        private int _baseUndoGroup;
+
+        // Carry dirty state and undo baseline across a Cancel-reopen.
+        // The window instance is destroyed by Unity before delayCall fires,
+        // so these must be static to survive the gap.
+        private static bool s_reopenDirty;
+        private static int s_reopenUndoGroup;
 
         [MenuItem("Tsvrc/Configure")]
         private static void Open() => GetWindow<TsvrcWindow>("Tsvrc Configure").Show();
 
-        private void OnEnable() => Reload();
+        private void OnEnable()
+        {
+            if (s_reopenDirty)
+            {
+                // Restore live references without touching the undo stack or dirty flag.
+                // Calling Reload() here would add a spurious IncrementCurrentGroup() between
+                // the saved baseline and the current undo position.
+                _config = Object.FindObjectOfType<TsvrcConfig>();
+                _so = _config != null ? new SerializedObject(_config) : null;
+                _isDirty = true;
+                _baseUndoGroup = s_reopenUndoGroup;
+                s_reopenDirty = false;
+            }
+            else
+            {
+                Reload();
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (!_isDirty) return;
+
+            int choice = EditorUtility.DisplayDialogComplex(
+                "Tsvrc — Unsaved Changes",
+                "You have unsaved config changes. Apply them now or discard?",
+                "Apply",    // 0
+                "Discard",  // 1
+                "Cancel"    // 2
+            );
+
+            if (choice == 0)
+            {
+                // Defer compile — calling AssetDatabase.Refresh() synchronously during OnDestroy is unsafe.
+                EditorApplication.delayCall += () => TsvrcCompiler.Compile();
+            }
+            else if (choice == 1)
+            {
+                Undo.RevertAllDownToGroup(_baseUndoGroup);
+            }
+            else
+            {
+                // Cancel: preserve dirty state and undo baseline, then reopen.
+                s_reopenDirty = true;
+                s_reopenUndoGroup = _baseUndoGroup;
+                EditorApplication.delayCall += Open;
+            }
+        }
 
         private void OnFocus()
         {
@@ -44,6 +99,10 @@ namespace Tsvrc.Editor
         {
             _config = Object.FindObjectOfType<TsvrcConfig>();
             _so = _config != null ? new SerializedObject(_config) : null;
+            _isDirty = false;
+            // Mark a boundary so Discard can revert exactly the edits made since this reload.
+            Undo.IncrementCurrentGroup();
+            _baseUndoGroup = Undo.GetCurrentGroup();
         }
 
         private void OnGUI()
@@ -61,21 +120,40 @@ namespace Tsvrc.Editor
             int newIndex = GUILayout.Toolbar(_tabIndex, TabLabels);
             if (newIndex != _tabIndex) { _tabIndex = newIndex; _scroll = Vector2.zero; }
 
-            // Description: fixed header, never scrolls, wraps to window width.
+            // Description: fixed header, wraps to window width.
             EditorGUILayout.LabelField(Tabs[_tabIndex].Description, EditorStyles.wordWrappedMiniLabel);
             EditorGUILayout.Space(4);
 
-            // Scrollable tab content
+            // Scrollable tab content — track whether any control was changed.
             _so.Update();
+            EditorGUI.BeginChangeCheck();
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             Tabs[_tabIndex].OnGUI(_so);
             EditorGUILayout.EndScrollView();
             _so.ApplyModifiedProperties();
+            if (EditorGUI.EndChangeCheck())
+                _isDirty = true;
 
-            // Compile button always pinned at the bottom.
+            // Bottom bar: compile prompt when dirty, plain button when clean.
             EditorGUILayout.Space(8);
-            if (GUILayout.Button("Compile Tsvrc"))
-                TsvrcCompiler.Compile();
+            if (_isDirty)
+            {
+                EditorGUILayout.HelpBox("Config changed — Apply to compile, or Discard to revert all changes.", MessageType.Warning);
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Apply"))
+                {
+                    TsvrcCompiler.Compile();
+                    Reload();
+                    GUIUtility.ExitGUI();
+                }
+                if (GUILayout.Button("Discard"))
+                {
+                    Undo.RevertAllDownToGroup(_baseUndoGroup);
+                    EditorApplication.delayCall += Reload;
+                    GUIUtility.ExitGUI();
+                }
+                EditorGUILayout.EndHorizontal();
+            }
         }
 
         private void DrawNoConfig()
