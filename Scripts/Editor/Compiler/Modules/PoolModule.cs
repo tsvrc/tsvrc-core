@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Tsvrc.Core;
 using UnityEditor;
@@ -12,7 +13,8 @@ namespace Tsvrc.Editor
     /// <summary>
     /// Scans config.TsvrcProcessPool and emits per-slot private fields plus Get{Type}() accessor methods.
     /// Slots are instantiated in the scene by the compiler so VRChat assigns them fixed network IDs.
-    /// Slot count is the total number of Get{Type}() call sites across all classes, so each caller can hold its slots simultaneously.
+    /// Slot count equals the total Get{Type}() call sites across all classes, ensuring each caller
+    /// can hold its maximum number of slots simultaneously.
     /// Only <see cref="TsvrcProcess"/> subclasses are valid pool entries.
     /// </summary>
     internal class PoolModule : TsvrcModule
@@ -21,49 +23,56 @@ namespace Tsvrc.Editor
 
         internal override void Scan(TsvrcConfig config)
         {
-            var resolved = ResolveFields(config);
+            var descriptors = ResolveDescriptors(config);
 
-            foreach (var field in resolved)
-                field.SlotCount = field.CallSites
-                    .GroupBy(cs => cs.ClassName)
-                    .Sum(g => g.Count());
+            // Single source-tree walk for all pool types.
+            var patterns = descriptors.ToDictionary(
+                f => f.Name,
+                f => new Regex(@"\b_ts\s*\.\s*Get" + Regex.Escape(f.Type) + @"\s*\(\s*\)"));
+            var callSiteMap = SourceScanner.FindCallSitesBatch(patterns);
 
-            _fields = resolved.OrderBy(f => f.Name).ToList();
-        }
-
-        internal override void ScanForWire(TsvrcConfig config, Type compiledType)
-        {
-            var resolved = ResolveFields(config);
-
-            var typeFieldNames = new HashSet<string>(compiledType
-                .GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .Select(f => f.Name));
-
-            foreach (var field in resolved)
+            foreach (var field in descriptors)
             {
-                string prefix = "_" + ToCamelCase(field.Name) + "_";
-                field.SlotCount = typeFieldNames.Count(f => f.StartsWith(prefix));
+                field.CallSites = callSiteMap[field.Name];
+                field.SlotCount = field.CallSites.Count;
             }
 
-            _fields = resolved.Where(f => f.SlotCount > 0).OrderBy(f => f.Name).ToList();
+            _fields = descriptors.OrderBy(f => f.Name).ToList();
         }
 
-        private List<TsvrcField> ResolveFields(TsvrcConfig config)
+        // Wire-only scan: uses reflection to determine slot counts from the compiled type.
+        // No source file scanning — avoids the cost of FindCallSitesBatch on every wire pass.
+        internal override void ScanForWire(TsvrcConfig config, Type compiledType)
+        {
+            var descriptors = ResolveDescriptors(config);
+
+            var typeFieldNames = new HashSet<string>(compiledType
+                .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                .Select(f => f.Name));
+
+            var fields = new List<TsvrcField>();
+            foreach (var field in descriptors)
+            {
+                string prefix = "_" + ToCamelCase(field.Name) + "_";
+                int slotCount = typeFieldNames.Count(n => n.StartsWith(prefix));
+                if (slotCount == 0) continue;
+                field.SlotCount = slotCount;
+                field.WireAlways = true;
+                fields.Add(field);
+            }
+
+            _fields = fields.OrderBy(f => f.Name).ToList();
+        }
+
+        // Returns resolved field descriptors from config without scanning source files.
+        private List<TsvrcField> ResolveDescriptors(TsvrcConfig config)
         {
             var internalConfig = TsvrcCompiler.LoadInternalConfig();
             var internalPool = internalConfig?.PoolPrefabs ?? Array.Empty<TsvrcProcess>();
-            var resolved = TsvrcResolver.Resolve(
+            return TsvrcResolver.Resolve(
                 (config.TsvrcProcessPool ?? Array.Empty<TsvrcProcess>())
                     .Union(internalPool)
                     .Cast<UnityEngine.Object>());
-
-            foreach (var field in resolved)
-            {
-                var pattern = new Regex(@"\b_ts\s*\.\s*Get" + Regex.Escape(field.Type) + @"\s*\(\s*\)");
-                field.CallSites = SourceScanner.FindCallSites(pattern);
-            }
-
-            return resolved;
         }
 
         internal override IEnumerable<string> GetUsings() =>
@@ -71,9 +80,11 @@ namespace Tsvrc.Editor
 
         internal override void WriteFields(CsWriter w)
         {
-            if (_fields.Count == 0) return;
+            var activeFields = _fields.Where(f => f.SlotCount > 0).ToList();
+            if (activeFields.Count == 0) return;
+
             w.Region("Process Pool Slots");
-            foreach (var field in _fields)
+            foreach (var field in activeFields)
                 for (int i = 0; i < field.SlotCount; i++)
                     w.Line($"[HideInInspector] [SerializeField] private {field.Type} {SlotFieldName(field, i)};");
             w.EndRegion();
@@ -122,21 +133,29 @@ namespace Tsvrc.Editor
 
         internal override void WriteStartBody(CsWriter w)
         {
-            foreach (var field in _fields)
+            foreach (var field in _fields.Where(f => f.SlotCount > 0))
                 for (int i = 0; i < field.SlotCount; i++)
                     w.Line($"{SlotFieldName(field, i)}.gameObject.SetActive(false);");
         }
 
         internal override void Wire(SerializedObject target)
         {
-            if (_fields.Count == 0) return;
+            var fieldsToWire = _fields.Where(f => f.WireAlways || f.SlotCount > 0).ToList();
+            if (fieldsToWire.Count == 0) return;
 
             var compiledGo = ((Component)target.targetObject).gameObject;
 
-            foreach (var field in _fields)
-            {
-                if (field.CallSites.Count == 0) continue;
+            // Destroy any previous pool container so repeated wire passes don't stack duplicate slots.
+            var existingContainer = compiledGo.transform.Find("Pool");
+            if (existingContainer != null)
+                Undo.DestroyObjectImmediate(existingContainer.gameObject);
 
+            var poolContainer = new GameObject("Pool");
+            Undo.RegisterCreatedObjectUndo(poolContainer, "Create Pool Container");
+            poolContainer.transform.SetParent(compiledGo.transform, false);
+
+            foreach (var field in fieldsToWire)
+            {
                 var source = field.SourceObject as Component;
                 if (source == null) continue;
 
@@ -148,8 +167,8 @@ namespace Tsvrc.Editor
                     if (prop == null) continue;
 
                     var instance = isPrefab
-                        ? (GameObject)PrefabUtility.InstantiatePrefab(source.gameObject, compiledGo.transform)
-                        : UnityEngine.Object.Instantiate(source.gameObject, compiledGo.transform);
+                        ? (GameObject)PrefabUtility.InstantiatePrefab(source.gameObject, poolContainer.transform)
+                        : UnityEngine.Object.Instantiate(source.gameObject, poolContainer.transform);
 
                     instance.name = $"{field.Name}_{i}";
                     Undo.RegisterCreatedObjectUndo(instance, $"Create {field.Name} pool slot {i}");
@@ -158,10 +177,24 @@ namespace Tsvrc.Editor
             }
         }
 
-        internal static string SlotFieldName(TsvrcField field, int index)
+        internal override IEnumerable<string> GetWireOnlyAssetPaths()
+        {
+            // Pool prefab content changes (not slot count) only need a wire pass to re-instantiate slots.
+            var config = UnityEngine.Object.FindObjectOfType<TsvrcConfig>();
+            var internalConfig = TsvrcCompiler.LoadInternalConfig();
+            var internalPool = internalConfig?.PoolPrefabs ?? Array.Empty<TsvrcProcess>();
+            foreach (var process in (config?.TsvrcProcessPool ?? Array.Empty<TsvrcProcess>()).Union(internalPool))
+            {
+                if (process == null) continue;
+                var path = AssetDatabase.GetAssetPath(process);
+                if (!string.IsNullOrEmpty(path)) yield return path;
+            }
+        }
+
+        private static string SlotFieldName(TsvrcField field, int index)
             => $"_{ToCamelCase(field.Name)}_{index}";
 
-        internal static string ToCamelCase(string name)
+        private static string ToCamelCase(string name)
             => string.IsNullOrEmpty(name) ? name : char.ToLower(name[0]) + name.Substring(1);
     }
 }
