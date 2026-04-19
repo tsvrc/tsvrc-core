@@ -52,6 +52,23 @@ namespace Tsvrc.Editor
             CollectTMPTargets();
         }
 
+        internal override IEnumerable<string> GetTrackedAssetPaths()
+        {
+            // Always track the config asset itself so adding/removing language files triggers a recompile.
+            yield return TranslationConfigAssetPath;
+
+            var translationConfig = AssetDatabase.LoadAssetAtPath<TranslationConfig>(TranslationConfigAssetPath);
+            if (translationConfig?.LanguageFiles == null) yield break;
+
+            foreach (var asset in translationConfig.LanguageFiles)
+            {
+                if (asset == null) continue;
+                var path = AssetDatabase.GetAssetPath(asset);
+                if (!string.IsNullOrEmpty(path))
+                    yield return path;
+            }
+        }
+
         private void LoadLanguages()
         {
             var translationConfig = AssetDatabase.LoadAssetAtPath<TranslationConfig>(TranslationConfigAssetPath);

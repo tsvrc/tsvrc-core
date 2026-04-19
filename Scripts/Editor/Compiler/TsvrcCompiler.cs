@@ -33,7 +33,9 @@ namespace Tsvrc.Editor
         };
 
         [MenuItem("Tsvrc/Compile")]
-        public static void Compile()
+        public static void Compile() => Compile(refreshAssetDatabase: true);
+
+        internal static void Compile(bool refreshAssetDatabase)
         {
             var config = RequireTsvrcConfig();
             if (config == null) return;
@@ -59,7 +61,8 @@ namespace Tsvrc.Editor
             File.WriteAllText(fileFull, source, Encoding.UTF8);
 
             TsvrcWirer.ScheduleWire();
-            AssetDatabase.Refresh();
+            if (refreshAssetDatabase)
+                AssetDatabase.Refresh();
         }
 
         internal static void LogSuccess()

@@ -26,6 +26,13 @@ namespace Tsvrc.Editor
 
         /// <summary>Assign scene references via SerializedObject after domain reload.</summary>
         internal virtual void Wire(SerializedObject target) { }
+
+        /// <summary>
+        /// Return asset paths (relative to project root, e.g. "Assets/Foo/bar.json") that this
+        /// module depends on. TsvrcWatcher uses this to trigger an auto-compile when any of these
+        /// assets are imported, modified, or deleted.
+        /// </summary>
+        internal virtual IEnumerable<string> GetTrackedAssetPaths() => Enumerable.Empty<string>();
     }
 }
 #endif

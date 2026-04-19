@@ -71,6 +71,12 @@ namespace Tsvrc.Editor
                 var prefab = obj is Component c ? c.gameObject : obj as GameObject;
                 if (prefab == null) continue;
 
+                if (!EditorUtility.IsPersistent(prefab))
+                {
+                    Debug.LogWarning($"[Tsvrc] Factory entry '{prefab.name}' is a scene object, not a prefab asset. Drag a prefab asset from the Project window instead. Skipping.");
+                    continue;
+                }
+
                 var behaviour = prefab.GetComponent<TsvrcBehaviour>();
                 var type = behaviour != null ? behaviour.GetType() : null;
 
@@ -114,6 +120,41 @@ namespace Tsvrc.Editor
             return name;
         }
 
+        internal override IEnumerable<string> GetTrackedAssetPaths()
+        {
+            // Read directly from config — _fields is only populated after Scan(), which is not
+            // guaranteed to have run when the watcher calls this at import time.
+            var config = UnityEngine.Object.FindObjectOfType<Tsvrc.Core.TsvrcConfig>();
+            if (config?.Factories == null) yield break;
+
+            foreach (var group in config.Factories)
+            {
+                if (group?.Prefabs == null) continue;
+                foreach (var obj in group.Prefabs)
+                {
+                    if (obj == null) continue;
+                    var path = AssetDatabase.GetAssetPath(obj);
+                    if (!string.IsNullOrEmpty(path))
+                        yield return path;
+                }
+            }
+
+            var internalConfig = TsvrcCompiler.LoadInternalConfig();
+            if (internalConfig?.Factories == null) yield break;
+
+            foreach (var group in internalConfig.Factories)
+            {
+                if (group?.Prefabs == null) continue;
+                foreach (var obj in group.Prefabs)
+                {
+                    if (obj == null) continue;
+                    var path = AssetDatabase.GetAssetPath(obj);
+                    if (!string.IsNullOrEmpty(path))
+                        yield return path;
+                }
+            }
+        }
+
         internal override IEnumerable<string> GetUsings()
             => _fields.Select(f => f.Namespace).Where(n => !string.IsNullOrEmpty(n));
 
@@ -151,14 +192,15 @@ namespace Tsvrc.Editor
                         continue;
                     }
 
+                    w.Line($"var go = (GameObject)Instantiate({FieldName(field.Name)}, parent);");
+                    w.Line("if (go == null) return null;");
+                    w.Line("go.SetActive(true);");
                     if (field.Type == "GameObject")
                     {
-                        w.Line($"return (GameObject)Instantiate({FieldName(field.Name)}, parent);");
+                        w.Line("return go;");
                     }
                     else
                     {
-                        w.Line($"var go = (GameObject)Instantiate({FieldName(field.Name)}, parent);");
-                        w.Line("if (go == null) return null;");
                         w.Line($"var instance = go.GetComponent<{field.Type}>();");
                         if (field.SourceObject is TsvrcBehaviour)
                             w.Line("if (instance != null) instance.TsConstruct(this);");
@@ -171,6 +213,22 @@ namespace Tsvrc.Editor
 
         internal override void Wire(SerializedObject target)
         {
+            if (_fields.Count == 0) return;
+
+            var compiled = target.targetObject as Component;
+            if (compiled == null) return;
+
+            // Find or create the Factories container under the CompiledTsvrc GameObject.
+            // Stale instances from a previous compile are removed first; the parent GameObject
+            // itself is recreated clean each time so there is no leftover state.
+            var existing = compiled.transform.Find("Factories");
+            if (existing != null)
+                Undo.DestroyObjectImmediate(existing.gameObject);
+
+            var factoriesGo = new GameObject("Factories");
+            Undo.RegisterCreatedObjectUndo(factoriesGo, "Create Factories Container");
+            factoriesGo.transform.SetParent(compiled.transform, false);
+
             foreach (var field in _fields)
             {
                 if (field.CallSites.Count == 0) continue;
@@ -182,9 +240,14 @@ namespace Tsvrc.Editor
                     continue;
                 }
 
-                prop.objectReferenceValue = field.SourceObject is Component c
-                    ? c.gameObject
-                    : (GameObject)field.SourceObject;
+                var prefabAsset = field.SourceObject is Component c ? c.gameObject : (GameObject)field.SourceObject;
+
+                // Instantiate as a scene object so Unity strips EditorOnly children at build time.
+                var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefabAsset, factoriesGo.transform);
+                instance.name = field.Name;
+                instance.SetActive(false);
+
+                prop.objectReferenceValue = instance;
             }
         }
 
