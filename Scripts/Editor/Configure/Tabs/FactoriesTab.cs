@@ -31,26 +31,34 @@ namespace Tsvrc.Editor
                 string groupName = groupNameProp.stringValue;
                 int prefabCount = prefabsProp.arraySize;
 
-                if (!_foldouts.ContainsKey(i))
-                    _foldouts[i] = false;
+                if (!_foldouts.TryGetValue(i, out bool expanded))
+                    expanded = false;
 
                 string foldoutLabel = string.IsNullOrEmpty(groupName)
                     ? $"(unnamed)   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})"
                     : $"{groupName}   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})";
 
                 EditorGUILayout.BeginHorizontal();
-                _foldouts[i] = EditorGUILayout.Foldout(_foldouts[i], foldoutLabel, true);
+                // Foldout is UI-only state — save/restore GUI.changed so toggling it does not
+                // bubble up to TsvrcWindow's EndChangeCheck and mark the config as dirty.
+                bool prevChanged = GUI.changed;
+                GUI.changed = false;
+                expanded = EditorGUILayout.Foldout(expanded, foldoutLabel, true);
+                _foldouts[i] = expanded;
+                GUI.changed = prevChanged;
                 if (GUILayout.Button("✕", GUILayout.Width(22)))
                     toDelete = i;
                 EditorGUILayout.EndHorizontal();
 
-                if (_foldouts[i])
+                if (expanded)
                 {
                     EditorGUI.indentLevel++;
                     EditorGUILayout.PropertyField(groupNameProp, LabelGroupName);
-                    string preview = string.IsNullOrWhiteSpace(groupName)
+                    // Read groupName after PropertyField so the prefix preview reflects the current value.
+                    string currentName = groupNameProp.stringValue;
+                    string preview = string.IsNullOrWhiteSpace(currentName)
                         ? "Create…"
-                        : $"Create{FactoryModule.Sanitize(groupName)}…";
+                        : $"Create{FactoryModule.Sanitize(currentName)}…";
                     EditorGUILayout.LabelField($"Prefix:  {preview}", EditorStyles.miniLabel);
                     EditorGUILayout.PropertyField(prefabsProp, LabelPrefabs, true);
                     EditorGUI.indentLevel--;
