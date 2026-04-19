@@ -19,16 +19,48 @@ namespace Tsvrc.Editor
 
         internal override void Scan(TsvrcConfig config)
         {
-            var internalConfig = TsvrcCompiler.LoadInternalConfig();
-            var internalSingletons = internalConfig?.Singletons ?? Array.Empty<UnityEngine.Object>();
-            var resolved = TsvrcResolver.Resolve(
-                (config.Singletons ?? Array.Empty<UnityEngine.Object>()).Union(internalSingletons));
+            var resolved = ResolveDescriptors(config);
+
+            // Single source-tree walk for all singletons.
+            var patterns = resolved.ToDictionary(
+                f => f.Name,
+                f => new Regex(@"\b_ts\s*\.\s*" + Regex.Escape(f.Name) + @"\b"));
+            var callSiteMap = SourceScanner.FindCallSitesBatch(patterns);
 
             foreach (var field in resolved)
-                field.CallSites = SourceScanner.FindCallSites(
-                    new Regex(@"\b_ts\s*\.\s*" + Regex.Escape(field.Name) + @"\b"));
+                field.CallSites = callSiteMap[field.Name];
 
             _fields = resolved.OrderBy(f => f.Name).ToList();
+        }
+
+        // Wire-only scan: uses reflection to find which singleton fields exist in the compiled type.
+        // No source file scanning — avoids FindCallSitesBatch on every wire pass.
+        internal override void ScanForWire(TsvrcConfig config, Type compiledType)
+        {
+            var resolved = ResolveDescriptors(config);
+
+            var fields = new List<TsvrcField>();
+            foreach (var field in resolved)
+            {
+                // Active singletons are emitted as serialized fields; stubs are computed properties.
+                // A public instance field with the exact name confirms this is an active entry.
+                if (compiledType.GetField(field.Name,
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance) == null)
+                    continue;
+                field.WireAlways = true;
+                fields.Add(field);
+            }
+
+            _fields = fields.OrderBy(f => f.Name).ToList();
+        }
+
+        // Returns resolved field descriptors from config without scanning source files.
+        private List<TsvrcField> ResolveDescriptors(TsvrcConfig config)
+        {
+            var internalConfig = TsvrcCompiler.LoadInternalConfig();
+            var internalSingletons = internalConfig?.Singletons ?? Array.Empty<UnityEngine.Object>();
+            return TsvrcResolver.Resolve(
+                (config.Singletons ?? Array.Empty<UnityEngine.Object>()).Union(internalSingletons));
         }
 
         internal override IEnumerable<string> GetUsings() =>
@@ -57,13 +89,15 @@ namespace Tsvrc.Editor
         internal override void WriteStartBody(CsWriter w)
         {
             foreach (var field in _fields)
-                if (field.SourceObject is TsvrcBehaviour && field.CallSites.Count > 0)
+                if (field.CallSites.Count > 0 && field.SourceObject is TsvrcBehaviour)
                     w.Line($"{field.Name}.TsConstruct(this);");
         }
 
         internal override void Wire(SerializedObject target)
         {
-            foreach (var field in _fields)
+            // Stubs are computed properties, not serialized fields — skip them to avoid spurious warnings.
+            var fieldsToWire = _fields.Where(f => f.WireAlways || f.CallSites.Count > 0).ToList();
+            foreach (var field in fieldsToWire)
             {
                 var prop = target.FindProperty(field.Name);
                 if (prop == null)
@@ -71,7 +105,7 @@ namespace Tsvrc.Editor
                     Debug.LogWarning($"[TsvrcWirer] Singleton property '{field.Name}' not found on CompiledTsvrc.");
                     continue;
                 }
-                prop.objectReferenceValue = field.CallSites.Count > 0 ? field.SourceObject : null;
+                prop.objectReferenceValue = field.SourceObject;
             }
         }
     }
