@@ -16,10 +16,14 @@ namespace Tsvrc.Editor
 
         public bool OnBuildRequested(VRCSDKRequestedBuildType requestedBuildType)
         {
+            // Tsvrc is world-only. Avatar builds must not be blocked.
+            if (requestedBuildType != VRCSDKRequestedBuildType.Scene)
+                return true;
+
             // Skip AssetDatabase.Refresh — calling it mid-build pipeline can trigger a domain
             // reload and corrupt the build or cause UdonSharp to recompile at the wrong time.
-            TsvrcCompiler.Compile(refreshAssetDatabase: false);
-            return true;
+            // Return false to abort the build if compilation fails (e.g. no TsvrcConfig in scene).
+            return TsvrcCompiler.Compile(refreshAssetDatabase: false);
         }
     }
 }

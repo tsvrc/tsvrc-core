@@ -12,8 +12,9 @@ namespace Tsvrc.Editor
 {
     internal static class TsvrcCompiler
     {
-        internal const string GeneratedFolder = "Assets/CompiledTsvrc";
-        private const string GeneratedFilePath = "Assets/CompiledTsvrc/CompiledTsvrc.cs";
+        internal const string GeneratedFolder    = "Assets/CompiledTsvrc";
+        internal const string GeneratedFilePath  = "Assets/CompiledTsvrc/CompiledTsvrc.cs";
+        internal const string GeneratedAssetPath = "Assets/CompiledTsvrc/CompiledTsvrc.asset";
         internal const string TsvrcConfigPrefabPath = "Assets/Tsvrc/Prefabs/TsvrcConfig.prefab";
         internal const string InternalConfigPath = "Assets/Tsvrc/InternalConfig.asset";
 
@@ -36,10 +37,13 @@ namespace Tsvrc.Editor
         [MenuItem("Tsvrc/Tools/Force Compile")]
         public static void Compile() => Compile(refreshAssetDatabase: true);
 
-        internal static void Compile(bool refreshAssetDatabase)
+        // refreshAssetDatabase should be false when called from the VRChat build pipeline:
+        // AssetDatabase.Refresh() mid-build can trigger a domain reload and corrupt the upload.
+        // Returns false if compilation could not proceed (e.g. no TsvrcConfig in scene).
+        internal static bool Compile(bool refreshAssetDatabase)
         {
             var config = RequireTsvrcConfig();
-            if (config == null) return;
+            if (config == null) return false;
 
             if (config.tag != "EditorOnly")
                 Debug.LogWarning("[TsvrcCompiler] TsvrcConfig GameObject is not tagged 'EditorOnly'. It will be included in the VRChat build. Set the tag to 'EditorOnly' in the Inspector.");
@@ -53,22 +57,55 @@ namespace Tsvrc.Editor
                 module.Scan(config);
 
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            string folderFull = ToAbsolutePath(projectRoot, GeneratedFolder);
-            string fileFull = ToAbsolutePath(projectRoot, GeneratedFilePath);
+            string folderFull  = ToAbsolutePath(projectRoot, GeneratedFolder);
+            string fileFull    = ToAbsolutePath(projectRoot, GeneratedFilePath);
 
             Directory.CreateDirectory(folderFull);
 
             string source = TsvrcCodeGen.Build(modules);
             File.WriteAllText(fileFull, source, Encoding.UTF8);
 
-            TsvrcWirer.ScheduleWire();
             if (refreshAssetDatabase)
+            {
+                // ScheduleWire only when Refresh follows: the domain reload it triggers is what
+                // lets TsvrcWirer pick up the newly compiled CompiledTsvrc type. Without Refresh
+                // (e.g. during a VRChat build) no reload occurs and wiring the scene is wrong.
+                TsvrcWirer.ScheduleWire();
                 AssetDatabase.Refresh();
+            }
+
+            return true;
         }
 
         internal static void LogSuccess()
         {
             Debug.Log("[Tsvrc Compiler] Tsvrc has been successfully compiled. CompiledTsvrc has been generated and wired into the scene.");
+        }
+
+        /// <summary>
+        /// Dry-run compile: scans source files and builds the generated output string,
+        /// then compares it to what is currently on disk.
+        /// Returns true if a real Compile() call would produce a different file.
+        /// Used by TsvrcWatcher to avoid triggering a domain reload when .cs files
+        /// are saved but no Tsvrc call sites were actually added or removed.
+        /// </summary>
+        internal static bool WouldChangeSource()
+        {
+            // Do not auto-create a TsvrcConfig during a dry run — read only.
+            var all = Object.FindObjectsOfType<TsvrcConfig>(true);
+            if (all.Length != 1) return false;
+
+            var modules = CreateModules();
+            SourceScanner.ExcludeFolder = GeneratedFolder;
+            foreach (var module in modules)
+                module.Scan(all[0]);
+
+            string newSource = TsvrcCodeGen.Build(modules);
+
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string fileFull = ToAbsolutePath(projectRoot, GeneratedFilePath);
+            if (!File.Exists(fileFull)) return true;
+            return File.ReadAllText(fileFull, Encoding.UTF8) != newSource;
         }
 
         // Instantiates TsvrcConfig into the active scene from the Tsvrc prefab.
@@ -91,10 +128,17 @@ namespace Tsvrc.Editor
 
         private static void CleanPrevious()
         {
-            // Remove CompiledTsvrc GameObject from scene by name — avoids iterating all components.
-            var existing = GameObject.Find("CompiledTsvrc");
-            if (existing != null)
-                Undo.DestroyObjectImmediate(existing);
+            // GameObject.Find skips inactive objects — search root objects instead so a
+            // deactivated CompiledTsvrc doesn't silently persist and duplicate after wire.
+            var scene = EditorSceneManager.GetActiveScene();
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                if (root.name == "CompiledTsvrc")
+                {
+                    Undo.DestroyObjectImmediate(root);
+                    break;
+                }
+            }
 
             // Delete only the auto-generated files; never wipe the whole folder so that
             // user assets (TranslationConfig.asset, MolInstance.asset, …) are preserved.
@@ -115,13 +159,13 @@ namespace Tsvrc.Editor
             var programAsset = ScriptableObject.CreateInstance<UdonSharpProgramAsset>();
             programAsset.sourceCsScript = monoScript;
             AssetDatabase.CreateAsset(programAsset, assetPath);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(programAsset);
             return true;
         }
 
         private static void DeleteGeneratedAsset(string assetPath)
         {
-            if (AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null)
+            if (!string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(assetPath)))
                 AssetDatabase.DeleteAsset(assetPath);
         }
 
@@ -130,7 +174,7 @@ namespace Tsvrc.Editor
 
         private static TsvrcConfig RequireTsvrcConfig()
         {
-            var all = Object.FindObjectsOfType<TsvrcConfig>();
+            var all = Object.FindObjectsOfType<TsvrcConfig>(true);
 
             switch (all.Length)
             {
@@ -142,10 +186,8 @@ namespace Tsvrc.Editor
                     return all[0];
 
                 default:
-                    var config = AddTsvrcConfigToScene();
-                    if (config == null)
-                        Debug.LogError("[TsvrcCompiler] No TsvrcConfig found in the scene. Open Tsvrc > Configure to set one up.");
-                    return config;
+                    // AddTsvrcConfigToScene already logs if the prefab is missing.
+                    return AddTsvrcConfigToScene();
             }
         }
     }
