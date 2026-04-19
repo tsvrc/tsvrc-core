@@ -54,8 +54,11 @@ namespace Tsvrc.Editor
             _targets.Clear();
 
             LoadLanguages();
-            if (_languages.Count > 0)
-                CollectTMPTargets();
+            // CollectTMPTargets is intentionally NOT called here. Scan() is called both by Compile()
+            // and by the dry-run WouldChangeSource(). Calling FindObjectsOfType in a dry-run context
+            // can return different scene objects than in a real compile, making the output
+            // non-deterministic and causing missed or spurious recompiles.
+            // Targets are collected lazily in Wire() where scene access is expected.
         }
 
         // Any change to the config or any JSON file requires regenerating the baked literals.
@@ -204,14 +207,12 @@ namespace Tsvrc.Editor
             // Guard against redundant SetLanguage calls (-1 = none set).
             w.Line("private int _tsCurrentLang = -1;");
 
-            if (_targets.Count > 0)
-            {
-                // Scene-wired TMP targets, serialized references baked at compile time.
-                w.Line("[HideInInspector] [SerializeField] private TextMeshProUGUI[] _translationTargets;");
-                // Batched visual update state.
-                w.Line("private int _tsBatchIndex;");
-                w.Line("private bool _tsBatchRunning;");
-            }
+            // Always emit batch fields when there are languages. Targets are wired at runtime;
+            // if no TMP targets match the naming pattern the array is simply empty and the
+            // batch update becomes a no-op. This keeps code generation deterministic.
+            w.Line("[HideInInspector] [SerializeField] private TextMeshProUGUI[] _translationTargets;");
+            w.Line("private int _tsBatchIndex;");
+            w.Line("private bool _tsBatchRunning;");
 
             w.EndRegion();
         }
@@ -236,12 +237,9 @@ namespace Tsvrc.Editor
                 w.Line($"else {{ Debug.LogError($\"[CompiledTsvrc] Language index {{_tsIdx}} is not available.\"); return; }}");
                 w.Line("_tsCurrentLang = _tsIdx;");
 
-                if (_targets.Count > 0)
-                {
-                    w.Line("_tsBatchIndex = 0;");
-                    w.Line("_tsBatchRunning = true;");
-                    w.Line("_TsApplyTranslationBatch();");
-                }
+                w.Line("_tsBatchIndex = 0;");
+                w.Line("_tsBatchRunning = true;");
+                w.Line("_TsApplyTranslationBatch();");
             }
 
             // Translate, linear scan across baked keys. With ~20 keys this is negligible.
@@ -262,31 +260,28 @@ namespace Tsvrc.Editor
                 w.Line("return key;");
             }
 
-            // Batched scene-target update, only generated when there are static targets.
-            if (_targets.Count > 0)
+            // Batched scene-target update.
+            using (w.Method("public void _TsApplyTranslationBatch()"))
             {
-                using (w.Method("public void _TsApplyTranslationBatch()"))
+                w.Line("if (!_tsBatchRunning || _tsCurrentKeys == null) return;");
+                w.Line($"int _tsEnd = Mathf.Min(_tsBatchIndex + {BatchSize}, _translationTargets.Length);");
+                using (w.Block("for (int _tsI = _tsBatchIndex; _tsI < _tsEnd; _tsI++)"))
                 {
-                    w.Line("if (!_tsBatchRunning || _tsCurrentKeys == null) return;");
-                    w.Line($"int _tsEnd = Mathf.Min(_tsBatchIndex + {BatchSize}, _translationTargets.Length);");
-                    using (w.Block("for (int _tsI = _tsBatchIndex; _tsI < _tsEnd; _tsI++)"))
+                    w.Line("if (_translationTargets[_tsI] == null) continue;");
+                    w.Line("string _tsName = _translationTargets[_tsI].gameObject.name;");
+                    using (w.Block("for (int _tsJ = 0; _tsJ < _tsCurrentKeys.Length; _tsJ++)"))
                     {
-                        w.Line("if (_translationTargets[_tsI] == null) continue;");
-                        w.Line("string _tsName = _translationTargets[_tsI].gameObject.name;");
-                        using (w.Block("for (int _tsJ = 0; _tsJ < _tsCurrentKeys.Length; _tsJ++)"))
+                        using (w.Block("if (_tsCurrentKeys[_tsJ] == _tsName)"))
                         {
-                            using (w.Block("if (_tsCurrentKeys[_tsJ] == _tsName)"))
-                            {
-                                w.Line("_translationTargets[_tsI].text = _tsCurrentVals[_tsJ];");
-                                w.Line("break;");
-                            }
+                            w.Line("_translationTargets[_tsI].text = _tsCurrentVals[_tsJ];");
+                            w.Line("break;");
                         }
                     }
-                    w.Line("_tsBatchIndex = _tsEnd;");
-                    using (w.Block("if (_tsBatchIndex < _translationTargets.Length)"))
-                        w.Line("SendCustomEventDelayedFrames(\"_TsApplyTranslationBatch\", 1);");
-                    w.Line("else _tsBatchRunning = false;");
                 }
+                w.Line("_tsBatchIndex = _tsEnd;");
+                using (w.Block("if (_tsBatchIndex < _translationTargets.Length)"))
+                    w.Line("SendCustomEventDelayedFrames(\"_TsApplyTranslationBatch\", 1);");
+                w.Line("else _tsBatchRunning = false;");
             }
         }
 
@@ -296,18 +291,19 @@ namespace Tsvrc.Editor
         {
             if (_languages.Count == 0) return;
 
-            if (_targets.Count > 0)
+            // Collect TMP targets here, not in Scan(), to keep code generation deterministic.
+            _targets.Clear();
+            CollectTMPTargets();
+
+            var targetsProp = target.FindProperty("_translationTargets");
+            if (targetsProp == null)
             {
-                var targetsProp = target.FindProperty("_translationTargets");
-                if (targetsProp == null)
-                {
-                    Debug.LogWarning("[TsvrcWirer] '_translationTargets' property not found on CompiledTsvrc.");
-                    return;
-                }
-                targetsProp.arraySize = _targets.Count;
-                for (int i = 0; i < _targets.Count; i++)
-                    targetsProp.GetArrayElementAtIndex(i).objectReferenceValue = _targets[i];
+                Debug.LogWarning("[TsvrcWirer] '_translationTargets' property not found on CompiledTsvrc.");
+                return;
             }
+            targetsProp.arraySize = _targets.Count;
+            for (int i = 0; i < _targets.Count; i++)
+                targetsProp.GetArrayElementAtIndex(i).objectReferenceValue = _targets[i];
         }
 
         private List<string> BuildEnumNames()
