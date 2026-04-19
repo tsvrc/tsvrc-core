@@ -38,7 +38,6 @@ namespace Tsvrc.Editor
         {
             var compiledTsvrc = (Component)target.targetObject;
             var memory = RequireMemory(compiledTsvrc.transform);
-            if (memory == null) return;
 
             var prop = target.FindProperty("Memory");
             if (prop != null)
@@ -49,12 +48,10 @@ namespace Tsvrc.Editor
 
         private static TsMemory RequireMemory(Transform parent)
         {
-            var existing = Object.FindObjectOfType<TsMemory>();
+            // Check for an existing TsMemory already under CompiledTsvrc (fast child lookup, no global scene search).
+            var existing = parent.GetComponentInChildren<TsMemory>(true);
             if (existing != null)
-            {
-                existing.transform.SetParent(parent, false);
                 return existing;
-            }
 
             var go = new GameObject("TsMemory");
             go.transform.SetParent(parent, false);
