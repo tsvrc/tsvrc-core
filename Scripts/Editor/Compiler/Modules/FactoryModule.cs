@@ -270,7 +270,7 @@ namespace Tsvrc.Editor
         // Converts an arbitrary prefab or group name into a valid PascalCase C# identifier.
         // Strips __Alias__ markers, splits on any non-alphanumeric separator, capitalises each
         // word, and prepends '_' if the result would start with a digit.
-        private static string Sanitize(string raw)
+        internal static string Sanitize(string raw)
         {
             if (string.IsNullOrEmpty(raw)) return string.Empty;
 

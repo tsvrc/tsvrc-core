@@ -71,6 +71,24 @@ namespace Tsvrc.Editor
             Debug.Log("[Tsvrc Compiler] Tsvrc has been successfully compiled. CompiledTsvrc has been generated and wired into the scene.");
         }
 
+        // Instantiates TsvrcConfig into the active scene from the Tsvrc prefab.
+        // Used by the Configure window's "Add TsvrcConfig to Scene" button.
+        internal static TsvrcConfig AddTsvrcConfigToScene()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(TsvrcConfigPrefabPath);
+            if (prefab == null)
+            {
+                Debug.LogError("[TsvrcCompiler] TsvrcConfig prefab not found at " + TsvrcConfigPrefabPath);
+                return null;
+            }
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            go.tag = "EditorOnly";
+            go.transform.SetSiblingIndex(0);
+            Undo.RegisterCreatedObjectUndo(go, "Add TsvrcConfig");
+            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            return go.GetComponent<TsvrcConfig>();
+        }
+
         private static void CleanPrevious()
         {
             // Remove CompiledTsvrc GameObject from scene by name — avoids iterating all components.
@@ -124,20 +142,10 @@ namespace Tsvrc.Editor
                     return all[0];
 
                 default:
-                    var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(TsvrcConfigPrefabPath);
-                    if (prefab == null)
-                    {
+                    var config = AddTsvrcConfigToScene();
+                    if (config == null)
                         Debug.LogError("[TsvrcCompiler] No TsvrcConfig found in the scene. Open Tsvrc > Configure to set one up.");
-                        return null;
-                    }
-
-                    var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-                    go.tag = "EditorOnly";
-                    go.transform.SetSiblingIndex(0);
-                    Undo.RegisterCreatedObjectUndo(go, "Add TsvrcConfig");
-                    EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
-
-                    return go.GetComponent<TsvrcConfig>();
+                    return config;
             }
         }
     }
