@@ -16,6 +16,7 @@ namespace Tsvrc.Editor
         private string _savePath = "Assets/CombinedMesh.asset";
         private bool _deactivateSources = true;
         private bool _recalculateNormals = false;
+        private bool _excludeEditorOnly = true;
         private Vector2 _scroll;
 
         // Cached every time the sources list changes to avoid allocating on every repaint.
@@ -152,6 +153,11 @@ namespace Tsvrc.Editor
                     "Recompute normals from geometry after combining.\n" +
                     "Disable to preserve baked or hand-authored normals from the source meshes."),
                 _recalculateNormals);
+
+            _excludeEditorOnly = EditorGUILayout.Toggle(
+                new GUIContent("Exclude EditorOnly",
+                    "Skip source GameObjects tagged \"EditorOnly\" when combining."),
+                _excludeEditorOnly);
         }
 
         // Combine button
@@ -199,7 +205,7 @@ namespace Tsvrc.Editor
             Mesh combinedMesh = null;
             try
             {
-                var result = MeshCombinerTool.Combine(valid, _root, _recalculateNormals);
+                var result = MeshCombinerTool.Combine(valid, _root, _recalculateNormals, _excludeEditorOnly);
                 combinedMesh = result.Mesh;
 
                 // Overwrite existing asset rather than throwing.

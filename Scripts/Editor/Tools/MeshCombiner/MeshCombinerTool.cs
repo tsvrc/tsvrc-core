@@ -27,7 +27,7 @@ namespace Tsvrc.Editor
         /// Recompute normals from geometry after combining.
         /// Disable this to preserve baked/hand-authored normals from the source meshes.
         /// </param>
-        internal static CombineResult Combine(IList<MeshFilter> filters, Transform root, bool recalculateNormals = false)
+        internal static CombineResult Combine(IList<MeshFilter> filters, Transform root, bool recalculateNormals = false, bool excludeEditorOnly = true)
         {
             var rootInverse = root != null ? root.worldToLocalMatrix : Matrix4x4.identity;
 
@@ -38,6 +38,7 @@ namespace Tsvrc.Editor
             foreach (var filter in filters)
             {
                 if (filter == null || filter.sharedMesh == null) continue;
+                if (excludeEditorOnly && filter.CompareTag("EditorOnly")) continue;
 
                 var renderer = filter.GetComponent<MeshRenderer>();
                 if (renderer == null) continue;
