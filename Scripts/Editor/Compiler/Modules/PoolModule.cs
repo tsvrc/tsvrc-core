@@ -85,31 +85,36 @@ namespace Tsvrc.Editor
             w.Region("Process Pool Accessors");
             foreach (var field in _fields)
             {
-                w.Summary($"Gets a <see cref=\"{field.Type}\"/> at runtime. " +
-                          $"Pooled objects have stable VRChat network IDs and can send and receive network events. " +
-                          $"Call <see cref=\"Tsvrc.Core.TsvrcProcess.TsRelease\"/> when done to return it for reuse. " +
-                          $"Logs an error if all {field.SlotCount} slot(s) are already in use.");
-                using (w.Method($"public {field.Type} Get{field.Type}()"))
+                if (field.SlotCount == 0)
                 {
-                    if (field.SlotCount == 0)
+                    w.Summary(TsvrcCodeGen.StubSummary($"Get{field.Type}"));
+                    using (w.Method($"public {field.Type} Get{field.Type}()"))
                     {
                         w.Line($"Debug.LogError(\"{TsvrcCodeGen.NullFieldMessage($"Get{field.Type}")}\");");
                         w.Line("return null;");
-                        continue;
                     }
-
-                    for (int i = 0; i < field.SlotCount; i++)
+                }
+                else
+                {
+                    w.Summary($"Gets a <see cref=\"{field.Type}\"/> at runtime. " +
+                              $"Pooled objects have stable VRChat network IDs and can send and receive network events. " +
+                              $"Call <see cref=\"Tsvrc.Core.TsvrcProcess.TsRelease\"/> when done to return it for reuse. " +
+                              $"Logs an error if all {field.SlotCount} slot(s) are already in use.");
+                    using (w.Method($"public {field.Type} Get{field.Type}()"))
                     {
-                        string slot = SlotFieldName(field, i);
-                        using (w.Block($"if ({slot} != null && !{slot}.IsConstructed)"))
+                        for (int i = 0; i < field.SlotCount; i++)
                         {
-                            w.Line($"{slot}.gameObject.SetActive(true);");
-                            w.Line($"{slot}.TsConstruct(this);");
-                            w.Line($"return {slot};");
+                            string slot = SlotFieldName(field, i);
+                            using (w.Block($"if ({slot} != null && !{slot}.IsConstructed)"))
+                            {
+                                w.Line($"{slot}.gameObject.SetActive(true);");
+                                w.Line($"{slot}.TsConstruct(this);");
+                                w.Line($"return {slot};");
+                            }
                         }
+                        w.Line($"Debug.LogError(\"[CompiledTsvrc] {field.Type}: all {field.SlotCount} pool slot(s) are already active.\");");
+                        w.Line("return null;");
                     }
-                    w.Line($"Debug.LogError(\"[CompiledTsvrc] {field.Type}: all {field.SlotCount} pool slot(s) are already active.\");");
-                    w.Line("return null;");
                 }
             }
             w.EndRegion();

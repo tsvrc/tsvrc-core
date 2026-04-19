@@ -64,9 +64,13 @@ namespace Tsvrc.Editor
             return usings;
         }
 
-        // Emits the standard runtime error for a field that exists in CompiledTsvrc but has no scene reference.
-        internal static string NullFieldMessage(string fieldName)
-            => $"[Tsvrc] '{fieldName}' is null. It was not in use when Tsvrc was last compiled. Recompile Tsvrc to activate it.";
+        // Runtime error body for generated stubs. Used inside Debug.LogError() in CompiledTsvrc.
+        internal static string NullFieldMessage(string memberName)
+            => $"[Tsvrc] '{memberName}' was not in use when Tsvrc last compiled. Recompile Tsvrc to activate it.";
+
+        // XML doc summary for generated stub members. IDE-friendly; no log-prefix clutter.
+        internal static string StubSummary(string memberName)
+            => $"Inactive — <c>{memberName}</c> had no call sites at last compile. Recompile Tsvrc to enable it.";
     }
 }
 #endif

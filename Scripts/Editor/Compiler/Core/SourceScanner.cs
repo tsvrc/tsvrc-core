@@ -36,6 +36,37 @@ namespace Tsvrc.Editor
             return results;
         }
 
+        // Scans all user .cs files once and distributes call sites to all provided patterns.
+        // Returns one list per key; keys with no matches get an empty list.
+        internal static Dictionary<string, List<TsvrcCallSite>> FindCallSitesBatch(Dictionary<string, Regex> patterns)
+        {
+            var result = new Dictionary<string, List<TsvrcCallSite>>();
+            foreach (var key in patterns.Keys)
+                result[key] = new List<TsvrcCallSite>();
+
+            var excludePrefixes = GetExcludePrefixes();
+
+            foreach (var file in Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories))
+            {
+                string fullPath = Path.GetFullPath(file);
+                if (excludePrefixes.Any(p => fullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                string src = StripComments(File.ReadAllText(file));
+                string className = Path.GetFileNameWithoutExtension(file);
+                var callSite = new TsvrcCallSite { ClassName = className, FileName = file };
+
+                foreach (var kvp in patterns)
+                {
+                    var matches = kvp.Value.Matches(src);
+                    for (int i = 0; i < matches.Count; i++)
+                        result[kvp.Key].Add(callSite);
+                }
+            }
+
+            return result;
+        }
+
         internal static string StripComments(string src)
         {
             src = Regex.Replace(src, @"//[^\n]*", "");

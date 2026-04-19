@@ -83,7 +83,7 @@ namespace Tsvrc.Editor
             return null;
         }
 
-        private static string Deduplicate(string baseName, HashSet<string> usedNames)
+        internal static string Deduplicate(string baseName, HashSet<string> usedNames)
         {
             string name = baseName;
             int suffix = 2;
