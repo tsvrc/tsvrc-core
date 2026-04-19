@@ -1,5 +1,4 @@
 #if UNITY_EDITOR
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace Tsvrc.Editor
@@ -13,7 +12,8 @@ namespace Tsvrc.Editor
         internal Object SourceObject;
         /// <summary>Number of pool slots to generate. Always 1 for singletons and constructs.</summary>
         internal int SlotCount = 1;
-        internal List<TsvrcCallSite> CallSites = new List<TsvrcCallSite>();
+        /// <summary>Number of source-level call sites found for this field (singletons/factories).</summary>
+        internal int CallSiteCount;
         /// <summary>
         /// Set by the wire-only scan path to indicate this field must be wired unconditionally,
         /// because it already existed in the compiled type from the last full compile.

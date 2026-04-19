@@ -61,15 +61,15 @@ namespace Tsvrc.Editor
             var sorted = fields.OrderBy(f => f.Name).ToList();
 
             // Full compile only: scan all user .cs files once for all factory call sites.
-            // Wire-only path leaves CallSites as the default empty list (WireAlways drives wiring instead).
+            // Wire-only path leaves CallSiteCount as 0 (WireAlways drives wiring instead).
             if (activeFieldNames == null)
             {
                 var patterns = sorted.ToDictionary(
                     f => f.Name,
-                    f => new Regex(@"\b_ts\s*\.\s*Create" + Regex.Escape(f.Name) + @"\s*\("));
+                    f => new Regex(@"\b_ts\s*\.\s*Create" + Regex.Escape(f.Name) + @"\s*\(", RegexOptions.Compiled));
                 var callSiteMap = SourceScanner.FindCallSitesBatch(patterns);
                 foreach (var field in sorted)
-                    field.CallSites = callSiteMap[field.Name];
+                    field.CallSiteCount = callSiteMap[field.Name];
             }
 
             return sorted;
@@ -95,7 +95,7 @@ namespace Tsvrc.Editor
         /// Scans one factory group and appends resolved fields to <paramref name="fields"/>.
         /// <para>
         /// When <paramref name="activeFieldNames"/> is <c>null</c> (full compile): all prefabs are
-        /// included and <see cref="TsvrcField.CallSites"/> is populated by scanning user source files.
+        /// included and <see cref="TsvrcField.CallSiteCount"/> is populated by scanning user source files.
         /// </para>
         /// <para>
         /// When <paramref name="activeFieldNames"/> is provided (wire-only): only prefabs whose
@@ -143,7 +143,7 @@ namespace Tsvrc.Editor
                     Namespace = type?.Namespace ?? string.Empty,
                     SourceObject = (UnityEngine.Object)behaviour ?? prefab,
                     WireAlways = activeFieldNames != null,
-                    // CallSites assigned by BuildFields via batch scan (full compile) or left as empty list (wire-only).
+                    // CallSiteCount assigned by BuildFields via batch scan (full compile); 0 on wire-only path.
                 });
             }
         }
@@ -159,7 +159,7 @@ namespace Tsvrc.Editor
 
         internal override void WriteFields(CsWriter w)
         {
-            var active = _fields.Where(f => f.CallSites.Count > 0).ToList();
+            var active = _fields.Where(f => f.CallSiteCount > 0).ToList();
             if (active.Count == 0) return;
 
             w.Region("Factories");
@@ -175,7 +175,7 @@ namespace Tsvrc.Editor
             w.Region("Factory Methods");
             foreach (var field in _fields)
             {
-                if (field.CallSites.Count == 0)
+                if (field.CallSiteCount == 0)
                 {
                     w.Summary(TsvrcCodeGen.StubSummary($"Create{field.Name}"));
                     using (w.Method($"public {field.Type} Create{field.Name}(Transform parent)"))
@@ -210,7 +210,7 @@ namespace Tsvrc.Editor
 
         internal override void Wire(SerializedObject target)
         {
-            var fieldsToWire = _fields.Where(f => f.WireAlways || f.CallSites.Count > 0).ToList();
+            var fieldsToWire = _fields.Where(f => f.WireAlways || f.CallSiteCount > 0).ToList();
             if (fieldsToWire.Count == 0) return;
 
             var compiled = target.targetObject as Component;
@@ -222,9 +222,8 @@ namespace Tsvrc.Editor
             if (existing != null)
                 Undo.DestroyObjectImmediate(existing.gameObject);
 
-            var factoriesGo = new GameObject("Factories");
-            Undo.RegisterCreatedObjectUndo(factoriesGo, "Create Factories Container");
-            factoriesGo.transform.SetParent(compiled.transform, false);
+            // Create the container lazily so all-invalid entries don't leave an empty GameObject in the scene.
+            GameObject factoriesGo = null;
 
             foreach (var field in fieldsToWire)
             {
@@ -236,6 +235,13 @@ namespace Tsvrc.Editor
                 }
 
                 var prefabAsset = field.SourceObject is Component c ? c.gameObject : (GameObject)field.SourceObject;
+
+                if (factoriesGo == null)
+                {
+                    factoriesGo = new GameObject("Factories");
+                    Undo.RegisterCreatedObjectUndo(factoriesGo, "Create Factories Container");
+                    factoriesGo.transform.SetParent(compiled.transform, false);
+                }
 
                 // Instantiate as a scene object so Unity strips EditorOnly children at build time.
                 var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefabAsset, factoriesGo.transform);

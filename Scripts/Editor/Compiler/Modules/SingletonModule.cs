@@ -24,11 +24,11 @@ namespace Tsvrc.Editor
             // Single source-tree walk for all singletons.
             var patterns = resolved.ToDictionary(
                 f => f.Name,
-                f => new Regex(@"\b_ts\s*\.\s*" + Regex.Escape(f.Name) + @"\b"));
+                f => new Regex(@"\b_ts\s*\.\s*" + Regex.Escape(f.Name) + @"\b", RegexOptions.Compiled));
             var callSiteMap = SourceScanner.FindCallSitesBatch(patterns);
 
             foreach (var field in resolved)
-                field.CallSites = callSiteMap[field.Name];
+                field.CallSiteCount = callSiteMap[field.Name];
 
             _fields = resolved.OrderBy(f => f.Name).ToList();
         }
@@ -72,7 +72,7 @@ namespace Tsvrc.Editor
             w.Region("Singletons");
             foreach (var field in _fields)
             {
-                if (field.CallSites.Count == 0)
+                if (field.CallSiteCount == 0)
                 {
                     w.Summary(TsvrcCodeGen.StubSummary(field.Name));
                     w.Line($"public {field.Type} {field.Name} {{ get {{ Debug.LogError(\"{TsvrcCodeGen.NullFieldMessage(field.Name)}\"); return null; }} }}");
@@ -89,14 +89,14 @@ namespace Tsvrc.Editor
         internal override void WriteStartBody(CsWriter w)
         {
             foreach (var field in _fields)
-                if (field.CallSites.Count > 0 && field.SourceObject is TsvrcBehaviour)
+                if (field.CallSiteCount > 0 && field.SourceObject is TsvrcBehaviour)
                     w.Line($"{field.Name}.TsConstruct(this);");
         }
 
         internal override void Wire(SerializedObject target)
         {
             // Stubs are computed properties, not serialized fields, skip them to avoid spurious warnings.
-            var fieldsToWire = _fields.Where(f => f.WireAlways || f.CallSites.Count > 0).ToList();
+            var fieldsToWire = _fields.Where(f => f.WireAlways || f.CallSiteCount > 0).ToList();
             foreach (var field in fieldsToWire)
             {
                 var prop = target.FindProperty(field.Name);

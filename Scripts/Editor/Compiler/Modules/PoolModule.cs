@@ -25,17 +25,16 @@ namespace Tsvrc.Editor
         {
             var descriptors = ResolveDescriptors(config);
 
-            // Single source-tree walk for all pool types.
+            // Walk the source tree once for all pool types, counting each effective call site.
+            // Calls inside private helpers are multiplied by the number of times that helper is
+            // called, so wrapping _ts.GetX() in a shared method and calling it N times provisions N slots.
             var patterns = descriptors.ToDictionary(
                 f => f.Name,
-                f => new Regex(@"\b_ts\s*\.\s*Get" + Regex.Escape(f.Type) + @"\s*\(\s*\)"));
-            var callSiteMap = SourceScanner.FindCallSitesBatch(patterns);
+                f => new Regex(@"\b_ts\s*\.\s*Get" + Regex.Escape(f.Type) + @"\s*\(\s*\)", RegexOptions.Compiled));
+            var slotCounts = SourceScanner.CountCallSitesBatch(patterns);
 
             foreach (var field in descriptors)
-            {
-                field.CallSites = callSiteMap[field.Name];
-                field.SlotCount = field.CallSites.Count;
-            }
+                field.SlotCount = slotCounts[field.Name];
 
             _fields = descriptors.OrderBy(f => f.Name).ToList();
         }
@@ -46,16 +45,29 @@ namespace Tsvrc.Editor
         {
             var descriptors = ResolveDescriptors(config);
 
-            var typeFieldNames = new HashSet<string>(compiledType
-                .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
-                .Select(f => f.Name));
+            // Build prefix -> descriptor map so we can count slots in a single O(N) pass
+            // over the compiled type's fields instead of O(N×M) repeated enumerations.
+            var prefixToDescriptor = new Dictionary<string, TsvrcField>(StringComparer.Ordinal);
+            foreach (var d in descriptors)
+                prefixToDescriptor["_" + ToCamelCase(d.Name) + "_"] = d;
+
+            var slotCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var fname in compiledType.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                                             .Select(f => f.Name))
+            {
+                foreach (var kvp in prefixToDescriptor)
+                    if (fname.StartsWith(kvp.Key, StringComparison.Ordinal))
+                    {
+                        slotCounts.TryGetValue(kvp.Value.Name, out int c);
+                        slotCounts[kvp.Value.Name] = c + 1;
+                        break; // each field name matches at most one pool prefix
+                    }
+            }
 
             var fields = new List<TsvrcField>();
             foreach (var field in descriptors)
             {
-                string prefix = "_" + ToCamelCase(field.Name) + "_";
-                int slotCount = typeFieldNames.Count(n => n.StartsWith(prefix));
-                if (slotCount == 0) continue;
+                if (!slotCounts.TryGetValue(field.Name, out int slotCount) || slotCount == 0) continue;
                 field.SlotCount = slotCount;
                 field.WireAlways = true;
                 fields.Add(field);
@@ -157,21 +169,33 @@ namespace Tsvrc.Editor
             var fieldsToWire = _fields.Where(f => f.WireAlways || f.SlotCount > 0).ToList();
             if (fieldsToWire.Count == 0) return;
 
-            var compiledGo = ((Component)target.targetObject).gameObject;
+            var compiled = target.targetObject as Component;
+            if (compiled == null) return;
+            var compiledGo = compiled.gameObject;
 
             // Destroy any previous pool container so repeated wire passes don't stack duplicate slots.
             var existingContainer = compiledGo.transform.Find("Pool");
             if (existingContainer != null)
                 Undo.DestroyObjectImmediate(existingContainer.gameObject);
 
-            var poolContainer = new GameObject("Pool");
-            Undo.RegisterCreatedObjectUndo(poolContainer, "Create Pool Container");
-            poolContainer.transform.SetParent(compiledGo.transform, false);
+            // Create the container lazily so a scene with all-invalid entries doesn't leave an empty GameObject.
+            GameObject poolContainer = null;
 
             foreach (var field in fieldsToWire)
             {
                 var source = field.SourceObject as Component;
-                if (source == null) continue;
+                if (source == null)
+                {
+                    Debug.LogWarning($"[TsvrcWirer] Pool entry '{field.Name}' source is not a Component. Remove the invalid entry from TsvrcConfig and recompile.");
+                    continue;
+                }
+
+                if (poolContainer == null)
+                {
+                    poolContainer = new GameObject("Pool");
+                    Undo.RegisterCreatedObjectUndo(poolContainer, "Create Pool Container");
+                    poolContainer.transform.SetParent(compiledGo.transform, false);
+                }
 
                 for (int i = 0; i < field.SlotCount; i++)
                 {
@@ -179,6 +203,12 @@ namespace Tsvrc.Editor
                     if (prop == null) continue;
 
                     var instance = (GameObject)PrefabUtility.InstantiatePrefab(source.gameObject, poolContainer.transform);
+                    if (instance == null)
+                    {
+                        Debug.LogWarning($"[TsvrcWirer] Failed to instantiate pool prefab '{field.Name}'. The prefab asset may be missing or corrupted.");
+                        continue;
+                    }
+
                     instance.name = $"{field.Name}_{i}";
                     Undo.RegisterCreatedObjectUndo(instance, $"Create {field.Name} pool slot {i}");
                     prop.objectReferenceValue = instance.GetComponent(source.GetType());

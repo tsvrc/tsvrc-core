@@ -52,6 +52,7 @@ namespace Tsvrc.Editor
             var modules = CreateModules();
 
             SourceScanner.ExcludeFolder = GeneratedFolder;
+            SourceScanner.ClearSourceCache();
             foreach (var module in modules)
                 module.Scan(config);
 
@@ -96,6 +97,7 @@ namespace Tsvrc.Editor
 
             var modules = CreateModules();
             SourceScanner.ExcludeFolder = GeneratedFolder;
+            SourceScanner.ClearSourceCache();
             foreach (var module in modules)
                 module.Scan(all[0]);
 
