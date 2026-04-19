@@ -54,7 +54,8 @@ namespace Tsvrc.Editor
             _targets.Clear();
 
             LoadLanguages();
-            CollectTMPTargets();
+            if (_languages.Count > 0)
+                CollectTMPTargets();
         }
 
         // Any change to the config or any JSON file requires regenerating the baked literals.
@@ -190,8 +191,8 @@ namespace Tsvrc.Editor
                 var valLits = new List<string>();
                 foreach (var kv in lang.Entries)
                 {
-                    keyLits.Add($"\"{ EscapeString(kv.Key)}\"");
-                    valLits.Add($"\"{ EscapeString(kv.Value)}\"");
+                    keyLits.Add($"\"{EscapeString(kv.Key)}\"");
+                    valLits.Add($"\"{EscapeString(kv.Value)}\"");
                 }
                 w.Line($"private string[] _tsKeys_{id} = new string[] {{ {string.Join(", ", keyLits)} }};");
                 w.Line($"private string[] _tsVals_{id} = new string[] {{ {string.Join(", ", valLits)} }};");
@@ -206,7 +207,7 @@ namespace Tsvrc.Editor
             if (_targets.Count > 0)
             {
                 // Scene-wired TMP targets — serialized references baked at compile time.
-                w.Line("[HideInInspector] [SerializeField] private TMPro.TextMeshProUGUI[] _translationTargets;");
+                w.Line("[HideInInspector] [SerializeField] private TextMeshProUGUI[] _translationTargets;");
                 // Batched visual update state.
                 w.Line("private int _tsBatchIndex;");
                 w.Line("private bool _tsBatchRunning;");
@@ -298,12 +299,14 @@ namespace Tsvrc.Editor
             if (_targets.Count > 0)
             {
                 var targetsProp = target.FindProperty("_translationTargets");
-                if (targetsProp != null)
+                if (targetsProp == null)
                 {
-                    targetsProp.arraySize = _targets.Count;
-                    for (int i = 0; i < _targets.Count; i++)
-                        targetsProp.GetArrayElementAtIndex(i).objectReferenceValue = _targets[i];
+                    Debug.LogWarning("[TsvrcWirer] '_translationTargets' property not found on CompiledTsvrc.");
+                    return;
                 }
+                targetsProp.arraySize = _targets.Count;
+                for (int i = 0; i < _targets.Count; i++)
+                    targetsProp.GetArrayElementAtIndex(i).objectReferenceValue = _targets[i];
             }
         }
 
