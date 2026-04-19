@@ -76,7 +76,7 @@ namespace Tsvrc.Editor
                 TsvrcCompiler.Compile();
         }
 
-        // ── No config ──────────────────────────────────────────────────────────
+        // No config
 
         private void DrawNoConfig()
         {
@@ -102,7 +102,7 @@ namespace Tsvrc.Editor
             Reload();
         }
 
-        // ── Tabs ───────────────────────────────────────────────────────────────
+        // Tabs
 
         private void DrawTab(Tab tab)
         {
@@ -140,7 +140,7 @@ namespace Tsvrc.Editor
                 prop.InsertArrayElementAtIndex(prop.arraySize);
         }
 
-        // ── Factories tab ──────────────────────────────────────────────────────
+        // Factories tab
 
         private void DrawFactories()
         {
