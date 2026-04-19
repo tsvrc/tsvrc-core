@@ -73,20 +73,8 @@ namespace Tsvrc.Editor
             string assetPath = TsvrcCompiler.GeneratedFolder + "/CompiledTsvrc.asset";
             string scriptPath = TsvrcCompiler.GeneratedFolder + "/CompiledTsvrc.cs";
 
-            if (AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>(assetPath) != null)
-                return;
-
-            var monoScript = AssetDatabase.LoadAssetAtPath<MonoScript>(scriptPath);
-            if (monoScript == null)
-            {
+            if (!TsvrcCompiler.EnsureUdonSharpProgramAsset(scriptPath, assetPath))
                 Debug.LogError($"[TsvrcWirer] CompiledTsvrc.cs not found at '{scriptPath}'.");
-                return;
-            }
-
-            var programAsset = ScriptableObject.CreateInstance<UdonSharpProgramAsset>();
-            programAsset.sourceCsScript = monoScript;
-            AssetDatabase.CreateAsset(programAsset, assetPath);
-            AssetDatabase.SaveAssets();
         }
 
         private static Component RequireCompiledTsvrc(Type compiledType)

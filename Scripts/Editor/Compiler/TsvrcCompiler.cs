@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using Tsvrc.Core;
+using UdonSharp;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -86,6 +87,24 @@ namespace Tsvrc.Editor
             // Delete only the auto-generated files; never wipe the whole folder so that
             // user assets (TranslationConfig.asset, MolInstance.asset, …) are preserved.
             DeleteGeneratedAsset(GeneratedFilePath);
+        }
+
+        // Creates the UdonSharp program asset (.asset) for a given script if it does not already exist.
+        // Returns true if the asset already exists or was successfully created; false if the script was not found.
+        internal static bool EnsureUdonSharpProgramAsset(string scriptPath, string assetPath)
+        {
+            if (AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>(assetPath) != null)
+                return true;
+
+            var monoScript = AssetDatabase.LoadAssetAtPath<MonoScript>(scriptPath);
+            if (monoScript == null)
+                return false;
+
+            var programAsset = ScriptableObject.CreateInstance<UdonSharpProgramAsset>();
+            programAsset.sourceCsScript = monoScript;
+            AssetDatabase.CreateAsset(programAsset, assetPath);
+            AssetDatabase.SaveAssets();
+            return true;
         }
 
         private static void DeleteGeneratedAsset(string assetPath)

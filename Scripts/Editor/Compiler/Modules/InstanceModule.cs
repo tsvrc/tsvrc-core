@@ -1,9 +1,9 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
+using System.Reflection;
 using Tsvrc.Core;
-using UdonSharp;
 using UdonSharpEditor;
 using UnityEditor;
 using UnityEngine;
@@ -26,8 +26,7 @@ namespace Tsvrc.Editor
         {
             if (config.Instance != null)
             {
-                var resolved = TsvrcResolver.Resolve(new[] { (UnityEngine.Object)config.Instance });
-                _field = resolved.FirstOrDefault();
+                _field = FieldFromInstance(config.Instance);
                 _autoDetected = false;
                 return;
             }
@@ -42,10 +41,51 @@ namespace Tsvrc.Editor
             _field = new TsvrcField
             {
                 Type = found.Value.TypeName,
-                Name = found.Value.TypeName,
                 Namespace = found.Value.Namespace,
             };
             _scriptAssetPath = found.Value.AssetPath;
+            _autoDetected = true;
+        }
+
+        internal override void ScanForWire(TsvrcConfig config, Type compiledType)
+        {
+            // Config-assigned path: same fast type extraction as Scan, no file scan needed.
+            if (config.Instance != null)
+            {
+                _field = FieldFromInstance(config.Instance);
+                _autoDetected = false;
+                return;
+            }
+
+            // Auto-detected path: check if _coreTsvrcInstance exists in the compiled type via reflection
+            // so we avoid a full source file scan.
+            var fieldInfo = compiledType.GetField("_coreTsvrcInstance",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            if (fieldInfo == null)
+            {
+                _field = null;
+                return;
+            }
+
+            var instanceType = fieldInfo.FieldType;
+
+            // Locate the script asset using Unity's indexed asset database (fast, no file read).
+            _scriptAssetPath = string.Empty;
+            foreach (var guid in AssetDatabase.FindAssets($"t:MonoScript {instanceType.Name}"))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                if (Path.GetFileNameWithoutExtension(path) == instanceType.Name)
+                {
+                    _scriptAssetPath = path;
+                    break;
+                }
+            }
+
+            _field = new TsvrcField
+            {
+                Type = instanceType.Name,
+                Namespace = instanceType.Namespace ?? string.Empty,
+            };
             _autoDetected = true;
         }
 
@@ -97,9 +137,20 @@ namespace Tsvrc.Editor
             }
 
             string programAssetPath = TsvrcCompiler.GeneratedFolder + $"/{_field.Type}.asset";
-            EnsureProgramAsset(_scriptAssetPath, programAssetPath);
+
+            if (!TsvrcCompiler.EnsureUdonSharpProgramAsset(_scriptAssetPath, programAssetPath))
+            {
+                Debug.LogWarning($"[TsvrcWirer] Script not found at '{_scriptAssetPath}'. Cannot create program asset for '{_field.Type}'.");
+                return;
+            }
 
             var compiledGo = ((Component)target.targetObject).gameObject;
+
+            // Destroy any existing auto-detected instance child so repeated wire passes don't stack duplicates.
+            var existingChild = compiledGo.transform.Find(_field.Type);
+            if (existingChild != null)
+                Undo.DestroyObjectImmediate(existingChild.gameObject);
+
             var go = new GameObject(_field.Type);
             go.transform.SetParent(compiledGo.transform, false);
             Undo.RegisterCreatedObjectUndo(go, $"Create {_field.Type} instance");
@@ -107,22 +158,15 @@ namespace Tsvrc.Editor
             prop.objectReferenceValue = UdonSharpUndo.AddComponent(go, instanceType);
         }
 
-        private static void EnsureProgramAsset(string scriptAssetPath, string programAssetPath)
+        private static TsvrcField FieldFromInstance(TsvrcInstance instance)
         {
-            if (AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>(programAssetPath) != null)
-                return;
-
-            var monoScript = AssetDatabase.LoadAssetAtPath<MonoScript>(scriptAssetPath);
-            if (monoScript == null)
+            var type = instance.GetType();
+            return new TsvrcField
             {
-                Debug.LogWarning($"[TsvrcWirer] Script not found at '{scriptAssetPath}'. Cannot create program asset.");
-                return;
-            }
-
-            var programAsset = ScriptableObject.CreateInstance<UdonSharpProgramAsset>();
-            programAsset.sourceCsScript = monoScript;
-            AssetDatabase.CreateAsset(programAsset, programAssetPath);
-            AssetDatabase.SaveAssets();
+                Type = type.Name,
+                Namespace = type.Namespace ?? string.Empty,
+                SourceObject = instance,
+            };
         }
     }
 }
