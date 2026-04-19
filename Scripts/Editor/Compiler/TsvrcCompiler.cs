@@ -32,7 +32,7 @@ namespace Tsvrc.Editor
             new UiUtilitiesModule(),
         };
 
-        [MenuItem("Tsvrc/Compile")]
+        [MenuItem("Tsvrc/Tools/Force Compile")]
         public static void Compile() => Compile(refreshAssetDatabase: true);
 
         internal static void Compile(bool refreshAssetDatabase)
