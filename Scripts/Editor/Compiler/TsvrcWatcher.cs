@@ -9,8 +9,8 @@ namespace Tsvrc.Editor
     /// a recompile when needed.
     ///
     /// Two triggers:
-    ///   1. Data assets (e.g. translation JSON files) — cheap path-set check via GetFullCompileAssetPaths().
-    ///   2. User .cs files — dry-run scan+codegen to detect added or removed call sites
+    ///   1. Data assets (e.g. translation JSON files), cheap path-set check via GetFullCompileAssetPaths().
+    ///   2. User .cs files, dry-run scan+codegen to detect added or removed call sites
     ///      (e.g. a new _ts.GetFoo() call). Domain reload only fires if the output would actually change.
     /// </summary>
     internal class TsvrcWatcher : AssetPostprocessor
@@ -32,13 +32,13 @@ namespace Tsvrc.Editor
 
             if (RequiresFullCompile(changed))
             {
-                // JSON data asset changed — no domain reload follows, delayCall is safe.
+                // JSON data asset changed, no domain reload follows, delayCall is safe.
                 EditorApplication.delayCall += () => TsvrcCompiler.Compile();
                 return;
             }
             if (RequiresSourceCompile(changed))
             {
-                // .cs file changed — Unity will trigger a domain reload after this callback returns,
+                // .cs file changed, Unity will trigger a domain reload after this callback returns,
                 // wiping any delayCall. Persist via EditorPrefs so TsvrcWirer picks it up post-reload.
                 TsvrcWirer.ScheduleCompile();
             }

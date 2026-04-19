@@ -7,7 +7,7 @@ namespace Tsvrc.Editor
     /// <summary>
     /// Emits small UI helper methods onto CompiledTsvrc so every TsvrcBehaviour can call
     /// _ts.SetButtonVisible / SetButtonInteractable / SetTextVisible without duplicating the boilerplate.
-    /// No scene scanning is required — the output is always the same fixed block of code.
+    /// No scene scanning is required, the output is always the same fixed block of code.
     /// </summary>
     internal class UiUtilitiesModule : TsvrcModule
     {

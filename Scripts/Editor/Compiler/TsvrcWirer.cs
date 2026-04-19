@@ -79,11 +79,11 @@ namespace Tsvrc.Editor
 
         // UdonSharp requires a .asset program file to exist alongside the .cs before a component can be added.
         // Creates it if missing, mirroring what the UdonSharp script creation wizard does.
-        // Returns false if the script could not be found — RunWire must not continue in that case.
+        // Returns false if the script could not be found, RunWire must not continue in that case.
         private static bool EnsureProgramAsset()
         {
             string scriptPath = TsvrcCompiler.GeneratedFilePath;
-            string assetPath  = TsvrcCompiler.GeneratedAssetPath;
+            string assetPath = TsvrcCompiler.GeneratedAssetPath;
 
             if (TsvrcCompiler.EnsureUdonSharpProgramAsset(scriptPath, assetPath))
                 return true;

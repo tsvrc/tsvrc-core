@@ -12,8 +12,8 @@ namespace Tsvrc.Editor
 {
     internal static class TsvrcCompiler
     {
-        internal const string GeneratedFolder    = "Assets/CompiledTsvrc";
-        internal const string GeneratedFilePath  = "Assets/CompiledTsvrc/CompiledTsvrc.cs";
+        internal const string GeneratedFolder = "Assets/CompiledTsvrc";
+        internal const string GeneratedFilePath = "Assets/CompiledTsvrc/CompiledTsvrc.cs";
         internal const string GeneratedAssetPath = "Assets/CompiledTsvrc/CompiledTsvrc.asset";
         internal const string TsvrcConfigPrefabPath = "Assets/Tsvrc/Prefabs/TsvrcConfig.prefab";
         internal const string InternalConfigPath = "Assets/Tsvrc/InternalConfig.asset";
@@ -57,8 +57,8 @@ namespace Tsvrc.Editor
                 module.Scan(config);
 
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            string folderFull  = ToAbsolutePath(projectRoot, GeneratedFolder);
-            string fileFull    = ToAbsolutePath(projectRoot, GeneratedFilePath);
+            string folderFull = ToAbsolutePath(projectRoot, GeneratedFolder);
+            string fileFull = ToAbsolutePath(projectRoot, GeneratedFilePath);
 
             Directory.CreateDirectory(folderFull);
 
@@ -91,7 +91,7 @@ namespace Tsvrc.Editor
         /// </summary>
         internal static bool WouldChangeSource()
         {
-            // Do not auto-create a TsvrcConfig during a dry run — read only.
+            // Do not auto-create a TsvrcConfig during a dry run, read only.
             var all = Object.FindObjectsOfType<TsvrcConfig>(true);
             if (all.Length != 1) return false;
 
@@ -128,7 +128,7 @@ namespace Tsvrc.Editor
 
         private static void CleanPrevious()
         {
-            // GameObject.Find skips inactive objects — search root objects instead so a
+            // GameObject.Find skips inactive objects, search root objects instead so a
             // deactivated CompiledTsvrc doesn't silently persist and duplicate after wire.
             var scene = EditorSceneManager.GetActiveScene();
             foreach (var root in scene.GetRootGameObjects())

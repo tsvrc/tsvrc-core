@@ -11,20 +11,20 @@ namespace Tsvrc.Player
     /// tracking have settled. Collider data is baked once on Begin().
     ///
     /// PostLateUpdate stages:
-    ///   0. Movement gate — skip all work when head movement per axis is below _movSkip and no
+    ///   0. Movement gate, skip all work when head movement per axis is below _movSkip and no
     ///                      violation was active last frame. Keeps standing-still frames cheap.
-    ///   1. Batch phase   — advance a rolling slice of all colliders through a wide AABB each frame;
+    ///   1. Batch phase, advance a rolling slice of all colliders through a wide AABB each frame;
     ///                      candidates added/removed in O(1) via swap-with-last.
-    ///   2. Reject phase  — tight AABB pre-check on each candidate before the OBB test.
-    ///   3. Test phase    — full OBB+margin test on surviving candidates.
-    ///   4. Push phase    — accumulate minimum push vectors per violated OBB; teleport capsule.
+    ///   2. Reject phase, tight AABB pre-check on each candidate before the OBB test.
+    ///   3. Test phase, full OBB+margin test on surviving candidates.
+    ///   4. Push phase, accumulate minimum push vectors per violated OBB; teleport capsule.
     ///
     /// Forward rotation for the push is derived as the conjugate of the stored inverse rotation:
     ///   q_forward = Quaternion(-ix, -iy, -iz, iw)   (valid for unit quaternions)
     ///
     /// Handles multiple simultaneous violations (e.g. geometry corners) by accumulating push vectors.
     /// Falls back to the last safe capsule position when push vectors cancel exactly
-    /// (head trapped symmetrically between two opposing walls — extremely rare).
+    /// (head trapped symmetrically between two opposing walls, extremely rare).
     ///
     /// Usage: Begin(colliders, count). Call End() to stop.
     /// </summary>
@@ -185,7 +185,7 @@ namespace Tsvrc.Player
                 return;
             }
 
-            // GetRotation is deferred to here — only needed when a teleport will actually fire.
+            // GetRotation is deferred to here, only needed when a teleport will actually fire.
             Quaternion capsuleRot = _localPlayer.GetRotation();
             float sqrPush = totalPush.sqrMagnitude;
             _localPlayer.TeleportTo(

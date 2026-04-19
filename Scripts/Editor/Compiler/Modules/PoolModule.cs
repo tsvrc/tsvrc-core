@@ -41,7 +41,7 @@ namespace Tsvrc.Editor
         }
 
         // Wire-only scan: uses reflection to determine slot counts from the compiled type.
-        // No source file scanning — avoids the cost of FindCallSitesBatch on every wire pass.
+        // No source file scanning, avoids the cost of FindCallSitesBatch on every wire pass.
         internal override void ScanForWire(TsvrcConfig config, Type compiledType)
         {
             var descriptors = ResolveDescriptors(config);
@@ -65,7 +65,7 @@ namespace Tsvrc.Editor
         }
 
         // Returns resolved field descriptors from config without scanning source files.
-        // Only prefab assets are accepted — scene objects are skipped with a warning.
+        // Only prefab assets are accepted, scene objects are skipped with a warning.
         private List<TsvrcField> ResolveDescriptors(TsvrcConfig config)
         {
             var internalConfig = TsvrcCompiler.LoadInternalConfig();

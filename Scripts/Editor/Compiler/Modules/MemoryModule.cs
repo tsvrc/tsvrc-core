@@ -10,7 +10,7 @@ namespace Tsvrc.Editor
 {
     /// <summary>
     /// Built-in module that always emits a <see cref="TsMemory"/> singleton on CompiledTsvrc.
-    /// Requires no user configuration — the GameObject is created automatically if missing.
+    /// Requires no user configuration, the GameObject is created automatically if missing.
     /// </summary>
     internal class MemoryModule : TsvrcModule
     {

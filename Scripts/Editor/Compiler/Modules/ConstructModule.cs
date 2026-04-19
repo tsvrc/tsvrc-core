@@ -12,7 +12,7 @@ namespace Tsvrc.Editor
     /// <summary>
     /// Scans config.TsvrcBehaviourConstruct and emits the Constructs region.
     /// All entries receive TsConstruct(this) in Start().
-    /// Unlike singletons, constructs are always wired — no call-site scanning is required.
+    /// Unlike singletons, constructs are always wired, no call-site scanning is required.
     /// </summary>
     internal class ConstructModule : TsvrcModule
     {
@@ -62,7 +62,7 @@ namespace Tsvrc.Editor
             {
                 if (field.SourceObject == null)
                 {
-                    Debug.LogWarning($"[TsvrcWirer] Construct '{field.Name}' source object is null — remove the missing entry from TsvrcConfig and recompile.");
+                    Debug.LogWarning($"[TsvrcWirer] Construct '{field.Name}' source object is null, remove the missing entry from TsvrcConfig and recompile.");
                     continue;
                 }
 

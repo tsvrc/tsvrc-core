@@ -16,7 +16,7 @@ namespace Tsvrc.Utils
     /// <remarks>
     /// <b>PlayerData size limit:</b> VRChat allows 100 KB of PlayerData per player per world.
     /// VRChat compresses data before storing it, so easily compressible data may exceed 100 KB uncompressed.
-    /// If the limit is exceeded, VRChat logs an error and the write is silently dropped — no exception is thrown.
+    /// If the limit is exceeded, VRChat logs an error and the write is silently dropped, no exception is thrown.
     /// Keep persistent values small and avoid storing large strings, dicts, or lists.<br/><br/>
     /// <b>OnPlayerLeft restriction:</b> VRChat cannot commit PlayerData writes that happen inside
     /// <c>OnPlayerLeft</c>. Avoid calling <see cref="Set"/> on persistent keys inside that event.<br/><br/>

@@ -8,7 +8,7 @@ namespace Tsvrc.Editor
     internal sealed class FactoriesTab : WindowTab
     {
         // Keyed by array index. Using int (not group name) means the key is stable while
-        // the user is typing — the foldout never collapses mid-edit.
+        // the user is typing, the foldout never collapses mid-edit.
         private readonly Dictionary<int, bool> _foldouts = new Dictionary<int, bool>();
 
         private static readonly GUIContent LabelGroupName = new GUIContent("Group Name");
@@ -39,7 +39,7 @@ namespace Tsvrc.Editor
                     : $"{groupName}   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})";
 
                 EditorGUILayout.BeginHorizontal();
-                // Foldout is UI-only state — save/restore GUI.changed so toggling it does not
+                // Foldout is UI-only state, save/restore GUI.changed so toggling it does not
                 // bubble up to TsvrcWindow's EndChangeCheck and mark the config as dirty.
                 bool prevChanged = GUI.changed;
                 GUI.changed = false;

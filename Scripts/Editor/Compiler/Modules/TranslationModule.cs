@@ -13,7 +13,7 @@ namespace Tsvrc.Editor
 {
     /// <summary>
     /// Compiler module that bakes all language data directly into the generated C# source as flat
-    /// parallel string arrays. Strings are interned by Mono at load time — zero extra RAM, zero
+    /// parallel string arrays. Strings are interned by Mono at load time, zero extra RAM, zero
     /// CPU work in Start(). This is the best achievable runtime profile.
     ///
     /// The tradeoff: any JSON value edit triggers a full recompile (CompiledTsvrc.cs regenerated,
@@ -22,14 +22,14 @@ namespace Tsvrc.Editor
     ///
     /// Generated members on CompiledTsvrc:
     ///   - public enum Language  { … }
-    ///   - private string[] _tsKeys_{id}, _tsVals_{id}  — one pair per language, baked as literals
-    ///   - private string[] _tsCurrentKeys, _tsCurrentVals  — pointers to the active language arrays
-    ///   - private int _tsCurrentLang                       — guard against redundant SetLanguage calls
-    ///   - [SerializeField] private TextMeshProUGUI[] _translationTargets  — scene-wired TMPs
-    ///   - public void SetLanguage(Language lang)           — switches pointers; starts batched target update
-    ///   - public string Translate(string key)              — O(n) scan, n ≈ number of keys (small)
-    ///   - public string Translate(string key, string param)— same with {value} substitution
-    ///   - public void _TsApplyTranslationBatch()           — batched per-frame update of static targets
+    ///   - private string[] _tsKeys_{id}, _tsVals_{id} , one pair per language, baked as literals
+    ///   - private string[] _tsCurrentKeys, _tsCurrentVals , pointers to the active language arrays
+    ///   - private int _tsCurrentLang                      , guard against redundant SetLanguage calls
+    ///   - [SerializeField] private TextMeshProUGUI[] _translationTargets , scene-wired TMPs
+    ///   - public void SetLanguage(Language lang)          , switches pointers; starts batched target update
+    ///   - public string Translate(string key)             , O(n) scan, n ≈ number of keys (small)
+    ///   - public string Translate(string key, string param),  same with {value} substitution
+    ///   - public void _TsApplyTranslationBatch()          , batched per-frame update of static targets
     /// </summary>
     internal class TranslationModule : TsvrcModule
     {
@@ -83,7 +83,7 @@ namespace Tsvrc.Editor
                 yield break;
             }
 
-            // No config — discover all language_*.json TextAssets in the project.
+            // No config, discover all language_*.json TextAssets in the project.
             foreach (var guid in AssetDatabase.FindAssets("t:TextAsset", new[] { "Assets" }))
             {
                 var p = AssetDatabase.GUIDToAssetPath(guid);
@@ -182,7 +182,7 @@ namespace Tsvrc.Editor
 
             w.Region("Translation");
 
-            // Bake key/value pairs as flat parallel arrays — literals interned by Mono, zero
+            // Bake key/value pairs as flat parallel arrays, literals interned by Mono, zero
             // runtime allocation beyond the array objects themselves, nothing in Start().
             foreach (var lang in _languages)
             {
@@ -198,7 +198,7 @@ namespace Tsvrc.Editor
                 w.Line($"private string[] _tsVals_{id} = new string[] {{ {string.Join(", ", valLits)} }};");
             }
 
-            // Active language — just two pointers, switched in O(1) by SetLanguage.
+            // Active language, just two pointers, switched in O(1) by SetLanguage.
             w.Line("private string[] _tsCurrentKeys;");
             w.Line("private string[] _tsCurrentVals;");
             // Guard against redundant SetLanguage calls (-1 = none set).
@@ -206,7 +206,7 @@ namespace Tsvrc.Editor
 
             if (_targets.Count > 0)
             {
-                // Scene-wired TMP targets — serialized references baked at compile time.
+                // Scene-wired TMP targets, serialized references baked at compile time.
                 w.Line("[HideInInspector] [SerializeField] private TextMeshProUGUI[] _translationTargets;");
                 // Batched visual update state.
                 w.Line("private int _tsBatchIndex;");
@@ -220,7 +220,7 @@ namespace Tsvrc.Editor
         {
             if (_languages.Count == 0) return;
 
-            // SetLanguage — switches active array pointers; O(1), no allocation.
+            // SetLanguage, switches active array pointers; O(1), no allocation.
             using (w.Method("public void SetLanguage(Language lang)"))
             {
                 w.Line("int _tsIdx = (int)lang;");
@@ -244,7 +244,7 @@ namespace Tsvrc.Editor
                 }
             }
 
-            // Translate — linear scan across baked keys. With ~20 keys this is negligible.
+            // Translate, linear scan across baked keys. With ~20 keys this is negligible.
             using (w.Method("public string Translate(string key)"))
             {
                 w.Line("if (_tsCurrentKeys == null) { Debug.LogWarning(\"[CompiledTsvrc] Translate called before SetLanguage.\"); return key; }");
@@ -262,7 +262,7 @@ namespace Tsvrc.Editor
                 w.Line("return key;");
             }
 
-            // Batched scene-target update — only generated when there are static targets.
+            // Batched scene-target update, only generated when there are static targets.
             if (_targets.Count > 0)
             {
                 using (w.Method("public void _TsApplyTranslationBatch()"))
@@ -290,7 +290,7 @@ namespace Tsvrc.Editor
             }
         }
 
-        internal override void WriteStartBody(CsWriter w) { /* arrays are baked as literals — no runtime init needed */ }
+        internal override void WriteStartBody(CsWriter w) { /* arrays are baked as literals, no runtime init needed */ }
 
         internal override void Wire(SerializedObject target)
         {

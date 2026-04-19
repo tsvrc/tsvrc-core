@@ -61,7 +61,7 @@ namespace Tsvrc.Editor
             if (!_isDirty) return;
 
             int choice = EditorUtility.DisplayDialogComplex(
-                "Tsvrc — Unsaved Changes",
+                "Tsvrc, Unsaved Changes",
                 "You have unsaved config changes. Apply them now or discard?",
                 "Apply",    // 0
                 "Discard",  // 1
@@ -70,7 +70,7 @@ namespace Tsvrc.Editor
 
             if (choice == 0)
             {
-                // Defer compile — calling AssetDatabase.Refresh() synchronously during OnDestroy is unsafe.
+                // Defer compile, calling AssetDatabase.Refresh() synchronously during OnDestroy is unsafe.
                 EditorApplication.delayCall += () => TsvrcCompiler.Compile();
             }
             else if (choice == 1)
@@ -124,7 +124,7 @@ namespace Tsvrc.Editor
             EditorGUILayout.LabelField(Tabs[_tabIndex].Description, EditorStyles.wordWrappedMiniLabel);
             EditorGUILayout.Space(4);
 
-            // Scrollable tab content — track whether any control was changed.
+            // Scrollable tab content, track whether any control was changed.
             _so.Update();
             EditorGUI.BeginChangeCheck();
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
@@ -138,7 +138,7 @@ namespace Tsvrc.Editor
             EditorGUILayout.Space(8);
             if (_isDirty)
             {
-                EditorGUILayout.HelpBox("Config changed — Apply to compile, or Discard to revert all changes.", MessageType.Warning);
+                EditorGUILayout.HelpBox("Config changed, Apply to compile, or Discard to revert all changes.", MessageType.Warning);
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button("Apply"))
                 {

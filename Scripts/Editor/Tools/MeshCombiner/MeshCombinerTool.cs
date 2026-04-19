@@ -71,7 +71,7 @@ namespace Tsvrc.Editor
                 }
             }
 
-            // Pass 1 — combine all instances that share a material into one mesh each.
+            // Pass 1, combine all instances that share a material into one mesh each.
             var perMaterialMeshes = new CombineInstance[materialOrder.Count];
             var tempMeshes = new Mesh[materialOrder.Count];
             var combined = new Mesh
@@ -91,7 +91,7 @@ namespace Tsvrc.Editor
                     tempMeshes[i] = sub;
                 }
 
-                // Pass 2 — merge per-material meshes, keeping submesh boundaries.
+                // Pass 2, merge per-material meshes, keeping submesh boundaries.
                 combined.CombineMeshes(perMaterialMeshes, mergeSubMeshes: false, useMatrices: false);
                 if (recalculateNormals)
                     combined.RecalculateNormals();
@@ -101,7 +101,7 @@ namespace Tsvrc.Editor
             }
             finally
             {
-                // Always destroy temp meshes — even if an exception is thrown above.
+                // Always destroy temp meshes, even if an exception is thrown above.
                 foreach (var m in tempMeshes)
                     if (m != null) Object.DestroyImmediate(m);
 

@@ -29,7 +29,7 @@ namespace Tsvrc.Editor
 
         /// <summary>
         /// Asset paths whose change requires regenerating CompiledTsvrc.cs (full compile + domain reload).
-        /// Use when the change affects the generated code structure — e.g. adding a language adds new fields.
+        /// Use when the change affects the generated code structure, e.g. adding a language adds new fields.
         /// </summary>
         internal virtual IEnumerable<string> GetFullCompileAssetPaths() => Enumerable.Empty<string>();
     }

@@ -70,7 +70,7 @@ namespace Tsvrc.Editor
 
         // XML doc summary for generated stub members. IDE-friendly; no log-prefix clutter.
         internal static string StubSummary(string memberName)
-            => $"Inactive — <c>{memberName}</c> had no call sites at last compile. Recompile Tsvrc to enable it.";
+            => $"Inactive, <c>{memberName}</c> had no call sites at last compile. Recompile Tsvrc to enable it.";
     }
 }
 #endif

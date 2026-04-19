@@ -34,7 +34,7 @@ namespace Tsvrc.Editor
         }
 
         // Wire-only scan: uses reflection to find which singleton fields exist in the compiled type.
-        // No source file scanning — avoids FindCallSitesBatch on every wire pass.
+        // No source file scanning, avoids FindCallSitesBatch on every wire pass.
         internal override void ScanForWire(TsvrcConfig config, Type compiledType)
         {
             var resolved = ResolveDescriptors(config);
@@ -95,7 +95,7 @@ namespace Tsvrc.Editor
 
         internal override void Wire(SerializedObject target)
         {
-            // Stubs are computed properties, not serialized fields — skip them to avoid spurious warnings.
+            // Stubs are computed properties, not serialized fields, skip them to avoid spurious warnings.
             var fieldsToWire = _fields.Where(f => f.WireAlways || f.CallSites.Count > 0).ToList();
             foreach (var field in fieldsToWire)
             {

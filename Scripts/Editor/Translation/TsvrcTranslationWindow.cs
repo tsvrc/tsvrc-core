@@ -23,7 +23,7 @@ namespace Tsvrc.Editor
         private SerializedObject _so;
         private Vector2 _scroll;
         private int _tmpTargetCount = -1; // -1 = stale; invalidated by hierarchy changes
-        // Caches PeekKeyLabel results per TextAsset instanceID — avoids re-running two regex
+        // Caches PeekKeyLabel results per TextAsset instanceID, avoids re-running two regex
         // matches per entry per repaint. Cleared when the config is reloaded.
         private readonly Dictionary<int, (string key, string label)> _peekCache =
             new Dictionary<int, (string key, string label)>();
@@ -135,7 +135,7 @@ namespace Tsvrc.Editor
             }
             EditorGUILayout.EndScrollView();
 
-            // Deferred outside the draw loop — deleting inside BeginHorizontal would leak the layout group.
+            // Deferred outside the draw loop, deleting inside BeginHorizontal would leak the layout group.
             // Two-step removal required for UnityEngine.Object arrays: Unity clears the reference
             // on the first call, then actually removes the slot on the second.
             if (toDelete >= 0)

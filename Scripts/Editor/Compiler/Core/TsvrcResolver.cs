@@ -30,13 +30,13 @@ namespace Tsvrc.Editor
             {
                 if (obj == null)
                 {
-                    Debug.LogWarning("[TsvrcResolver] Null entry in config — remove the missing-script slot from TsvrcConfig and recompile.");
+                    Debug.LogWarning("[TsvrcResolver] Null entry in config, remove the missing-script slot from TsvrcConfig and recompile.");
                     continue;
                 }
 
                 if (!seen.Add(obj))
                 {
-                    Debug.LogWarning($"[TsvrcResolver] Duplicate entry '{obj.name}' in config — remove the duplicate from TsvrcConfig.");
+                    Debug.LogWarning($"[TsvrcResolver] Duplicate entry '{obj.name}' in config, remove the duplicate from TsvrcConfig.");
                     continue;
                 }
 
