@@ -17,7 +17,7 @@ namespace Tsvrc.Editor
 
         static TsvrcWirer()
         {
-            // Compile must run before wire: if both are pending, compile will re-schedule the wire.
+            // Compile must run before wire. If both are pending, compile will reschedule the wire.
             if (EditorPrefs.GetBool(PendingCompileKey, false))
             {
                 EditorPrefs.DeleteKey(PendingCompileKey);
@@ -40,6 +40,9 @@ namespace Tsvrc.Editor
         {
             EditorPrefs.SetBool(PendingWireKey, true);
         }
+
+        // True while RunWire is queued but has not yet executed.
+        internal static bool IsWirePending() => EditorPrefs.GetBool(PendingWireKey, false);
 
         private static void RunWire()
         {
@@ -72,16 +75,14 @@ namespace Tsvrc.Editor
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
             TsvrcCompiler.LogSuccess();
 
-            // A source file saved during the Compile -> AssetDatabase.Refresh -> domain-reload
-            // cycle arrives in an OnPostprocessAllAssets call with didDomainReload=true, which
-            // TsvrcWatcher skips. Check here so that change is never silently lost.
+            // A source file saved during the Compile -> Refresh -> domain reload cycle arrives
+            // with didDomainReload=true, which TsvrcWatcher skips. Check here so it is not lost.
             if (TsvrcCompiler.WouldChangeSource())
                 EditorApplication.delayCall += () => TsvrcCompiler.Compile();
         }
 
-        // UdonSharp requires a .asset program file to exist alongside the .cs before a component can be added.
-        // Creates it if missing, mirroring what the UdonSharp script creation wizard does.
-        // Returns false if the script could not be found, RunWire must not continue in that case.
+        // UdonSharp requires a .asset program file alongside the .cs before a component can be added.
+        // Creates it if missing. Returns false if the script itself is not found.
         private static bool EnsureProgramAsset()
         {
             string scriptPath = TsvrcCompiler.GeneratedFilePath;

@@ -25,9 +25,8 @@ namespace Tsvrc.Editor
         private bool _isDirty;
         private int _baseUndoGroup;
 
-        // Carry dirty state and undo baseline across a Cancel-reopen.
-        // The window instance is destroyed by Unity before delayCall fires,
-        // so these must be static to survive the gap.
+        // Dirty state and undo baseline need to survive a cancel and reopen.
+        // The window is destroyed before the delayCall fires, so these are static.
         private static bool s_reopenDirty;
         private static int s_reopenUndoGroup;
 
@@ -40,7 +39,7 @@ namespace Tsvrc.Editor
             {
                 // Restore live references without touching the undo stack or dirty flag.
                 // Calling Reload() here would add a spurious IncrementCurrentGroup() between
-                // the saved baseline and the current undo position.
+                // the saved baseline and the current undo position, so we do it manually.
                 _config = Object.FindObjectOfType<TsvrcConfig>();
                 _so = _config != null ? new SerializedObject(_config) : null;
                 _isDirty = true;
@@ -50,6 +49,11 @@ namespace Tsvrc.Editor
             else
             {
                 Reload();
+                // RunWire is queued in the static ctor, so it fires before this delayCall.
+                // Reloading after it advances _baseUndoGroup past the wire's undo registrations,
+                // so Discard only reverts the user's config changes and not the CompiledTsvrc creation.
+                if (TsvrcWirer.IsWirePending())
+                    EditorApplication.delayCall += Reload;
             }
         }
 
@@ -85,10 +89,11 @@ namespace Tsvrc.Editor
 
         private void OnFocus()
         {
-            // Only reload when the config reference is lost (e.g. scene unloaded / switched).
-            // Rebuilding a live SerializedObject on every focus event would discard any
-            // in-progress text edits (e.g. typing a factory group name).
-            if (_config == null)
+            // Reload only when the config reference is gone (e.g. scene was unloaded).
+            // Rebuilding on every focus would throw away any text field edits in progress.
+            // Skip when dirty too: a scene switch while changes were pending would otherwise
+            // silently discard them. OnGUI shows DrawNoConfig() when _config is null.
+            if (_config == null && !_isDirty)
                 Reload();
         }
 
@@ -136,8 +141,10 @@ namespace Tsvrc.Editor
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button("Apply"))
                 {
-                    TsvrcCompiler.Compile();
-                    Reload();
+                    // Only clear dirty state when compilation succeeded.
+                    // If it fails, the warning stays visible.
+                    if (TsvrcCompiler.Compile(refreshAssetDatabase: true))
+                        Reload();
                     GUIUtility.ExitGUI();
                 }
                 if (GUILayout.Button("Discard"))
