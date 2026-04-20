@@ -4,20 +4,14 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Base class for all tabs rendered inside <see cref="TsvrcWindow"/>.
-    /// </summary>
+    // Base class for all tabs rendered inside TsvrcWindow.
     internal abstract class WindowTab
     {
         internal abstract string Description { get; }
         internal abstract void OnGUI(SerializedObject so);
     }
 
-    /// <summary>
-    /// Shared implementation for the three simple object-reference list tabs
-    /// (Singletons, Pool, Constructs). Subclasses only need to supply the
-    /// SerializedObject property name and display strings.
-    /// </summary>
+    // Shared list tab for Singletons, Pool, and Constructs. Subclasses only need to supply the property name.
     internal abstract class ObjectListTab : WindowTab
     {
         protected abstract string PropertyName { get; }

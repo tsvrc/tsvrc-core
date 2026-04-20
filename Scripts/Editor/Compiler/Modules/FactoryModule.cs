@@ -11,25 +11,9 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Scans <see cref="TsvrcConfig.Factories"/> and <see cref="InternalTsvrcConfig.Factories"/> and emits
-    /// per-prefab private <c>GameObject</c> fields plus <c>Create{GroupName}{PrefabName}(Transform parent)</c>
-    /// factory methods on <c>CompiledTsvrc</c>.
-    ///
-    /// <para>
-    /// Factory prefabs are never placed in the scene at compile time.
-    /// At runtime, each call to <c>Create*</c> instantiates a brand-new scene object.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>VRChat networking limitation:</b> objects created with <c>Instantiate</c> at runtime
-    /// are NOT assigned a VRChat network ID.  They cannot send or receive any VRC network
-    /// events (e.g. <c>OnDeserialization</c>, <c>SendCustomNetworkEvent</c>,
-    /// <c>OnPlayerJoined</c>).  If you need networked objects, register them in the Pool
-    /// instead; pool slots exist in the scene before play and therefore receive stable
-    /// network IDs from VRChat.
-    /// </para>
-    /// </summary>
+    // Emits per-prefab fields and Create*() methods for each factory group.
+    // Prefabs are never placed in the scene at compile time; Create*() instantiates them at runtime.
+    // Runtime-instantiated objects get no VRChat network ID, so they cannot use any VRC network events.
     internal class FactoryModule : TsvrcModule
     {
         private List<TsvrcField> _fields = new List<TsvrcField>();
@@ -37,10 +21,8 @@ namespace Tsvrc.Editor
         internal override void Scan(TsvrcConfig config)
             => _fields = BuildFields(config, activeFieldNames: null);
 
-        /// <summary>
-        /// Wire-only scan: uses reflection on the compiled type to include only factory fields that
-        /// were generated during the last full compile (i.e. had call sites at that time).
-        /// </summary>
+        // Only wire factory fields that exist in the compiled type. Fields added after
+        // the last full compile are skipped until the user recompiles.
         internal override void ScanForWire(TsvrcConfig config, Type compiledType)
         {
             var activeFieldNames = new HashSet<string>(
@@ -75,10 +57,6 @@ namespace Tsvrc.Editor
             return sorted;
         }
 
-        /// <summary>
-        /// Returns all valid factory groups from both user config and internal config, in order.
-        /// Groups with null Prefabs are excluded.
-        /// </summary>
         private static IEnumerable<TsvrcFactoryGroup> AllFactoryGroups(TsvrcConfig config)
         {
             if (config?.Factories != null)
@@ -91,19 +69,10 @@ namespace Tsvrc.Editor
                     if (group?.Prefabs != null) yield return group;
         }
 
-        /// <summary>
-        /// Scans one factory group and appends resolved fields to <paramref name="fields"/>.
-        /// <para>
-        /// When <paramref name="activeFieldNames"/> is <c>null</c> (full compile): all prefabs are
-        /// included and <see cref="TsvrcField.CallSiteCount"/> is populated by scanning user source files.
-        /// </para>
-        /// <para>
-        /// When <paramref name="activeFieldNames"/> is provided (wire-only): only prefabs whose
-        /// serialized field already exists in the compiled type are included, and
-        /// <see cref="TsvrcField.WireAlways"/> is set to <c>true</c> so <see cref="Wire"/> wires
-        /// them unconditionally.
-        /// </para>
-        /// </summary>
+        // Full compile (activeFieldNames == null): all prefabs are included and CallSiteCount is
+        // populated from user source files.
+        // Wire-only (activeFieldNames provided): only prefabs whose field already exists in the
+        // compiled type are included, and WireAlways is set so Wire() skips the call-site check.
         private static void ScanGroup(
             string groupName,
             UnityEngine.Object[] prefabs,
@@ -258,9 +227,8 @@ namespace Tsvrc.Editor
             }
         }
 
-        // Converts an arbitrary prefab or group name into a valid PascalCase C# identifier.
-        // Strips __Alias__ markers, splits on any non-alphanumeric separator, capitalises each
-        // word, and prepends '_' if the result would start with a digit.
+        // Strips __Alias__ markers, splits on non-alphanumeric separators, PascalCases each word,
+        // and prepends '_' if the result starts with a digit.
         internal static string Sanitize(string raw)
         {
             if (string.IsNullOrEmpty(raw)) return string.Empty;

@@ -8,16 +8,14 @@ namespace Tsvrc.Editor
         internal string Type;
         internal string Name;
         internal string Namespace;
-        /// <summary>The original scene object from config (used by the wirer to assign SerializedProperty values).</summary>
+        // The original scene object from config, used by the wirer to assign SerializedProperty values.
         internal Object SourceObject;
-        /// <summary>Number of pool slots to generate. Always 1 for singletons and constructs.</summary>
+        // Number of pool slots to generate. Always 1 for singletons and constructs.
         internal int SlotCount = 1;
-        /// <summary>Number of source-level call sites found for this field (singletons/factories).</summary>
+        // Number of source-level call sites found for this field. Only populated for singletons and factories.
         internal int CallSiteCount;
-        /// <summary>
-        /// Set by the wire-only scan path to indicate this field must be wired unconditionally,
-        /// because it already existed in the compiled type from the last full compile.
-        /// </summary>
+        // When set, the wirer assigns this field unconditionally without checking call sites.
+        // Used for fields that already existed in the last compiled output.
         internal bool WireAlways;
     }
 }

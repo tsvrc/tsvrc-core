@@ -8,12 +8,11 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Built-in module that always emits a <see cref="TsMemory"/> singleton on CompiledTsvrc.
-    /// Requires no user configuration, the GameObject is created automatically if missing.
-    /// </summary>
+    // Always emits a TsMemory singleton on CompiledTsvrc. Needs no user config;
+    // the child GameObject is created automatically during wiring if it does not exist yet.
     internal class MemoryModule : TsvrcModule
     {
+        // No config entries to read; TsMemory is unconditionally generated.
         internal override void Scan(TsvrcConfig config) { }
 
         internal override IEnumerable<string> GetUsings()

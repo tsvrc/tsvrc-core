@@ -10,13 +10,10 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Scans config.TsvrcProcessPool and emits per-slot private fields plus Get{Type}() accessor methods.
-    /// Slots are instantiated in the scene by the compiler so VRChat assigns them fixed network IDs.
-    /// Slot count equals the total Get{Type}() call sites across all classes, ensuring each caller
-    /// can hold its maximum number of slots simultaneously.
-    /// Only <see cref="TsvrcProcess"/> subclasses are valid pool entries.
-    /// </summary>
+    // Emits per-slot fields and Get{Type}() accessors for each pool type.
+    // Slots are placed in the scene at compile time so VRChat assigns them stable network IDs,
+    // meaning pooled objects can send and receive VRC network events.
+    // Slot count is derived from call-site analysis so each concurrent caller gets its own slot.
     internal class PoolModule : TsvrcModule
     {
         private List<TsvrcField> _fields = new List<TsvrcField>();
@@ -25,9 +22,8 @@ namespace Tsvrc.Editor
         {
             var descriptors = ResolveDescriptors(config);
 
-            // Walk the source tree once for all pool types, counting each effective call site.
-            // Calls inside private helpers are multiplied by the number of times that helper is
-            // called, so wrapping _ts.GetX() in a shared method and calling it N times provisions N slots.
+            // Wrapping _ts.GetX() in a shared helper and calling it N times provisions N slots,
+            // because CountCallSitesBatch multiplies each call site by its enclosing method's call count.
             var patterns = descriptors.ToDictionary(
                 f => f.Name,
                 f => new Regex(@"\b_ts\s*\.\s*Get" + Regex.Escape(f.Type) + @"\s*\(\s*\)", RegexOptions.Compiled));
@@ -76,8 +72,7 @@ namespace Tsvrc.Editor
             _fields = fields.OrderBy(f => f.Name).ToList();
         }
 
-        // Returns resolved field descriptors from config without scanning source files.
-        // Only prefab assets are accepted, scene objects are skipped with a warning.
+        // Only prefab assets are accepted; scene objects are skipped with a warning.
         private List<TsvrcField> ResolveDescriptors(TsvrcConfig config)
         {
             var internalConfig = TsvrcCompiler.LoadInternalConfig();

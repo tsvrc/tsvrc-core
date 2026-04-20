@@ -4,10 +4,8 @@ using System.Linq;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Assembles the full CompiledTsvrc.cs source string from a list of modules.
-    /// Each module independently contributes usings, fields, methods, and Start() lines.
-    /// </summary>
+    // Assembles the full CompiledTsvrc.cs source string from a list of modules.
+    // Each module independently contributes usings, fields, methods, and Start() body lines.
     internal static class TsvrcCodeGen
     {
         private const string CompiledClassName = "CompiledTsvrc";

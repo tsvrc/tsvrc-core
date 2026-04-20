@@ -3,11 +3,8 @@ using UnityEngine;
 
 namespace Tsvrc.Core
 {
-    /// <summary>
-    /// Editor-only config asset for the Tsvrc Translation system.
-    /// Create via Tsvrc > Localization. Do not create manually.
-    /// Consumed at compile time by TranslationModule; never included in the VRChat build.
-    /// </summary>
+    // Do not create manually, use Tsvrc > Localization.
+    // Consumed at compile time by TranslationModule and never included in the VRChat build.
     public class TranslationConfig : ScriptableObject
     {
         [Tooltip("One JSON file per language. Each file must contain the fields \"key\", \"label\", and \"entries\".")]

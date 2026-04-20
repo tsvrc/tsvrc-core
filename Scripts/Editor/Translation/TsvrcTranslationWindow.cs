@@ -8,10 +8,7 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Editor window for managing Tsvrc translation language files.
-    /// Open via Tsvrc > Translation
-    /// </summary>
+    // Open via Tsvrc > Translation.
     internal class TsvrcTranslationWindow : EditorWindow
     {
         private const string ConfigAssetPath = "Assets/CompiledTsvrc/TranslationConfig.asset";

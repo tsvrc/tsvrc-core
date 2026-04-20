@@ -5,6 +5,8 @@ using System.Text;
 
 namespace Tsvrc.Editor
 {
+    // Builds indented C# source as a string. Block() and Method() return a scope
+    // that writes the closing brace when disposed, so callers use them with 'using'.
     internal sealed class CsWriter
     {
         private const string IndentUnit = "    ";
@@ -75,6 +77,7 @@ namespace Tsvrc.Editor
             return sb.ToString();
         }
 
+        // Invoked by BlockScope.Dispose() when a using scope ends.
         private void CloseBlock()
         {
             _depth--;

@@ -11,26 +11,12 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Compiler module that bakes all language data directly into the generated C# source as flat
-    /// parallel string arrays. Strings are interned by Mono at load time, zero extra RAM, zero
-    /// CPU work in Start(). This is the best achievable runtime profile.
-    ///
-    /// The tradeoff: any JSON value edit triggers a full recompile (CompiledTsvrc.cs regenerated,
-    /// domain reload, CompiledTsvrc GameObject recreated). Adding/removing/renaming a language
-    /// also requires a full recompile because the enum members and field names change.
-    ///
-    /// Generated members on CompiledTsvrc:
-    ///   - public enum Language  { … }
-    ///   - private string[] _tsKeys_{id}, _tsVals_{id} , one pair per language, baked as literals
-    ///   - private string[] _tsCurrentKeys, _tsCurrentVals , pointers to the active language arrays
-    ///   - private int _tsCurrentLang                      , guard against redundant SetLanguage calls
-    ///   - [SerializeField] private TextMeshProUGUI[] _translationTargets , scene-wired TMPs
-    ///   - public void SetLanguage(Language lang)          , switches pointers; starts batched target update
-    ///   - public string Translate(string key)             , O(n) scan, n ≈ number of keys (small)
-    ///   - public string Translate(string key, string param),  same with {value} substitution
-    ///   - public void _TsApplyTranslationBatch()          , batched per-frame update of static targets
-    /// </summary>
+    // Bakes all language data directly into the generated C# source as flat parallel string arrays.
+    // Strings are interned by MonoBehaviour at load time, so there is zero extra RAM and zero CPU work in Start().
+    //
+    // The tradeoff: any JSON value edit triggers a full recompile (CompiledTsvrc.cs regenerated,
+    // domain reload, CompiledTsvrc GameObject recreated). Adding, removing, or renaming a language
+    // also requires a full recompile because the enum members and field names change.
     internal class TranslationModule : TsvrcModule
     {
         private const string TranslationConfigAssetPath = "Assets/CompiledTsvrc/TranslationConfig.asset";
@@ -86,7 +72,7 @@ namespace Tsvrc.Editor
                 yield break;
             }
 
-            // No config, discover all language_*.json TextAssets in the project.
+            // No config asset found, so discover all language_*.json TextAssets in the project.
             foreach (var guid in AssetDatabase.FindAssets("t:TextAsset", new[] { "Assets" }))
             {
                 var p = AssetDatabase.GUIDToAssetPath(guid);
@@ -227,7 +213,6 @@ namespace Tsvrc.Editor
                 w.Line("int _tsIdx = (int)lang;");
                 w.Line("if (_tsIdx == _tsCurrentLang) return;");
 
-                // Emit if/else chain to assign the correct baked arrays.
                 for (int i = 0; i < _languages.Count; i++)
                 {
                     var id = SanitizeIdentifier(_languages[i].Key);
@@ -251,7 +236,6 @@ namespace Tsvrc.Editor
                 w.Line("return key;");
             }
 
-            // Translate with {value} substitution.
             using (w.Method("public string Translate(string key, string param)"))
             {
                 w.Line("if (_tsCurrentKeys == null) { Debug.LogWarning(\"[CompiledTsvrc] Translate called before SetLanguage.\"); return key; }");
@@ -260,7 +244,6 @@ namespace Tsvrc.Editor
                 w.Line("return key;");
             }
 
-            // Batched scene-target update.
             using (w.Method("public void _TsApplyTranslationBatch()"))
             {
                 w.Line("if (!_tsBatchRunning || _tsCurrentKeys == null) return;");
@@ -285,7 +268,8 @@ namespace Tsvrc.Editor
             }
         }
 
-        internal override void WriteStartBody(CsWriter w) { /* arrays are baked as literals, no runtime init needed */ }
+        // Arrays are baked as literals, so there is nothing to initialize at runtime.
+        internal override void WriteStartBody(CsWriter w) { }
 
         internal override void Wire(SerializedObject target)
         {

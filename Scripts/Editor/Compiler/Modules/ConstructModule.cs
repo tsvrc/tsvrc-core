@@ -9,11 +9,7 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Scans config.TsvrcBehaviourConstruct and emits the Constructs region.
-    /// All entries receive TsConstruct(this) in Start().
-    /// Unlike singletons, constructs are always wired, no call-site scanning is required.
-    /// </summary>
+    // Unlike singletons and factories, constructs are always wired. No call-site scanning is needed.
     internal class ConstructModule : TsvrcModule
     {
         private List<TsvrcField> _fields = new List<TsvrcField>();
@@ -23,10 +19,8 @@ namespace Tsvrc.Editor
             _fields = ResolveFields(config);
         }
 
-        /// <summary>
-        /// Wire-only scan: uses reflection to skip any construct whose field was not generated
-        /// during the last full compile (e.g. a new entry added without recompiling).
-        /// </summary>
+        // Only wire constructs whose fields exist in the compiled type. New entries added
+        // after the last full compile are skipped until the user recompiles.
         internal override void ScanForWire(TsvrcConfig config, Type compiledType)
         {
             var activeFieldNames = new HashSet<string>(

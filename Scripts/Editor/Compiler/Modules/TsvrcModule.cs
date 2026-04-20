@@ -10,7 +10,7 @@ namespace Tsvrc.Editor
     // Subclass and register in TsvrcCompiler.CreateModules() to extend the compiler.
     internal abstract class TsvrcModule
     {
-        /// <summary>Read config + scan source files. Called once before any Write or Wire.</summary>
+        // Reads config and scans source files. Called once before any Write or Wire method.
         internal abstract void Scan(TsvrcConfig config);
 
         // Called in RunWire after domain reload. Uses reflection on the compiled type instead of
@@ -18,19 +18,18 @@ namespace Tsvrc.Editor
         internal virtual void ScanForWire(TsvrcConfig config, Type compiledType) => Scan(config);
 
         internal virtual IEnumerable<string> GetUsings() => Enumerable.Empty<string>();
-        /// <summary>Emit plain C# types at namespace scope, before the generated class.</summary>
+        // Emits plain C# types at namespace scope, before the generated class declaration.
         internal virtual void WriteBeforeClass(CsWriter w) { }
         internal virtual void WriteFields(CsWriter w) { }
         internal virtual void WriteMethods(CsWriter w) { }
         internal virtual void WriteStartBody(CsWriter w) { }
 
-        /// <summary>Assign scene references via SerializedObject after domain reload.</summary>
+        // Assigns scene references via SerializedObject. Called after domain reload.
         internal virtual void Wire(SerializedObject target) { }
 
-        /// <summary>
-        /// Asset paths whose change requires regenerating CompiledTsvrc.cs (full compile + domain reload).
-        /// Use when the change affects the generated code structure, e.g. adding a language adds new fields.
-        /// </summary>
+        // Returns asset paths whose modification requires a full recompile rather than just re-wiring.
+        // Use this when a change affects the generated code structure, for example adding a language
+        // adds new fields and needs CompiledTsvrc.cs to be regenerated.
         internal virtual IEnumerable<string> GetFullCompileAssetPaths() => Enumerable.Empty<string>();
     }
 }

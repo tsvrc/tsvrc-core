@@ -5,10 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Pure logic for combining meshes from a set of MeshFilters into a single mesh.
-    /// Multi-material is preserved: one submesh is produced per unique material.
-    /// </summary>
+    // Multi-material is preserved: one submesh per unique material.
     internal static class MeshCombinerTool
     {
         internal struct CombineResult
@@ -17,21 +14,13 @@ namespace Tsvrc.Editor
             public Material[] Materials;
         }
 
-        /// <param name="filters">Source MeshFilters. Null entries are skipped.</param>
-        /// <param name="root">
-        /// The transform that the combined mesh will be placed on.
-        /// Vertices are expressed in root's local space.
-        /// Pass null to use world space.
-        /// </param>
-        /// <param name="recalculateNormals">
-        /// Recompute normals from geometry after combining.
-        /// Disable this to preserve baked/hand-authored normals from the source meshes.
-        /// </param>
+        // filters: null entries are skipped.
+        // root: vertices are expressed in root's local space. Pass null to use world space.
+        // recalculateNormals: disable to preserve baked or hand-authored normals from the source meshes.
         internal static CombineResult Combine(IList<MeshFilter> filters, Transform root, bool recalculateNormals = false, bool excludeEditorOnly = true)
         {
             var rootInverse = root != null ? root.worldToLocalMatrix : Matrix4x4.identity;
 
-            // material → list of CombineInstances (one per submesh)
             var byMaterial = new Dictionary<Material, List<CombineInstance>>();
             var materialOrder = new List<Material>(); // preserve insertion order
 

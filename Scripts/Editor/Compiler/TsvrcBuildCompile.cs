@@ -3,13 +3,11 @@ using VRC.SDKBase.Editor.BuildPipeline;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Ensures Tsvrc is compiled before every VRChat world build so the uploaded content is
-    /// always in sync with the current config and source files.
-    ///
-    /// Runs early (order -100) so the generated CompiledTsvrc.cs and scene wiring are settled
-    /// before UdonSharp's own build-time compilation pass.
-    /// </summary>
+    // Ensures Tsvrc is compiled before every VRChat world build so the uploaded content is
+    // always in sync with the current config and source files.
+    //
+    // Runs at order -100 so the generated CompiledTsvrc.cs and scene wiring are settled
+    // before UdonSharp's own build-time compilation pass.
     internal class TsvrcBuildCompile : IVRCSDKBuildRequestedCallback
     {
         public int callbackOrder => -100;

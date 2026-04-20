@@ -9,10 +9,8 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Scans config.Singletons and emits typed public fields on CompiledTsvrc.
-    /// Only entries referenced as _ts.FieldName somewhere in user code are included.
-    /// </summary>
+    // Emits typed public fields for each configured singleton.
+    // Singletons with no call sites in user code are emitted as error-logging stubs instead of real fields.
     internal class SingletonModule : TsvrcModule
     {
         private List<TsvrcField> _fields = new List<TsvrcField>();
@@ -21,7 +19,6 @@ namespace Tsvrc.Editor
         {
             var resolved = ResolveDescriptors(config);
 
-            // Single source-tree walk for all singletons.
             var patterns = resolved.ToDictionary(
                 f => f.Name,
                 f => new Regex(@"\b_ts\s*\.\s*" + Regex.Escape(f.Name) + @"\b", RegexOptions.Compiled));
@@ -54,7 +51,7 @@ namespace Tsvrc.Editor
             _fields = fields.OrderBy(f => f.Name).ToList();
         }
 
-        // Returns resolved field descriptors from config without scanning source files.
+        // Shared between Scan and ScanForWire. Does not touch source files.
         private List<TsvrcField> ResolveDescriptors(TsvrcConfig config)
         {
             var internalConfig = TsvrcCompiler.LoadInternalConfig();

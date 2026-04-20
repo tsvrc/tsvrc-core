@@ -82,13 +82,11 @@ namespace Tsvrc.Editor
             Debug.Log("[Tsvrc Compiler] Tsvrc has been successfully compiled. CompiledTsvrc has been generated and wired into the scene.");
         }
 
-        /// <summary>
-        /// Dry-run compile: scans source files and builds the generated output string,
-        /// then compares it to what is currently on disk.
-        /// Returns true if a real Compile() call would produce a different file.
-        /// Used by TsvrcWatcher to avoid triggering a domain reload when .cs files
-        /// are saved but no Tsvrc call sites were actually added or removed.
-        /// </summary>
+        // Dry-run compile: scans source files and builds the generated output string, then
+        // compares it to what is currently on disk. Returns true if a real Compile() call
+        // would produce a different file.
+        // Used by TsvrcWatcher to avoid triggering a domain reload when .cs files are saved
+        // but no Tsvrc call sites were actually added or removed.
         internal static bool WouldChangeSource()
         {
             // Do not auto-create a TsvrcConfig during a dry run, read only.

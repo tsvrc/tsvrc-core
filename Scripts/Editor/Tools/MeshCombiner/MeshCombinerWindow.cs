@@ -5,10 +5,7 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Editor window for combining multiple mesh renderers into a single mesh asset.
-    /// Open via Tsvrc > Tools > Mesh Combiner.
-    /// </summary>
+    // Open via Tsvrc > Tools > Mesh Combiner.
     internal class MeshCombinerWindow : EditorWindow
     {
         private readonly List<MeshFilter> _sources = new List<MeshFilter>();
@@ -41,7 +38,7 @@ namespace Tsvrc.Editor
 
         private void OnGUI()
         {
-            // Recompute per-frame caches at the start of each repaint.
+            // Reset the path error cache so it recomputes once per repaint.
             _pathErrorDirty = true;
 
             EditorGUILayout.LabelField("Mesh Combiner", EditorStyles.boldLabel);
@@ -60,8 +57,6 @@ namespace Tsvrc.Editor
             if (!string.IsNullOrEmpty(_statusMessage))
                 EditorGUILayout.HelpBox(_statusMessage, _statusType);
         }
-
-        // Sources
 
         private void DrawSources()
         {
@@ -118,8 +113,6 @@ namespace Tsvrc.Editor
             EditorGUILayout.LabelField($"{valid.Count} valid source(s) of {_sources.Count} slot(s)", EditorStyles.miniLabel);
         }
 
-        // Settings
-
         private void DrawSettings()
         {
             EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
@@ -160,8 +153,6 @@ namespace Tsvrc.Editor
                 _excludeEditorOnly);
         }
 
-        // Combine button
-
         private void DrawCombineButton()
         {
             var valid = GetValid();
@@ -176,8 +167,6 @@ namespace Tsvrc.Editor
             if (valid.Count == 0)
                 EditorGUILayout.HelpBox("Add at least one MeshFilter to combine.", MessageType.Warning);
         }
-
-        // Actions
 
         private void LoadFromSelection()
         {
@@ -253,8 +242,6 @@ namespace Tsvrc.Editor
                 Debug.LogException(ex);
             }
         }
-
-        // Helpers
 
         private void InvalidateCache() => _validDirty = true;
 

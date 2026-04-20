@@ -10,12 +10,10 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Handles the single TsvrcInstance for the world.
-    /// If config.Instance is assigned, uses it directly.
-    /// If not, auto-detects any TsvrcInstance subclass in user code, creates a child GameObject
-    /// under CompiledTsvrc, and wires it as the instance.
-    /// </summary>
+    // Handles the single TsvrcInstance for the world.
+    // If config.Instance is assigned it is used directly. Otherwise the module scans user
+    // source files for a TsvrcInstance subclass, creates a child GameObject under CompiledTsvrc,
+    // and wires it automatically.
     internal class InstanceModule : TsvrcModule
     {
         private TsvrcField _field;

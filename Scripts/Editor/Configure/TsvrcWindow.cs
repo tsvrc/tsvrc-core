@@ -5,10 +5,7 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    /// <summary>
-    /// Unified Tsvrc configuration window.
-    /// Open via Tsvrc > Configure.
-    /// </summary>
+    // Open via Tsvrc > Configure.
     internal class TsvrcWindow : EditorWindow
     {
         private static readonly WindowTab[] Tabs =
@@ -120,11 +117,9 @@ namespace Tsvrc.Editor
             int newIndex = GUILayout.Toolbar(_tabIndex, TabLabels);
             if (newIndex != _tabIndex) { _tabIndex = newIndex; _scroll = Vector2.zero; }
 
-            // Description: fixed header, wraps to window width.
             EditorGUILayout.LabelField(Tabs[_tabIndex].Description, EditorStyles.wordWrappedMiniLabel);
             EditorGUILayout.Space(4);
 
-            // Scrollable tab content, track whether any control was changed.
             _so.Update();
             EditorGUI.BeginChangeCheck();
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
@@ -134,7 +129,6 @@ namespace Tsvrc.Editor
             if (EditorGUI.EndChangeCheck())
                 _isDirty = true;
 
-            // Bottom bar: compile prompt when dirty, plain button when clean.
             EditorGUILayout.Space(8);
             if (_isDirty)
             {

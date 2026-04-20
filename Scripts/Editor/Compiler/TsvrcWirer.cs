@@ -1,7 +1,6 @@
 #if UNITY_EDITOR
 using System;
 using Tsvrc.Core;
-using UdonSharp;
 using UdonSharpEditor;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -29,17 +28,14 @@ namespace Tsvrc.Editor
                 EditorApplication.delayCall += RunWire;
         }
 
-        /// <summary>
-        /// Persists a pending compile across a domain reload.
-        /// Call this instead of scheduling a delayCall whenever a .cs file change triggers a recompile,
-        /// since delayCall delegates are wiped when Unity reloads the domain for the .cs change.
-        /// </summary>
+        // Persists a pending compile so it survives the domain reload that follows a .cs file change.
+        // A delayCall would be lost when Unity reloads the domain, so EditorPrefs is used instead.
         internal static void ScheduleCompile()
         {
             EditorPrefs.SetBool(PendingCompileKey, true);
         }
 
-        /// <summary>Called by TsvrcCompiler after writing the generated file, before AssetDatabase.Refresh().</summary>
+        // Called by TsvrcCompiler after writing the generated file, before AssetDatabase.Refresh().
         internal static void ScheduleWire()
         {
             EditorPrefs.SetBool(PendingWireKey, true);

@@ -7,15 +7,9 @@ namespace Tsvrc.Editor
 {
     internal static class TsvrcResolver
     {
-        /// <summary>
-        /// Resolves a collection of Unity objects into typed <see cref="TsvrcField"/> descriptors.
-        /// Nulls are skipped with a warning. Duplicate object references are also skipped with a warning.
-        /// </summary>
-        /// <param name="objects">Objects to resolve. May be null or empty.</param>
-        /// <param name="usedNames">
-        /// Running set of already-used field names for deduplication across multiple calls.
-        /// Pass <c>null</c> to start fresh.
-        /// </param>
+        // Resolves a collection of Unity objects into TsvrcField descriptors.
+        // Null entries and duplicate object references are both skipped with a warning.
+        // Pass an existing usedNames set to share deduplication across multiple calls.
         internal static List<TsvrcField> Resolve(
             IEnumerable<UnityEngine.Object> objects,
             HashSet<string> usedNames = null)
@@ -72,6 +66,8 @@ namespace Tsvrc.Editor
             return CustomFieldName(goName) ?? type.Name;
         }
 
+        // If a GameObject is named __Foo__, the field name becomes Foo instead of the type name.
+        // This lets users override the generated field name directly from the scene hierarchy.
         private static string CustomFieldName(string goName)
         {
             if (goName != null

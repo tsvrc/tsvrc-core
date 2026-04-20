@@ -43,8 +43,7 @@ namespace Tsvrc.Editor
             return _cachedSources;
         }
 
-        // Scans all user .cs files and counts how many times each pattern matches.
-        // Returns one int per key; keys with no matches get 0.
+        // Keys with no matches get 0; callers do not need to check for missing keys.
         internal static Dictionary<string, int> FindCallSitesBatch(Dictionary<string, Regex> patterns)
         {
             if (patterns.Count == 0) return new Dictionary<string, int>();
@@ -136,7 +135,6 @@ namespace Tsvrc.Editor
             return result;
         }
 
-        // Builds and caches a global map of method-name → declaration count across all sources.
         // Shared by CountCallSitesBatch; cleared alongside _cachedSources.
         private static Dictionary<string, int> GetGlobalDefCounts(
             List<(string fileName, string src, List<(int pos, string name)> methodIndex)> processedSources)
@@ -152,14 +150,12 @@ namespace Tsvrc.Editor
             return _cachedGlobalDefCounts;
         }
 
-        // Pattern that matches method declarations that have an explicit access modifier.
-        // Captures the method name in group 1.
+        // Matches method declarations that have an explicit access modifier, captures the name.
         private static readonly Regex EnclosingMethodRegex = new Regex(
             @"\b(?:private|protected|public|internal)\s+(?:(?:static|virtual|override|abstract|async)\s+)*(?:\w+(?:<[^>]+>)?(?:\[\s*\])*\s+)+(\w+)\s*\(",
             RegexOptions.Compiled);
 
-        // Builds a sorted (position, name) list for all method declarations in src.
-        // Matches returns results left-to-right so the list is already in position order.
+        // Regex.Matches returns results left-to-right, so the list is already sorted by position.
         private static List<(int pos, string name)> BuildMethodIndex(string src)
         {
             var index = new List<(int pos, string name)>();
@@ -185,8 +181,7 @@ namespace Tsvrc.Editor
 
         private static readonly Regex NamespacePattern = new Regex(@"namespace\s+([\w.]+)", RegexOptions.Compiled);
 
-        // Finds the first class in user code that directly inherits baseTypeName.
-        // Returns (TypeName, Namespace, UnityAssetPath) or null if not found.
+        // Returns null if no subclass is found in user code.
         internal static (string TypeName, string Namespace, string AssetPath)? FindSubclass(string baseTypeName)
         {
             // Single-use pattern: Compiled would cost ~50-200ms JIT with no reuse benefit.
