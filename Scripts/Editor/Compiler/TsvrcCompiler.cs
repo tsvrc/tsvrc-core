@@ -47,7 +47,12 @@ namespace Tsvrc.Editor
             if (config.tag != "EditorOnly")
                 Debug.LogWarning("[TsvrcCompiler] TsvrcConfig GameObject is not tagged 'EditorOnly'. It will be included in the VRChat build. Set the tag to 'EditorOnly' in the Inspector.");
 
-            CleanPrevious();
+            // During a build (refreshAssetDatabase: false) the scene already has the correct
+            // wired CompiledTsvrc from the last normal compile. Cleaning would destroy that GO
+            // and remove the .cs from the AssetDatabase without a Refresh to restore it, causing
+            // UdonSharpBuildChecks to abort on the now-null script reference.
+            if (refreshAssetDatabase)
+                CleanPrevious();
 
             var modules = CreateModules();
 
