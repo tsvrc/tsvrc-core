@@ -3,7 +3,7 @@ using UdonSharp;
 namespace Tsvrc.Network
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class DataTransferer : DataReceiver
+    public class DataTransferer : DataSenderReceiver
     {
         /// <summary>
         /// Emitted when the transfer starts.

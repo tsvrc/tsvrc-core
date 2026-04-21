@@ -6,7 +6,7 @@ using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Network
 {
-    public class DataReceiver : DataSender
+    public class DataSenderReceiver : DataSender
     {
         /// <summary>
         /// Emitted when data reception starts.
