@@ -87,6 +87,9 @@ namespace Tsvrc.Network
 
             _trackedPlayerIds = _initialTrackerPlayerIds;
             _initialTrackerPlayerIds = new string[0];
+            // base.StartProcess() serialized before OnProcessStarted was called, so _trackedPlayerIds
+            // was still empty at that point. Serialize now so late joiners receive the correct list.
+            RequestSerialization();
 
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessStarted), _trackedPlayerIds);
         }
@@ -229,6 +232,8 @@ namespace Tsvrc.Network
 
         /// <summary>
         /// Checks if a player with the given ID is being tracked.
+        /// On non-owner clients this reflects the last deserialized state, which may lag behind
+        /// network event callbacks. Use <c>LastPlayerIds</c> for an accurate snapshot within <c>Notify*</c> callbacks.
         /// </summary>
         protected bool IsTrackedPlayer(string playerId)
         {
@@ -237,7 +242,7 @@ namespace Tsvrc.Network
 
         /// <summary>
         /// Broadcast target: fires on all instance players when the process starts.
-        /// Read <c>LastPlayerIds</c> or call <see cref="IsTrackedPlayer"/> to check if the local player is tracked.
+        /// Read <c>LastPlayerIds</c> to check if the local player is tracked.
         /// </summary>
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessStarted(string[] playerIds)
@@ -248,7 +253,7 @@ namespace Tsvrc.Network
 
         /// <summary>
         /// Broadcast target: fires on all instance players when the process stops.
-        /// Read <c>LastPlayerIds</c> or call <see cref="IsTrackedPlayer"/> to check if the local player is tracked.
+        /// Read <c>LastPlayerIds</c> to check if the local player is tracked.
         /// </summary>
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessStopped(string[] playerIds)
@@ -259,7 +264,7 @@ namespace Tsvrc.Network
 
         /// <summary>
         /// Broadcast target: fires on all instance players when the process completes.
-        /// Read <c>LastPlayerIds</c> or call <see cref="IsTrackedPlayer"/> to check if the local player is tracked.
+        /// Read <c>LastPlayerIds</c> to check if the local player is tracked.
         /// </summary>
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessCompleted(string[] playerIds)
@@ -298,6 +303,7 @@ namespace Tsvrc.Network
         public void BroadcastAddTrackedPlayers(string[] playerIds)
         {
             if (!IsProcessOwner()) return;
+            if (playerIds == null || playerIds.Length == 0) return;
 
             string[] validPlayerIds = new string[playerIds.Length];
             int validCount = 0;
@@ -333,6 +339,7 @@ namespace Tsvrc.Network
         public void BroadcastRemoveTrackedPlayers(string[] playerIds)
         {
             if (!IsProcessOwner()) return;
+            if (playerIds == null || playerIds.Length == 0) return;
 
             string[] validPlayerIds = new string[playerIds.Length];
             int validCount = 0;
