@@ -21,13 +21,12 @@ namespace Tsvrc.Core
 
         private const float _processUpdateInterval = 0.5f;
 
-        // Tracks whether the update loop is currently scheduled locally.
-        // Prevents duplicate loops after ownership transfer.
+        // Prevents duplicate loop scheduling after ownership transfer.
         private bool _updateLoopActive = false;
 
-        // Cached local player ID to avoid string construction on every IsProcessOwner() call.
-        // The local player identity is constant for the duration of a session.
-        private string _localPlayerId = "";
+        // Cached local player ID — session-constant. Protected so subclasses can use it
+        // directly instead of calling TsPlayer.GetPlayerID(Networking.LocalPlayer).
+        protected string _localPlayerId = "";
 
         protected override void TsStart()
         {
@@ -92,6 +91,10 @@ namespace Tsvrc.Core
             }
         }
 
+        /// <summary>
+        /// Starts the process, claiming ownership of the object for the local player.
+        /// </summary>
+        /// <param name="useProcessUpdate">When <c>true</c>, <see cref="OnProcessUpdate"/> fires every 0.5 s while the process runs.</param>
         public virtual void StartProcess(bool useProcessUpdate = false)
         {
             if (_isRunning)
@@ -169,6 +172,7 @@ namespace Tsvrc.Core
             ExecuteComplete();
         }
 
+        /// <summary>Returns <c>true</c> if the process is currently running.</summary>
         public bool IsProcessRunning()
         {
             return _isRunning;
@@ -282,6 +286,8 @@ namespace Tsvrc.Core
 
         /// <summary>
         /// Received by the owner when a non-owner calls <see cref="CompleteProcess"/>.
+        /// Guard checks discard the event if ownership disagreement caused misrouting,
+        /// or if the process already completed before the packet arrived.
         /// </summary>
         [NetworkCallable]
         public void RequestCompleteProcess()
