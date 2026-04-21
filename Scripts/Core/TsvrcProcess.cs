@@ -18,19 +18,22 @@ namespace Tsvrc.Core
         [UdonSynced] private bool _isRunning = false;
         [UdonSynced] private string _ownerId = "";
         [UdonSynced] private bool _useProcessUpdate = false;
-        [UdonSynced] private float _processUpdateInterval = 0.5f;
 
-        #region Tsvrc Lifecycle
+        private const float _processUpdateInterval = 0.5f;
+
+        // Tracks whether the update loop is currently scheduled locally.
+        // Prevents duplicate loops after ownership transfer.
+        private bool _updateLoopActive = false;
+
+        // Cached local player ID to avoid string construction on every IsProcessOwner() call.
+        // The local player identity is constant for the duration of a session.
+        private string _localPlayerId = "";
 
         protected override void TsStart()
         {
             base.TsStart();
 
-            if (IsProcessOwner())
-            {
-                // Ensure synced state is correct on start
-                SetProcessOwner(Networking.GetOwner(gameObject));
-            }
+            _localPlayerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
         }
 
         /// <summary>
@@ -41,41 +44,53 @@ namespace Tsvrc.Core
         /// </summary>
         public virtual void TsRelease()
         {
-            OnProcessCleanup(false);
+            // Guard against double invocation: ExecuteStop/ExecuteComplete already called
+            // OnProcessCleanup. A second call would pass a contradictory isCompleted value.
+            if (_isRunning)
+                OnProcessCleanup(false);
+
             ResetBehaviourState();
         }
 
-        #endregion
-
-        #region VRChat Callbacks
-
         public override void OnPlayerLeft(VRCPlayerApi player)
         {
-            /* UdonSharp transfers the master before invoking OnPlayerLeft,
-             so its safe to check only for master here. */
-            if (!IsProcessRunning() || !Networking.IsMaster) return;
+            if (!IsProcessRunning()) return;
 
             var playerId = TsPlayer.GetPlayerID(player);
-            if (playerId == _ownerId)
-            {
-                SetProcessOwner(Networking.Master);
-                OnOwnerAbandonedProcess();
-            }
+            if (playerId != _ownerId) return;
+
+            // VRChat normally transfers Unity ownership before OnPlayerLeft fires, but a known
+            // event-ordering bug can cause OnOwnershipTransferred to fire after OnPlayerLeft.
+            // OnOwnershipTransferred handles that fallback.
+            if (!Networking.IsOwner(gameObject)) return;
+
+            TakeOverAbandonedProcess();
         }
 
         public override void OnOwnershipTransferred(VRCPlayerApi player)
         {
             base.OnOwnershipTransferred(player);
 
-            if (IsProcessOwner() && IsProcessRunning() && _useProcessUpdate)
-            {
-                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(BroadcastUpdateProcess));
-            }
+            // 1. Fallback for the event-ordering bug: OnPlayerLeft may have found IsOwner=false
+            //    and done nothing. FindPlayerByID confirms the owner is truly gone.
+            // 2. IsProcessOwner() guard skips this if OnPlayerLeft already ran and
+            //    TakeOverAbandonedProcess already updated _ownerId to our ID.
+            if (!Networking.IsOwner(gameObject) || !IsProcessRunning() || IsProcessOwner()) return;
+            if (_ownerId == "" || TsPlayer.FindPlayerByID(_ownerId) != null) return;
+
+            TakeOverAbandonedProcess();
         }
 
-        #endregion
-
-        #region Public Methods
+        public override void OnDeserialization()
+        {
+            // Synced variables are guaranteed current here, the safe place to restart
+            // the update loop after an ownership transfer. Guard against duplicate loops.
+            if (IsProcessOwner() && IsProcessRunning() && _useProcessUpdate && !_updateLoopActive)
+            {
+                _updateLoopActive = true;
+                SendCustomEvent(nameof(_TickProcessUpdate));
+            }
+        }
 
         public virtual void StartProcess(bool useProcessUpdate = false)
         {
@@ -85,25 +100,35 @@ namespace Tsvrc.Core
                 return;
             }
 
+            // Set state before SetProcessOwner so its RequestSerialization sends a single
+            // atomic packet with ownership and running state together.
+            _isRunning = true;
+            _useProcessUpdate = useProcessUpdate;
+
             if (!IsProcessOwner())
             {
                 SetProcessOwner(Networking.LocalPlayer);
             }
-
-            _isRunning = true;
-            _useProcessUpdate = useProcessUpdate;
-            RequestSerialization();
+            else
+            {
+                RequestSerialization();
+            }
 
             OnProcessStarted();
 
             if (_useProcessUpdate)
             {
-                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(BroadcastUpdateProcess));
+                // Caller is always the owner at this point. Use SendCustomEvent to avoid
+                // routing through the network (which could hit the previous Unity owner if
+                // Networking.SetOwner hasn't propagated yet).
+                _updateLoopActive = true;
+                SendCustomEvent(nameof(_TickProcessUpdate));
             }
         }
 
         /// <summary>
         /// Forcibly stops the Tsvrc Process before completion.
+        /// If called by a non-owner, the request is forwarded to the owner via a network event.
         /// </summary>
         public virtual void StopProcess()
         {
@@ -115,20 +140,17 @@ namespace Tsvrc.Core
 
             if (!IsProcessOwner())
             {
-                // Minor FIXME: Setting another owner could cause that a synced variable don't be loaded
-                // yet in the new owner, leading to inconsistent states.
-                SetProcessOwner(Networking.LocalPlayer);
+                // Forward to the owner; the guard in RequestStopProcess discards stale arrivals.
+                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestStopProcess));
+                return;
             }
 
-            _isRunning = false;
-            RequestSerialization();
-
-            OnProcessStopped();
-            OnProcessCleanup(false);
+            ExecuteStop();
         }
 
         /// <summary>
         /// Completes the Tsvrc Process successfully.
+        /// If called by a non-owner, the request is forwarded to the owner via a network event.
         /// </summary>
         public void CompleteProcess()
         {
@@ -140,14 +162,11 @@ namespace Tsvrc.Core
 
             if (!IsProcessOwner())
             {
-                SetProcessOwner(Networking.LocalPlayer);
+                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestCompleteProcess));
+                return;
             }
 
-            _isRunning = false;
-            RequestSerialization();
-
-            OnProcessCompleted();
-            OnProcessCleanup(true);
+            ExecuteComplete();
         }
 
         public bool IsProcessRunning()
@@ -155,14 +174,9 @@ namespace Tsvrc.Core
             return _isRunning;
         }
 
-        #endregion
-
-        #region Protected Methods
-
         /// <summary>
-        /// Sets the owner of the process.
-        /// Use this method instead of SetOwner to ensure
-        /// the internal state is updated correctly.
+        /// Transfers process ownership to <paramref name="newOwner"/> and syncs the change
+        /// to all clients. Prefer this over <c>Networking.SetOwner</c> directly.
         /// </summary>
         protected void SetProcessOwner(VRCPlayerApi newOwner)
         {
@@ -172,19 +186,17 @@ namespace Tsvrc.Core
         }
 
         /// <summary>
-        /// Determines if the local player is the process owner.
-        /// Uses _ownerId instead of Networking.IsOwner() because Networking.SetOwner() is
-        /// not immediately reflected on the local client. _ownerId is set synchronously and
-        /// arrives atomically with _isRunning via RequestSerialization on remote clients.
+        /// Returns <c>true</c> if the local player is the current process owner.
         /// </summary>
+        /// <remarks>
+        /// Uses <c>_ownerId</c> instead of <c>Networking.IsOwner()</c> because
+        /// <c>SetOwner</c> is not immediately reflected locally, whereas <c>_ownerId</c>
+        /// is set synchronously and arrives atomically with <c>_isRunning</c> on remote clients.
+        /// </remarks>
         protected bool IsProcessOwner()
         {
-            return _ownerId == TsPlayer.GetPlayerID(Networking.LocalPlayer);
+            return _ownerId == _localPlayerId;
         }
-
-        #endregion
-
-        #region Virtual Methods
 
         /// <summary>
         /// Called when the process is started.
@@ -217,12 +229,14 @@ namespace Tsvrc.Core
         /// <param name="isCompleted">True if cleanup is after successful completion, false if after stop/abort.</param>
         protected virtual void OnProcessCleanup(bool isCompleted)
         {
-            // Reset process state on release to ensure clean start on next TsConstruct
             _isRunning = false;
             _ownerId = "";
             _useProcessUpdate = false;
-            _processUpdateInterval = 0.5f;
+            _updateLoopActive = false;
 
+            // Serialize the cleared owner/state so remote clients don't see stale _ownerId,
+            // which would cause IsProcessOwner() to incorrectly return true on the old owner.
+            RequestSerialization();
         }
 
         /// <summary>
@@ -231,20 +245,78 @@ namespace Tsvrc.Core
         /// </summary>
         protected virtual void OnProcessUpdate() { }
 
-        #endregion
-
-        #region Network Events
-
-        [NetworkCallable]
-        public void BroadcastUpdateProcess()
+        public void _TickProcessUpdate()
         {
-            if (!IsProcessRunning()) return;
+            // Stop the loop if the process ended or ownership was transferred away.
+            if (!IsProcessRunning() || !IsProcessOwner())
+            {
+                _updateLoopActive = false;
+                return;
+            }
 
             OnProcessUpdate();
 
-            SendCustomEventDelayedSeconds(nameof(BroadcastUpdateProcess), _processUpdateInterval);
+            // Re-check after the callback: OnProcessUpdate() may have stopped the process
+            // or transferred ownership. Without this, a SetProcessOwner() call inside the
+            // callback would not stop the loop until the next invocation.
+            if (!IsProcessRunning() || !IsProcessOwner())
+            {
+                _updateLoopActive = false;
+                return;
+            }
+
+            SendCustomEventDelayedSeconds(nameof(_TickProcessUpdate), _processUpdateInterval);
         }
 
-        #endregion
+        /// <summary>
+        /// Received by the owner when a non-owner calls <see cref="StopProcess"/>.
+        /// Guard checks discard the event if ownership disagreement caused misrouting,
+        /// or if the process already stopped before the packet arrived.
+        /// </summary>
+        [NetworkCallable]
+        public void RequestStopProcess()
+        {
+            if (!IsProcessOwner() || !_isRunning) return;
+            ExecuteStop();
+        }
+
+        /// <summary>
+        /// Received by the owner when a non-owner calls <see cref="CompleteProcess"/>.
+        /// </summary>
+        [NetworkCallable]
+        public void RequestCompleteProcess()
+        {
+            if (!IsProcessOwner() || !_isRunning) return;
+            ExecuteComplete();
+        }
+
+        private void TakeOverAbandonedProcess()
+        {
+            SetProcessOwner(Networking.LocalPlayer);
+
+            // OnDeserialization does not fire on the sender of RequestSerialization;
+            // the loop must be restarted explicitly here.
+            if (_useProcessUpdate && !_updateLoopActive)
+            {
+                _updateLoopActive = true;
+                SendCustomEvent(nameof(_TickProcessUpdate));
+            }
+
+            OnOwnerAbandonedProcess();
+        }
+
+        private void ExecuteStop()
+        {
+            _isRunning = false;
+            OnProcessStopped();
+            OnProcessCleanup(false);
+        }
+
+        private void ExecuteComplete()
+        {
+            _isRunning = false;
+            OnProcessCompleted();
+            OnProcessCleanup(true);
+        }
     }
 }
