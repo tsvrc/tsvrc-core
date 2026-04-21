@@ -8,6 +8,13 @@ using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Process
 {
+    /// <summary>
+    /// A <see cref="PlayerTracker"/> that runs a ready check over a set of tracked players.
+    /// The owner polls readiness every 0.5 s and completes immediately when all tracked players
+    /// are ready. Any player can call <see cref="SetReady"/> to mark themselves ready or unready.
+    /// Subscribe via the <c>OnReadyCheck*Event</c> string constants and read
+    /// <see cref="PlayerTracker.LastPlayerIds"/> in your callback.
+    /// </summary>
     public class ReadyCheckProcess : PlayerTracker
     {
         /// <summary>
@@ -39,8 +46,6 @@ namespace Tsvrc.Process
             TsSubscribe(this, OnTrackingPlayersRemovedEvent, nameof(_OnTrackingPlayersRemoved));
         }
 
-        #region TsvrcProcess Callbacks
-
         protected override void OnProcessStarted()
         {
             base.OnProcessStarted();
@@ -60,23 +65,23 @@ namespace Tsvrc.Process
         protected override void OnProcessUpdate()
         {
             base.OnProcessUpdate();
+            CheckAllPlayersReady();
+        }
 
+        // Completes the ready check if all tracked players are ready.
+        // Called from both BroadcastAddReadyPlayer (event-driven) and OnProcessUpdate (safety-net poll).
+        private void CheckAllPlayersReady()
+        {
             string[] trackedPlayerIds = GetTrackedPlayerIds();
+            if (trackedPlayerIds.Length == 0) return;
 
             foreach (string playerId in trackedPlayerIds)
             {
-                if (!IsPlayerReady(playerId))
-                {
-                    return; // At least one player is not ready
-                }
+                if (!IsPlayerReady(playerId)) return;
             }
 
             CompleteReadyCheck();
         }
-
-        #endregion
-
-        #region TsvrcPlayerListTracker Callbacks
 
         public void _OnTrackingStarted()
         {
@@ -99,18 +104,20 @@ namespace Tsvrc.Process
 
         public void _OnTrackingPlayersRemoved()
         {
+            // NotifyTrackedPlayersRemoved fires on all clients. Only the owner has an accurate
+            // _readyPlayerIds and should mutate state. Calling directly avoids the N² event
+            // storm that would result from every client sending to All.
+            if (!IsProcessOwner()) return;
+
             foreach (string playerId in LastRemovedPlayerIds)
             {
                 if (IsPlayerReady(playerId))
-                {
-                    SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastRemoveReadyPlayer), playerId);
-                }
+                    BroadcastRemoveReadyPlayer(playerId);
             }
+
+            // A non-ready player may have just been removed, making all remaining players ready.
+            CheckAllPlayersReady();
         }
-
-        #endregion
-
-        #region Public Methods
 
         /// <summary>
         /// Starts the ready check process.
@@ -141,6 +148,8 @@ namespace Tsvrc.Process
         /// </summary>
         public void SetReady(bool ready = true)
         {
+            if (!IsProcessRunning()) return;
+
             string playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
 
             if (ready)
@@ -155,10 +164,6 @@ namespace Tsvrc.Process
             }
         }
 
-        #endregion
-
-        #region Protected Methods
-
         /// <summary>
         /// Checks if a player with the given ID is marked as ready.
         /// </summary>
@@ -167,41 +172,33 @@ namespace Tsvrc.Process
             return TsArray.Contains(_readyPlayerIds, playerId);
         }
 
-        #endregion
-
-        #region Network Events
-
         /// <summary>
-        /// Adds a player to the ready list.
-        /// Sent to all players instead of NetworkEventTarget.Owner to avoid a race where
-        /// ownership hasn't propagated yet on the sender's side.
+        /// Adds a player to the ready list. Only the owner processes the change.
         /// </summary>
         [NetworkCallable]
         public void BroadcastAddReadyPlayer(string playerId)
         {
-            if (!IsProcessRunning()) return;
-            if (!IsProcessOwner()) return;
+            if (!IsProcessRunning() || !IsProcessOwner()) return;
+            if (string.IsNullOrEmpty(playerId)) return;
+            if (!IsTrackedPlayer(playerId) || IsPlayerReady(playerId)) return;
 
-            string[] playerIds = TsPlayer.ToArray(playerId);
-            _readyPlayerIds = TsArray.Add(_readyPlayerIds, playerIds);
+            _readyPlayerIds = TsArray.Add(_readyPlayerIds, TsPlayer.ToArray(playerId));
             RequestSerialization();
+            // Event-driven completion: check immediately rather than waiting for the next poll.
+            CheckAllPlayersReady();
         }
 
         /// <summary>
-        /// Removes a player from the ready list.
-        /// See BroadcastAddReadyPlayer for the two-guard reasoning.
+        /// Removes a player from the ready list. Only the owner processes the change.
         /// </summary>
         [NetworkCallable]
         public void BroadcastRemoveReadyPlayer(string playerId)
         {
-            if (!IsProcessRunning()) return;
-            if (!IsProcessOwner()) return;
+            if (!IsProcessRunning() || !IsProcessOwner()) return;
+            if (string.IsNullOrEmpty(playerId) || !IsPlayerReady(playerId)) return;
 
-            string[] playerIds = TsPlayer.ToArray(playerId);
-            _readyPlayerIds = TsArray.Remove(_readyPlayerIds, playerIds);
+            _readyPlayerIds = TsArray.Remove(_readyPlayerIds, TsPlayer.ToArray(playerId));
             RequestSerialization();
         }
-
-        #endregion
     }
 }
