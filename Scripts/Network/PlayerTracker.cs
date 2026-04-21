@@ -236,61 +236,56 @@ namespace Tsvrc.Network
         }
 
         /// <summary>
-        /// Broadcast target: fires when the process starts. Only executes for tracked players.
+        /// Broadcast target: fires on all instance players when the process starts.
+        /// Read <c>LastPlayerIds</c> or call <see cref="IsTrackedPlayer"/> to check if the local player is tracked.
         /// </summary>
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessStarted(string[] playerIds)
         {
-            if (!TsArray.Contains(playerIds, _localPlayerId)) return;
-
             LastPlayerIds = playerIds;
             TsEmit(OnTrackingStartedEvent);
         }
 
         /// <summary>
-        /// Broadcast target: fires when the process stops. Only executes for tracked players.
+        /// Broadcast target: fires on all instance players when the process stops.
+        /// Read <c>LastPlayerIds</c> or call <see cref="IsTrackedPlayer"/> to check if the local player is tracked.
         /// </summary>
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessStopped(string[] playerIds)
         {
-            if (!TsArray.Contains(playerIds, _localPlayerId)) return;
-
             LastPlayerIds = playerIds;
             TsEmit(OnTrackingStoppedEvent);
         }
 
         /// <summary>
-        /// Broadcast target: fires when the process completes. Only executes for tracked players.
+        /// Broadcast target: fires on all instance players when the process completes.
+        /// Read <c>LastPlayerIds</c> or call <see cref="IsTrackedPlayer"/> to check if the local player is tracked.
         /// </summary>
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessCompleted(string[] playerIds)
         {
-            if (!TsArray.Contains(playerIds, _localPlayerId)) return;
-
             LastPlayerIds = playerIds;
             TsEmit(OnTrackingCompletedEvent);
         }
 
         /// <summary>
-        /// Broadcast target: fires when players are added. Only executes for players already tracked before the addition.
+        /// Broadcast target: fires on all instance players when players are added.
+        /// Read <c>LastAddedPlayerIds</c> in your callback.
         /// </summary>
         [NetworkCallable]
-        public void NotifyTrackedPlayersAdded(string[] addedPlayerIds, string[] notifyPlayerIds)
+        public void NotifyTrackedPlayersAdded(string[] addedPlayerIds)
         {
-            if (!TsArray.Contains(notifyPlayerIds, _localPlayerId)) return;
-
             LastAddedPlayerIds = addedPlayerIds;
             TsEmit(OnTrackingPlayersAddedEvent);
         }
 
         /// <summary>
-        /// Broadcast target: fires when players are removed. Only executes for players still tracked after the removal.
+        /// Broadcast target: fires on all instance players when players are removed.
+        /// Read <c>LastRemovedPlayerIds</c> in your callback.
         /// </summary>
         [NetworkCallable]
-        public void NotifyTrackedPlayersRemoved(string[] removedPlayerIds, string[] notifyPlayerIds)
+        public void NotifyTrackedPlayersRemoved(string[] removedPlayerIds)
         {
-            if (!TsArray.Contains(notifyPlayerIds, _localPlayerId)) return;
-
             LastRemovedPlayerIds = removedPlayerIds;
             TsEmit(OnTrackingPlayersRemovedEvent);
         }
@@ -324,14 +319,10 @@ namespace Tsvrc.Network
                 validPlayerIds = trimmed;
             }
 
-            // Capture reference before reassigning _trackedPlayerIds.
-            // TsArray.Add never modifies original, so no clone is needed.
-            var currentTrackedPlayers = _trackedPlayerIds;
-
             _trackedPlayerIds = TsArray.Add(_trackedPlayerIds, validPlayerIds);
             RequestSerialization();
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersAdded), validPlayerIds, currentTrackedPlayers);
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersAdded), validPlayerIds);
         }
 
         /// <summary>
@@ -363,14 +354,12 @@ namespace Tsvrc.Network
                 validPlayerIds = trimmed;
             }
 
-            // Remaining players serve as both the new tracked list and the notify list.
             var remainingPlayerIds = TsArray.Remove(_trackedPlayerIds, validPlayerIds);
-            var notifyPlayerIds = remainingPlayerIds;
 
             _trackedPlayerIds = remainingPlayerIds;
             RequestSerialization();
 
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersRemoved), validPlayerIds, notifyPlayerIds);
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersRemoved), validPlayerIds);
         }
     }
 }
