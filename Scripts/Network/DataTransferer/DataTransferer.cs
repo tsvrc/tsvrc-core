@@ -39,9 +39,12 @@ namespace Tsvrc.Network
 
         protected override void OnOwnerAbandonedProcess()
         {
+            // DataSender.OnOwnerAbandonedProcess (called via base) already calls StopReadyCheck(),
+            // which executes ExecuteStop() → broadcasts NotifyTrackedPlayersDataTransferStopped
+            // and clears all process/transfer state via InternalCleanup. A second CancelDataTransfer()
+            // here would call StopReadyCheck() with _isRunning=false, producing a spurious
+            // "[TsvrcProcess] Process is not running" warning on every ownership transfer.
             base.OnOwnerAbandonedProcess();
-
-            CancelDataTransfer();
         }
 
         #endregion

@@ -62,6 +62,14 @@ namespace Tsvrc.Network
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStarted));
             }
 
+            // Guard: a subscriber to OnDataReceptionStartedEvent (fired inline from the network event
+            // above) may have called CancelDataTransfer(), which runs StopReadyCheck() →
+            // ExecuteStop() → InternalCleanup() → ResetInternalTransferData(), resetting
+            // _currentChunkIndex to 0. SendDataChunk(0, ...) would access _dataChunks[0-1] = _dataChunks[-1]
+            // → IndexOutOfRangeException. Source: creators.vrchat.com/worlds/udon/networking/events —
+            // "trigger locally before moving on, just like a regular function call would".
+            if (!IsProcessRunning()) return;
+
             SendDataChunk(_currentChunkIndex, trackedPlayerIds);
         }
 
