@@ -70,9 +70,9 @@ namespace Tsvrc.Process
 
             // Reset local flag so SetReady() is inert until the next StartReadyCheck.
             // _OnTrackingStopped/_OnTrackingCompleted handle the normal stop/complete paths,
-            // but TsvrcProcess.TsRelease() calls OnProcessCleanup(false) directly without
-            // going through ExecuteStop(), so OnProcessStopped() and therefore
-            // NotifyTrackedPlayersProcessStopped are never broadcast — _OnTrackingStopped
+            // but TsvrcProcess.TsRelease() calls InternalCleanup(false) which invokes
+            // OnProcessCleanup without going through ExecuteStop(), so OnProcessStopped() and
+            // therefore NotifyTrackedPlayersProcessStopped are never broadcast — _OnTrackingStopped
             // never fires on the releasing client. Resetting here covers that case.
             _readyCheckActive = false;
         }
