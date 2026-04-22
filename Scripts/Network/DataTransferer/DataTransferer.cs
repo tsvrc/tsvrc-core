@@ -70,18 +70,5 @@ namespace Tsvrc.Network
 
         #endregion
 
-        #region Public Methods
-
-        public override void TransferData(string data, string[] playerIds)
-        {
-            base.TransferData(data, playerIds);
-        }
-
-        public override void CancelDataTransfer()
-        {
-            base.CancelDataTransfer();
-        }
-
-        #endregion
     }
 }

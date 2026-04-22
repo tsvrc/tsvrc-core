@@ -35,14 +35,21 @@ namespace Tsvrc.Process
 
         [UdonSynced] private string[] _readyPlayerIds = new string[0];
 
+        // Network-event-driven flag: true while a ready check is in progress on this client.
+        // Used in SetReady() instead of IsProcessRunning() ([UdonSynced] _isRunning) to avoid a
+        // serialization-vs-event race: manual-sync packets and network events travel through
+        // separate VRChat subsystems with no ordering guarantee between them, so _isRunning=true
+        // may not yet have arrived when SetReady() is called from inside a network event handler.
+        // _readyCheckActive is set/cleared purely by the Notify* network events that PlayerTracker
+        // already sends, which ARE ordered with all other events from the same sender.
+        private bool _readyCheckActive = false;
+
         protected override void TsStart()
         {
             base.TsStart();
             TsSubscribe(this, OnTrackingStartedEvent, nameof(_OnTrackingStarted));
             TsSubscribe(this, OnTrackingStoppedEvent, nameof(_OnTrackingStopped));
             TsSubscribe(this, OnTrackingCompletedEvent, nameof(_OnTrackingCompleted));
-            TsSubscribe(this, OnTrackingDeserializationEvent, nameof(_OnTrackingDeserialization));
-            TsSubscribe(this, OnTrackingPlayersAddedEvent, nameof(_OnTrackingPlayersAdded));
             TsSubscribe(this, OnTrackingPlayersRemovedEvent, nameof(_OnTrackingPlayersRemoved));
         }
 
@@ -60,6 +67,14 @@ namespace Tsvrc.Process
 
             _readyPlayerIds = new string[0];
             RequestSerialization();
+
+            // Reset local flag so SetReady() is inert until the next StartReadyCheck.
+            // _OnTrackingStopped/_OnTrackingCompleted handle the normal stop/complete paths,
+            // but TsvrcProcess.TsRelease() calls OnProcessCleanup(false) directly without
+            // going through ExecuteStop(), so OnProcessStopped() and therefore
+            // NotifyTrackedPlayersProcessStopped are never broadcast — _OnTrackingStopped
+            // never fires on the releasing client. Resetting here covers that case.
+            _readyCheckActive = false;
         }
 
         protected override void OnProcessUpdate()
@@ -85,22 +100,21 @@ namespace Tsvrc.Process
 
         public void _OnTrackingStarted()
         {
+            _readyCheckActive = true;
             TsEmit(OnReadyCheckStartedEvent);
         }
 
         public void _OnTrackingStopped()
         {
+            _readyCheckActive = false;
             TsEmit(OnReadyCheckStoppedEvent);
         }
 
         public void _OnTrackingCompleted()
         {
+            _readyCheckActive = false;
             TsEmit(OnReadyCheckCompletedEvent);
         }
-
-        public void _OnTrackingDeserialization() { }
-
-        public void _OnTrackingPlayersAdded() { }
 
         public void _OnTrackingPlayersRemoved()
         {
@@ -148,18 +162,24 @@ namespace Tsvrc.Process
         /// </summary>
         public void SetReady(bool ready = true)
         {
-            if (!IsProcessRunning()) return;
+            // _readyCheckActive is a local event-driven flag — safe to read from inside network
+            // event handlers. IsProcessRunning() reads [UdonSynced] _isRunning which may not have
+            // arrived yet when this is called from a network event handler in the same frame.
+            if (!_readyCheckActive) return;
 
             string playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
 
+            // IsPlayerReady() reads [UdonSynced] _readyPlayerIds which can be stale (e.g. between
+            // chunks the owner resets _readyPlayerIds and serializes, but that packet may not have
+            // arrived before this event fires). The owner's BroadcastAddReadyPlayer /
+            // BroadcastRemoveReadyPlayer both deduplicate before mutating, so extra sends are
+            // harmless and the deduplication guards here are not needed.
             if (ready)
             {
-                if (IsPlayerReady(playerId)) return;
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastAddReadyPlayer), playerId);
             }
             else
             {
-                if (!IsPlayerReady(playerId)) return;
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastRemoveReadyPlayer), playerId);
             }
         }

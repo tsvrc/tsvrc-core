@@ -1,6 +1,6 @@
 using Tsvrc.Player;
-using Tsvrc.Utils;
 using Tsvrc.Process;
+using Tsvrc.Utils;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
@@ -36,22 +36,9 @@ namespace Tsvrc.Network
         private int _totalChunks = 0;
 
         private string[] _targetPlayerIds = new string[0];
-
-        protected override void TsStart()
-        {
-            base.TsStart();
-            TsSubscribe(this, OnReadyCheckStartedEvent, nameof(_OnReadyCheckStarted));
-            TsSubscribe(this, OnReadyCheckStoppedEvent, nameof(_OnReadyCheckStopped));
-            TsSubscribe(this, OnReadyCheckCompletedEvent, nameof(_OnReadyCheckCompleted));
-        }
-
-        #region ReadyCheckProcess Callbacks
-
-        public void _OnReadyCheckStarted() { }
-        public void _OnReadyCheckStopped() { }
-        public void _OnReadyCheckCompleted() { }
-
-        #endregion
+        // True during the one-frame gap between SendCustomEventDelayedSeconds and _StartNextReadyCheck.
+        // Prevents TransferData from overwriting mid-transfer state while _isRunning is temporarily false.
+        private bool _pendingNextChunk = false;
 
         #region TsvrcProcess Callbacks
 
@@ -68,11 +55,11 @@ namespace Tsvrc.Network
                 _currentChunkIndex = 1;
             }
 
-            var trackedPlayerIds = (string[])GetTrackedPlayerIds().Clone();
+            var trackedPlayerIds = GetTrackedPlayerIds();
 
             if (_currentChunkIndex == 1)
             {
-                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStarted), trackedPlayerIds);
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStarted));
             }
 
             SendDataChunk(_currentChunkIndex, trackedPlayerIds);
@@ -81,33 +68,24 @@ namespace Tsvrc.Network
         protected override void OnProcessStopped()
         {
             base.OnProcessStopped();
-
-            var stoppedPlayerIds = (string[])GetTrackedPlayerIds().Clone();
-            ResetInternalTransferData();
-
-            if (stoppedPlayerIds.Length > 0)
-            {
-                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStopped), stoppedPlayerIds);
-            }
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStopped));
         }
 
         protected override void OnProcessCompleted()
         {
             base.OnProcessCompleted();
 
-            var completedPlayerIds = (string[])GetTrackedPlayerIds().Clone();
-
-            // Check if this was the LAST chunk BEFORE incrementing
             bool isLastChunk = _currentChunkIndex == _totalChunks;
 
             if (isLastChunk)
             {
-                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferCompleted), completedPlayerIds);
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferCompleted));
                 return;
             }
 
-            // Not the last chunk - save target players for next chunk
-            _targetPlayerIds = completedPlayerIds;
+            // PlayerTracker.OnProcessCleanup reassigns _trackedPlayerIds to a new empty array.
+            // Capturing the reference here keeps the player list alive for the next chunk.
+            _targetPlayerIds = GetTrackedPlayerIds();
         }
 
         protected override void OnProcessCleanup(bool isCompleted)
@@ -118,7 +96,13 @@ namespace Tsvrc.Network
             if (isCompleted && _currentChunkIndex < _totalChunks)
             {
                 _currentChunkIndex++;
-                StartReadyCheck(_targetPlayerIds);
+                // Flag the gap so TransferData/CancelDataTransfer behave correctly while
+                // _isRunning is temporarily false before the next chunk starts.
+                _pendingNextChunk = true;
+                // Defer to the next frame so the current _TickProcessUpdate exits cleanly
+                // before the new process starts its own loop — prevents duplicate concurrent
+                // tick loops accumulating with each chunk.
+                SendCustomEventDelayedSeconds(nameof(_StartNextReadyCheck), 0);
             }
             else
             {
@@ -126,20 +110,111 @@ namespace Tsvrc.Network
             }
         }
 
+        public void _StartNextReadyCheck()
+        {
+            // Guard: CancelDataTransfer() may have cleared _pendingNextChunk during the one-frame
+            // deferral window. Without this check, a cancelled transfer would still call
+            // StartReadyCheck with empty/reset state, causing SendDataChunk(0) → _dataChunks[-1] crash.
+            if (!_pendingNextChunk) return;
+
+            _pendingNextChunk = false;
+
+            // Filter departed players from _targetPlayerIds before starting the next chunk.
+            // PlayerTracker.OnPlayerLeft guards on IsProcessRunning() and therefore ignores any
+            // player departure that happens while _isRunning=false (the inter-chunk gap). A player
+            // who left during that window stays in _targetPlayerIds, gets tracked in the next
+            // StartReadyCheck, and can never call SetReady() — CheckAllPlayersReady() then stalls
+            // indefinitely. The same scan pattern is already used in OnOwnerAbandonedProcess.
+            string[] activeIds = TsPlayer.GetAllPlayerIDs();
+
+            int count = 0;
+            for (int i = 0; i < _targetPlayerIds.Length; i++)
+            {
+                if (TsArray.Contains(activeIds, _targetPlayerIds[i]))
+                    count++;
+            }
+
+            if (count == 0)
+            {
+                // All targets departed during the gap — cancel gracefully so all clients
+                // receive the stopped event and clean up receiver state.
+                ResetInternalTransferData();
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStopped));
+                return;
+            }
+
+            string[] filteredIds;
+            if (count == _targetPlayerIds.Length)
+            {
+                filteredIds = _targetPlayerIds;
+            }
+            else
+            {
+                filteredIds = new string[count];
+                int idx = 0;
+                for (int i = 0; i < _targetPlayerIds.Length; i++)
+                {
+                    if (TsArray.Contains(activeIds, _targetPlayerIds[i]))
+                        filteredIds[idx++] = _targetPlayerIds[i];
+                }
+            }
+
+            StartReadyCheck(filteredIds);
+        }
+
         #endregion
 
         #region Public Methods
+
+        public override void TsRelease()
+        {
+            // TsvrcProcess.TsRelease skips OnProcessCleanup when _isRunning is false.
+            // ResetBehaviourState() only clears subscriptions, not subclass fields.
+            // If _pendingNextChunk is true when TsRelease is called, the deferred
+            // _StartNextReadyCheck would fire on a released object. Clear our state first
+            // so the guard in _StartNextReadyCheck sees _pendingNextChunk = false and exits.
+            ResetInternalTransferData();
+            base.TsRelease();
+        }
+
+        protected override void OnOwnerAbandonedProcess()
+        {
+            // Transfer state (_dataChunks, _currentChunkIndex, _totalChunks) is unsynced and
+            // only exists on the original owner. The new owner has all these at default (0/empty).
+            // Without this guard: base.OnOwnerAbandonedProcess calls BroadcastRemoveTrackedPlayers
+            // for the departed owner, which triggers _OnTrackingPlayersRemoved → CheckAllPlayersReady.
+            // If synced _readyPlayerIds still shows remaining players as ready, CompleteReadyCheck
+            // fires → OnProcessCompleted sees _currentChunkIndex==_totalChunks (0==0) → emits
+            // NotifyTrackedPlayersDataTransferCompleted as a false completion.
+            // Stopping first sends the correct stopped broadcast and prevents the false completion.
+            // IsProcessOwner() returns true here because TakeOverAbandonedProcess set _ownerId
+            // before calling this method, so StopProcess() executes ExecuteStop() directly.
+            StopReadyCheck();
+            base.OnOwnerAbandonedProcess();
+        }
 
         /// <summary>
         /// Sends string data to specified players.
         /// </summary>
         public virtual void TransferData(string data, string[] playerIds)
         {
-            if (!ValidateMessage(data))
+            if (IsProcessRunning() || _pendingNextChunk)
             {
-                Debug.LogWarning("[TsvrcDataSender] Message validation failed. Transfer aborted.");
+                Debug.LogWarning("[TsvrcDataSender] Transfer already in progress. Call CancelDataTransfer() first.");
                 return;
             }
+
+            // Guard: ReadyCheckProcess.CheckAllPlayersReady returns early when trackedPlayerIds
+            // is empty, and BroadcastAddReadyPlayer rejects non-tracked callers, so no player
+            // can ever signal ready. The _TickProcessUpdate loop would run forever with no path
+            // to completion — a permanent resource leak until CancelDataTransfer is called.
+            if (playerIds == null || playerIds.Length == 0)
+            {
+                Debug.LogWarning("[TsvrcDataSender] Cannot transfer to null or empty player list.");
+                return;
+            }
+
+            if (!ValidateMessage(data)) return;
 
             ResetInternalTransferData();
             _initialData = data;
@@ -152,6 +227,13 @@ namespace Tsvrc.Network
         /// </summary>
         public virtual void CancelDataTransfer()
         {
+            if (_pendingNextChunk)
+            {
+                // Process is stopped between chunks — cancel the pending continuation.
+                ResetInternalTransferData(); // also clears _pendingNextChunk
+                SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStopped));
+                return;
+            }
             StopReadyCheck();
         }
 
@@ -189,6 +271,7 @@ namespace Tsvrc.Network
             _currentChunkIndex = 0;
             _totalChunks = 0;
             _targetPlayerIds = new string[0];
+            _pendingNextChunk = false;
         }
 
         /// <summary>
@@ -254,41 +337,29 @@ namespace Tsvrc.Network
         #region Network Events
 
         /// <summary>
-        /// Network callable method to notify tracked players that the data transfer has started.
-        /// This method is invoked on all players via network event, but only executes for tracked players.
+        /// Broadcast target: fires on all instance players when the data transfer starts.
         /// </summary>
         [NetworkCallable]
-        public void NotifyTrackedPlayersDataTransferStarted(string[] playerIds)
+        public void NotifyTrackedPlayersDataTransferStarted()
         {
-            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
-            if (!TsArray.Contains(playerIds, playerId)) return;
-
             TsEmit(OnDataTransferStartedEvent);
         }
 
         /// <summary>
-        /// Network callable method to notify tracked players that the data transfer has stopped.
-        /// This method is invoked on all players via network event, but only executes for tracked players.
+        /// Broadcast target: fires on all instance players when the data transfer is stopped.
         /// </summary>
         [NetworkCallable]
-        public void NotifyTrackedPlayersDataTransferStopped(string[] playerIds)
+        public void NotifyTrackedPlayersDataTransferStopped()
         {
-            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
-            if (!TsArray.Contains(playerIds, playerId)) return;
-
             TsEmit(OnDataTransferStoppedEvent);
         }
 
         /// <summary>
-        /// Network callable method to notify tracked players that the data transfer has completed.
-        /// This method is invoked on all players via network event, but only executes for tracked players.
+        /// Broadcast target: fires on all instance players when the data transfer completes.
         /// </summary>
         [NetworkCallable]
-        public void NotifyTrackedPlayersDataTransferCompleted(string[] playerIds)
+        public void NotifyTrackedPlayersDataTransferCompleted()
         {
-            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
-            if (!TsArray.Contains(playerIds, playerId)) return;
-
             TsEmit(OnDataTransferCompletedEvent);
         }
 
