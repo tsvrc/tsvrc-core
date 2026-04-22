@@ -302,7 +302,13 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void BroadcastAddTrackedPlayers(string[] playerIds)
         {
-            if (!IsProcessOwner()) return;
+            // IsProcessRunning() guards the window between ExecuteStop setting _isRunning=false
+            // and InternalCleanup clearing _ownerId. During that window IsProcessOwner() is still
+            // true, so a subscriber callback from OnProcessStopped/OnProcessCompleted that calls
+            // AddTrackedPlayers would pass the IsProcessOwner() check alone and mutate
+            // _trackedPlayerIds + send a spurious NotifyTrackedPlayersAdded event to all clients.
+            // This matches the guard pattern already used in ReadyCheckProcess.BroadcastAddReadyPlayer.
+            if (!IsProcessRunning() || !IsProcessOwner()) return;
             if (playerIds == null || playerIds.Length == 0) return;
 
             string[] validPlayerIds = new string[playerIds.Length];
@@ -338,7 +344,8 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void BroadcastRemoveTrackedPlayers(string[] playerIds)
         {
-            if (!IsProcessOwner()) return;
+            // Same guard rationale as BroadcastAddTrackedPlayers — see its comment.
+            if (!IsProcessRunning() || !IsProcessOwner()) return;
             if (playerIds == null || playerIds.Length == 0) return;
 
             string[] validPlayerIds = new string[playerIds.Length];
