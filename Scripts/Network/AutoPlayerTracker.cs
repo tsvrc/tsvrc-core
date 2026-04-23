@@ -38,25 +38,14 @@ namespace Tsvrc.Network
         /// </summary>
         public const string OnAutoTrackingPlayersRemovedEvent = "OnAutoTrackingPlayersRemoved";
 
-        protected override void TsStart()
-        {
-            base.TsStart();
-            TsSubscribe(this, OnTrackingStartedEvent, nameof(_OnTrackingStarted));
-            TsSubscribe(this, OnTrackingStoppedEvent, nameof(_OnTrackingStopped));
-            TsSubscribe(this, OnTrackingCompletedEvent, nameof(_OnTrackingCompleted));
-            TsSubscribe(this, OnTrackingDeserializationEvent, nameof(_OnTrackingDeserialization));
-            TsSubscribe(this, OnTrackingPlayersAddedEvent, nameof(_OnTrackingPlayersAdded));
-            TsSubscribe(this, OnTrackingPlayersRemovedEvent, nameof(_OnTrackingPlayersRemoved));
-        }
+        #region PlayerTracker Overrides
 
-        #region PlayerTracker Callbacks
-
-        public void _OnTrackingStarted() { TsEmit(OnAutoTrackingStartedEvent); }
-        public void _OnTrackingStopped() { TsEmit(OnAutoTrackingStoppedEvent); }
-        public void _OnTrackingCompleted() { TsEmit(OnAutoTrackingCompletedEvent); }
-        public void _OnTrackingDeserialization() { TsEmit(OnAutoTrackingDeserializationEvent); }
-        public void _OnTrackingPlayersAdded() { TsEmit(OnAutoTrackingPlayersAddedEvent); }
-        public void _OnTrackingPlayersRemoved() { TsEmit(OnAutoTrackingPlayersRemovedEvent); }
+        protected override void OnTrackingStarted(string[] playerIds) => TsEmit(OnAutoTrackingStartedEvent);
+        protected override void OnTrackingStopped(string[] playerIds) => TsEmit(OnAutoTrackingStoppedEvent);
+        protected override void OnTrackingCompleted(string[] playerIds) => TsEmit(OnAutoTrackingCompletedEvent);
+        protected override void OnTrackingDeserialization() => TsEmit(OnAutoTrackingDeserializationEvent);
+        protected override void OnTrackingPlayersAdded(string[] added) => TsEmit(OnAutoTrackingPlayersAddedEvent);
+        protected override void OnTrackingPlayersRemoved(string[] removed) => TsEmit(OnAutoTrackingPlayersRemovedEvent);
 
         #endregion
 

@@ -26,15 +26,6 @@ namespace Tsvrc.Network
         /// </summary>
         public const string OnTransferChunkEvent = "OnTransferChunk";
 
-        protected override void TsStart()
-        {
-            base.TsStart();
-            TsSubscribe(this, OnDataReceptionStartedEvent, nameof(_OnDataReceptionStarted));
-            TsSubscribe(this, OnDataReceptionStoppedEvent, nameof(_OnDataReceptionStopped));
-            TsSubscribe(this, OnDataReceptionCompletedEvent, nameof(_OnDataReceptionCompleted));
-            TsSubscribe(this, OnDataChunkReceivedEvent, nameof(_OnDataChunkReceived));
-        }
-
         #region TsvrcProcess Callbacks
 
         protected override void OnOwnerAbandonedProcess()
@@ -49,29 +40,13 @@ namespace Tsvrc.Network
 
         #endregion
 
-        #region DataReceiver Callbacks
+        #region DataSenderReceiver Overrides
 
-        public void _OnDataReceptionStarted()
-        {
-            TsEmit(OnTransferStartedEvent);
-        }
-
-        public void _OnDataReceptionStopped()
-        {
-            TsEmit(OnTransferStoppedEvent);
-        }
-
-        public void _OnDataReceptionCompleted()
-        {
-            TsEmit(OnTransferCompletedEvent);
-        }
-
-        public void _OnDataChunkReceived()
-        {
-            TsEmit(OnTransferChunkEvent);
-        }
+        protected override void OnDataReceptionStarted() => TsEmit(OnTransferStartedEvent);
+        protected override void OnDataReceptionStopped() => TsEmit(OnTransferStoppedEvent);
+        protected override void OnDataReceptionCompleted() => TsEmit(OnTransferCompletedEvent);
+        protected override void OnDataChunkReceived() => TsEmit(OnTransferChunkEvent);
 
         #endregion
-
     }
 }

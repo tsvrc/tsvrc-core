@@ -49,28 +49,28 @@ namespace Tsvrc.Network
         private bool _transferActive = false;
 
         // Staging fields for the deferred completion emit.
-        // _OnDataTransferCompleted sets _transferActive=false and defers the emission by one frame
+        // OnTransferCompleted sets _transferActive=false and defers the emission by one frame
         // so that InternalCleanup finishes before user callbacks run (see comment on that method).
         // In the same Udon frame, user code (or another network event) can call TransferData(),
         // which fires StartReadyCheck → NotifyTrackedPlayersDataTransferStarted inline on the
-        // sender → _OnDataTransferStarted → ResetReceiverState(), clearing LastData = "".
+        // sender → OnTransferStarted → ResetReceiverState(), clearing LastData = "".
         // When the deferred _EmitDataReceptionCompleted fires next frame the callback would then
         // read empty LastData. Staging in _pendingCompletionData preserves the assembled string
         // across the ResetReceiverState call and only assigns LastData at emit time.
-        // _pendingCompletion prevents a spurious emit when TsRelease + TsStart (pool reuse)
+        // _pendingCompletion prevents a spurious emit when a new TransferData start
         // happens between the deferral and the firing: ResetReceiverState sets it to false,
         // so _EmitDataReceptionCompleted sees no pending emit and returns early.
         private bool _pendingCompletion = false;
         private string _pendingCompletionData = "";
 
         // Mirror of _pendingCompletion for the stopped path.
-        // _OnDataTransferStopped defers TsEmit(OnDataReceptionStoppedEvent) by one frame so that
+        // OnTransferStopped defers TsEmit(OnDataReceptionStoppedEvent) by one frame so that
         // InternalCleanup finishes before user callbacks run. Without the deferral, user code
         // calling TransferData() from the stopped callback fires inside ExecuteStop before
         // InternalCleanup has run, which then overwrites the new transfer's _ownerId,
         // _trackedPlayerIds, _useProcessUpdate, _updateLoopActive, and _dataChunks — silently
         // killing it. ResetReceiverState clears this flag, suppressing a stale stopped emit
-        // if TsRelease or a new TransferData start runs before the deferred call fires.
+        // if a new TransferData start runs before the deferred call fires.
         private bool _pendingStop = false;
 
         protected string[] _receivedChunks = new string[0];
@@ -81,28 +81,19 @@ namespace Tsvrc.Network
 
         #region DataSender Overrides
 
-        protected override void TsStart()
-        {
-            base.TsStart();
-            TsSubscribe(this, OnDataTransferStartedEvent, nameof(_OnDataTransferStarted));
-            TsSubscribe(this, OnDataTransferStoppedEvent, nameof(_OnDataTransferStopped));
-            TsSubscribe(this, OnDataTransferCompletedEvent, nameof(_OnDataTransferCompleted));
-        }
-
-        #region DataSender Callbacks
-
-        public void _OnDataTransferStarted()
+        protected override void OnTransferStarted()
         {
             ResetReceiverState();   // clears _transferActive, chunks, and Last* properties
             _transferActive = true; // set true after reset: chunks for this transfer are now accepted
+            OnDataReceptionStarted();
             TsEmit(OnDataReceptionStartedEvent);
         }
 
-        public void _OnDataTransferStopped()
+        protected override void OnTransferStopped()
         {
             ResetReceiverState(); // clears _transferActive, _pendingCompletion, _pendingStop, etc.
             _pendingStop = true;
-            // Defer for the same reason as _OnDataTransferCompleted: TsEmit is synchronous and
+            // Defer for the same reason as OnTransferCompleted: TsEmit is synchronous and
             // fires while ExecuteStop is still on the call stack (InternalCleanup not yet run).
             // A TransferData() call from the user callback would have its state wiped by the
             // subsequent InternalCleanup. Source: creators.vrchat.com/worlds/udon/networking/
@@ -110,24 +101,11 @@ namespace Tsvrc.Network
             SendCustomEventDelayedSeconds(nameof(_EmitDataReceptionStopped), 0f);
         }
 
-        // Underscore prefix: local-only, cannot be triggered via network event.
-        // Called by SendCustomEventDelayedSeconds in _OnDataTransferStopped.
-        public void _EmitDataReceptionStopped()
-        {
-            // Guard: ResetReceiverState (called by _OnDataTransferStarted, TsRelease, or a new
-            // TransferData start) clears _pendingStop = false. Without this, a TsRelease + TsStart
-            // or a new transfer starting before this fires would deliver a spurious
-            // OnDataReceptionStoppedEvent to new subscribers.
-            if (!_pendingStop) return;
-            _pendingStop = false;
-            TsEmit(OnDataReceptionStoppedEvent);
-        }
-
-        public void _OnDataTransferCompleted()
+        protected override void OnTransferCompleted()
         {
             // Stage into _pendingCompletionData rather than LastData directly. If user code or
             // another network event calls TransferData() in the same Udon frame, the resulting
-            // inline _OnDataTransferStarted → ResetReceiverState() clears LastData = "" but
+            // inline OnTransferStarted → ResetReceiverState() clears LastData = "" but
             // leaves _pendingCompletionData intact. LastData is only assigned in
             // _EmitDataReceptionCompleted, atomically with the emission.
             _pendingCompletionData = ReassembleMessage(_receivedChunks);
@@ -146,23 +124,39 @@ namespace Tsvrc.Network
             SendCustomEventDelayedSeconds(nameof(_EmitDataReceptionCompleted), 0f);
         }
 
+        #endregion
+
         // Underscore prefix: local-only, cannot be triggered via network event.
-        // Called by SendCustomEventDelayedSeconds in _OnDataTransferCompleted.
+        // Called by SendCustomEventDelayedSeconds in OnTransferStopped.
+        public void _EmitDataReceptionStopped()
+        {
+            // Guard: ResetReceiverState (called by OnTransferStarted or a new
+            // TransferData start) clears _pendingStop = false. Without this, a new transfer
+            // starting before this fires would deliver a spurious OnDataReceptionStoppedEvent.
+            if (!_pendingStop) return;
+            _pendingStop = false;
+            OnDataReceptionStopped();
+            TsEmit(OnDataReceptionStoppedEvent);
+        }
+
+        // Underscore prefix: local-only, cannot be triggered via network event.
+        // Called by SendCustomEventDelayedSeconds in OnTransferCompleted.
         public void _EmitDataReceptionCompleted()
         {
-            // Guard: ResetReceiverState (called from _OnDataTransferStarted on TsRelease or new
-            // TransferData start) clears _pendingCompletion = false. Without this check, a
-            // TsRelease + TsStart (pool reuse) between the deferral and this firing would deliver
-            // a spurious OnDataReceptionCompletedEvent with empty LastData to the new subscribers.
+            // Guard: ResetReceiverState (called from OnTransferStarted on a new TransferData start)
+            // clears _pendingCompletion = false. Without this check, a new transfer starting between
+            // the deferral and this firing would deliver a spurious OnDataReceptionCompletedEvent
+            // with empty LastData to the new subscribers.
             if (!_pendingCompletion) return;
             _pendingCompletion = false;
 
             // Assign LastData atomically with the emission. This is safe even if ResetReceiverState
-            // ran between _OnDataTransferCompleted and here — _pendingCompletionData is preserved
+            // ran between OnTransferCompleted and here — _pendingCompletionData is preserved
             // through that call (see staging field comment above), unlike LastData which gets "".
             LastData = _pendingCompletionData;
             _pendingCompletionData = "";
 
+            OnDataReceptionCompleted();
             TsEmit(OnDataReceptionCompletedEvent);
         }
 
@@ -173,12 +167,23 @@ namespace Tsvrc.Network
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(BroadcastDataChunkReceived), dataChunk, chunkIndex, totalChunks, playerIds);
         }
 
+        #region Reception Virtual Methods
+
+        /// <summary>Called on all clients when data reception starts.</summary>
+        protected virtual void OnDataReceptionStarted() { }
+        /// <summary>Called on all clients when data reception is stopped before completion.</summary>
+        protected virtual void OnDataReceptionStopped() { }
+        /// <summary>Called on all clients when data reception completes. <c>LastData</c> is set before this fires.</summary>
+        protected virtual void OnDataReceptionCompleted() { }
+        /// <summary>Called on all tracked clients when a data chunk is received. <c>LastChunkIndex</c> and <c>LastTotalChunks</c> are set before this fires.</summary>
+        protected virtual void OnDataChunkReceived() { }
+
         #endregion
 
         #region Protected Methods
 
         /// <summary>
-        /// Resets receiver-side state. Called on start, stop, and TsRelease.
+        /// Resets receiver-side state. Called on transfer start and stop.
         /// </summary>
         protected void ResetReceiverState()
         {
@@ -189,7 +194,7 @@ namespace Tsvrc.Network
             LastTotalChunks = 0;
             // Clear staging fields so the deferred _EmitDataReceptionCompleted/_EmitDataReceptionStopped
             // from a previous transfer see their flags as false and return early — prevents spurious
-            // events with stale data after TsRelease or a new transfer start.
+            // events with stale data after a new transfer start.
             _pendingCompletion = false;
             _pendingCompletionData = "";
             _pendingStop = false;
@@ -269,6 +274,7 @@ namespace Tsvrc.Network
             // synchronously (VRChat docs: sender executes inline "like a regular function call").
             // Emitting here first guarantees chunk events always precede completion events,
             // preserving correct ordering for progress-reporting subscribers.
+            OnDataChunkReceived();
             TsEmit(OnDataChunkReceivedEvent);
 
             NotifyChunkReceived();

@@ -44,15 +44,6 @@ namespace Tsvrc.Process
         // already sends, which ARE ordered with all other events from the same sender.
         private bool _readyCheckActive = false;
 
-        protected override void TsStart()
-        {
-            base.TsStart();
-            TsSubscribe(this, OnTrackingStartedEvent, nameof(_OnTrackingStarted));
-            TsSubscribe(this, OnTrackingStoppedEvent, nameof(_OnTrackingStopped));
-            TsSubscribe(this, OnTrackingCompletedEvent, nameof(_OnTrackingCompleted));
-            TsSubscribe(this, OnTrackingPlayersRemovedEvent, nameof(_OnTrackingPlayersRemoved));
-        }
-
         protected override void OnProcessStarted()
         {
             base.OnProcessStarted();
@@ -69,11 +60,8 @@ namespace Tsvrc.Process
             RequestSerialization();
 
             // Reset local flag so SetReady() is inert until the next StartReadyCheck.
-            // _OnTrackingStopped/_OnTrackingCompleted handle the normal stop/complete paths,
-            // but TsvrcProcess.TsRelease() calls InternalCleanup(false) which invokes
-            // OnProcessCleanup without going through ExecuteStop(), so OnProcessStopped() and
-            // therefore NotifyTrackedPlayersProcessStopped are never broadcast — _OnTrackingStopped
-            // never fires on the releasing client. Resetting here covers that case.
+            // OnTrackingStopped/OnTrackingCompleted handle the normal stop/complete paths.
+            // Resetting here also covers InternalCleanup calls that bypass ExecuteStop().
             _readyCheckActive = false;
         }
 
@@ -98,32 +86,35 @@ namespace Tsvrc.Process
             CompleteReadyCheck();
         }
 
-        public void _OnTrackingStarted()
+        protected override void OnTrackingStarted(string[] playerIds)
         {
             _readyCheckActive = true;
+            OnReadyCheckStarted();
             TsEmit(OnReadyCheckStartedEvent);
         }
 
-        public void _OnTrackingStopped()
+        protected override void OnTrackingStopped(string[] playerIds)
         {
             _readyCheckActive = false;
+            OnReadyCheckStopped();
             TsEmit(OnReadyCheckStoppedEvent);
         }
 
-        public void _OnTrackingCompleted()
+        protected override void OnTrackingCompleted(string[] playerIds)
         {
             _readyCheckActive = false;
+            OnReadyCheckCompleted();
             TsEmit(OnReadyCheckCompletedEvent);
         }
 
-        public void _OnTrackingPlayersRemoved()
+        protected override void OnTrackingPlayersRemoved(string[] removedPlayerIds)
         {
             // NotifyTrackedPlayersRemoved fires on all clients. Only the owner has an accurate
             // _readyPlayerIds and should mutate state. Calling directly avoids the N² event
             // storm that would result from every client sending to All.
             if (!IsProcessOwner()) return;
 
-            foreach (string playerId in LastRemovedPlayerIds)
+            foreach (string playerId in removedPlayerIds)
             {
                 if (IsPlayerReady(playerId))
                     BroadcastRemoveReadyPlayer(playerId);
@@ -132,6 +123,10 @@ namespace Tsvrc.Process
             // A non-ready player may have just been removed, making all remaining players ready.
             CheckAllPlayersReady();
         }
+
+        protected virtual void OnReadyCheckStarted() { }
+        protected virtual void OnReadyCheckStopped() { }
+        protected virtual void OnReadyCheckCompleted() { }
 
         /// <summary>
         /// Starts the ready check process.

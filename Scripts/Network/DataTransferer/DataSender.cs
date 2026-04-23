@@ -179,7 +179,7 @@ namespace Tsvrc.Network
             // Transfer state (_dataChunks, _currentChunkIndex, _totalChunks) is unsynced and
             // only exists on the original owner. The new owner has all these at default (0/empty).
             // Without this guard: base.OnOwnerAbandonedProcess calls BroadcastRemoveTrackedPlayers
-            // for the departed owner, which triggers _OnTrackingPlayersRemoved → CheckAllPlayersReady.
+            // for the departed owner, which triggers OnTrackingPlayersRemoved → CheckAllPlayersReady.
             // If synced _readyPlayerIds still shows remaining players as ready, CompleteReadyCheck
             // fires → OnProcessCompleted sees _currentChunkIndex==_totalChunks (0==0) → emits
             // NotifyTrackedPlayersDataTransferCompleted as a false completion.
@@ -323,11 +323,14 @@ namespace Tsvrc.Network
         /// Only invoked on the process owner.
         /// This fires for each chunk.
         /// </summary>
-        /// <param name="dataChunk">The chunk of data to send.</param>
-        /// <param name="chunkIndex">The index of the chunk being sent (1-based).</param>
-        /// <param name="totalChunks">The total number of chunks in the transfer.</param>
-        /// <param name="playerIds">The player IDs for this transfer.</param>
         protected virtual void OnDataChunkSendRequested(string dataChunk, int chunkIndex, int totalChunks, string[] playerIds) { }
+
+        /// <summary>Called on all clients when the data transfer starts.</summary>
+        protected virtual void OnTransferStarted() { }
+        /// <summary>Called on all clients when the data transfer is stopped before completion.</summary>
+        protected virtual void OnTransferStopped() { }
+        /// <summary>Called on all clients when the data transfer completes successfully.</summary>
+        protected virtual void OnTransferCompleted() { }
 
         #endregion
 
@@ -339,6 +342,7 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void NotifyTrackedPlayersDataTransferStarted()
         {
+            OnTransferStarted();
             TsEmit(OnDataTransferStartedEvent);
         }
 
@@ -348,6 +352,7 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void NotifyTrackedPlayersDataTransferStopped()
         {
+            OnTransferStopped();
             TsEmit(OnDataTransferStoppedEvent);
         }
 
@@ -357,6 +362,7 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void NotifyTrackedPlayersDataTransferCompleted()
         {
+            OnTransferCompleted();
             TsEmit(OnDataTransferCompletedEvent);
         }
 

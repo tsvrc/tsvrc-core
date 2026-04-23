@@ -12,16 +12,13 @@ namespace Tsvrc.Core
     {
         protected CompiledTsvrc _ts;
 
-        private bool _isConstructed = false;
-        public bool IsConstructed => _isConstructed;
-
-        private UdonSharpBehaviour[] _eventListeners = new UdonSharpBehaviour[0];
-        private string[] _eventKeys = new string[0];
-        private string[] _eventCallbacks = new string[0];
+        private UdonSharpBehaviour[] _subListeners = new UdonSharpBehaviour[0];
+        private string[] _subKeys = new string[0];
+        private string[] _subCallbacks = new string[0];
 
         /// <summary>
-        /// Constructs this behaviour with the given <see cref="CompiledTsvrc"/>.
-        /// Called automatically by the compiler for behaviours placed in the scene.
+        /// Assigns the <see cref="CompiledTsvrc"/> reference and calls <see cref="TsStart"/>.
+        /// Idempotent: subsequent calls are no-ops.
         /// </summary>
         public void TsConstruct(CompiledTsvrc tsvrc)
         {
@@ -41,26 +38,24 @@ namespace Tsvrc.Core
         #region Events
 
         /// <summary>
-        /// Registers <paramref name="listener"/> to receive a <see cref="UdonSharpBehaviour.SendCustomEvent"/> call
-        /// with <paramref name="callbackName"/> as the method name whenever <paramref name="eventName"/> is emitted.
-        /// Use <c>nameof()</c> for both parameters to avoid magic strings.
+        /// Subscribes <paramref name="listener"/> to <paramref name="eventName"/> on this behaviour.
+        /// Subscriptions are world-lifetime and never cleared. Use <c>nameof()</c> for both string parameters.
         /// </summary>
         public void TsSubscribe(UdonSharpBehaviour listener, string eventName, string callbackName)
         {
-            _eventListeners = TsArray.Add(_eventListeners, new UdonSharpBehaviour[] { listener });
-            _eventKeys = TsArray.Add(_eventKeys, new string[] { eventName });
-            _eventCallbacks = TsArray.Add(_eventCallbacks, new string[] { callbackName });
+            _subListeners = TsArray.Add(_subListeners, new UdonSharpBehaviour[] { listener });
+            _subKeys = TsArray.Add(_subKeys, new string[] { eventName });
+            _subCallbacks = TsArray.Add(_subCallbacks, new string[] { callbackName });
         }
 
         /// <summary>
-        /// Emits <paramref name="eventName"/> to all registered listeners via
-        /// <see cref="UdonSharpBehaviour.SendCustomEvent"/>, invoking each listener's registered callback.
+        /// Emits <paramref name="eventName"/> to all registered listeners.
         /// </summary>
         public void TsEmit(string eventName)
         {
-            UdonSharpBehaviour[] listeners = _eventListeners;
-            string[] keys = _eventKeys;
-            string[] callbacks = _eventCallbacks;
+            UdonSharpBehaviour[] listeners = _subListeners;
+            string[] keys = _subKeys;
+            string[] callbacks = _subCallbacks;
             int len = listeners.Length;
             for (int i = 0; i < len; i++)
                 if (keys[i] == eventName)

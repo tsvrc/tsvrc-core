@@ -65,6 +65,7 @@ namespace Tsvrc.Network
             base.OnDeserialization();
 
             LastPlayerIds = _trackedPlayerIds;
+            OnTrackingDeserialization();
             TsEmit(OnTrackingDeserializationEvent);
         }
 
@@ -240,6 +241,13 @@ namespace Tsvrc.Network
             return TsArray.Contains(_trackedPlayerIds, playerId);
         }
 
+        protected virtual void OnTrackingStarted(string[] playerIds) { }
+        protected virtual void OnTrackingStopped(string[] playerIds) { }
+        protected virtual void OnTrackingCompleted(string[] playerIds) { }
+        protected virtual void OnTrackingDeserialization() { }
+        protected virtual void OnTrackingPlayersAdded(string[] addedPlayerIds) { }
+        protected virtual void OnTrackingPlayersRemoved(string[] removedPlayerIds) { }
+
         /// <summary>
         /// Broadcast target: fires on all instance players when the process starts.
         /// Read <c>LastPlayerIds</c> to check if the local player is tracked.
@@ -248,6 +256,7 @@ namespace Tsvrc.Network
         public void NotifyTrackedPlayersProcessStarted(string[] playerIds)
         {
             LastPlayerIds = playerIds;
+            OnTrackingStarted(playerIds);
             TsEmit(OnTrackingStartedEvent);
         }
 
@@ -259,6 +268,7 @@ namespace Tsvrc.Network
         public void NotifyTrackedPlayersProcessStopped(string[] playerIds)
         {
             LastPlayerIds = playerIds;
+            OnTrackingStopped(playerIds);
             TsEmit(OnTrackingStoppedEvent);
         }
 
@@ -270,6 +280,7 @@ namespace Tsvrc.Network
         public void NotifyTrackedPlayersProcessCompleted(string[] playerIds)
         {
             LastPlayerIds = playerIds;
+            OnTrackingCompleted(playerIds);
             TsEmit(OnTrackingCompletedEvent);
         }
 
@@ -281,6 +292,7 @@ namespace Tsvrc.Network
         public void NotifyTrackedPlayersAdded(string[] addedPlayerIds)
         {
             LastAddedPlayerIds = addedPlayerIds;
+            OnTrackingPlayersAdded(addedPlayerIds);
             TsEmit(OnTrackingPlayersAddedEvent);
         }
 
@@ -292,6 +304,7 @@ namespace Tsvrc.Network
         public void NotifyTrackedPlayersRemoved(string[] removedPlayerIds)
         {
             LastRemovedPlayerIds = removedPlayerIds;
+            OnTrackingPlayersRemoved(removedPlayerIds);
             TsEmit(OnTrackingPlayersRemovedEvent);
         }
 
