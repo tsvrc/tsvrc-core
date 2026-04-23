@@ -26,7 +26,7 @@ namespace Tsvrc.Editor
             _cachedGlobalDefCounts = null;
         }
 
-        private static List<(string fileName, string src, List<(int pos, string name)> methodIndex)> GetProcessedSources()
+        internal static List<(string fileName, string src, List<(int pos, string name)> methodIndex)> GetProcessedSources()
         {
             if (_cachedSources != null) return _cachedSources;
 

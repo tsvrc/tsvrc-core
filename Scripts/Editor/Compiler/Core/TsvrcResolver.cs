@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using Tsvrc.Core;
 using UnityEngine;
 
 namespace Tsvrc.Editor
@@ -8,7 +9,7 @@ namespace Tsvrc.Editor
     internal static class TsvrcResolver
     {
         // Resolves a collection of Unity objects into TsvrcField descriptors.
-        // Null entries and duplicate object references are both skipped with a warning.
+        // Null entries and duplicate type definitions are both skipped with a warning.
         // Pass an existing usedNames set to share deduplication across multiple calls.
         internal static List<TsvrcField> Resolve(
             IEnumerable<UnityEngine.Object> objects,
@@ -24,17 +25,18 @@ namespace Tsvrc.Editor
             {
                 if (obj == null)
                 {
-                    Debug.LogWarning("[TsvrcResolver] Null entry in config, remove the missing-script slot from TsvrcConfig and recompile.");
+                    Debug.LogWarning("[TsvrcResolver] Null entry in config, remove the missing-script slot and recompile.");
                     continue;
                 }
 
                 if (!seen.Add(obj))
                 {
-                    Debug.LogWarning($"[TsvrcResolver] Duplicate entry '{obj.name}' in config, remove the duplicate from TsvrcConfig.");
+                    Debug.LogWarning($"[TsvrcResolver] Duplicate entry '{obj.name}' in config, remove the duplicate.");
                     continue;
                 }
 
                 var type = obj.GetType();
+
                 string goName = obj switch
                 {
                     Component c => c.gameObject.name,
@@ -46,12 +48,16 @@ namespace Tsvrc.Editor
                 string fieldName = Deduplicate(baseName, usedNames);
                 usedNames.Add(fieldName);
 
+                // Check if this type is a TsvrcBehaviour subclass
+                bool isTsvrcBehaviour = typeof(TsvrcBehaviour).IsAssignableFrom(type);
+
                 fields.Add(new TsvrcField
                 {
                     Type = type.Name,
                     Name = fieldName,
                     Namespace = type.Namespace,
                     SourceObject = obj,
+                    IsTsvrcBehaviour = isTsvrcBehaviour,
                 });
             }
 
