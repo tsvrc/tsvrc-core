@@ -7,7 +7,7 @@ namespace Tsvrc.Core
     /// Use this attribute on any class field to document which types you want pooled.
     /// The compiler will validate that all [WirePool] types are registered in TsvrcConfig.PooledObjects.
     ///
-    /// If the pooled type is a TsvrcBehaviour subclass, the pool slots will have TsInitialize called
+    /// If the pooled type is a TsvrcBehaviour subclass, the pool slots will have TsConstruct called
     /// at scene start. For other types, they are simply wired as references.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]

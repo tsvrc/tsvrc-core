@@ -35,25 +35,6 @@ namespace Tsvrc.Core
             _localPlayerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
         }
 
-        /// <summary>
-        /// Resets this process to a clean state for reuse. Clears running state,
-        /// event subscriptions, and the constructed flag. Deactivate the GameObject
-        /// and call <see cref="TsvrcBehaviour.TsConstruct(Tsvrc.Core.Compiled.CompiledTsvrc)"/>
-        /// again to reuse it.
-        /// </summary>
-        public virtual void TsRelease()
-        {
-            // Guard against double invocation: ExecuteStop/ExecuteComplete already called
-            // InternalCleanup. A second call would pass a contradictory isCompleted value.
-            if (_isRunning)
-            {
-                _isRunning = false;
-                InternalCleanup(false);
-            }
-
-            ResetBehaviourState();
-        }
-
         public override void OnPlayerLeft(VRCPlayerApi player)
         {
             if (!IsProcessRunning()) return;
@@ -283,9 +264,9 @@ namespace Tsvrc.Core
         /// Unconditionally clears synced process state, invokes the
         /// <see cref="OnProcessCleanup"/> subclass hook, then serializes everything to remotes
         /// in one atomic packet.
-        /// Always called by <see cref="ExecuteStop"/>, <see cref="ExecuteComplete"/>, and
-        /// <see cref="TsRelease"/> so critical resets are never skipped even if a subclass
-        /// overrides <see cref="OnProcessCleanup"/> without calling base.
+        /// Always called by <see cref="ExecuteStop"/> and <see cref="ExecuteComplete"/> so
+        /// critical resets are never skipped even if a subclass overrides
+        /// <see cref="OnProcessCleanup"/> without calling base.
         /// </summary>
         private void InternalCleanup(bool isCompleted)
         {
@@ -318,7 +299,7 @@ namespace Tsvrc.Core
         public void _TickProcessUpdate()
         {
             // Discard stale ticks that were already queued via SendCustomEventDelayedSeconds
-            // when InternalCleanup (triggered by StopProcess/CompleteProcess/TsRelease) set
+            // when InternalCleanup (triggered by StopProcess/CompleteProcess) set
             // _updateLoopActive to false. Returning without modifying _updateLoopActive leaves
             // the field correctly false so a subsequent StartProcess can safely schedule a new loop.
             // Note: if StopProcess and StartProcess are called in the same frame, a stale tick

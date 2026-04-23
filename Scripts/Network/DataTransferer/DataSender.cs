@@ -174,17 +174,6 @@ namespace Tsvrc.Network
 
         #region Public Methods
 
-        public override void TsRelease()
-        {
-            // TsvrcProcess.TsRelease skips OnProcessCleanup when _isRunning is false.
-            // ResetBehaviourState() only clears subscriptions, not subclass fields.
-            // If _pendingNextChunk is true when TsRelease is called, the deferred
-            // _StartNextReadyCheck would fire on a released object. Clear our state first
-            // so the guard in _StartNextReadyCheck sees _pendingNextChunk = false and exits.
-            ResetInternalTransferData();
-            base.TsRelease();
-        }
-
         protected override void OnOwnerAbandonedProcess()
         {
             // Transfer state (_dataChunks, _currentChunkIndex, _totalChunks) is unsynced and

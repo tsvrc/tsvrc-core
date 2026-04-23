@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Emits one hidden private field per pool slot on CompiledTsvrc (used only to call TsInitialize at scene start).
+    // Emits one hidden private field per pool slot on CompiledTsvrc to call TsConstruct at scene start.
     // Slot count equals the number of [WirePool] declarations for each type found in user code.
     // At wire time, each slot is assigned to exactly one scene component that declares [WirePool] of that type.
     internal class PoolModule : TsvrcModule
@@ -116,10 +116,7 @@ namespace Tsvrc.Editor
         {
             foreach (var field in _fields.Where(f => f.SlotCount > 0 && f.IsTsvrcBehaviour))
                 for (int i = 0; i < field.SlotCount; i++)
-                {
-                    w.Line($"{PoolInitFieldName(field, i)}.TsInitialize(this);");
-                    w.Line($"{PoolInitFieldName(field, i)}.gameObject.SetActive(false);");
-                }
+                    w.Line($"{PoolInitFieldName(field, i)}.TsConstruct(this);");
         }
 
         internal override void Wire(SerializedObject target)
@@ -293,7 +290,7 @@ namespace Tsvrc.Editor
             }
         }
 
-        // Hidden field prefix on CompiledTsvrc used only for TsInitialize calls.
+        // Hidden field prefix on CompiledTsvrc used only for TsConstruct calls.
         private static string PoolInitFieldPrefix(TsvrcField field) => $"_pool_{field.Name}_";
         private static string PoolInitFieldName(TsvrcField field, int index) => $"_pool_{field.Name}_{index}";
     }

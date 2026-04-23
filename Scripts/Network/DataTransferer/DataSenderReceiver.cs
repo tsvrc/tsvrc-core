@@ -79,15 +79,7 @@ namespace Tsvrc.Network
         public int LastChunkIndex { get; private set; } = 0;
         public int LastTotalChunks { get; private set; } = 0;
 
-        public override void TsRelease()
-        {
-            // DataSender.TsRelease calls ResetInternalTransferData() which only clears DataSender
-            // fields. TsvrcBehaviour.ResetBehaviourState() only clears subscriptions.
-            // Neither touches the receiver-side fields below, leaving stale data visible to
-            // callers after pool reuse (before the next transfer's _OnDataTransferStarted fires).
-            ResetReceiverState();
-            base.TsRelease();
-        }
+        #region DataSender Overrides
 
         protected override void TsStart()
         {

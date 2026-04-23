@@ -1,18 +1,12 @@
 using Tsvrc.Core.Compiled;
 using Tsvrc.Utils;
 using UdonSharp;
-using UnityEngine;
 
 namespace Tsvrc.Core
 {
     /// <summary>
-    /// An enhanced <see cref="UdonSharpBehaviour"/> with structured construction,
-    /// dependency injection, and pooled reuse.
-    /// <see cref="TsConstruct(CompiledTsvrc)"/> must be called to initialize Tsvrc
-    /// functionalities. Behaviours placed directly in the scene are constructed
-    /// automatically by the compiler; behaviours spawned at runtime can be constructed
-    /// from an existing <see cref="TsvrcBehaviour"/> via
-    /// <see cref="TsConstruct(TsvrcBehaviour)"/>.
+    /// An enhanced <see cref="UdonSharpBehaviour"/> with structured initialization
+    /// and dependency injection.
     /// </summary>
     public class TsvrcBehaviour : UdonSharpBehaviour
     {
@@ -31,20 +25,13 @@ namespace Tsvrc.Core
         /// </summary>
         public void TsConstruct(CompiledTsvrc tsvrc)
         {
-            if (_isConstructed)
-            {
-                Debug.LogError($"[CompiledTsvrc] {gameObject.name}: TsConstruct called on an already constructed instance.");
-                return;
-            }
-
-            _isConstructed = true;
             _ts = tsvrc;
             TsStart();
         }
 
         /// <summary>
-        /// Constructs this behaviour by propagating the <see cref="CompiledTsvrc"/> from
-        /// an existing <see cref="TsvrcBehaviour"/>.
+        /// Propagates the <see cref="CompiledTsvrc"/> reference from an existing
+        /// <see cref="TsvrcBehaviour"/> and fully constructs this behaviour.
         /// </summary>
         public void TsConstruct(TsvrcBehaviour parent)
         {
@@ -82,19 +69,7 @@ namespace Tsvrc.Core
 
         #endregion
 
-        #region Virtual Lifecycle
-
-        /// <summary>
-        /// Resets the core <see cref="TsvrcBehaviour"/> state: clears the constructed flag
-        /// and all event subscriptions.
-        /// </summary>
-        protected void ResetBehaviourState()
-        {
-            _isConstructed = false;
-            _eventListeners = new UdonSharpBehaviour[0];
-            _eventKeys = new string[0];
-            _eventCallbacks = new string[0];
-        }
+        #region Lifecycle
 
         /// <summary>
         /// Destroys the GameObject, permanently removing it and freeing its position in memory.

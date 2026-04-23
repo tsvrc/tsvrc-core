@@ -17,7 +17,7 @@ namespace Tsvrc.Editor
         // When set, the wirer assigns this field unconditionally without checking call sites.
         // Used for fields that already existed in the last compiled output.
         internal bool WireAlways;
-        // True if this field's type is a TsvrcBehaviour subclass. Used to decide whether to call TsInitialize.
+        // True if this field's type is a TsvrcBehaviour subclass. Used to decide whether to call TsConstruct.
         internal bool IsTsvrcBehaviour;
     }
 }
