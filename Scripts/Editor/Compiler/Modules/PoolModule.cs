@@ -256,38 +256,17 @@ namespace Tsvrc.Editor
         /// </summary>
         private void ValidatePoolDeclarations(List<TsvrcField> descriptors, Dictionary<string, int> declaredCounts)
         {
-            var settings = TsvrcCompilerSettings.Instance;
-
             foreach (var group in descriptors.GroupBy(f => f.Type, StringComparer.Ordinal).Where(g => g.Count() > 1))
-            {
-                ReportValidation(settings.PoolValidation,
-                    $"Pool type '{group.Key}' appears {group.Count()} times in PooledObjects. " +
+                Debug.LogWarning($"[TsvrcPool] Pool type '{group.Key}' appears {group.Count()} times in PooledObjects. " +
                     $"Each type can only be registered once. Remove the duplicates: {string.Join(", ", group.Select(f => f.Name))}");
-            }
 
             foreach (var kvp in declaredCounts)
-            {
                 if (!descriptors.Any(f => f.Type == kvp.Key))
-                    ReportValidation(settings.PoolValidation,
-                        $"Pool type '{kvp.Key}' has [WirePool] attribute but is not registered in TsvrcConfig.PooledObjects.");
-            }
+                    Debug.LogWarning($"[TsvrcPool] Pool type '{kvp.Key}' has [WirePool] attribute but is not registered in TsvrcConfig.PooledObjects.");
 
             foreach (var descriptor in descriptors)
-            {
                 if (!declaredCounts.ContainsKey(descriptor.Type))
-                    ReportValidation(settings.PoolValidation,
-                        $"PooledObjects entry '{descriptor.Name}' ({descriptor.Type}) has no [WirePool] declaration. Remove it or add [WirePool] to a field.");
-            }
-        }
-
-        private void ReportValidation(ValidationLevel level, string message)
-        {
-            switch (level)
-            {
-                case ValidationLevel.Error:   throw new InvalidOperationException($"[TsvrcPool] {message}");
-                case ValidationLevel.Warn:    Debug.LogWarning($"[TsvrcPool] {message}"); break;
-                case ValidationLevel.Silent:  break;
-            }
+                    Debug.LogWarning($"[TsvrcPool] PooledObjects entry '{descriptor.Name}' ({descriptor.Type}) has no [WirePool] declaration. Remove it or add [WirePool] to a field.");
         }
 
         // Hidden field prefix on CompiledTsvrc used only for TsConstruct calls.
