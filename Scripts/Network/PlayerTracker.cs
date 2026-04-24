@@ -77,7 +77,7 @@ namespace Tsvrc.Network
 
             var playerId = TsPlayer.GetPlayerID(player);
             if (!IsTrackedPlayer(playerId)) return;
-            // Already confirmed as the process owner — call directly to avoid the self-loop
+            // Already confirmed as the process owner, so call directly to avoid the self-loop
             // overhead of SendCustomNetworkEvent(Owner,...) firing back to us synchronously.
             BroadcastRemoveTrackedPlayers(TsPlayer.ToArray(playerId));
         }
@@ -126,7 +126,7 @@ namespace Tsvrc.Network
 
             // Handles both event-ordering cases when a tracked process owner leaves:
             // - Normal flow: base.OnPlayerLeft ran TakeOverAbandonedProcess; after returning,
-            //   IsTrackedPlayer() is false in PlayerTracker.OnPlayerLeft — no double removal.
+            //   IsTrackedPlayer() is false in PlayerTracker.OnPlayerLeft, so no double removal.
             // - VRChat bug flow: OnPlayerLeft found IsProcessOwner()=false and skipped removal;
             //   this scan catches it via the OnOwnershipTransferred fallback path.
             // GetAllPlayerIDs() is called once rather than per-entry to avoid repeated SDK allocation.
@@ -160,6 +160,34 @@ namespace Tsvrc.Network
         public virtual void StartPlayerTracking(string[] playerIds, bool useProcessUpdate = false)
         {
             if (playerIds == null) playerIds = new string[0];
+
+            // De-dup the initial list to maintain the same no-duplicate invariant that
+            // BroadcastAddTrackedPlayers enforces at runtime via IsTrackedPlayer checks.
+            // Without this, a caller passing repeated IDs would produce duplicates in
+            // _trackedPlayerIds, corrupting LastPlayerIds on all clients and causing
+            // OnOwnerAbandonedProcess to broadcast spurious double-entries in the removed list.
+            if (playerIds.Length > 1)
+            {
+                string[] deduped = new string[playerIds.Length];
+                int dedupedCount = 0;
+                for (int i = 0; i < playerIds.Length; i++)
+                {
+                    bool isDuplicate = false;
+                    for (int j = 0; j < dedupedCount; j++)
+                    {
+                        if (deduped[j] == playerIds[i]) { isDuplicate = true; break; }
+                    }
+                    if (!isDuplicate)
+                        deduped[dedupedCount++] = playerIds[i];
+                }
+                if (dedupedCount < playerIds.Length)
+                {
+                    string[] trimmed = new string[dedupedCount];
+                    System.Array.Copy(deduped, trimmed, dedupedCount);
+                    playerIds = trimmed;
+                }
+            }
+
             _initialTrackerPlayerIds = playerIds;
 
             base.StartProcess(useProcessUpdate);
@@ -241,11 +269,27 @@ namespace Tsvrc.Network
             return TsArray.Contains(_trackedPlayerIds, playerId);
         }
 
+        /// <summary>Called on all clients when tracking starts. Read <see cref="LastPlayerIds"/> in this callback.</summary>
+        /// <param name="playerIds">The initial set of tracked player IDs.</param>
         protected virtual void OnTrackingStarted(string[] playerIds) { }
+
+        /// <summary>Called on all clients when tracking stops. Read <see cref="LastPlayerIds"/> in this callback.</summary>
+        /// <param name="playerIds">The tracked player IDs at the time of stopping.</param>
         protected virtual void OnTrackingStopped(string[] playerIds) { }
+
+        /// <summary>Called on all clients when tracking completes. Read <see cref="LastPlayerIds"/> in this callback.</summary>
+        /// <param name="playerIds">The tracked player IDs at the time of completion.</param>
         protected virtual void OnTrackingCompleted(string[] playerIds) { }
+
+        /// <summary>Called on non-owner clients when synced state is received. Read <see cref="LastPlayerIds"/> in this callback.</summary>
         protected virtual void OnTrackingDeserialization() { }
+
+        /// <summary>Called on all clients when players are added. Read <see cref="LastAddedPlayerIds"/> in this callback.</summary>
+        /// <param name="addedPlayerIds">The player IDs that were added.</param>
         protected virtual void OnTrackingPlayersAdded(string[] addedPlayerIds) { }
+
+        /// <summary>Called on all clients when players are removed. Read <see cref="LastRemovedPlayerIds"/> in this callback.</summary>
+        /// <param name="removedPlayerIds">The player IDs that were removed.</param>
         protected virtual void OnTrackingPlayersRemoved(string[] removedPlayerIds) { }
 
         /// <summary>
@@ -255,6 +299,10 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessStarted(string[] playerIds)
         {
+            // Null guard: any [NetworkCallable] method can be called by any player in the
+            // instance with null parameters (VRChat passes default(T), which is null for arrays).
+            // LastPlayerIds = null would crash subscribers doing LastPlayerIds.Length.
+            if (playerIds == null) return;
             LastPlayerIds = playerIds;
             OnTrackingStarted(playerIds);
             TsEmit(OnTrackingStartedEvent);
@@ -267,6 +315,7 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessStopped(string[] playerIds)
         {
+            if (playerIds == null) return;
             LastPlayerIds = playerIds;
             OnTrackingStopped(playerIds);
             TsEmit(OnTrackingStoppedEvent);
@@ -279,6 +328,7 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void NotifyTrackedPlayersProcessCompleted(string[] playerIds)
         {
+            if (playerIds == null) return;
             LastPlayerIds = playerIds;
             OnTrackingCompleted(playerIds);
             TsEmit(OnTrackingCompletedEvent);
@@ -291,7 +341,31 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void NotifyTrackedPlayersAdded(string[] addedPlayerIds)
         {
+            if (addedPlayerIds == null) return;
             LastAddedPlayerIds = addedPlayerIds;
+            // Apply the delta so LastPlayerIds is current when the callback runs.
+            // On the owner _trackedPlayerIds is already updated before this fires (synchronous).
+            // On remotes the serialization packet may arrive BEFORE this event (no relative
+            // ordering guarantee between RequestSerialization and SendCustomNetworkEvent per
+            // VRChat docs), so LastPlayerIds may already contain some/all of addedPlayerIds.
+            // Guard against duplicates by mirroring the de-dup pattern in BroadcastAddTrackedPlayers.
+            string[] toAdd = new string[addedPlayerIds.Length];
+            int toAddCount = 0;
+            for (int i = 0; i < addedPlayerIds.Length; i++)
+            {
+                if (!TsArray.Contains(LastPlayerIds, addedPlayerIds[i]))
+                    toAdd[toAddCount++] = addedPlayerIds[i];
+            }
+            if (toAddCount > 0)
+            {
+                if (toAddCount < toAdd.Length)
+                {
+                    string[] trimmed = new string[toAddCount];
+                    System.Array.Copy(toAdd, trimmed, toAddCount);
+                    toAdd = trimmed;
+                }
+                LastPlayerIds = TsArray.Add(LastPlayerIds, toAdd);
+            }
             OnTrackingPlayersAdded(addedPlayerIds);
             TsEmit(OnTrackingPlayersAddedEvent);
         }
@@ -303,7 +377,13 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void NotifyTrackedPlayersRemoved(string[] removedPlayerIds)
         {
+            // Null guard: same rationale as NotifyTrackedPlayersProcessStarted.
+            // TsArray.Remove would NullReferenceException on items.Length if null is passed.
+            if (removedPlayerIds == null) return;
             LastRemovedPlayerIds = removedPlayerIds;
+            // Apply the delta so LastPlayerIds is current when the callback runs.
+            // Mirrors the delta applied in NotifyTrackedPlayersAdded.
+            LastPlayerIds = TsArray.Remove(LastPlayerIds, removedPlayerIds);
             OnTrackingPlayersRemoved(removedPlayerIds);
             TsEmit(OnTrackingPlayersRemovedEvent);
         }
@@ -320,7 +400,6 @@ namespace Tsvrc.Network
             // true, so a subscriber callback from OnProcessStopped/OnProcessCompleted that calls
             // AddTrackedPlayers would pass the IsProcessOwner() check alone and mutate
             // _trackedPlayerIds + send a spurious NotifyTrackedPlayersAdded event to all clients.
-            // This matches the guard pattern already used in ReadyCheckProcess.BroadcastAddReadyPlayer.
             if (!IsProcessRunning() || !IsProcessOwner()) return;
             if (playerIds == null || playerIds.Length == 0) return;
 
@@ -357,7 +436,7 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void BroadcastRemoveTrackedPlayers(string[] playerIds)
         {
-            // Same guard rationale as BroadcastAddTrackedPlayers — see its comment.
+            // Same guard rationale as BroadcastAddTrackedPlayers; see its comment.
             if (!IsProcessRunning() || !IsProcessOwner()) return;
             if (playerIds == null || playerIds.Length == 0) return;
 
