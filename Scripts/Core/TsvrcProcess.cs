@@ -24,7 +24,7 @@ namespace Tsvrc.Core
         // Prevents duplicate loop scheduling after ownership transfer.
         private bool _updateLoopActive = false;
 
-        // Cached local player ID — session-constant. Protected so subclasses can use it
+        // Cached local player ID, constant for the session. Protected so subclasses can use it
         // directly instead of calling TsPlayer.GetPlayerID(Networking.LocalPlayer).
         protected string _localPlayerId = "";
 
@@ -92,13 +92,45 @@ namespace Tsvrc.Core
 
         public override void OnDeserialization()
         {
-            // Synced variables are guaranteed current here, the safe place to restart
-            // the update loop after an ownership transfer. Guard against duplicate loops.
-            // Use SendCustomEventDelayedSeconds(0f) — not SendCustomEvent — to avoid running
-            // _TickProcessUpdate (and therefore OnProcessUpdate) synchronously inside
-            // VRChat's networking callback. OnDeserialization fires during the network-update
-            // phase; firing OnProcessUpdate here could observe other synced variables that
-            // haven't been applied yet by VRChat's internal deserialization loop.
+            // Stale-packet guard: in Manual sync mode a reliable packet sent by the departed
+            // or suspended owner can arrive after TakeOverAbandonedProcess has already run,
+            // overwriting _ownerId with the old owner's ID. Two cascading failures result:
+            //   (a) _TickProcessUpdate sees IsProcessOwner()=false and kills the tick loop.
+            //   (b) A subsequent OnOwnershipTransferred (from any cause) sees IsProcessOwner()=
+            //       false + FindPlayerByID(_ownerId)=null and re-enters TakeOverAbandonedProcess
+            //       spuriously, even when _useProcessUpdate=false (where _updateLoopActive is
+            //       never set, so a guard keyed on that flag would never fire for that case).
+            //
+            // The fix: if we are the Unity owner, the process is still marked running, and
+            // _ownerId names a player who has already left or is suspended, re-assert ownership.
+            // This mirrors the same FindPlayerByID pattern in OnOwnershipTransferred.
+            //
+            // Per VRChat docs: departed players are removed from GetPlayers() before OnPlayerLeft
+            // fires, so FindPlayerByID returns null for them. Suspended players remain in the
+            // instance with isSuspended=true.
+            if (Networking.IsOwner(gameObject) && _isRunning && !IsProcessOwner())
+            {
+                // _ownerId="" is the "no owner" sentinel; a running process should never have
+                // an empty owner. Guards against FindPlayerByID("") returning null and spuriously
+                // claiming ownership. Mirrors the identical guard in OnOwnershipTransferred.
+                if (_ownerId == "") return;
+
+                var namedOwner = TsPlayer.FindPlayerByID(_ownerId);
+                if (namedOwner == null || namedOwner.isSuspended)
+                {
+                    // No return after SetProcessOwner: fall through to the loop-restart block
+                    // below so that if the stale packet killed the loop (_TickProcessUpdate saw
+                    // IsProcessOwner()=false and set _updateLoopActive=false before this
+                    // OnDeserialization fired), the loop is recovered in the same event.
+                    SetProcessOwner(Networking.LocalPlayer);
+                }
+            }
+
+            // Restart the update loop if we are the owner and it is not already running.
+            // Covers stale-packet recovery (loop was killed before re-assertion above) and any
+            // other scenario where the loop should be running but isn't. Does NOT fire on the
+            // sender of RequestSerialization (VRChat guarantee), so TakeOverAbandonedProcess
+            // restarts the loop explicitly to cover that gap.
             if (IsProcessOwner() && IsProcessRunning() && _useProcessUpdate && !_updateLoopActive)
             {
                 _updateLoopActive = true;
@@ -110,6 +142,15 @@ namespace Tsvrc.Core
         /// Starts the process, claiming ownership of the object for the local player.
         /// </summary>
         /// <param name="useProcessUpdate">When <c>true</c>, <see cref="OnProcessUpdate"/> fires every 0.5 s while the process runs.</param>
+        /// <remarks>
+        /// <b>Concurrent-start race:</b> if two clients call <c>StartProcess</c> before either's
+        /// <c>RequestSerialization</c> packet has been received, both will pass the
+        /// <c>_isRunning</c> guard and both will call <c>OnProcessStarted</c>. Eventually one
+        /// client's packet overwrites the other via <c>OnDeserialization</c>, leaving the losing
+        /// client with a locally-running process that the network has discarded. Callers should
+        /// guard against concurrent starts at a higher level (e.g. call only from the master or
+        /// via a coordinated network event).
+        /// </remarks>
         public virtual void StartProcess(bool useProcessUpdate = false)
         {
             if (_isRunning)
@@ -159,12 +200,9 @@ namespace Tsvrc.Core
 
             // Dual-authority check mirrors RequestStopProcess: accept either _ownerId match
             // (normal case) or Unity ownership (fallback for the deserialization-lag race where
-            // the previous owner just left and VRChat re-assigned Unity ownership to us before the
-            // new _ownerId packet arrives). Without the Networking.IsOwner() branch we would
-            // self-send a network event to ourselves — which VRChat executes synchronously and
-            // correctly (see docs: "it will trigger locally before moving on"), but going through
-            // the network dispatch unnecessarily sets NetworkCalling.InNetworkCall=true for the
-            // duration of ExecuteStop and its callbacks, visible to subclass overrides.
+            // the previous owner just left and VRChat re-assigned Unity ownership to us before
+            // the new _ownerId packet arrives). Avoids the unnecessary network round-trip of
+            // self-sending the event via NetworkEventTarget.Owner.
             if (!IsProcessOwner() && !Networking.IsOwner(gameObject))
             {
                 // Forward to the owner; the guard in RequestStopProcess discards stale arrivals.
@@ -187,7 +225,7 @@ namespace Tsvrc.Core
                 return;
             }
 
-            // Same dual-authority check as StopProcess — see its comment.
+            // Same dual-authority check as StopProcess; see its comment.
             if (!IsProcessOwner() && !Networking.IsOwner(gameObject))
             {
                 SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestCompleteProcess));
@@ -221,10 +259,14 @@ namespace Tsvrc.Core
         /// Uses <c>_ownerId</c> instead of <c>Networking.IsOwner()</c> because
         /// <c>SetOwner</c> is not immediately reflected locally, whereas <c>_ownerId</c>
         /// is set synchronously and arrives atomically with <c>_isRunning</c> on remote clients.
+        /// The <c>_ownerId != ""</c> guard prevents a false positive when both fields are
+        /// <c>""</c>: <c>_ownerId = ""</c> is the "no owner" sentinel (process not running),
+        /// and if <c>TsConstruct</c> was never called <c>_localPlayerId</c> is also <c>""</c>,
+        /// which would otherwise make this return <c>true</c> even with no active process.
         /// </remarks>
         protected bool IsProcessOwner()
         {
-            return _ownerId == _localPlayerId;
+            return _ownerId != "" && _ownerId == _localPlayerId;
         }
 
         /// <summary>
@@ -279,14 +321,14 @@ namespace Tsvrc.Core
             // are already zeroed-out when RequestSerialization sends the packet. Without this
             // ordering, the first packet would carry stale subclass variable values because
             // InternalCleanup's RequestSerialization fired before the subclass had a chance to
-            // clear them — leaving remote clients with _isRunning=false but dirty synced arrays
+            // clear them, leaving remote clients with _isRunning=false but dirty synced arrays
             // that are never corrected (subclasses that don't call their own RequestSerialization
             // in OnProcessCleanup would never send a corrective packet).
             OnProcessCleanup(isCompleted);
 
             // Serialize the cleared owner/state so remote clients don't see stale data.
             // If a subclass also called RequestSerialization() inside OnProcessCleanup, this
-            // second call is redundant but harmless — both packets carry fully-cleared state.
+            // second call is redundant but harmless; both packets carry fully-cleared state.
             RequestSerialization();
         }
 
@@ -296,6 +338,8 @@ namespace Tsvrc.Core
         /// </summary>
         protected virtual void OnProcessUpdate() { }
 
+        // Public only because SendCustomEventDelayedSeconds requires a public method target;
+        // do not call this directly.
         public void _TickProcessUpdate()
         {
             // Discard stale ticks that were already queued via SendCustomEventDelayedSeconds
@@ -333,14 +377,19 @@ namespace Tsvrc.Core
         /// Guard checks discard the event if ownership disagreement caused misrouting,
         /// or if the process already stopped before the packet arrived.
         /// </summary>
-        [NetworkCallable]
+        /// <remarks>
+        /// Rate-limited to 1/s. Any player in the instance can invoke this directly as a
+        /// network event (VRChat cannot restrict callers of <c>[NetworkCallable]</c> methods).
+        /// Authorization beyond the owner-guard below is the responsibility of subclasses.
+        /// </remarks>
+        [NetworkCallable(maxEventsPerSecond: 1)]
         public void RequestStopProcess()
         {
             // Accept on either authority:
-            // - IsProcessOwner(): normal case — _ownerId deserialization has already arrived.
-            // - Networking.IsOwner(): fallback for the race where the previous owner just left,
+            //   IsProcessOwner() for the normal case where _ownerId deserialization has already arrived.
+            //   Networking.IsOwner() as a fallback for the race where the previous owner just left,
             //   VRChat re-routed this event to the new Unity owner, but the deserialization packet
-            //   carrying the new _ownerId hasn't arrived yet, so IsProcessOwner() is still false.
+            //   carrying the new _ownerId has not arrived yet, so IsProcessOwner() is still false.
             if ((!IsProcessOwner() && !Networking.IsOwner(gameObject)) || !_isRunning) return;
             ExecuteStop();
         }
@@ -350,10 +399,13 @@ namespace Tsvrc.Core
         /// Guard checks discard the event if ownership disagreement caused misrouting,
         /// or if the process already completed before the packet arrived.
         /// </summary>
-        [NetworkCallable]
+        /// <remarks>
+        /// Rate-limited to 1/s. Same caller-authorization note as <see cref="RequestStopProcess"/>.
+        /// </remarks>
+        [NetworkCallable(maxEventsPerSecond: 1)]
         public void RequestCompleteProcess()
         {
-            // Same dual-authority guard as RequestStopProcess — see its comment.
+            // Same dual-authority guard as RequestStopProcess; see its comment.
             if ((!IsProcessOwner() && !Networking.IsOwner(gameObject)) || !_isRunning) return;
             ExecuteComplete();
         }
