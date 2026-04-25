@@ -4,6 +4,12 @@ using VRC.SDKBase;
 
 namespace Tsvrc.Network
 {
+    /// <summary>
+    /// A <see cref="PlayerTracker"/> that automatically tracks every player in the instance.
+    /// Players are added when they join and removed when they leave.
+    /// Subscribe via the <c>OnAutoTracking*Event</c> string constants and read the <c>Last*</c>
+    /// properties in your callback. Call <see cref="StartAutoTracking"/> to begin.
+    /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class AutoPlayerTracker : PlayerTracker
     {
@@ -38,7 +44,55 @@ namespace Tsvrc.Network
         /// </summary>
         public const string OnAutoTrackingPlayersRemovedEvent = "OnAutoTrackingPlayersRemoved";
 
-        #region PlayerTracker Overrides
+        /// <summary>
+        /// Starts tracking all players currently in the instance.
+        /// Any player who joins after this call is automatically added; any who leave are removed.
+        /// </summary>
+        /// <remarks>
+        /// The snapshot of current players is taken at the moment this method is called, not
+        /// inside <c>OnPlayerJoined</c>. VRChat docs (event-nodes#onplayerjoined): "When you
+        /// join an instance, you execute OnPlayerJoined for every player in the instance,
+        /// including yourself." That initial wave fires before any user code runs, so
+        /// <c>IsProcessRunning()</c> is still false and all those events are dropped. By the
+        /// time this method is called the wave is already gone; <c>GetAllPlayerIDs()</c> here
+        /// captures every fully-joined player at exactly the right moment.
+        ///
+        /// Any player still mid-joining at this instant has not yet fired their
+        /// <c>OnPlayerJoined</c>; it will fire after the process starts and be handled there.
+        ///
+        /// UdonSharp runs on Unity's single main thread, so no <c>OnPlayerJoined</c> event
+        /// can interleave between <c>GetAllPlayerIDs()</c> and the process going live.
+        /// </remarks>
+        public void StartAutoTracking()
+        {
+            base.StartPlayerTracking(TsPlayer.GetAllPlayerIDs(), false);
+        }
+
+        /// <summary>
+        /// Stops auto-tracking before completion. All clients are notified and the tracked player list is cleared.
+        /// </summary>
+        public void StopAutoTracking()
+        {
+            base.StopPlayerTracking();
+        }
+
+        /// <summary>
+        /// Marks auto-tracking as successfully completed. All clients are notified and the tracked player list is cleared.
+        /// </summary>
+        public void CompleteAutoTracking()
+        {
+            base.CompletePlayerTracking();
+        }
+
+        /// <summary>
+        /// Redirects to the auto-snapshot; both parameters are ignored.
+        /// <see cref="AutoPlayerTracker"/> always tracks all players in the instance and never
+        /// uses the process-update loop. Use <see cref="StartAutoTracking"/> for the intention-clear entry point.
+        /// </summary>
+        public override void StartPlayerTracking(string[] playerIds, bool useProcessUpdate = false)
+        {
+            base.StartPlayerTracking(TsPlayer.GetAllPlayerIDs(), false);
+        }
 
         protected override void OnTrackingStarted(string[] playerIds) => TsEmit(OnAutoTrackingStartedEvent);
         protected override void OnTrackingStopped(string[] playerIds) => TsEmit(OnAutoTrackingStoppedEvent);
@@ -47,19 +101,15 @@ namespace Tsvrc.Network
         protected override void OnTrackingPlayersAdded(string[] added) => TsEmit(OnAutoTrackingPlayersAddedEvent);
         protected override void OnTrackingPlayersRemoved(string[] removed) => TsEmit(OnAutoTrackingPlayersRemovedEvent);
 
-        #endregion
-
-        #region VRChat Callbacks
-
         public override void OnPlayerJoined(VRCPlayerApi player)
         {
+            // VRChat: player refs can be invalid; accessing them silently crashes the UdonBehaviour.
+            if (!player.IsValid()) return;
             if (!IsProcessRunning() || !IsProcessOwner()) return;
 
             var playerId = TsPlayer.GetPlayerID(player);
             var players = TsPlayer.ToArray(playerId);
             AddTrackedPlayers(players);
         }
-
-        #endregion
     }
 }
