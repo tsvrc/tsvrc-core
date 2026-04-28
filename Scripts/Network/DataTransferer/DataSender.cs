@@ -3,7 +3,6 @@ using Tsvrc.Process;
 using Tsvrc.Utils;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
-using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Network
