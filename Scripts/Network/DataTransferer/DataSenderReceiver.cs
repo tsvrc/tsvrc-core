@@ -42,13 +42,13 @@ namespace Tsvrc.Network
 
         // totalChunks value from the first accepted chunk of the current transfer.
         // Subsequent chunks must carry the same value; a mismatch means either a retransmit
-        // from a new conflicting transfer or a malicious injection — both are rejected.
+        // from a new conflicting transfer or a malicious injection, and both are rejected.
         // Reset to 0 by ResetReceiverState() so the first chunk of a new transfer can set it.
         private int _expectedTotalChunks = 0;
 
         // Set immediately before and cleared immediately after SendCustomNetworkEvent(All, ...) in
         // OnDataChunkSendRequested. When true, BroadcastDataChunkReceived skips the CallingPlayer
-        // validation — CallingPlayer is unreliable during the owner's own inline call because it
+        // validation because CallingPlayer is unreliable during the owner's own inline call:
         // may be propagated from an outer network event context (VRChat docs: "InNetworkCall is
         // only reset once the entry function terminates"). Reliable because Udon is single-threaded:
         // the flag cannot be true when a network event from another player arrives.
@@ -64,7 +64,7 @@ namespace Tsvrc.Network
 
         // Staging fields for the deferred completion emit (see OnTransferCompleted).
         // _pendingCompletionData holds the assembled string until the deferred emit fires, so
-        // a new TransferData() call — which resets LastData = "" via ResetReceiverState() —
+        // a new TransferData() call (which resets LastData = "" via ResetReceiverState())
         // cannot corrupt the pending data. _pendingCompletion guards against a spurious emit
         // if a new transfer starts before the deferred call fires: ResetReceiverState() clears
         // it to false, causing _EmitDataReceptionCompleted to return early.
@@ -72,7 +72,7 @@ namespace Tsvrc.Network
         private string _pendingCompletionData = "";
 
         // Mirror of _pendingCompletion for the stopped path. OnTransferStopped defers the emit
-        // so InternalCleanup finishes before user callbacks run — a TransferData() call from the
+        // so InternalCleanup finishes before user callbacks run. A TransferData() call from the
         // callback would otherwise fire inside ExecuteStop and corrupt the new transfer's state.
         // ResetReceiverState() clears this to suppress a stale emit if a new transfer starts
         // before the deferred call fires.
@@ -94,7 +94,7 @@ namespace Tsvrc.Network
             // any network event handler (VRChat docs: "InNetworkCall is only reset once the entry
             // function terminates"). If the owner calls TransferData() from inside a network event
             // callback (e.g. OnReadyCheckCompleted, which fires inline from BroadcastAddReadyPlayer),
-            // CallingPlayer = the remote sender of that outer event — which would cause remote
+            // CallingPlayer = the remote sender of that outer event, which would cause remote
             // clients to reject the owner's chunks, stalling the transfer indefinitely.
             // IsProcessOwner() is safe here: TsvrcProcess.StartProcess() sets _ownerId
             // synchronously before OnProcessStarted() fires, so it is always accurate at this point.
@@ -207,7 +207,7 @@ namespace Tsvrc.Network
             LastChunkIndex = 0;
             LastTotalChunks = 0;
             // Clear staging fields so the deferred _EmitDataReceptionCompleted/_EmitDataReceptionStopped
-            // from a previous transfer see their flags as false and return early — prevents spurious
+            // from a previous transfer see their flags as false and return early, preventing spurious
             // events with stale data after a new transfer start.
             _pendingCompletion = false;
             _pendingCompletionData = "";
@@ -254,7 +254,7 @@ namespace Tsvrc.Network
             // Reject chunks not sent by the process owner. Any player can call this [NetworkCallable]
             // to inject arbitrary data or trigger false SetReady() ACKs without this check.
             // _isSendingChunk is true only during the owner's own synchronous SendCustomNetworkEvent
-            // call (see OnDataChunkSendRequested), bypassing the CallingPlayer check — which is
+            // call (see OnDataChunkSendRequested), bypassing the CallingPlayer check, which is
             // unreliable there due to possible propagation from an outer network event context.
             // For all network-delivered calls, CallingPlayer is the actual packet sender:
             //   Owner's chunk:     CallingPlayer = owner = _expectedSenderId → accepted.

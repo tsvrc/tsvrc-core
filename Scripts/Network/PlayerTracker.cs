@@ -301,7 +301,7 @@ namespace Tsvrc.Network
         // docs, ordering is only guaranteed when neither event hits its rate limit. At 5/s
         // (default), rapid-restart cycles queue this event while the 100/s chunk drains ahead.
         // Remote clients then receive chunks before _readyCheckActive is set, making
-        // SetReady() a no-op — the transfer stalls waiting for an ack that never comes.
+        // SetReady() a no-op and the transfer stalls waiting for an ack that never comes.
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersProcessStarted(string[] playerIds)
         {

@@ -337,7 +337,7 @@ namespace Tsvrc.Network
         // hit your own defined rate-limit." At 5/s (default), rapid CancelDataTransfer+TransferData
         // cycles (>5/s) queue this event while the 100/s chunk event drains ahead of it. Remote
         // clients then receive BroadcastDataChunkReceived before NotifyTrackedPlayersDataTransferStarted,
-        // so _transferActive is still false when the first chunk arrives — the chunk is dropped,
+        // so _transferActive is still false when the first chunk arrives, the chunk is dropped,
         // the recipient never calls SetReady(), and the transfer stalls indefinitely.
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersDataTransferStarted()
