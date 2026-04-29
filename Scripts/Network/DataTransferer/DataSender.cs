@@ -331,7 +331,15 @@ namespace Tsvrc.Network
         /// <summary>
         /// Broadcast target: fires on all instance players when the data transfer starts.
         /// </summary>
-        [NetworkCallable]
+        // maxEventsPerSecond: 100. Must match BroadcastDataChunkReceived (also 100/s) so that
+        // per VRChat docs (creators.vrchat.com/worlds/udon/networking/events#rate-limiting):
+        // "The order in which events are sent and received is guaranteed as long as you don't
+        // hit your own defined rate-limit." At 5/s (default), rapid CancelDataTransfer+TransferData
+        // cycles (>5/s) queue this event while the 100/s chunk event drains ahead of it. Remote
+        // clients then receive BroadcastDataChunkReceived before NotifyTrackedPlayersDataTransferStarted,
+        // so _transferActive is still false when the first chunk arrives — the chunk is dropped,
+        // the recipient never calls SetReady(), and the transfer stalls indefinitely.
+        [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersDataTransferStarted()
         {
             // Cancel any deferred stopped/completed emit from a previous transfer so it
@@ -345,7 +353,9 @@ namespace Tsvrc.Network
         /// <summary>
         /// Broadcast target: fires on all instance players when the data transfer is stopped.
         /// </summary>
-        [NetworkCallable]
+        // maxEventsPerSecond: 100. Same rationale as NotifyTrackedPlayersDataTransferStarted:
+        // must match BroadcastDataChunkReceived to preserve event ordering under load.
+        [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersDataTransferStopped()
         {
             // Set flag BEFORE the virtual callback. OnTransferStopped() fires synchronously, and
@@ -373,13 +383,17 @@ namespace Tsvrc.Network
         /// <summary>
         /// Broadcast target: fires on all instance players when the data transfer completes.
         /// </summary>
-        [NetworkCallable]
+        // maxEventsPerSecond: 100. Same rationale as NotifyTrackedPlayersDataTransferStarted.
+        [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersDataTransferCompleted()
         {
-            // Same ordering rationale as NotifyTrackedPlayersDataTransferStopped.
+            // Flag before virtual call: a new TransferData() from the callback would call
+            // NotifyTrackedPlayersDataTransferStarted inline, clearing this flag; setting
+            // after the call would re-set it, causing a spurious completed emit.
             _pendingTransferCompleted = true;
             OnTransferCompleted();
-            // Same deferral rationale as NotifyTrackedPlayersDataTransferStopped.
+            // Defer so InternalCleanup finishes before user callbacks run
+            // (same reason as NotifyTrackedPlayersDataTransferStopped).
             SendCustomEventDelayedSeconds(nameof(_EmitDataTransferCompleted), 0f);
         }
 

@@ -296,12 +296,17 @@ namespace Tsvrc.Network
         /// Broadcast target: fires on all instance players when the process starts.
         /// Read <c>LastPlayerIds</c> to check if the local player is tracked.
         /// </summary>
-        [NetworkCallable]
+        // maxEventsPerSecond: 100. This event is sent by the same owner in the same
+        // StartReadyCheck call stack as BroadcastDataChunkReceived (also 100/s). Per VRChat
+        // docs, ordering is only guaranteed when neither event hits its rate limit. At 5/s
+        // (default), rapid-restart cycles queue this event while the 100/s chunk drains ahead.
+        // Remote clients then receive chunks before _readyCheckActive is set, making
+        // SetReady() a no-op — the transfer stalls waiting for an ack that never comes.
+        [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersProcessStarted(string[] playerIds)
         {
-            // Null guard: any [NetworkCallable] method can be called by any player in the
-            // instance with null parameters (VRChat passes default(T), which is null for arrays).
-            // LastPlayerIds = null would crash subscribers doing LastPlayerIds.Length.
+            // Any [NetworkCallable] can be invoked with null parameters from the network;
+            // LastPlayerIds = null would crash any subscriber reading LastPlayerIds.Length.
             if (playerIds == null) return;
             LastPlayerIds = playerIds;
             OnTrackingStarted(playerIds);
@@ -312,7 +317,8 @@ namespace Tsvrc.Network
         /// Broadcast target: fires on all instance players when the process stops.
         /// Read <c>LastPlayerIds</c> to check if the local player is tracked.
         /// </summary>
-        [NetworkCallable]
+        // maxEventsPerSecond: 100. Same rationale as NotifyTrackedPlayersProcessStarted.
+        [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersProcessStopped(string[] playerIds)
         {
             if (playerIds == null) return;
@@ -325,7 +331,8 @@ namespace Tsvrc.Network
         /// Broadcast target: fires on all instance players when the process completes.
         /// Read <c>LastPlayerIds</c> to check if the local player is tracked.
         /// </summary>
-        [NetworkCallable]
+        // maxEventsPerSecond: 100. Same rationale as NotifyTrackedPlayersProcessStarted.
+        [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersProcessCompleted(string[] playerIds)
         {
             if (playerIds == null) return;
@@ -343,12 +350,10 @@ namespace Tsvrc.Network
         {
             if (addedPlayerIds == null) return;
             LastAddedPlayerIds = addedPlayerIds;
-            // Apply the delta so LastPlayerIds is current when the callback runs.
-            // On the owner _trackedPlayerIds is already updated before this fires (synchronous).
-            // On remotes the serialization packet may arrive BEFORE this event (no relative
-            // ordering guarantee between RequestSerialization and SendCustomNetworkEvent per
-            // VRChat docs), so LastPlayerIds may already contain some/all of addedPlayerIds.
-            // Guard against duplicates by mirroring the de-dup pattern in BroadcastAddTrackedPlayers.
+            // Apply the delta so LastPlayerIds is current when the callback fires.
+            // Serialization packets and network events have no relative ordering guarantee
+            // (VRChat docs), so LastPlayerIds may already include some of these entries;
+            // deduplicate to match the invariant enforced by BroadcastAddTrackedPlayers.
             string[] toAdd = new string[addedPlayerIds.Length];
             int toAddCount = 0;
             for (int i = 0; i < addedPlayerIds.Length; i++)
@@ -377,12 +382,10 @@ namespace Tsvrc.Network
         [NetworkCallable]
         public void NotifyTrackedPlayersRemoved(string[] removedPlayerIds)
         {
-            // Null guard: same rationale as NotifyTrackedPlayersProcessStarted.
-            // TsArray.Remove would NullReferenceException on items.Length if null is passed.
+            // Any [NetworkCallable] can receive null parameters; TsArray.Remove crashes on null input.
             if (removedPlayerIds == null) return;
             LastRemovedPlayerIds = removedPlayerIds;
             // Apply the delta so LastPlayerIds is current when the callback runs.
-            // Mirrors the delta applied in NotifyTrackedPlayersAdded.
             LastPlayerIds = TsArray.Remove(LastPlayerIds, removedPlayerIds);
             OnTrackingPlayersRemoved(removedPlayerIds);
             TsEmit(OnTrackingPlayersRemovedEvent);
