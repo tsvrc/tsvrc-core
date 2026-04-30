@@ -7,17 +7,18 @@ namespace Tsvrc.Network
     {
         /// <summary>
         /// Emitted when the transfer starts.
-        /// Read <c>LastPlayerIds</c> in your callback.
+        /// <c>LastPlayerIds</c> is populated (carried over from the preceding <c>OnTrackingStarted</c> broadcast).
         /// </summary>
         public const string OnTransferStartedEvent = "OnTransferStarted";
         /// <summary>
         /// Emitted when the transfer is stopped before completion.
-        /// Read <c>LastPlayerIds</c> in your callback.
+        /// <c>LastPlayerIds</c> is populated (carried over from the preceding <c>OnTrackingStopped</c> broadcast).
         /// </summary>
         public const string OnTransferStoppedEvent = "OnTransferStopped";
         /// <summary>
         /// Emitted when the transfer completes.
-        /// Read <c>LastData</c> and <c>LastPlayerIds</c> in your callback.
+        /// Read <c>LastData</c> in your callback.
+        /// <c>LastPlayerIds</c> is also populated (carried over from the preceding <c>OnTrackingCompleted</c> broadcast).
         /// </summary>
         public const string OnTransferCompletedEvent = "OnTransferCompleted";
         /// <summary>

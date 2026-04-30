@@ -3,6 +3,7 @@ using Tsvrc.Process;
 using Tsvrc.Utils;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
+using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Network
@@ -25,7 +26,31 @@ namespace Tsvrc.Network
         /// </summary>
         public const string OnDataTransferCompletedEvent = "OnDataTransferCompleted";
 
-        protected const int CHUNK_SIZE = 15000;
+        // BroadcastDataChunkReceived carries four parameters whose total encoded size must stay
+        // under VRChat's hard 16 KB (16,384 byte) per-event limit (docs: new byte[16*1024] =
+        // "maximum allowed size"). All four are counted together:
+        //
+        //   dataChunk (string)  : CHUNK_SIZE × bytes_per_char (UTF-8)
+        //   chunkIndex (int)    : 4 bytes
+        //   totalChunks (int)   : 4 bytes
+        //   playerIds (string[]): sum(UTF-8 bytes per ID) + N × 4 bytes (length-field overhead)
+        //                         (docs: new string[2]{"test","foobar"} = 4+6+8 = 18 bytes)
+        //
+        // Worst case bytes per C# char: 3 bytes (BMP characters U+0800–U+FFFF, e.g. CJK).
+        // Surrogate pairs (emoji, U+10000+) are 2 C# chars → 4 UTF-8 bytes = 2 bytes/char,
+        // strictly less than CJK, so CJK is the binding worst case — NOT emoji.
+        //
+        // playerIds format: "displayName#playerId". VRCPlayerApi.playerId is the instance-local
+        // runtime player ID (1–80 range for a standard 80-player instance = 2 decimal digits).
+        // Max display name: 32 chars. Worst-case CJK ID: 32×3 + 1 + 2 + 4 = 103 bytes/entry.
+        //
+        // Safety check for CHUNK_SIZE=2500 with 80 CJK-named players and CJK data:
+        //   2500 × 3 + 8 + 80 × 103 = 7,500 + 8 + 8,240 = 15,748 bytes ≤ 16,384 ✓
+        //
+        // CHUNK_SIZE=3000 overflows starting at 72 CJK-named players with CJK data:
+        //   3000 × 3 + 8 + 72 × 103 = 9,000 + 8 + 7,416 = 16,424 bytes → event silently
+        //   dropped → no ACK → transfer stalls indefinitely.
+        protected const int CHUNK_SIZE = 2500;
         protected const int MAX_MESSAGE_SIZE = 500000;
 
         private string _initialData = "";
@@ -62,7 +87,9 @@ namespace Tsvrc.Network
 
             if (_currentChunkIndex == 1)
             {
+                _isBroadcasting = true;
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStarted));
+                _isBroadcasting = false;
             }
 
             // Guard: a subscriber to OnDataReceptionStartedEvent (fired inline above) may have called
@@ -81,7 +108,9 @@ namespace Tsvrc.Network
             // A subscriber calling TransferData() from that event starts a new transfer (_isRunning=true).
             // Sending the stopped broadcast now would clear _transferActive on all clients.
             if (IsProcessRunning()) return;
+            _isBroadcasting = true;
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStopped));
+            _isBroadcasting = false;
         }
 
         protected override void OnProcessCompleted()
@@ -99,7 +128,9 @@ namespace Tsvrc.Network
 
             if (isLastChunk)
             {
+                _isBroadcasting = true;
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferCompleted));
+                _isBroadcasting = false;
                 return;
             }
 
@@ -143,24 +174,45 @@ namespace Tsvrc.Network
 
             _pendingNextChunk = false;
 
-            // Filter players who departed during the inter-chunk gap. PlayerTracker.OnPlayerLeft
-            // ignores departures while _isRunning=false, so departed players would remain in
-            // _targetPlayerIds and stall CheckAllPlayersReady() indefinitely.
-            string[] activeIds = TsPlayer.GetAllPlayerIDs();
+            // Filter players who departed or suspended during the inter-chunk gap.
+            // Both PlayerTracker.OnPlayerLeft and PlayerTracker.OnPlayerSuspendChanged guard
+            // with IsProcessRunning()=true, so neither fires while _isRunning=false between
+            // chunks. A departed player has left the instance; a suspended player cannot call
+            // SetReady() or respond to network events (VRChat docs: "While suspended, devices
+            // don't run Udon code or respond to network events until the player reopens VRChat").
+            // Either case would stall CheckAllPlayersReady() indefinitely.
+            // Using GetAllPlayers() instead of GetAllPlayerIDs() lets us check isSuspended in
+            // the same pass, avoiding an O(n) FindPlayerByID call per tracked player.
+            VRCPlayerApi[] allPlayers = TsPlayer.GetAllPlayers();
+            string[] activeNonSuspendedIds = new string[allPlayers.Length];
+            int activeCount = 0;
+            for (int i = 0; i < allPlayers.Length; i++)
+            {
+                if (!allPlayers[i].isSuspended)
+                    activeNonSuspendedIds[activeCount++] = TsPlayer.GetPlayerID(allPlayers[i]);
+            }
+            if (activeCount < allPlayers.Length)
+            {
+                string[] trimmed = new string[activeCount];
+                System.Array.Copy(activeNonSuspendedIds, trimmed, activeCount);
+                activeNonSuspendedIds = trimmed;
+            }
 
             int count = 0;
             for (int i = 0; i < _targetPlayerIds.Length; i++)
             {
-                if (TsArray.Contains(activeIds, _targetPlayerIds[i]))
+                if (TsArray.Contains(activeNonSuspendedIds, _targetPlayerIds[i]))
                     count++;
             }
 
             if (count == 0)
             {
-                // All targets departed during the gap. Cancel gracefully so all clients
-                // receive the stopped event and clean up receiver state.
+                // All targets departed or suspended during the gap. Cancel gracefully so all
+                // clients receive the stopped event and clean up receiver state.
                 ResetInternalTransferData();
+                _isBroadcasting = true;
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStopped));
+                _isBroadcasting = false;
                 return;
             }
 
@@ -175,12 +227,33 @@ namespace Tsvrc.Network
                 int idx = 0;
                 for (int i = 0; i < _targetPlayerIds.Length; i++)
                 {
-                    if (TsArray.Contains(activeIds, _targetPlayerIds[i]))
+                    if (TsArray.Contains(activeNonSuspendedIds, _targetPlayerIds[i]))
                         filteredIds[idx++] = _targetPlayerIds[i];
                 }
             }
 
             StartReadyCheck(filteredIds);
+        }
+
+        protected override void OnProcessUpdate()
+        {
+            base.OnProcessUpdate(); // ReadyCheckProcess → CheckAllPlayersReady
+
+            // CheckAllPlayersReady() guards: if (trackedPlayerIds.Length == 0) return.
+            // This means that if all tracked players depart or suspend DURING an active ready
+            // check, base.OnProcessUpdate() becomes a no-op — the process never stops or
+            // completes, and the transfer stalls indefinitely. The between-chunk gap is handled
+            // by _StartNextReadyCheck filtering departed+suspended players, but there is no
+            // equivalent filter while a ready check is actively running.
+            //
+            // Detect the empty-tracker case here and cancel. IsProcessRunning() guards against
+            // the case where base.OnProcessUpdate() just completed the process (all remaining
+            // players were ready), in which case _isRunning is already false and CancelDataTransfer
+            // must not fire.
+            if (IsProcessRunning() && GetTrackedPlayerIds().Length == 0)
+            {
+                CancelDataTransfer();
+            }
         }
 
         protected override void OnOwnerAbandonedProcess()
@@ -190,7 +263,16 @@ namespace Tsvrc.Network
             // base.OnOwnerAbandonedProcess could reach CheckAllPlayersReady and fire a false completion
             // (_currentChunkIndex == _totalChunks == 0). IsProcessOwner() returns true here because
             // TakeOverAbandonedProcess already set _ownerId before calling this method.
-            StopReadyCheck();
+            //
+            // Guard: if the previous owner left during the inter-chunk one-frame gap
+            // (_pendingNextChunk=true on the old client), _isRunning was already set false by
+            // InternalCleanup when the previous chunk's ready-check completed. Calling StopReadyCheck
+            // → StopProcess() with _isRunning=false triggers a spurious "[TsvrcProcess] Process is
+            // not running" warning even though the state is correct. Skip the call in that case:
+            // base.OnOwnerAbandonedProcess() is already a no-op there because InternalCleanup also
+            // cleared _trackedPlayerIds, causing PlayerTracker.OnOwnerAbandonedProcess to return
+            // immediately on the _trackedPlayerIds.Length == 0 check.
+            if (IsProcessRunning()) StopReadyCheck();
             base.OnOwnerAbandonedProcess();
         }
 
@@ -230,7 +312,9 @@ namespace Tsvrc.Network
             {
                 // The process is stopped between chunks, so cancel the pending continuation.
                 ResetInternalTransferData(); // also clears _pendingNextChunk
+                _isBroadcasting = true;
                 SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersDataTransferStopped));
+                _isBroadcasting = false;
                 return;
             }
             StopReadyCheck();
@@ -342,6 +426,18 @@ namespace Tsvrc.Network
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersDataTransferStarted()
         {
+            // Only the process owner sends this event. Any instance player can invoke a
+            // [NetworkCallable] directly; without this guard a malicious player could call
+            // OnTransferStarted() → ResetReceiverState() on all clients, corrupting
+            // _expectedSenderId so the real owner's subsequent chunks are rejected, and
+            // stalling the transfer permanently. _isBroadcasting bypasses the check during
+            // the owner's own inline execution where CallingPlayer may be propagated.
+            if (!_isBroadcasting)
+            {
+                var caller = NetworkCalling.CallingPlayer;
+                var owner = Networking.GetOwner(gameObject);
+                if (caller == null || owner == null || caller.playerId != owner.playerId) return;
+            }
             // Cancel any deferred stopped/completed emit from a previous transfer so it
             // does not fire after this new transfer has already started.
             _pendingTransferStopped = false;
@@ -358,6 +454,13 @@ namespace Tsvrc.Network
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersDataTransferStopped()
         {
+            // Owner-only guard: same rationale as NotifyTrackedPlayersDataTransferStarted.
+            if (!_isBroadcasting)
+            {
+                var caller = NetworkCalling.CallingPlayer;
+                var owner = Networking.GetOwner(gameObject);
+                if (caller == null || owner == null || caller.playerId != owner.playerId) return;
+            }
             // Set flag BEFORE the virtual callback. OnTransferStopped() fires synchronously, and
             // a subclass may call TransferData() inside it. That triggers
             // NotifyTrackedPlayersDataTransferStarted inline, clearing this flag. Setting after
@@ -387,6 +490,13 @@ namespace Tsvrc.Network
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersDataTransferCompleted()
         {
+            // Owner-only guard: same rationale as NotifyTrackedPlayersDataTransferStarted.
+            if (!_isBroadcasting)
+            {
+                var caller = NetworkCalling.CallingPlayer;
+                var owner = Networking.GetOwner(gameObject);
+                if (caller == null || owner == null || caller.playerId != owner.playerId) return;
+            }
             // Flag before virtual call: a new TransferData() from the callback would call
             // NotifyTrackedPlayersDataTransferStarted inline, clearing this flag; setting
             // after the call would re-set it, causing a spurious completed emit.

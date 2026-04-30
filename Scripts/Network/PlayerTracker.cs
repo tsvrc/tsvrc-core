@@ -82,6 +82,26 @@ namespace Tsvrc.Network
             BroadcastRemoveTrackedPlayers(TsPlayer.ToArray(playerId));
         }
 
+        public override void OnPlayerSuspendChanged(VRCPlayerApi player)
+        {
+            base.OnPlayerSuspendChanged(player);
+
+            // Mirror OnPlayerLeft: a suspended tracked player cannot call SetReady() or respond
+            // to any network event (VRChat docs, creators.vrchat.com/worlds/udon/players/:
+            // "While suspended, devices don't run Udon code or respond to network events until
+            // the player reopens VRChat"). Without this, the ready check for the current chunk
+            // would stall permanently. The base class already handles the case where the
+            // *process owner* suspends (ownership transfer via Networking.SetOwner); this guard
+            // covers non-owner tracked players.
+            // Only act on the suspend event (isSuspended=true). Wakeup (isSuspended=false) does
+            // not require action: the player has already been removed from tracking.
+            if (!player.isSuspended || !IsProcessRunning() || !IsProcessOwner()) return;
+
+            var playerId = TsPlayer.GetPlayerID(player);
+            if (!IsTrackedPlayer(playerId)) return;
+            BroadcastRemoveTrackedPlayers(TsPlayer.ToArray(playerId));
+        }
+
         protected override void OnProcessStarted()
         {
             base.OnProcessStarted();
@@ -92,26 +112,39 @@ namespace Tsvrc.Network
             // was still empty at that point. Serialize now so late joiners receive the correct list.
             RequestSerialization();
 
+            _isBroadcasting = true;
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessStarted), _trackedPlayerIds);
+            _isBroadcasting = false;
         }
 
         protected override void OnProcessStopped()
         {
             base.OnProcessStopped();
 
+            _isBroadcasting = true;
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessStopped), _trackedPlayerIds);
+            _isBroadcasting = false;
         }
 
         protected override void OnProcessCompleted()
         {
             base.OnProcessCompleted();
 
+            _isBroadcasting = true;
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessCompleted), _trackedPlayerIds);
+            _isBroadcasting = false;
         }
 
         protected override void OnProcessCleanup(bool isCompleted)
         {
             base.OnProcessCleanup(isCompleted);
+
+            // Guard: a new process started from an inline callback (see TsvrcProcess.InternalCleanup
+            // for full explanation) will have already written its correct _trackedPlayerIds in
+            // PlayerTracker.OnProcessStarted. Clearing them here would overwrite that state before
+            // InternalCleanup's RequestSerialization serializes it, sending an empty list to all
+            // remote clients and breaking the new process's tracked-player set permanently.
+            if (IsProcessRunning()) return;
 
             _trackedPlayerIds = new string[0];
             _initialTrackerPlayerIds = new string[0];
@@ -129,28 +162,53 @@ namespace Tsvrc.Network
             //   IsTrackedPlayer() is false in PlayerTracker.OnPlayerLeft, so no double removal.
             // - VRChat bug flow: OnPlayerLeft found IsProcessOwner()=false and skipped removal;
             //   this scan catches it via the OnOwnershipTransferred fallback path.
-            // GetAllPlayerIDs() is called once rather than per-entry to avoid repeated SDK allocation.
+            //
+            // Also removes suspended tracked players. OnPlayerSuspendChanged removes suspended
+            // players while the process is running, but only on the CURRENT owner because it
+            // guards with IsProcessOwner(). When the process owner themselves suspends, all
+            // non-owner clients see IsProcessOwner()=false and skip the removal. By the time
+            // TakeOverAbandonedProcess promotes a new owner, the suspended player is still in
+            // _trackedPlayerIds. A suspended player cannot call SetReady() (VRChat docs:
+            // "While suspended, devices don't run Udon code or respond to network events"),
+            // so leaving them tracked would permanently stall the ready check on the new owner.
+            //
+            // GetAllPlayers() is called once to check both departure and suspension in one pass,
+            // avoiding a separate FindPlayerByID call per tracked player.
             if (_trackedPlayerIds.Length == 0) return;
 
-            string[] currentPlayerIds = TsPlayer.GetAllPlayerIDs();
-            string[] departed = new string[_trackedPlayerIds.Length];
-            int departedCount = 0;
+            VRCPlayerApi[] allPlayers = TsPlayer.GetAllPlayers();
+            string[] activePlayers = new string[allPlayers.Length];
+            int activeCount = 0;
+            for (int i = 0; i < allPlayers.Length; i++)
+            {
+                if (!allPlayers[i].isSuspended)
+                    activePlayers[activeCount++] = TsPlayer.GetPlayerID(allPlayers[i]);
+            }
+            if (activeCount < allPlayers.Length)
+            {
+                string[] trimmed = new string[activeCount];
+                System.Array.Copy(activePlayers, trimmed, activeCount);
+                activePlayers = trimmed;
+            }
+
+            string[] toRemove = new string[_trackedPlayerIds.Length];
+            int removeCount = 0;
             for (int i = 0; i < _trackedPlayerIds.Length; i++)
             {
-                if (!TsArray.Contains(currentPlayerIds, _trackedPlayerIds[i]))
-                    departed[departedCount++] = _trackedPlayerIds[i];
+                if (!TsArray.Contains(activePlayers, _trackedPlayerIds[i]))
+                    toRemove[removeCount++] = _trackedPlayerIds[i];
             }
 
-            if (departedCount == 0) return;
+            if (removeCount == 0) return;
 
-            if (departedCount < departed.Length)
+            if (removeCount < toRemove.Length)
             {
-                string[] trimmed = new string[departedCount];
-                System.Array.Copy(departed, trimmed, departedCount);
-                departed = trimmed;
+                string[] trimmed = new string[removeCount];
+                System.Array.Copy(toRemove, trimmed, removeCount);
+                toRemove = trimmed;
             }
 
-            BroadcastRemoveTrackedPlayers(departed);
+            BroadcastRemoveTrackedPlayers(toRemove);
         }
 
         /// <summary>
@@ -308,6 +366,17 @@ namespace Tsvrc.Network
             // Any [NetworkCallable] can be invoked with null parameters from the network;
             // LastPlayerIds = null would crash any subscriber reading LastPlayerIds.Length.
             if (playerIds == null) return;
+            // Only the process owner sends this event. Any instance player can invoke a
+            // [NetworkCallable] method directly; without this guard a malicious player could
+            // corrupt LastPlayerIds, spoof _readyCheckActive, and trigger false lifecycle events
+            // on all clients. _isBroadcasting bypasses the check during the owner's own inline
+            // execution where CallingPlayer may be propagated from an outer event context.
+            if (!_isBroadcasting)
+            {
+                var caller = NetworkCalling.CallingPlayer;
+                var owner = Networking.GetOwner(gameObject);
+                if (caller == null || owner == null || caller.playerId != owner.playerId) return;
+            }
             LastPlayerIds = playerIds;
             OnTrackingStarted(playerIds);
             TsEmit(OnTrackingStartedEvent);
@@ -322,6 +391,13 @@ namespace Tsvrc.Network
         public void NotifyTrackedPlayersProcessStopped(string[] playerIds)
         {
             if (playerIds == null) return;
+            // Owner-only guard: same rationale as NotifyTrackedPlayersProcessStarted.
+            if (!_isBroadcasting)
+            {
+                var caller = NetworkCalling.CallingPlayer;
+                var owner = Networking.GetOwner(gameObject);
+                if (caller == null || owner == null || caller.playerId != owner.playerId) return;
+            }
             LastPlayerIds = playerIds;
             OnTrackingStopped(playerIds);
             TsEmit(OnTrackingStoppedEvent);
@@ -336,6 +412,13 @@ namespace Tsvrc.Network
         public void NotifyTrackedPlayersProcessCompleted(string[] playerIds)
         {
             if (playerIds == null) return;
+            // Owner-only guard: same rationale as NotifyTrackedPlayersProcessStarted.
+            if (!_isBroadcasting)
+            {
+                var caller = NetworkCalling.CallingPlayer;
+                var owner = Networking.GetOwner(gameObject);
+                if (caller == null || owner == null || caller.playerId != owner.playerId) return;
+            }
             LastPlayerIds = playerIds;
             OnTrackingCompleted(playerIds);
             TsEmit(OnTrackingCompletedEvent);
@@ -349,6 +432,13 @@ namespace Tsvrc.Network
         public void NotifyTrackedPlayersAdded(string[] addedPlayerIds)
         {
             if (addedPlayerIds == null) return;
+            // Owner-only guard: same rationale as NotifyTrackedPlayersProcessStarted.
+            if (!_isBroadcasting)
+            {
+                var caller = NetworkCalling.CallingPlayer;
+                var owner = Networking.GetOwner(gameObject);
+                if (caller == null || owner == null || caller.playerId != owner.playerId) return;
+            }
             LastAddedPlayerIds = addedPlayerIds;
             // Apply the delta so LastPlayerIds is current when the callback fires.
             // Serialization packets and network events have no relative ordering guarantee
@@ -384,6 +474,13 @@ namespace Tsvrc.Network
         {
             // Any [NetworkCallable] can receive null parameters; TsArray.Remove crashes on null input.
             if (removedPlayerIds == null) return;
+            // Owner-only guard: same rationale as NotifyTrackedPlayersProcessStarted.
+            if (!_isBroadcasting)
+            {
+                var caller = NetworkCalling.CallingPlayer;
+                var owner = Networking.GetOwner(gameObject);
+                if (caller == null || owner == null || caller.playerId != owner.playerId) return;
+            }
             LastRemovedPlayerIds = removedPlayerIds;
             // Apply the delta so LastPlayerIds is current when the callback runs.
             LastPlayerIds = TsArray.Remove(LastPlayerIds, removedPlayerIds);
@@ -429,7 +526,9 @@ namespace Tsvrc.Network
             _trackedPlayerIds = TsArray.Add(_trackedPlayerIds, validPlayerIds);
             RequestSerialization();
 
+            _isBroadcasting = true;
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersAdded), validPlayerIds);
+            _isBroadcasting = false;
         }
 
         /// <summary>
@@ -468,7 +567,9 @@ namespace Tsvrc.Network
             _trackedPlayerIds = remainingPlayerIds;
             RequestSerialization();
 
+            _isBroadcasting = true;
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersRemoved), validPlayerIds);
+            _isBroadcasting = false;
         }
     }
 }

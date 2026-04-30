@@ -56,6 +56,13 @@ namespace Tsvrc.Process
         {
             base.OnProcessCleanup(isCompleted);
 
+            // Guard: same rationale as PlayerTracker.OnProcessCleanup. A new process started
+            // from an inline callback has _readyPlayerIds=[] (set in ReadyCheckProcess.OnProcessStarted)
+            // and _readyCheckActive=true (set from inline NotifyTrackedPlayersProcessStarted →
+            // OnTrackingStarted). Clearing _readyCheckActive here would make SetReady() a silent
+            // no-op for all remote clients, permanently preventing ACKs for the new transfer.
+            if (IsProcessRunning()) return;
+
             _readyPlayerIds = new string[0];
             RequestSerialization();
 
@@ -124,10 +131,38 @@ namespace Tsvrc.Process
             // storm that would result from every client sending to All.
             if (!IsProcessOwner()) return;
 
+            // Batch-collect ready players that need removing, then call TsArray.Remove once.
+            // The naive loop (one RemoveReadyPlayerInternal per player) calls TsArray.Remove M
+            // times for M removed players, each allocating a new array and iterating _readyPlayerIds
+            // O(R) times: total O(M×R) iterations + M allocations. Using a batch reduces this to
+            // O(M+R) iterations + 2 allocations regardless of M. This matters when
+            // OnOwnerAbandonedProcess broadcasts a batch removal of up to 79 players at once.
+            // TsArray.Remove(original, items) already accepts a multi-element remove array —
+            // the same signature is used in NotifyTrackedPlayersRemoved for LastPlayerIds.
+            string[] readyToRemove = new string[removedPlayerIds.Length];
+            int removeCount = 0;
             foreach (string playerId in removedPlayerIds)
             {
                 if (IsPlayerReady(playerId))
-                    RemoveReadyPlayerInternal(playerId);
+                    readyToRemove[removeCount++] = playerId;
+            }
+            if (removeCount > 0)
+            {
+                if (removeCount < readyToRemove.Length)
+                {
+                    string[] trimmed = new string[removeCount];
+                    System.Array.Copy(readyToRemove, trimmed, removeCount);
+                    readyToRemove = trimmed;
+                }
+                // RemoveReadyPlayerInternal cannot be used here because CallingPlayer propagates
+                // through the entire call chain from any outer [NetworkCallable] context
+                // (VRChat docs: "InNetworkCall is only reset once the entry function terminates").
+                // Direct mutation bypasses the spoofing guard that RemoveReadyPlayerInternal's
+                // caller (BroadcastRemoveReadyPlayer) would apply — but that guard only protects
+                // against spoofed player IDs from the network. Here we have already validated
+                // that each ID in readyToRemove was in _readyPlayerIds (IsPlayerReady check above).
+                _readyPlayerIds = TsArray.Remove(_readyPlayerIds, readyToRemove);
+                RequestSerialization();
             }
 
             // A non-ready player may have just been removed, making all remaining players ready.
@@ -175,7 +210,10 @@ namespace Tsvrc.Process
             // arrived yet when this is called from a network event handler in the same frame.
             if (!_readyCheckActive) return;
 
-            string playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
+            // _localPlayerId is cached once in TsvrcProcess.TsStart(); VRChat guarantees
+            // displayName and playerId are immutable for the duration of a session, so this
+            // is always equivalent to TsPlayer.GetPlayerID(Networking.LocalPlayer).
+            string playerId = _localPlayerId;
 
             // No local dedup check: _readyPlayerIds can be stale on non-owners; the owner's
             // Broadcast* methods deduplicate before mutating, so redundant sends are harmless.

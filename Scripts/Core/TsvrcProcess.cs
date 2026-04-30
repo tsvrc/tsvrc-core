@@ -24,6 +24,14 @@ namespace Tsvrc.Core
         // Prevents duplicate loop scheduling after ownership transfer.
         private bool _updateLoopActive = false;
 
+        // Set to true immediately before and cleared immediately after each
+        // SendCustomNetworkEvent(NetworkEventTarget.All, ...) call.  On the calling owner the
+        // network event fires inline synchronously before SendCustomNetworkEvent returns; this flag
+        // tells the broadcast-target's CallingPlayer guard that the inline execution is legitimate
+        // even when CallingPlayer has been propagated from an outer network-event context.
+        // Safe because Udon is single-threaded: no concurrent access is possible.
+        protected bool _isBroadcasting = false;
+
         // Cached local player ID, constant for the session. Protected so subclasses can use it
         // directly instead of calling TsPlayer.GetPlayerID(Networking.LocalPlayer).
         protected string _localPlayerId = "";
@@ -312,9 +320,25 @@ namespace Tsvrc.Core
         /// </summary>
         private void InternalCleanup(bool isCompleted)
         {
-            _ownerId = "";
-            _useProcessUpdate = false;
-            _updateLoopActive = false;
+            // Guard: ExecuteStop/ExecuteComplete sets _isRunning=false before calling
+            // OnProcessStopped/OnProcessCompleted. A subscriber to an inline event fired
+            // from inside those methods (e.g. OnReadyCheckCompletedEvent, which fires
+            // synchronously via SendCustomNetworkEvent(All,...)) may call StartProcess,
+            // resetting _isRunning=true. VRChat docs confirm the sender receives its own
+            // SendCustomNetworkEvent inline before returning (creators.vrchat.com/worlds/udon/
+            // networking/events: "it will trigger locally before moving on, just like a
+            // regular function call would"). In that case _ownerId, _useProcessUpdate, and
+            // _updateLoopActive already belong to the NEW process; clearing them here would:
+            //   - Set _ownerId="" → IsProcessOwner()=false → BroadcastAddReadyPlayer rejects
+            //     all ACKs → new transfer stalls permanently.
+            //   - Set _updateLoopActive=false → _TickProcessUpdate exits on next tick → no
+            //     poll-based completion fallback for the new process.
+            if (!_isRunning)
+            {
+                _ownerId = "";
+                _useProcessUpdate = false;
+                _updateLoopActive = false;
+            }
 
             // Invoke the subclass hook BEFORE serializing so that any [UdonSynced] variables
             // a subclass clears in OnProcessCleanup (e.g. _trackedPlayerIds, _readyPlayerIds)
@@ -329,6 +353,8 @@ namespace Tsvrc.Core
             // Serialize the cleared owner/state so remote clients don't see stale data.
             // If a subclass also called RequestSerialization() inside OnProcessCleanup, this
             // second call is redundant but harmless; both packets carry fully-cleared state.
+            // When a new process started from an inline callback (_isRunning=true), this
+            // serializes the NEW process's correct state rather than cleared state.
             RequestSerialization();
         }
 

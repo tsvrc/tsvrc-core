@@ -34,11 +34,12 @@ namespace Tsvrc.Network
         // prevent a malicious player from triggering new string[Int32.MaxValue] → OOM on all clients.
         private const int _maxChunks = (MAX_MESSAGE_SIZE + CHUNK_SIZE - 1) / CHUNK_SIZE;
 
-        // ID of the player who initiated the current transfer, captured in OnTransferStarted()
-        // via IsProcessOwner() (owner → _localPlayerId) or NetworkCalling.CallingPlayer (remote).
+        // playerId (int) of the player who initiated the current transfer, captured in OnTransferStarted()
+        // via Networking.LocalPlayer.playerId (owner) or CallingPlayer.playerId (remote).
         // Validated in BroadcastDataChunkReceived to reject chunks injected by other players.
-        // Reset by ResetReceiverState() so a stale value never matches a new transfer's sender.
-        private string _expectedSenderId = "";
+        // int comparison avoids the string allocations that TsPlayer.GetPlayerID would require.
+        // Reset to 0 by ResetReceiverState(); valid playerIds are >=1 so 0 is a safe sentinel.
+        private int _expectedSenderPlayerId = 0;
 
         // totalChunks value from the first accepted chunk of the current transfer.
         // Subsequent chunks must carry the same value; a mismatch means either a retransmit
@@ -100,7 +101,7 @@ namespace Tsvrc.Network
             // synchronously before OnProcessStarted() fires, so it is always accurate at this point.
             if (IsProcessOwner())
             {
-                _expectedSenderId = _localPlayerId;
+                _expectedSenderPlayerId = Networking.LocalPlayer.playerId;
             }
             else
             {
@@ -108,7 +109,7 @@ namespace Tsvrc.Network
                 // [NetworkCallable] method. The _localPlayerId fallback covers the unreachable
                 // edge case of a direct local call on a non-owner (user error).
                 var cp = NetworkCalling.CallingPlayer;
-                _expectedSenderId = cp != null ? TsPlayer.GetPlayerID(cp) : _localPlayerId;
+                _expectedSenderPlayerId = cp != null ? cp.playerId : Networking.LocalPlayer.playerId;
             }
 
             OnDataReceptionStarted();
@@ -201,7 +202,7 @@ namespace Tsvrc.Network
         {
             _transferActive = false;
             _receivedChunks = new string[0];
-            _expectedSenderId = "";
+            _expectedSenderPlayerId = 0;
             _expectedTotalChunks = 0;
             LastData = "";
             LastChunkIndex = 0;
@@ -219,11 +220,21 @@ namespace Tsvrc.Network
         /// </summary>
         protected string ReassembleMessage(string[] receivedChunks)
         {
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            // Pre-allocate to the exact total length to avoid repeated internal buffer
+            // reallocations. The default StringBuilder capacity is 16 chars; without
+            // pre-allocation a 500,000-char message (200 chunks × 2,500 chars) would
+            // resize the buffer ~15 times, each doubling it and copying all prior data.
+            // Chunks are guaranteed non-null at this call site: ReassembleMessage is only
+            // called from OnTransferCompleted, which is only reached after all N chunks have
+            // been accepted (each ready check completes only when all tracked players ACK
+            // the current chunk, and chunks arrive in strict order due to the sequential
+            // ready-check protocol).
+            int totalLength = 0;
             for (int i = 0; i < receivedChunks.Length; i++)
-            {
+                totalLength += receivedChunks[i].Length;
+            System.Text.StringBuilder sb = new System.Text.StringBuilder(totalLength);
+            for (int i = 0; i < receivedChunks.Length; i++)
                 sb.Append(receivedChunks[i]);
-            }
             return sb.ToString();
         }
 
@@ -239,11 +250,13 @@ namespace Tsvrc.Network
         /// Network callable method to broadcast the reception of a data chunk.
         /// This method is invoked on all players via network event, but only executes for tracked players.
         /// </summary>
-        // maxEventsPerSecond: The default rate limit (5 internal events/second) would stall delivery
-        // of a single CHUNK_SIZE=15000-char chunk by up to 3 seconds, because VRChat splits events
-        // larger than 1024 bytes into ~15 internal events and each counts against the per-second
-        // budget. Setting 100 keeps the effective chunk-delivery time to ~0.15 s while the global
-        // ~18 KB/s throughput cap still provides the real upper bound.
+        // maxEventsPerSecond: VRChat splits events >1 KB into internal 1-KB packets, each counted
+        // against the rate budget (VRChat docs: 'these internal events are visible in the rate-limiting
+        // queue'). CHUNK_SIZE=2500-char ASCII chunk ≈ 2,500 bytes → ~3 internal events; a CJK chunk
+        // ≈ 7,500 bytes UTF-8 → ~8 internal events. At the default 5/s budget, even an ASCII
+        // chunk would stall ~0.6 s; a CJK chunk ~1.6 s. 100/s delivers ASCII chunks in ~0.03 s and
+        // CJK chunks in ~0.08 s, well within the global ~11 KB/s throughput cap (network-details
+        // page), which is the real upper bound on transfer speed.
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void BroadcastDataChunkReceived(string dataChunk, int chunkIndex, int totalChunks, string[] playerIds)
         {
@@ -257,20 +270,22 @@ namespace Tsvrc.Network
             // call (see OnDataChunkSendRequested), bypassing the CallingPlayer check, which is
             // unreliable there due to possible propagation from an outer network event context.
             // For all network-delivered calls, CallingPlayer is the actual packet sender:
-            //   Owner's chunk:     CallingPlayer = owner = _expectedSenderId → accepted.
-            //   Malicious chunk:   CallingPlayer = attacker ≠ _expectedSenderId → rejected.
+            //   Owner's chunk:     CallingPlayer = owner → playerId matches _expectedSenderPlayerId.
+            //   Malicious chunk:   CallingPlayer = attacker → playerId mismatch → rejected.
             //   Direct local call: CallingPlayer = null → rejected.
             if (!_isSendingChunk)
             {
                 var caller = NetworkCalling.CallingPlayer;
-                if (caller == null || TsPlayer.GetPlayerID(caller) != _expectedSenderId) return;
+                if (caller == null || caller.playerId != _expectedSenderPlayerId) return;
             }
 
             // Any [NetworkCallable] parameter can be null from a malicious call;
             // TsArray.Contains crashes on null.Length without this check.
             if (playerIds == null) return;
 
-            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
+            // _localPlayerId is cached once in TsvrcProcess.TsStart(); VRChat guarantees
+            // displayName and playerId are immutable for the duration of a session.
+            var playerId = _localPlayerId;
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             // null dataChunk is stored silently (StringBuilder.Append(null) is a no-op),
@@ -299,6 +314,13 @@ namespace Tsvrc.Network
             {
                 _receivedChunks = new string[totalChunks];
             }
+
+            // Suppress duplicate deliveries: VRChat docs describe internal event splitting as
+            // 'almost transparent' — the 'almost' covers edge cases (e.g. network anomalies,
+            // ownership-transfer races) where the same logical event could be delivered twice.
+            // Without this guard, a duplicate would overwrite the slot, re-fire OnDataChunkReceived,
+            // and send a redundant SetReady() ACK to the owner.
+            if (_receivedChunks[chunkIndex - 1] != null) return;
 
             _receivedChunks[chunkIndex - 1] = dataChunk;
             LastChunkIndex = chunkIndex;
