@@ -64,6 +64,8 @@ namespace Tsvrc.Network
         {
             base.OnDeserialization();
 
+            // Update LastPlayerIds from the synced array so late joiners have an accurate
+            // snapshot even though they never received the NotifyTrackedPlayersProcessStarted event.
             LastPlayerIds = _trackedPlayerIds;
             OnTrackingDeserialization();
             TsEmit(OnTrackingDeserializationEvent);
@@ -77,7 +79,7 @@ namespace Tsvrc.Network
 
             var playerId = TsPlayer.GetPlayerID(player);
             if (!IsTrackedPlayer(playerId)) return;
-            // Already confirmed as the process owner, so call directly to avoid the self-loop
+            // Already confirmed as the process owner, so call directly to avoid the self loop
             // overhead of SendCustomNetworkEvent(Owner,...) firing back to us synchronously.
             BroadcastRemoveTrackedPlayers(TsPlayer.ToArray(playerId));
         }
@@ -86,13 +88,14 @@ namespace Tsvrc.Network
         {
             base.OnPlayerSuspendChanged(player);
 
-            // Mirror OnPlayerLeft: a suspended tracked player cannot call SetReady() or respond
-            // to any network event (VRChat docs, creators.vrchat.com/worlds/udon/players/:
+            // Mirror OnPlayerLeft: a suspended tracked player cannot respond to any network
+            // event (VRChat docs, creators.vrchat.com/worlds/udon/players/:
             // "While suspended, devices don't run Udon code or respond to network events until
-            // the player reopens VRChat"). Without this, the ready check for the current chunk
-            // would stall permanently. The base class already handles the case where the
-            // *process owner* suspends (ownership transfer via Networking.SetOwner); this guard
-            // covers non-owner tracked players.
+            // the player reopens VRChat"). Leaving them in the tracked list would permanently
+            // block any subclass logic that waits for all tracked players to respond.
+            // The base class already handles the case where the *process owner* suspends
+            // (ownership transfer via Networking.SetOwner); this guard covers non-owner
+            // tracked players.
             // Only act on the suspend event (isSuspended=true). Wakeup (isSuspended=false) does
             // not require action: the player has already been removed from tracking.
             if (!player.isSuspended || !IsProcessRunning() || !IsProcessOwner()) return;
@@ -139,11 +142,11 @@ namespace Tsvrc.Network
         {
             base.OnProcessCleanup(isCompleted);
 
-            // Guard: a new process started from an inline callback (see TsvrcProcess.InternalCleanup
-            // for full explanation) will have already written its correct _trackedPlayerIds in
-            // PlayerTracker.OnProcessStarted. Clearing them here would overwrite that state before
-            // InternalCleanup's RequestSerialization serializes it, sending an empty list to all
-            // remote clients and breaking the new process's tracked-player set permanently.
+            // If a new process was started from an inline callback (see TsvrcProcess.InternalCleanup
+            // for the full explanation), it will have already written the correct _trackedPlayerIds
+            // in PlayerTracker.OnProcessStarted. Clearing them here would overwrite that state before
+            // InternalCleanup's RequestSerialization serializes it, which would send an empty list
+            // to all remote clients and permanently break the new process's tracked player set.
             if (IsProcessRunning()) return;
 
             _trackedPlayerIds = new string[0];
@@ -157,20 +160,21 @@ namespace Tsvrc.Network
         {
             base.OnOwnerAbandonedProcess();
 
-            // Handles both event-ordering cases when a tracked process owner leaves:
-            // - Normal flow: base.OnPlayerLeft ran TakeOverAbandonedProcess; after returning,
-            //   IsTrackedPlayer() is false in PlayerTracker.OnPlayerLeft, so no double removal.
-            // - VRChat bug flow: OnPlayerLeft found IsProcessOwner()=false and skipped removal;
-            //   this scan catches it via the OnOwnershipTransferred fallback path.
+            // This covers two event ordering cases when the tracked process owner leaves.
+            // In the normal flow, base.OnPlayerLeft already ran TakeOverAbandonedProcess so
+            // IsTrackedPlayer() is false when we arrive here, preventing a double removal.
+            // In a known VRChat bug case, OnPlayerLeft found IsProcessOwner()=false and skipped
+            // the removal entirely; this scan catches that via the OnOwnershipTransferred fallback.
             //
             // Also removes suspended tracked players. OnPlayerSuspendChanged removes suspended
             // players while the process is running, but only on the CURRENT owner because it
             // guards with IsProcessOwner(). When the process owner themselves suspends, all
             // non-owner clients see IsProcessOwner()=false and skip the removal. By the time
             // TakeOverAbandonedProcess promotes a new owner, the suspended player is still in
-            // _trackedPlayerIds. A suspended player cannot call SetReady() (VRChat docs:
-            // "While suspended, devices don't run Udon code or respond to network events"),
-            // so leaving them tracked would permanently stall the ready check on the new owner.
+            // _trackedPlayerIds. A suspended player cannot respond to any network events
+            // (VRChat docs: "While suspended, devices don't run Udon code or respond to network
+            // events"), so leaving them tracked would permanently block any subclass logic
+            // that waits for all tracked players to respond on the new owner.
             //
             // GetAllPlayers() is called once to check both departure and suspension in one pass,
             // avoiding a separate FindPlayerByID call per tracked player.
@@ -219,11 +223,11 @@ namespace Tsvrc.Network
         {
             if (playerIds == null) playerIds = new string[0];
 
-            // De-dup the initial list to maintain the same no-duplicate invariant that
-            // BroadcastAddTrackedPlayers enforces at runtime via IsTrackedPlayer checks.
-            // Without this, a caller passing repeated IDs would produce duplicates in
-            // _trackedPlayerIds, corrupting LastPlayerIds on all clients and causing
-            // OnOwnerAbandonedProcess to broadcast spurious double-entries in the removed list.
+            // Deduplicate the initial list to match the invariant that BroadcastAddTrackedPlayers
+            // enforces at runtime: no ID appears more than once. Without this, a caller passing
+            // repeated IDs would produce duplicates in _trackedPlayerIds, which corrupts
+            // LastPlayerIds on all clients and causes OnOwnerAbandonedProcess to broadcast
+            // spurious duplicate entries in the removed list.
             if (playerIds.Length > 1)
             {
                 string[] deduped = new string[playerIds.Length];
@@ -278,7 +282,7 @@ namespace Tsvrc.Network
                 return;
             }
 
-            // Owner fast-path: avoid the self-loop overhead of SendCustomNetworkEvent(Owner,...).
+            // Owner fast path: avoid the self loop overhead of SendCustomNetworkEvent(Owner,...).
             if (IsProcessOwner())
             {
                 BroadcastAddTrackedPlayers(playerIds);
@@ -299,7 +303,7 @@ namespace Tsvrc.Network
                 return;
             }
 
-            // Owner fast-path: avoid the self-loop overhead of SendCustomNetworkEvent(Owner,...).
+            // Owner fast path: avoid the self loop overhead of SendCustomNetworkEvent(Owner,...).
             if (IsProcessOwner())
             {
                 BroadcastRemoveTrackedPlayers(playerIds);
@@ -354,12 +358,11 @@ namespace Tsvrc.Network
         /// Broadcast target: fires on all instance players when the process starts.
         /// Read <c>LastPlayerIds</c> to check if the local player is tracked.
         /// </summary>
-        // maxEventsPerSecond: 100. This event is sent by the same owner in the same
-        // StartReadyCheck call stack as BroadcastDataChunkReceived (also 100/s). Per VRChat
-        // docs, ordering is only guaranteed when neither event hits its rate limit. At 5/s
-        // (default), rapid-restart cycles queue this event while the 100/s chunk drains ahead.
-        // Remote clients then receive chunks before _readyCheckActive is set, making
-        // SetReady() a no-op and the transfer stalls waiting for an ack that never comes.
+        // maxEventsPerSecond: 100. VRChat only guarantees event ordering from a single sender
+        // when neither event type hits its rate limit. NotifyTrackedPlayersAdded/Removed also
+        // use 100/s; keeping all owner-broadcast events at the same limit ensures that rapid
+        // add/remove sequences cannot skip ahead of or fall behind start/stop/complete events
+        // on remote clients, so LastPlayerIds is always current when lifecycle callbacks fire.
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersProcessStarted(string[] playerIds)
         {
@@ -368,9 +371,9 @@ namespace Tsvrc.Network
             if (playerIds == null) return;
             // Only the process owner sends this event. Any instance player can invoke a
             // [NetworkCallable] method directly; without this guard a malicious player could
-            // corrupt LastPlayerIds, spoof _readyCheckActive, and trigger false lifecycle events
-            // on all clients. _isBroadcasting bypasses the check during the owner's own inline
-            // execution where CallingPlayer may be propagated from an outer event context.
+            // corrupt LastPlayerIds and trigger false lifecycle events on all clients.
+            // _isBroadcasting bypasses the check during the owner's own inline execution
+            // where CallingPlayer may be propagated from an outer event context.
             if (!_isBroadcasting)
             {
                 var caller = NetworkCalling.CallingPlayer;
@@ -387,6 +390,9 @@ namespace Tsvrc.Network
         /// Read <c>LastPlayerIds</c> to check if the local player is tracked.
         /// </summary>
         // maxEventsPerSecond: 100. Same rationale as NotifyTrackedPlayersProcessStarted.
+        // If this were at 5/s and NotifyTrackedPlayersAdded/Removed fired 6+ times in rapid
+        // succession before a stop, this event would skip queued add/remove events and arrive
+        // first, leaving LastPlayerIds incomplete when OnTrackingStopped fires.
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersProcessStopped(string[] playerIds)
         {
@@ -408,6 +414,7 @@ namespace Tsvrc.Network
         /// Read <c>LastPlayerIds</c> to check if the local player is tracked.
         /// </summary>
         // maxEventsPerSecond: 100. Same rationale as NotifyTrackedPlayersProcessStarted.
+        // Same ordering concern as NotifyTrackedPlayersProcessStopped.
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersProcessCompleted(string[] playerIds)
         {
@@ -428,7 +435,11 @@ namespace Tsvrc.Network
         /// Broadcast target: fires on all instance players when players are added.
         /// Read <c>LastAddedPlayerIds</c> in your callback.
         /// </summary>
-        [NetworkCallable]
+        // maxEventsPerSecond: 100. Same rationale as NotifyTrackedPlayersProcessStarted.
+        // Without this, rapid add sequences (6+ per second) would queue this event while
+        // NotifyTrackedPlayersProcessStopped/Completed (100/s) skip ahead, leaving
+        // LastPlayerIds incomplete when lifecycle callbacks fire on remote clients.
+        [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersAdded(string[] addedPlayerIds)
         {
             if (addedPlayerIds == null) return;
@@ -469,7 +480,8 @@ namespace Tsvrc.Network
         /// Broadcast target: fires on all instance players when players are removed.
         /// Read <c>LastRemovedPlayerIds</c> in your callback.
         /// </summary>
-        [NetworkCallable]
+        // maxEventsPerSecond: 100. Same rationale as NotifyTrackedPlayersAdded.
+        [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersRemoved(string[] removedPlayerIds)
         {
             // Any [NetworkCallable] can receive null parameters; TsArray.Remove crashes on null input.
@@ -499,7 +511,7 @@ namespace Tsvrc.Network
             // and InternalCleanup clearing _ownerId. During that window IsProcessOwner() is still
             // true, so a subscriber callback from OnProcessStopped/OnProcessCompleted that calls
             // AddTrackedPlayers would pass the IsProcessOwner() check alone and mutate
-            // _trackedPlayerIds + send a spurious NotifyTrackedPlayersAdded event to all clients.
+            // _trackedPlayerIds and fire a spurious NotifyTrackedPlayersAdded event to all clients.
             if (!IsProcessRunning() || !IsProcessOwner()) return;
             if (playerIds == null || playerIds.Length == 0) return;
 
