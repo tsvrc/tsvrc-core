@@ -35,50 +35,58 @@ namespace Tsvrc.Process
 
         [UdonSynced] private string[] _readyPlayerIds = new string[0];
 
-        // Network-event-driven flag: true while a ready check is in progress on this client.
-        // Used in SetReady() instead of IsProcessRunning() ([UdonSynced] _isRunning) to avoid a
-        // serialization-vs-event race: manual-sync packets and network events travel through
-        // separate VRChat subsystems with no ordering guarantee between them, so _isRunning=true
-        // may not yet have arrived when SetReady() is called from inside a network event handler.
-        // Set/cleared by Notify* network events (ordered with all other events from the same
-        // sender); corrected by OnTrackingDeserialization for late joiners and missed events.
+        // Tracks whether a ready check is active on this client. Used in SetReady() instead of
+        // IsProcessRunning() to avoid a race where the synced _isRunning has not arrived yet when
+        // SetReady() is called from inside a network event handler. VRChat delivers synced
+        // variables and network events through separate subsystems with no ordering guarantee.
+        // Updated by Notify* events (which are ordered relative to each other from the same
+        // sender) and corrected by OnTrackingDeserialization for late joiners or missed events.
         private bool _readyCheckActive = false;
 
         protected override void OnProcessStarted()
         {
-            base.OnProcessStarted();
-
+            // Clear _readyPlayerIds before calling base. PlayerTracker.OnProcessStarted fires
+            // NotifyTrackedPlayersProcessStarted inline, which calls OnTrackingStarted and then
+            // OnReadyCheckStarted before returning. If a restart is triggered from an inline
+            // OnReadyCheckCompleted callback, the old _readyPlayerIds would still be visible
+            // during OnReadyCheckStarted, and any SetReady() call there would silently do
+            // nothing because IsPlayerReady would return true for players from the old run.
             _readyPlayerIds = new string[0];
-            RequestSerialization();
+            base.OnProcessStarted();
+            // No explicit RequestSerialization here. PlayerTracker.OnProcessStarted already
+            // calls it after assigning _trackedPlayerIds, and since _readyPlayerIds was cleared
+            // above before that call, the single packet captures both arrays. VRChat coalesces
+            // multiple RequestSerialization calls in the same frame into one outbound packet.
         }
 
         protected override void OnProcessCleanup(bool isCompleted)
         {
             base.OnProcessCleanup(isCompleted);
 
-            // Guard: same rationale as PlayerTracker.OnProcessCleanup. A new process started
-            // from an inline callback has _readyPlayerIds=[] (set in ReadyCheckProcess.OnProcessStarted)
-            // and _readyCheckActive=true (set from inline NotifyTrackedPlayersProcessStarted →
-            // OnTrackingStarted). Clearing _readyCheckActive here would make SetReady() a silent
-            // no-op for all remote clients, permanently preventing ACKs for the new transfer.
+            // If a new process was started from an inline callback, _readyPlayerIds is already
+            // empty (cleared in OnProcessStarted) and _readyCheckActive is already true (set
+            // by the inline NotifyTrackedPlayersProcessStarted which calls OnTrackingStarted).
+            // Clearing _readyCheckActive here would silently block all SetReady() calls on
+            // every client for the new process, so we skip cleanup when a process is running.
             if (IsProcessRunning()) return;
 
             _readyPlayerIds = new string[0];
-            RequestSerialization();
+            // No explicit RequestSerialization here. TsvrcProcess.InternalCleanup always calls
+            // it after OnProcessCleanup returns, so _readyPlayerIds=[] is captured by that packet.
 
-            // Reset local flag so SetReady() is inert until the next StartReadyCheck.
-            // OnTrackingStopped/OnTrackingCompleted handle the normal stop/complete paths.
-            // Resetting here also covers InternalCleanup calls that bypass ExecuteStop().
+            // Reset the flag so SetReady() does nothing until the next StartReadyCheck.
+            // OnTrackingStopped and OnTrackingCompleted cover the normal stop and complete paths.
+            // This also handles InternalCleanup calls that bypass the normal stop/complete flow.
             _readyCheckActive = false;
         }
 
         protected override void OnTrackingDeserialization()
         {
-            // Late-joiner fix: network events are not repeated for late joiners, so a player
-            // who joins mid-check never receives NotifyTrackedPlayersProcessStarted and
-            // _readyCheckActive stays false, silently blocking their SetReady() calls.
-            // Also corrects missed stop/complete events. _isRunning is already up-to-date
-            // here because OnDeserialization fires after all synced variables are written.
+            // Late joiners never receive NotifyTrackedPlayersProcessStarted because network
+            // events are not replayed, so _readyCheckActive would stay false and block SetReady().
+            // Deriving it from the synced _isRunning fixes this. Also corrects missed stop/complete
+            // events. OnDeserialization always fires after all synced variables are written, so
+            // _isRunning is already up to date when we read it here.
             _readyCheckActive = IsProcessRunning();
         }
 
@@ -88,8 +96,8 @@ namespace Tsvrc.Process
             CheckAllPlayersReady();
         }
 
-        // Completes the ready check if all tracked players are ready.
-        // Called from both BroadcastAddReadyPlayer (event-driven) and OnProcessUpdate (safety-net poll).
+        // Completes the ready check if every tracked player is ready.
+        // Called immediately after each player marks ready and also on every 0.5s poll tick.
         private void CheckAllPlayersReady()
         {
             string[] trackedPlayerIds = GetTrackedPlayerIds();
@@ -126,19 +134,16 @@ namespace Tsvrc.Process
 
         protected override void OnTrackingPlayersRemoved(string[] removedPlayerIds)
         {
-            // NotifyTrackedPlayersRemoved fires on all clients. Only the owner has an accurate
-            // _readyPlayerIds and should mutate state. Calling directly avoids the N² event
-            // storm that would result from every client sending to All.
+            // NotifyTrackedPlayersRemoved fires on all clients, but only the owner holds an
+            // accurate _readyPlayerIds and should mutate it. Having every client send to the
+            // owner would cause N² network calls with N players, so we guard here.
             if (!IsProcessOwner()) return;
 
-            // Batch-collect ready players that need removing, then call TsArray.Remove once.
-            // The naive loop (one RemoveReadyPlayerInternal per player) calls TsArray.Remove M
-            // times for M removed players, each allocating a new array and iterating _readyPlayerIds
-            // O(R) times: total O(M×R) iterations + M allocations. Using a batch reduces this to
-            // O(M+R) iterations + 2 allocations regardless of M. This matters when
-            // OnOwnerAbandonedProcess broadcasts a batch removal of up to 79 players at once.
-            // TsArray.Remove(original, items) already accepts a multi-element remove array —
-            // the same signature is used in NotifyTrackedPlayersRemoved for LastPlayerIds.
+            // Collect all ready players to remove in one pass, then call TsArray.Remove once.
+            // Doing one removal per player would allocate a new array each time and iterate
+            // _readyPlayerIds on every call. Batching reduces this to two passes and two
+            // allocations regardless of how many players are removed. This matters because
+            // OnOwnerAbandonedProcess can remove up to 79 players at once.
             string[] readyToRemove = new string[removedPlayerIds.Length];
             int removeCount = 0;
             foreach (string playerId in removedPlayerIds)
@@ -154,18 +159,16 @@ namespace Tsvrc.Process
                     System.Array.Copy(readyToRemove, trimmed, removeCount);
                     readyToRemove = trimmed;
                 }
-                // RemoveReadyPlayerInternal cannot be used here because CallingPlayer propagates
-                // through the entire call chain from any outer [NetworkCallable] context
-                // (VRChat docs: "InNetworkCall is only reset once the entry function terminates").
-                // Direct mutation bypasses the spoofing guard that RemoveReadyPlayerInternal's
-                // caller (BroadcastRemoveReadyPlayer) would apply — but that guard only protects
-                // against spoofed player IDs from the network. Here we have already validated
-                // that each ID in readyToRemove was in _readyPlayerIds (IsPlayerReady check above).
+                // RemoveReadyPlayerInternal cannot be used here because VRChat keeps CallingPlayer
+                // active for the entire call chain until the outermost network call returns. If we
+                // arrive here from a network event, CallingPlayer belongs to the original sender
+                // and the spoofing guard in BroadcastRemoveReadyPlayer would reject the call. We
+                // mutate directly since we already confirmed each ID is valid via IsPlayerReady.
                 _readyPlayerIds = TsArray.Remove(_readyPlayerIds, readyToRemove);
                 RequestSerialization();
             }
 
-            // A non-ready player may have just been removed, making all remaining players ready.
+            // Removing a non-ready player may make all remaining tracked players ready.
             CheckAllPlayersReady();
         }
 
@@ -177,8 +180,9 @@ namespace Tsvrc.Process
         protected virtual void OnReadyCheckCompleted() { }
 
         /// <summary>
-        /// Starts the ready check process.
+        /// Starts the ready check for the given set of players.
         /// </summary>
+        /// <param name="playerIds">The player IDs to include in the ready check.</param>
         public virtual void StartReadyCheck(string[] playerIds)
         {
             base.StartPlayerTracking(playerIds, useProcessUpdate: true);
@@ -203,23 +207,43 @@ namespace Tsvrc.Process
         /// <summary>
         /// Sets the local player's ready status.
         /// </summary>
+        /// <param name="ready">Pass false to mark the local player as not ready.</param>
         public void SetReady(bool ready = true)
         {
-            // _readyCheckActive is a local event-driven flag, safe to read from inside network
-            // event handlers. IsProcessRunning() reads [UdonSynced] _isRunning which may not have
-            // arrived yet when this is called from a network event handler in the same frame.
+            // Use _readyCheckActive instead of IsProcessRunning(). IsProcessRunning reads the
+            // synced _isRunning which may not have arrived yet when called from inside a network
+            // event handler. _readyCheckActive is driven by ordered events and is reliable here.
             if (!_readyCheckActive) return;
 
-            // _localPlayerId is cached once in TsvrcProcess.TsStart(); VRChat guarantees
-            // displayName and playerId are immutable for the duration of a session, so this
-            // is always equivalent to TsPlayer.GetPlayerID(Networking.LocalPlayer).
             string playerId = _localPlayerId;
 
-            // No local dedup check: _readyPlayerIds can be stale on non-owners; the owner's
-            // Broadcast* methods deduplicate before mutating, so redundant sends are harmless.
-            //
-            // NetworkEventTarget.Owner: only the owner processes these calls. Routing to All
-            // with N players calling SetReady would cause N² deliveries; Owner reduces this to N.
+            // On the owner, routing through SendCustomNetworkEvent would be rejected by the
+            // spoofing guard in BroadcastAddReadyPlayer. VRChat keeps CallingPlayer active for
+            // the entire call chain until the outermost network call returns, so if SetReady is
+            // called from inside a network event, CallingPlayer belongs to the original sender
+            // and the guard would reject the call. We mutate directly instead.
+            // IsProcessRunning is checked explicitly because _readyCheckActive can lag behind
+            // the true process state on the owner.
+            if (IsProcessOwner())
+            {
+                if (!IsProcessRunning()) return;
+                if (ready)
+                {
+                    if (!IsTrackedPlayer(playerId) || IsPlayerReady(playerId)) return;
+                    _readyPlayerIds = TsArray.Add(_readyPlayerIds, TsPlayer.ToArray(playerId));
+                    RequestSerialization();
+                    CheckAllPlayersReady();
+                }
+                else
+                {
+                    RemoveReadyPlayerInternal(playerId);
+                }
+                return;
+            }
+
+            // Route to the owner since only the owner mutates _readyPlayerIds. Sending to All
+            // would cause N² deliveries with N players. We skip a local duplicate check since
+            // _readyPlayerIds can be stale on non-owners and the owner deduplicates on arrival.
             if (ready)
             {
                 SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(BroadcastAddReadyPlayer), playerId);
@@ -231,18 +255,18 @@ namespace Tsvrc.Process
         }
 
         /// <summary>
-        /// Checks if a player with the given ID is marked as ready.
+        /// Returns true if the player with the given ID is currently marked as ready.
         /// </summary>
         protected bool IsPlayerReady(string playerId)
         {
             return TsArray.Contains(_readyPlayerIds, playerId);
         }
 
-        // Internal mutation helper: removes a player without network/caller validation.
-        // BroadcastRemoveReadyPlayer cannot be used here because CallingPlayer propagates
-        // through the entire call chain (VRChat docs: "InNetworkCall is only reset once the
-        // entry function terminates"). If this path is reached from within a [NetworkCallable]
-        // context, CallingPlayer ≠ removedPlayerId and the spoofing guard would reject the call.
+        // Removes a player without going through the network event path. We cannot call
+        // BroadcastRemoveReadyPlayer here because VRChat keeps CallingPlayer active for the
+        // entire chain until the outermost network call returns. If this runs inside a network
+        // event, CallingPlayer would not match the player being removed and the spoofing guard
+        // in BroadcastRemoveReadyPlayer would reject the call.
         private void RemoveReadyPlayerInternal(string playerId)
         {
             if (!IsPlayerReady(playerId)) return;
@@ -253,38 +277,36 @@ namespace Tsvrc.Process
         /// <summary>
         /// Adds a player to the ready list. Only the owner processes the change.
         /// </summary>
-        // maxEventsPerSecond: 2. Per VRChat docs: "It is strongly recommended to set this
-        // value as low as you can to mitigate malicious actors abusing your events." A player
-        // only needs to toggle ready once or twice per ready check; 2/s is more than enough.
+        // Rate limited to 2 per second. VRChat recommends keeping this as low as possible
+        // to prevent abuse. A player only needs to toggle ready a couple of times per check.
         [NetworkCallable(maxEventsPerSecond: 2)]
         public void BroadcastAddReadyPlayer(string playerId)
         {
             if (!IsProcessRunning() || !IsProcessOwner()) return;
             if (string.IsNullOrEmpty(playerId)) return;
-            // Prevent a player from marking someone else as ready: when this arrives over the
-            // network the calling player must be the one they claim to be. CallingPlayer is null
-            // for direct (non-network) calls, in which case the identity check is skipped.
+            // Only allow a player to mark themselves as ready. CallingPlayer is null for
+            // direct local calls so the check is skipped in that case.
             var caller = NetworkCalling.CallingPlayer;
             if (caller != null && TsPlayer.GetPlayerID(caller) != playerId) return;
             if (!IsTrackedPlayer(playerId) || IsPlayerReady(playerId)) return;
 
             _readyPlayerIds = TsArray.Add(_readyPlayerIds, TsPlayer.ToArray(playerId));
             RequestSerialization();
-            // Event-driven completion: check immediately rather than waiting for the next poll.
+            // Check immediately instead of waiting for the next poll tick.
             CheckAllPlayersReady();
         }
 
         /// <summary>
         /// Removes a player from the ready list. Only the owner processes the change.
         /// </summary>
-        // maxEventsPerSecond: 2. Same rationale as BroadcastAddReadyPlayer.
+        // Rate limited to 2 per second, same reason as BroadcastAddReadyPlayer.
         [NetworkCallable(maxEventsPerSecond: 2)]
         public void BroadcastRemoveReadyPlayer(string playerId)
         {
             if (!IsProcessRunning() || !IsProcessOwner()) return;
             if (string.IsNullOrEmpty(playerId)) return;
-            // Spoofing guard: the calling player must be the one they claim to be.
-            // CallingPlayer is null outside a network call, in which case the check is skipped.
+            // Only allow a player to unready themselves. CallingPlayer is null for direct
+            // local calls so the check is skipped in that case.
             var caller = NetworkCalling.CallingPlayer;
             if (caller != null && TsPlayer.GetPlayerID(caller) != playerId) return;
             RemoveReadyPlayerInternal(playerId);
