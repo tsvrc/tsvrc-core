@@ -18,7 +18,6 @@ namespace Tsvrc.Core
 
         /// <summary>
         /// Assigns the <see cref="CompiledTsvrc"/> reference and calls <see cref="TsStart"/>.
-        /// Idempotent: subsequent calls are no-ops.
         /// </summary>
         public void TsConstruct(CompiledTsvrc tsvrc)
         {
@@ -34,8 +33,6 @@ namespace Tsvrc.Core
         {
             TsConstruct(parent._ts);
         }
-
-        #region Events
 
         /// <summary>
         /// Subscribes <paramref name="listener"/> to <paramref name="eventName"/> on this behaviour.
@@ -62,12 +59,8 @@ namespace Tsvrc.Core
                     listeners[i].SendCustomEvent(callbacks[i]);
         }
 
-        #endregion
-
-        #region Lifecycle
-
         /// <summary>
-        /// Destroys the GameObject, permanently removing it and freeing its position in memory.
+        /// Removes the GameObject from the scene.
         /// </summary>
         public virtual void TsDestroy()
         {
@@ -75,7 +68,5 @@ namespace Tsvrc.Core
         }
 
         protected virtual void TsStart() { }
-
-        #endregion
     }
 }
