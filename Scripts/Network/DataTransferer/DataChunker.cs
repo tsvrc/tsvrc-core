@@ -4,52 +4,58 @@ using UnityEngine;
 namespace Tsvrc.Network
 {
     /// <summary>
-    /// Provides chunk-size constants and pure chunking math for string data.
-    /// No network, no process state — only splitting and validation logic.
+    /// Provides chunk-size constants and string chunking utilities.
+    /// This class has no network or process state. It only handles splitting and validating string data.
     /// </summary>
     public class DataChunker : ReadyCheckProcess
     {
-        // BroadcastDataChunkReceived carries four parameters whose total encoded size must stay
-        // under VRChat's hard 16 KB (16,384 byte) per-event limit (docs: new byte[16*1024] =
-        // "maximum allowed size"). All four are counted together:
+        // CHUNK_SIZE controls how many characters go into each BroadcastDataChunkReceived call.
+        // That event carries four parameters and their combined encoded size must stay under
+        // VRChat's hard 16 KB (16,384 byte) per-event limit (docs: new byte[16*1024] is the maximum).
         //
-        //   dataChunk (string)  : CHUNK_SIZE × bytes_per_char (UTF-8)
-        //   chunkIndex (int)    : 4 bytes
-        //   totalChunks (int)   : 4 bytes
-        //   playerIds (string[]): sum(UTF-8 bytes per ID) + N × 4 bytes (length-field overhead)
-        //                         (docs: new string[2]{"test","foobar"} = 4+6+8 = 18 bytes)
+        // Parameter sizes:
+        //   dataChunk (string)   : CHUNK_SIZE × bytes per char (UTF-8)
+        //   chunkIndex (int)     : 4 bytes
+        //   totalChunks (int)    : 4 bytes
+        //   playerIds (string[]) : UTF-8 bytes per ID + 4 bytes overhead per entry
+        //                          (e.g. new string[2]{"test","foobar"} = 4+6+8 = 18 bytes)
         //
-        // Worst case bytes per C# char: 3 bytes (BMP characters U+0800–U+FFFF, e.g. CJK).
-        // Surrogate pairs (emoji, U+10000+) are 2 C# chars → 4 UTF-8 bytes = 2 bytes/char,
-        // strictly less than CJK, so CJK is the binding worst case — NOT emoji.
+        // UTF-8 encodes BMP characters in the U+0800 to U+FFFF range (e.g. CJK) at 3 bytes per char.
+        // Emoji and other characters above U+FFFF use 2 C# chars but only 4 UTF-8 bytes total,
+        // which is 2 bytes per char. CJK is therefore the real worst case, not emoji.
         //
-        // playerIds format: "displayName#playerId". VRCPlayerApi.playerId is the instance-local
-        // runtime player ID (1–80 range for a standard 80-player instance = 2 decimal digits).
-        // Max display name: 32 chars. Worst-case CJK ID: 32×3 + 1 + 2 + 4 = 103 bytes/entry.
+        // Player IDs use the format "displayName#playerId". The numeric part is assigned in
+        // monotonically increasing order and never reused when a player leaves. In a busy session
+        // with player turnover, IDs can grow past the concurrent player cap, so a 3-digit bound
+        // (up to 999 total distinct joins) is a safe and realistic estimate.
+        // A 32-char CJK display name with a 3-digit ID gives 32×3 + 1 + 3 + 4 = 104 bytes per entry.
         //
         // Safety check for CHUNK_SIZE=2500 with 80 CJK-named players and CJK data:
-        //   2500 × 3 + 8 + 80 × 103 = 7,500 + 8 + 8,240 = 15,748 bytes ≤ 16,384 ✓
+        //   2500 × 3 + 8 + 80 × 104 = 7,500 + 8 + 8,320 = 15,828 bytes, within the 16,384 limit. ✓
         //
-        // CHUNK_SIZE=3000 overflows starting at 72 CJK-named players with CJK data:
-        //   3000 × 3 + 8 + 72 × 103 = 9,000 + 8 + 7,416 = 16,424 bytes → event silently
-        //   dropped → no ACK → transfer stalls indefinitely.
+        // At CHUNK_SIZE=3000 the limit breaks at 71 CJK-named players:
+        //   3000 × 3 + 8 + 71 × 104 = 9,000 + 8 + 7,384 = 16,392 bytes, over the limit.
+        //   An oversized event is silently dropped, the receiver never ACKs, and the transfer stalls.
         protected const int CHUNK_SIZE = 2500;
         protected const int MAX_MESSAGE_SIZE = 500000;
 
         /// <summary>
-        /// Checks if a message is valid for transfer.
+        /// Returns true if the message is non-empty and within the allowed size limit.
+        /// Logs a warning for empty messages and an error if the size limit is exceeded.
         /// </summary>
+        /// <param name="message">The message to validate.</param>
+        /// <returns>True if the message is valid for transfer, false otherwise.</returns>
         protected bool ValidateMessage(string message)
         {
             if (string.IsNullOrEmpty(message))
             {
-                Debug.LogWarning("[TsvrcDataSender] Cannot send empty message");
+                Debug.LogWarning("[DataChunker] Cannot send empty message");
                 return false;
             }
 
             if (message.Length > MAX_MESSAGE_SIZE)
             {
-                Debug.LogError($"[TsvrcDataSender] Message too large: {message.Length} chars (max {MAX_MESSAGE_SIZE})");
+                Debug.LogError($"[DataChunker] Message too large: {message.Length} chars (max {MAX_MESSAGE_SIZE})");
                 return false;
             }
 
@@ -57,8 +63,10 @@ namespace Tsvrc.Network
         }
 
         /// <summary>
-        /// Creates data chunks from the full data string.
+        /// Splits the data string into sequential chunks of at most <see cref="CHUNK_SIZE"/> characters each.
         /// </summary>
+        /// <param name="data">The full string to split.</param>
+        /// <returns>An ordered array of chunk strings.</returns>
         protected string[] CreateDataChunks(string data)
         {
             var chunksCount = CalculateTotalChunks(data.Length);
@@ -71,16 +79,22 @@ namespace Tsvrc.Network
         }
 
         /// <summary>
-        /// Calculates the total number of chunks needed for the data length.
+        /// Returns the number of chunks needed to transmit a string of the given character length.
         /// </summary>
+        /// <param name="dataLength">The character length of the full string.</param>
+        /// <returns>The total number of chunks.</returns>
         protected int CalculateTotalChunks(int dataLength)
         {
             return (dataLength + CHUNK_SIZE - 1) / CHUNK_SIZE;
         }
 
         /// <summary>
-        /// Extracts a specific chunk from the data string.
+        /// Returns the substring for the given zero-based chunk index.
+        /// The last chunk may be shorter than <see cref="CHUNK_SIZE"/> if the data does not divide evenly.
         /// </summary>
+        /// <param name="data">The full string to extract from.</param>
+        /// <param name="chunkIndex">The zero-based index of the chunk to extract.</param>
+        /// <returns>The chunk substring.</returns>
         protected string ExtractChunk(string data, int chunkIndex)
         {
             int startIndex = chunkIndex * CHUNK_SIZE;
