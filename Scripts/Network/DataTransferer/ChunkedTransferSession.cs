@@ -1,5 +1,6 @@
 using Tsvrc.Player;
 using Tsvrc.Utils;
+using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
 
@@ -22,7 +23,9 @@ namespace Tsvrc.Network
         private string[] _targetPlayerIds = new string[0];
         // True during the one-frame gap between SendCustomEventDelayedSeconds and _StartNextReadyCheck.
         // Prevents TransferData from overwriting mid-transfer state while _isRunning is temporarily false.
-        private bool _pendingNextChunk = false;
+        // Synced so that if the owner leaves during this gap, the new owner can detect it in
+        // OnOwnerAbandonedProcess and broadcast the stopped event to clean up receiver state.
+        [UdonSynced] private bool _pendingNextChunk = false;
 
         protected override void OnProcessStarted()
         {
@@ -32,7 +35,7 @@ namespace Tsvrc.Network
             {
                 _dataChunks = CreateDataChunks(_initialData);
                 _totalChunks = _dataChunks.Length;
-                // Important to clear initial data to avoid re-creating chunks on retries
+                // Clear now so _initialData does not survive a retry of OnProcessStarted.
                 _initialData = "";
                 _currentChunkIndex = 1;
             }
@@ -40,11 +43,11 @@ namespace Tsvrc.Network
             if (_currentChunkIndex == 1)
                 OnChunkSequenceStarted();
 
-            // Guard: a subscriber to OnDataReceptionStartedEvent (fired inline above via
-            // OnChunkSequenceStarted) may have called CancelDataTransfer(), resetting
-            // _currentChunkIndex to 0. SendDataChunk(0) would access _dataChunks[-1].
-            // GetTrackedPlayerIds() is called after this guard so that a cancel +
-            // new TransferData() inside the callback uses the new transfer's player list.
+            // A subscriber to OnDataReceptionStartedEvent (fired inline by OnChunkSequenceStarted)
+            // may have called CancelDataTransfer(), resetting _currentChunkIndex to 0.
+            // SendDataChunk(0) would access _dataChunks[-1]. GetTrackedPlayerIds() is called
+            // after this check so a cancel + new TransferData() in the callback uses the
+            // new transfer's player list.
             if (!IsProcessRunning()) return;
 
             SendDataChunk(_currentChunkIndex, GetTrackedPlayerIds());
@@ -53,24 +56,24 @@ namespace Tsvrc.Network
         protected override void OnProcessStopped()
         {
             base.OnProcessStopped();
-            // Guard: base.OnProcessStopped() fires TsEmit(OnReadyCheckStoppedEvent) inline.
-            // A subscriber calling TransferData() from that event starts a new transfer (_isRunning=true).
-            // Calling OnChunkSequenceStopped now would clear _transferActive on all clients.
+            // base.OnProcessStopped() fires TsEmit(OnReadyCheckStoppedEvent) inline, and a
+            // subscriber may call TransferData() from there, starting a new transfer.
+            // Calling OnChunkSequenceStopped here would clear _transferActive on all clients.
             if (IsProcessRunning()) return;
             OnChunkSequenceStopped();
         }
 
         protected override void OnProcessCompleted()
         {
-            // Capture before base call: base.OnProcessCompleted() fires TsEmit(OnReadyCheckCompletedEvent)
-            // inline, and a subscriber calling TransferData() may reset _currentChunkIndex/_totalChunks.
+            // Capture before the base call because base.OnProcessCompleted() fires
+            // TsEmit(OnReadyCheckCompletedEvent) inline, and a subscriber calling TransferData()
+            // may reset _currentChunkIndex and _totalChunks.
             bool isLastChunk = _currentChunkIndex == _totalChunks;
 
             base.OnProcessCompleted();
 
-            // Guard: same as OnProcessStopped. A new transfer from an inline subscriber may have
-            // set _isRunning=true. Proceeding would corrupt the new transfer (wrong completion
-            // broadcast on last chunk, or corrupted _targetPlayerIds on non-last chunk).
+            // Same guard as OnProcessStopped: a subscriber may have started a new transfer
+            // inline, setting _isRunning=true. Proceeding would corrupt that transfer.
             if (IsProcessRunning()) return;
 
             if (isLastChunk)
@@ -88,9 +91,8 @@ namespace Tsvrc.Network
         {
             base.OnProcessCleanup(isCompleted);
 
-            // Guard: a TransferData() call from inside OnProcessCompleted/Stopped's inline callbacks
-            // may have started a new transfer (_isRunning=true). Avoid advancing _currentChunkIndex
-            // or resetting the new transfer's chunk state.
+            // A TransferData() call from an inline callback in OnProcessCompleted or OnProcessStopped
+            // may have started a new transfer. Do not advance _currentChunkIndex or reset chunk state.
             if (IsProcessRunning()) return;
 
             // Only continue to next chunk if completed successfully (not stopped)
@@ -113,21 +115,19 @@ namespace Tsvrc.Network
 
         public void _StartNextReadyCheck()
         {
-            // Guard: CancelDataTransfer() may have cleared _pendingNextChunk during the one-frame gap.
-            // Without this, a cancelled transfer would call StartReadyCheck with reset state.
+            // CancelDataTransfer() may have cleared _pendingNextChunk during the one-frame gap.
+            // Without this check, a cancelled transfer would call StartReadyCheck with reset state.
             if (!_pendingNextChunk) return;
 
             _pendingNextChunk = false;
 
-            // Filter players who departed or suspended during the inter-chunk gap.
-            // Both PlayerTracker.OnPlayerLeft and PlayerTracker.OnPlayerSuspendChanged guard
-            // with IsProcessRunning()=true, so neither fires while _isRunning=false between
-            // chunks. A departed player has left the instance; a suspended player cannot call
-            // SetReady() or respond to network events (VRChat docs: "While suspended, devices
-            // don't run Udon code or respond to network events until the player reopens VRChat").
+            // PlayerTracker.OnPlayerLeft and OnPlayerSuspendChanged both guard with
+            // IsProcessRunning()=true, so neither fires while _isRunning=false between chunks.
+            // Departed and suspended players must be filtered manually before starting the next chunk.
+            // A suspended player cannot respond to network events (VRChat docs: "While suspended,
+            // devices don't run Udon code or respond to network events until the player reopens VRChat").
             // Either case would stall CheckAllPlayersReady() indefinitely.
-            // Using GetAllPlayers() instead of GetAllPlayerIDs() lets us check isSuspended in
-            // the same pass, avoiding an O(n) FindPlayerByID call per tracked player.
+            // GetAllPlayers() is used so the isSuspended check and ID lookup happen in a single pass.
             VRCPlayerApi[] allPlayers = TsPlayer.GetAllPlayers();
             string[] activeNonSuspendedIds = new string[allPlayers.Length];
             int activeCount = 0;
@@ -156,6 +156,9 @@ namespace Tsvrc.Network
                 // clients receive the stopped event and clean up receiver state.
                 ResetInternalTransferData();
                 OnChunkSequenceStopped();
+                // _pendingNextChunk is [UdonSynced] and was cleared at the top of this method
+                // outside InternalCleanup, so serialize explicitly.
+                RequestSerialization();
                 return;
             }
 
@@ -182,17 +185,12 @@ namespace Tsvrc.Network
         {
             base.OnProcessUpdate(); // ReadyCheckProcess → CheckAllPlayersReady
 
-            // CheckAllPlayersReady() guards: if (trackedPlayerIds.Length == 0) return.
-            // This means that if all tracked players depart or suspend DURING an active ready
-            // check, base.OnProcessUpdate() becomes a no-op — the process never stops or
-            // completes, and the transfer stalls indefinitely. The between-chunk gap is handled
-            // by _StartNextReadyCheck filtering departed+suspended players, but there is no
-            // equivalent filter while a ready check is actively running.
-            //
-            // Detect the empty-tracker case here and cancel. IsProcessRunning() guards against
-            // the case where base.OnProcessUpdate() just completed the process (all remaining
-            // players were ready), in which case _isRunning is already false and CancelDataTransfer
-            // must not fire.
+            // CheckAllPlayersReady() returns early when trackedPlayerIds is empty, so if all
+            // tracked players leave or suspend during an active ready check, the process stalls.
+            // _StartNextReadyCheck filters these players between chunks, but there is no
+            // equivalent during an active ready check, so we detect and cancel here.
+            // IsProcessRunning() prevents calling CancelDataTransfer() when base.OnProcessUpdate()
+            // just completed the process (all players were ready), where _isRunning is already false.
             if (IsProcessRunning() && GetTrackedPlayerIds().Length == 0)
                 CancelDataTransfer();
         }
@@ -200,26 +198,110 @@ namespace Tsvrc.Network
         protected override void OnOwnerAbandonedProcess()
         {
             // Transfer state (_dataChunks, _currentChunkIndex, _totalChunks) is owner-only and
-            // unsynced. The new owner has all these at default (0/empty). Without stopping first,
-            // base.OnOwnerAbandonedProcess could reach CheckAllPlayersReady and fire a false completion
-            // (_currentChunkIndex == _totalChunks == 0). IsProcessOwner() returns true here because
-            // TakeOverAbandonedProcess already set _ownerId before calling this method.
+            // unsynced, so the new owner starts with all of these at zero or empty. Without stopping
+            // first, a stale tick could reach CheckAllPlayersReady and false-complete the process
+            // because _currentChunkIndex == _totalChunks == 0. IsProcessOwner() is already true here
+            // because TakeOverAbandonedProcess set _ownerId before calling this method.
             //
-            // Guard: if the previous owner left during the inter-chunk one-frame gap
-            // (_pendingNextChunk=true on the old client), _isRunning was already set false by
-            // InternalCleanup when the previous chunk's ready-check completed. Calling StopReadyCheck
-            // → StopProcess() with _isRunning=false triggers a spurious "[TsvrcProcess] Process is
-            // not running" warning even though the state is correct. Skip the call in that case:
-            // base.OnOwnerAbandonedProcess() is already a no-op there because InternalCleanup also
-            // cleared _trackedPlayerIds, causing PlayerTracker.OnOwnerAbandonedProcess to return
-            // immediately on the _trackedPlayerIds.Length == 0 check.
-            if (IsProcessRunning()) StopReadyCheck();
+            // If the previous owner left during an active ready check, stop it.
+            //
+            // If the previous owner left during the inter-chunk gap (_pendingNextChunk=true),
+            // _isRunning is already false. The deferred _StartNextReadyCheck scheduled on the old
+            // owner is lost when ownership transfers. Without the else-if branch, no DataTransferStopped
+            // event would ever be broadcast, leaving all receivers with _transferActive=true.
+            // _pendingNextChunk is synced, so the new owner reads the correct value here.
+            //
+            // The stale sync packet from the old owner can arrive AFTER this method runs, in
+            // which case _pendingNextChunk is still false here. OnDeserialization handles that.
+            if (IsProcessRunning())
+                StopReadyCheck();
+            else if (_pendingNextChunk)
+            {
+                // Broadcast stopped to clean up _transferActive on all receivers, then serialize
+                // the cleared _pendingNextChunk so late joiners do not see a stale true.
+                ResetInternalTransferData();
+                OnChunkSequenceStopped();
+                RequestSerialization();
+            }
             base.OnOwnerAbandonedProcess();
         }
 
+        public override void OnDeserialization()
+        {
+            base.OnDeserialization();
+
+            // Late-packet gap case:
+            // The old owner's sync packet (chunk N InternalCleanup: _pendingNextChunk=true,
+            // _isRunning=false) can arrive AFTER OnOwnerAbandonedProcess already ran and saw
+            // _pendingNextChunk=false. No stopped event was broadcast in that window.
+            //
+            // Networking.IsOwner() is used instead of IsProcessOwner() because the stale packet
+            // may overwrite _ownerPlayerIdInt=0 (cleared by the old owner's InternalCleanup),
+            // making IsProcessOwner() return false even though we hold Unity ownership.
+            // TsvrcProcess.OnDeserialization only recovers stale-packet ownership when _isRunning=true,
+            // so it does not handle the _pendingNextChunk=true, _isRunning=false case.
+            //
+            // If a new transfer already started (IsProcessRunning()=true), the started event
+            // already reset receiver state, so we do not broadcast stopped again.
+            //
+            // The _dataChunks.Length == 0 guard prevents a false positive when packet A arrives
+            // after a new transfer started from a deferred user callback (e.g. OnDataTransferStopped
+            // next-frame). Packet A overwrites _isRunning=false before this method runs.
+            // TsvrcProcess.OnDeserialization hits the early return on _ownerId="" and does not
+            // reassert ownership. Without this guard, the handler would wipe the live transfer's
+            // _dataChunks and broadcast a spurious stopped event. _dataChunks is unsynced and
+            // only populated in OnProcessStarted, so it is always non-empty for a live transfer.
+            if (Networking.IsOwner(gameObject) && !IsProcessRunning() && _pendingNextChunk
+                && _dataChunks.Length == 0)
+            {
+                ResetInternalTransferData(); // clears _pendingNextChunk = false
+                OnChunkSequenceStopped();
+                RequestSerialization(); // serialize _pendingNextChunk = false to all clients
+                return;
+            }
+
+            // Zombie-process case:
+            // The old owner may send two sync packets when leaving during chunk N+1's first frame:
+            //   Packet A (frame N,   InternalCleanup): _isRunning=false, _pendingNextChunk=true
+            //   Packet B (frame N+1, StartReadyCheck): _isRunning=true,  _pendingNextChunk=false
+            //
+            // If both arrive after TakeOverAbandonedProcess, TsvrcProcess.OnDeserialization sees
+            // packet B's _isRunning=true with a departed _ownerId, calls SetProcessOwner(local)
+            // and restarts the tick loop. The new owner now has a zombie process:
+            //   _isRunning=true, IsProcessOwner()=true, _dataChunks.Length=0 (unsynced)
+            //   _trackedPlayerIds = stale players from packet B
+            //
+            // A tick fires CheckAllPlayersReady(). Those stale players already called SetReady(),
+            // so it immediately false-completes. OnProcessCompleted sees isLastChunk=(0==0)=true
+            // and calls OnChunkSequenceCompleted, broadcasting a false transfer-complete.
+            //
+            // _dataChunks is unsynced and always populated synchronously in OnProcessStarted
+            // before RequestSerialization is called. It is never empty on a legitimate owner
+            // with _isRunning=true. OnDeserialization never fires for the sender of
+            // RequestSerialization (VRChat guarantee), so this check never produces a false positive.
+            //
+            // The second StopReadyCheck() is NECESSARY, not merely idempotent.
+            // SetProcessOwner() in TsvrcProcess.OnDeserialization calls RequestSerialization()
+            // while _isRunning is still true, re-broadcasting it to all remote clients. Their
+            // OnDeserialization restores _readyCheckActive=true. Without the second stop,
+            // those clients stay stuck with _readyCheckActive=true permanently.
+            //
+            // As a result, NotifyTrackedPlayersProcessStopped fires twice on all clients.
+            // The second fire is what clears _readyCheckActive on clients where it was restored.
+            // NotifyTrackedPlayersDataTransferStopped also fires twice, but the _pendingTransferStopped
+            // and _pendingStop guards in DataSender and DataSenderReceiver suppress the second
+            // user-visible emission.
+            if (IsProcessOwner() && IsProcessRunning() && _dataChunks.Length == 0 && !_pendingNextChunk)
+                StopReadyCheck();
+        }
+
         /// <summary>
-        /// Sends string data to specified players.
+        /// Starts a chunked data transfer to the specified players.
+        /// Data is split into chunks and sent sequentially. Each chunk requires all target
+        /// players to acknowledge receipt before the next one is sent.
         /// </summary>
+        /// <param name="data">The string to transfer. Must be non-empty and within the size limit.</param>
+        /// <param name="playerIds">The player IDs to send data to. Must be non-empty.</param>
         public virtual void TransferData(string data, string[] playerIds)
         {
             if (IsProcessRunning() || _pendingNextChunk)
@@ -228,7 +310,7 @@ namespace Tsvrc.Network
                 return;
             }
 
-            // Guard: an empty player list leaves the process with no path to completion.
+            // An empty player list leaves the process with no path to completion.
             // CheckAllPlayersReady never returns true and _TickProcessUpdate runs forever.
             if (playerIds == null || playerIds.Length == 0)
             {
@@ -245,7 +327,8 @@ namespace Tsvrc.Network
         }
 
         /// <summary>
-        /// Cancels the current data transfer before completion.
+        /// Cancels the current data transfer. Safe to call at any point during a transfer,
+        /// including while the process is between chunks. Has no effect if no transfer is active.
         /// </summary>
         public virtual void CancelDataTransfer()
         {
@@ -254,6 +337,9 @@ namespace Tsvrc.Network
                 // The process is stopped between chunks, so cancel the pending continuation.
                 ResetInternalTransferData(); // also clears _pendingNextChunk
                 OnChunkSequenceStopped();
+                // _pendingNextChunk is [UdonSynced] and was just cleared outside InternalCleanup,
+                // so serialize explicitly. InternalCleanup is not called on this path.
+                RequestSerialization();
                 return;
             }
             StopReadyCheck();
@@ -304,8 +390,12 @@ namespace Tsvrc.Network
 
         /// <summary>
         /// Called when a data chunk is ready to be sent.
-        /// Only invoked on the process owner. Fires for each chunk.
+        /// Only invoked on the process owner. Fires for each chunk in sequence.
         /// </summary>
+        /// <param name="dataChunk">The chunk content.</param>
+        /// <param name="chunkIndex">The 1-based index of this chunk.</param>
+        /// <param name="totalChunks">Total number of chunks in this transfer.</param>
+        /// <param name="playerIds">The player IDs that should receive this chunk.</param>
         protected virtual void OnDataChunkSendRequested(string dataChunk, int chunkIndex, int totalChunks, string[] playerIds) { }
     }
 }
