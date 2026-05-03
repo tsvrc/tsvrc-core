@@ -1,12 +1,27 @@
 using Tsvrc.Core;
+using UdonSharp;
 using VRC.SDK3.Data;
 
 namespace Tsvrc.State
 {
+    [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class StateManager : TsvrcBehaviour
     {
         // -1 means no state has been set yet
         protected int _currentState = -1;
+        protected int _previousState = -1;
+
+        /// <summary>
+        /// The state before the most recent transition. -1 if no transition has occurred yet.
+        /// Readable by pool-based subscribers directly on the StateManager reference.
+        /// </summary>
+        public int PreviousState => _previousState;
+
+        /// <summary>
+        /// The currently active state. -1 if SetState has never been called.
+        /// Readable by pool-based subscribers directly on the StateManager reference.
+        /// </summary>
+        public int CurrentState => _currentState;
 
         // Maps state int -> DataDictionary { "enter": methodName, "exit": methodName }
         private DataDictionary _stateData = new DataDictionary();
@@ -50,10 +65,14 @@ namespace Tsvrc.State
             }
 
             int oldState = _currentState;
+            _previousState = _currentState;
             _currentState = newState;
 
             // Notify subclass that the state has changed before entering the new state
             OnStateChanged(oldState, newState);
+
+            // Notify any external subscribers (compose-based users)
+            TsEmit("OnStateChanged");
 
             // --- Enter new state ---
             if (_stateData.ContainsKey(newState))
@@ -67,6 +86,11 @@ namespace Tsvrc.State
         public int GetCurrentState()
         {
             return _currentState;
+        }
+
+        public int GetPreviousState()
+        {
+            return _previousState;
         }
 
         /// <summary>
