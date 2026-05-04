@@ -134,6 +134,7 @@ namespace Tsvrc.UI
 
                 item.TsConstruct(this);
                 item.Bind(this, di, data);
+                go.SetActive(true);
                 _pool[i] = item;
             }
         }
