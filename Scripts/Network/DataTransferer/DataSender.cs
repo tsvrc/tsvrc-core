@@ -5,11 +5,11 @@ using VRC.Udon.Common.Interfaces;
 namespace Tsvrc.Network
 {
     /// <summary>
-    /// Broadcasts transfer lifecycle events (<c>Started</c>, <c>Stopped</c>, <c>Completed</c>)
-    /// to all instance players via <see cref="VRC.SDK3.UdonNetworkCalling.NetworkCallable"/> methods.
-    /// Receives the <see cref="ChunkedTransferSession"/> sequence hooks and translates them into
-    /// network events. Defers <see cref="TsEmit"/> calls so <c>InternalCleanup</c> finishes
-    /// before user callbacks fire.
+    /// Sends data transfer lifecycle notifications (started, stopped, completed) to all players
+    /// in the instance using <see cref="VRC.SDK3.UdonNetworkCalling.NetworkCallable"/> methods.
+    /// Hooks into the <see cref="ChunkedTransferSession"/> sequence callbacks and translates them
+    /// into network events. Stop and completion notifications are deferred by one frame so that
+    /// internal cleanup finishes before user callbacks run.
     /// </summary>
     public class DataSender : ChunkedTransferSession
     {
@@ -29,11 +29,12 @@ namespace Tsvrc.Network
         /// </summary>
         public const string OnDataTransferCompletedEvent = "OnDataTransferCompleted";
 
-        // Deferred-emission flags. TsEmit fires synchronously while ExecuteStop/ExecuteComplete
-        // is still on the call stack (InternalCleanup not yet run). Deferring to the next event
-        // cycle ensures InternalCleanup completes before user callbacks fire.
-        // Not reset by ResetInternalTransferData(). They must survive until _EmitDataTransfer*
-        // fires. Cleared only by NotifyTrackedPlayersDataTransferStarted to suppress stale emits.
+        // These flags track pending deferred emissions. TsEmit fires synchronously while
+        // ExecuteStop or ExecuteComplete is still on the call stack before InternalCleanup runs.
+        // Deferring to the next frame ensures state is fully cleaned up before user callbacks fire.
+        // Not reset by ResetInternalTransferData because they must survive until _EmitDataTransfer*
+        // fires. NotifyTrackedPlayersDataTransferStarted clears both to suppress stale emissions
+        // when a new transfer begins before the deferred call runs.
         private bool _pendingTransferStopped = false;
         private bool _pendingTransferCompleted = false;
 
@@ -68,31 +69,29 @@ namespace Tsvrc.Network
         /// <summary>
         /// Broadcast target: fires on all instance players when the data transfer starts.
         /// </summary>
-        // maxEventsPerSecond: 100. Must match BroadcastDataChunkReceived (also 100/s) so that
-        // per VRChat docs (creators.vrchat.com/worlds/udon/networking/events#rate-limiting):
-        // "The order in which events are sent and received is guaranteed as long as you don't
-        // hit your own defined rate-limit." At 5/s (default), rapid CancelDataTransfer+TransferData
-        // cycles (>5/s) queue this event while the 100/s chunk event drains ahead of it. Remote
-        // clients then receive BroadcastDataChunkReceived before NotifyTrackedPlayersDataTransferStarted,
-        // so _transferActive is still false when the first chunk arrives, the chunk is dropped,
-        // the recipient never calls SetReady(), and the transfer stalls indefinitely.
+        // maxEventsPerSecond must match BroadcastDataChunkReceived (both 100 per second).
+        // VRChat only guarantees event ordering when you stay under your own defined rate limit.
+        // At the default 5 per second, rapid CancelDataTransfer and TransferData calls can cause
+        // chunk events to arrive on remote clients before this started notification. When that
+        // happens, _transferActive is false when the first chunk arrives, the chunk is dropped,
+        // SetReady is never called, and the transfer stalls indefinitely.
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersDataTransferStarted()
         {
-            // Only the process owner sends this event. Any instance player can invoke a
-            // [NetworkCallable] directly; without this guard a malicious player could call
-            // OnTransferStarted() → ResetReceiverState() on all clients, corrupting
-            // _expectedSenderId so the real owner's subsequent chunks are rejected, and
-            // stalling the transfer permanently. _isBroadcasting bypasses the check during
-            // the owner's own inline execution where CallingPlayer may be propagated.
+            // Only the object owner should trigger this event. Any player can call a
+            // NetworkCallable directly, so without this check a malicious player could reset
+            // receiver state on all clients, corrupting _expectedSenderId and causing the real
+            // owner's chunks to be rejected, stalling the transfer permanently.
+            // _isBroadcasting bypasses this check during the owner's own local execution
+            // where CallingPlayer may not be propagated correctly.
             if (!_isBroadcasting)
             {
                 var caller = NetworkCalling.CallingPlayer;
                 var owner = Networking.GetOwner(gameObject);
                 if (caller == null || owner == null || caller.playerId != owner.playerId) return;
             }
-            // Cancel any deferred stopped/completed emit from a previous transfer so it
-            // does not fire after this new transfer has already started.
+            // Clear any pending deferred emissions from a previous transfer so they do not
+            // fire after this new transfer has already started.
             _pendingTransferStopped = false;
             _pendingTransferCompleted = false;
             OnTransferStarted();
@@ -102,35 +101,35 @@ namespace Tsvrc.Network
         /// <summary>
         /// Broadcast target: fires on all instance players when the data transfer is stopped.
         /// </summary>
-        // maxEventsPerSecond: 100. Same rationale as NotifyTrackedPlayersDataTransferStarted:
-        // must match BroadcastDataChunkReceived to preserve event ordering under load.
+        // maxEventsPerSecond must match BroadcastDataChunkReceived at 100 per second.
+        // Same ordering rationale as NotifyTrackedPlayersDataTransferStarted.
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersDataTransferStopped()
         {
-            // Owner-only guard: same rationale as NotifyTrackedPlayersDataTransferStarted.
+            // Same owner check as NotifyTrackedPlayersDataTransferStarted.
             if (!_isBroadcasting)
             {
                 var caller = NetworkCalling.CallingPlayer;
                 var owner = Networking.GetOwner(gameObject);
                 if (caller == null || owner == null || caller.playerId != owner.playerId) return;
             }
-            // Set flag BEFORE the virtual callback. OnTransferStopped() fires synchronously, and
-            // a subclass may call TransferData() inside it. That triggers
-            // NotifyTrackedPlayersDataTransferStarted inline, clearing this flag. Setting after
-            // the callback would re-set it after that clear, causing a spurious stopped event.
+            // Set the flag before calling the virtual method. If OnTransferStopped triggers
+            // a new TransferData call, NotifyTrackedPlayersDataTransferStarted will run inline
+            // and clear this flag. Setting it afterward would override that clear and emit a
+            // spurious stopped notification.
             _pendingTransferStopped = true;
             OnTransferStopped();
-            // Defer TsEmit: on the owner this fires while ExecuteStop is still on the call stack
-            // (InternalCleanup not yet run), so a TransferData() from the callback would corrupt state.
+            // Defer the emit so InternalCleanup finishes first. On the owner, ExecuteStop is
+            // still on the call stack here, so calling TransferData from the callback would
+            // corrupt internal state without this deferral.
             SendCustomEventDelayedSeconds(nameof(_EmitDataTransferStopped), 0f);
         }
 
-        // Underscore prefix: local-only, cannot be triggered via network event.
-        // Called by SendCustomEventDelayedSeconds in NotifyTrackedPlayersDataTransferStopped.
+        // Deferred emit scheduled by NotifyTrackedPlayersDataTransferStopped.
+        // The underscore prefix prevents this from being callable as a network event.
         public void _EmitDataTransferStopped()
         {
-            // Guard: NotifyTrackedPlayersDataTransferStarted clears _pendingTransferStopped,
-            // suppressing this if a new transfer started before the deferred call fires.
+            // If a new transfer started before this ran, the flag was already cleared, so skip.
             if (!_pendingTransferStopped) return;
             _pendingTransferStopped = false;
             TsEmit(OnDataTransferStoppedEvent);
@@ -139,33 +138,31 @@ namespace Tsvrc.Network
         /// <summary>
         /// Broadcast target: fires on all instance players when the data transfer completes.
         /// </summary>
-        // maxEventsPerSecond: 100. Same rationale as NotifyTrackedPlayersDataTransferStarted.
+        // maxEventsPerSecond must match BroadcastDataChunkReceived at 100 per second.
+        // Same ordering rationale as NotifyTrackedPlayersDataTransferStarted.
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersDataTransferCompleted()
         {
-            // Owner-only guard: same rationale as NotifyTrackedPlayersDataTransferStarted.
+            // Same owner check as NotifyTrackedPlayersDataTransferStarted.
             if (!_isBroadcasting)
             {
                 var caller = NetworkCalling.CallingPlayer;
                 var owner = Networking.GetOwner(gameObject);
                 if (caller == null || owner == null || caller.playerId != owner.playerId) return;
             }
-            // Flag before virtual call: a new TransferData() from the callback would call
-            // NotifyTrackedPlayersDataTransferStarted inline, clearing this flag; setting
-            // after the call would re-set it, causing a spurious completed emit.
+            // Set the flag before calling the virtual method, same reason as in
+            // NotifyTrackedPlayersDataTransferStopped.
             _pendingTransferCompleted = true;
             OnTransferCompleted();
-            // Defer so InternalCleanup finishes before user callbacks run
-            // (same reason as NotifyTrackedPlayersDataTransferStopped).
+            // Defer the emit so InternalCleanup finishes before user callbacks run.
             SendCustomEventDelayedSeconds(nameof(_EmitDataTransferCompleted), 0f);
         }
 
-        // Underscore prefix: local-only, cannot be triggered via network event.
-        // Called by SendCustomEventDelayedSeconds in NotifyTrackedPlayersDataTransferCompleted.
+        // Deferred emit scheduled by NotifyTrackedPlayersDataTransferCompleted.
+        // The underscore prefix prevents this from being callable as a network event.
         public void _EmitDataTransferCompleted()
         {
-            // Guard: NotifyTrackedPlayersDataTransferStarted clears _pendingTransferCompleted,
-            // suppressing this if a new transfer started before the deferred call fires.
+            // If a new transfer started before this ran, the flag was already cleared, so skip.
             if (!_pendingTransferCompleted) return;
             _pendingTransferCompleted = false;
             TsEmit(OnDataTransferCompletedEvent);
