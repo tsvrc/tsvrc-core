@@ -199,6 +199,8 @@ namespace Tsvrc.Editor
             w.Line("[HideInInspector] [SerializeField] private TextMeshProUGUI[] _translationTargets;");
             w.Line("private int _tsBatchIndex;");
             w.Line("private bool _tsBatchRunning;");
+            w.Line("private UdonSharpBehaviour[] _tsLangListeners = new UdonSharpBehaviour[0];");
+            w.Line("private string[] _tsLangCallbacks = new string[0];");
 
             w.EndRegion();
         }
@@ -225,6 +227,13 @@ namespace Tsvrc.Editor
                 w.Line("_tsBatchIndex = 0;");
                 w.Line("_tsBatchRunning = true;");
                 w.Line("_TsApplyTranslationBatch();");
+                w.Line("for (int _tsLi = 0; _tsLi < _tsLangListeners.Length; _tsLi++) _tsLangListeners[_tsLi].SendCustomEvent(_tsLangCallbacks[_tsLi]);");
+            }
+
+            using (w.Method("public void SubscribeLanguageChanged(UdonSharpBehaviour listener, string callback)"))
+            {
+                w.Line("_tsLangListeners = TsArray.Add(_tsLangListeners, new UdonSharpBehaviour[] { listener });");
+                w.Line("_tsLangCallbacks = TsArray.Add(_tsLangCallbacks, new string[] { callback });");
             }
 
             // Translate, linear scan across baked keys. With ~20 keys this is negligible.
