@@ -1,11 +1,12 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
+using UdonSharp;
 using UnityEditor;
 using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Open via Tsvrc > Tools > Mesh Combiner.
+    /// <summary>Editor window that combines selected MeshFilter sources into a single multi-material mesh asset. Open via Tsvrc > Tools > Mesh Combiner.</summary>
     internal class MeshCombinerWindow : EditorWindow
     {
         private readonly List<MeshFilter> _sources = new List<MeshFilter>();
@@ -14,6 +15,7 @@ namespace Tsvrc.Editor
         private bool _deactivateSources = true;
         private bool _recalculateNormals = false;
         private bool _excludeEditorOnly = true;
+        private bool _combineColliders = true;
         private Vector2 _scroll;
 
         // Cached every time the sources list changes to avoid allocating on every repaint.
@@ -138,7 +140,9 @@ namespace Tsvrc.Editor
 
             _deactivateSources = EditorGUILayout.Toggle(
                 new GUIContent("Deactivate Sources",
-                    "Deactivate source GameObjects after combining. Undoable."),
+                    "Deactivate source GameObjects after combining. Undoable.\n" +
+                    "Sources that have an UdonSharpBehaviour are not deactivated — their MeshRenderer is disabled instead " +
+                    "so the Udon script and its collider remain active."),
                 _deactivateSources);
 
             _recalculateNormals = EditorGUILayout.Toggle(
@@ -151,6 +155,13 @@ namespace Tsvrc.Editor
                 new GUIContent("Exclude EditorOnly",
                     "Skip source GameObjects tagged \"EditorOnly\" when combining."),
                 _excludeEditorOnly);
+
+            _combineColliders = EditorGUILayout.Toggle(
+                new GUIContent("Combine Colliders",
+                    "Merge solid MeshColliders into a single collision mesh asset (saved alongside the visual mesh). " +
+                    "Box, Sphere, Capsule, and trigger MeshColliders are recreated as child GameObjects under the combined object. " +
+                    "Disabled colliders and colliders on objects with UdonSharpBehaviour are excluded."),
+                _combineColliders);
         }
 
         private void DrawCombineButton()
@@ -171,7 +182,6 @@ namespace Tsvrc.Editor
         private void LoadFromSelection()
         {
             _sources.Clear();
-            // Reuse the field-level HashSet to avoid allocating on every call.
             _seenSet.Clear();
             foreach (var go in Selection.gameObjects)
                 foreach (var mf in go.GetComponentsInChildren<MeshFilter>(true))
@@ -191,55 +201,172 @@ namespace Tsvrc.Editor
 
         private void Execute(List<MeshFilter> valid)
         {
-            Mesh combinedMesh = null;
+            // Clear previous status so a slow combine does not show stale results.
+            _statusMessage = null;
+
+            // Group all undo operations so a single Ctrl+Z reverses the entire combine.
+            Undo.SetCurrentGroupName("Combine Meshes");
+            var undoGroup = Undo.GetCurrentGroup();
+
+            Mesh visualMesh = null;
+            Mesh collisionMesh = null;
+            // Declared outside try so catch can clean it up if an exception fires after creation.
+            GameObject go = null;
             try
             {
-                var result = MeshCombinerTool.Combine(valid, _root, _recalculateNormals, _excludeEditorOnly);
-                combinedMesh = result.Mesh;
+                var result = MeshCombinerTool.Combine(valid, _root, new MeshCombinerTool.CombineOptions
+                {
+                    RecalculateNormals = _recalculateNormals,
+                    ExcludeEditorOnly = _excludeEditorOnly,
+                    IncludeColliders = _combineColliders,
+                });
 
-                // Overwrite existing asset rather than throwing.
-                // Use Object (not Mesh) so any asset type at the path is caught.
-                if (AssetDatabase.LoadAssetAtPath<Object>(_savePath) != null)
-                    AssetDatabase.DeleteAsset(_savePath);
+                visualMesh = result.VisualMesh;
+                collisionMesh = result.CollisionMesh;
 
-                AssetDatabase.CreateAsset(combinedMesh, _savePath);
-                // Save only this asset, not all dirty assets project-wide.
-                AssetDatabase.SaveAssetIfDirty(combinedMesh);
+                SaveAsset(visualMesh, _savePath);
+                if (collisionMesh != null)
+                {
+                    // Slice the last 6 chars (".asset") to avoid Replace hitting any earlier occurrence.
+                    var collisionPath = _savePath[..^6] + "_Collider.asset";
+                    SaveAsset(collisionMesh, collisionPath);
+                }
 
-                var go = new GameObject("CombinedMesh");
+                go = new GameObject("CombinedMesh");
                 Undo.RegisterCreatedObjectUndo(go, "Combine Meshes");
 
                 if (_root != null)
                     go.transform.SetParent(_root, worldPositionStays: false);
 
-                go.AddComponent<MeshFilter>().sharedMesh = combinedMesh;
+                go.AddComponent<MeshFilter>().sharedMesh = visualMesh;
                 go.AddComponent<MeshRenderer>().sharedMaterials = result.Materials;
 
+                if (collisionMesh != null)
+                    go.AddComponent<MeshCollider>().sharedMesh = collisionMesh;
+
+                // Recreate primitive colliders as child GameObjects to preserve orientation.
+                // Parent first so we can correct localScale relative to the parent's world scale.
+                var parentScale = go.transform.lossyScale;
+                foreach (var col in result.PrimitiveColliders)
+                {
+                    var child = new GameObject(col.gameObject.name + "_Collider");
+                    Undo.RegisterCreatedObjectUndo(child, "Combine Meshes");
+                    child.transform.SetPositionAndRotation(col.transform.position, col.transform.rotation);
+                    child.transform.SetParent(go.transform, worldPositionStays: true);
+
+                    // Compute localScale so world scale matches the original after reparenting.
+                    // SetParent(worldPositionStays: true) only preserves position and rotation, not scale.
+                    var targetScale = col.transform.lossyScale;
+                    child.transform.localScale = new Vector3(
+                        parentScale.x != 0f ? targetScale.x / parentScale.x : targetScale.x,
+                        parentScale.y != 0f ? targetScale.y / parentScale.y : targetScale.y,
+                        parentScale.z != 0f ? targetScale.z / parentScale.z : targetScale.z);
+
+                    CopyCollider(col, child);
+                }
+
+                int skippedUdon = 0;
                 if (_deactivateSources)
                 {
                     foreach (var mf in valid)
                     {
-                        // RecordObject must be called BEFORE the mutation so Undo captures the previous state.
+                        if (mf.GetComponent<UdonSharpBehaviour>() != null)
+                        {
+                            // Keep the source active so the Udon script and its collider keep running.
+                            // Disabling the MeshRenderer hides rendering without affecting physics or script execution.
+                            var mr = mf.GetComponent<MeshRenderer>();
+                            if (mr != null)
+                            {
+                                Undo.RecordObject(mr, "Combine Meshes");
+                                mr.enabled = false;
+                            }
+                            skippedUdon++;
+                            continue;
+                        }
                         Undo.RecordObject(mf.gameObject, "Combine Meshes");
                         mf.gameObject.SetActive(false);
                     }
                 }
 
+                // Collapse all registered undo operations into the single group opened at the top.
+                // Without this, every RegisterCreatedObjectUndo and RecordObject is a separate step.
+                Undo.CollapseUndoOperations(undoGroup);
                 Selection.activeGameObject = go;
 
-                _statusMessage = $"Done \u2014 {combinedMesh.vertexCount:N0} vertices, {result.Materials.Length} material(s) saved to {_savePath}";
+                _statusMessage = $"Done: {visualMesh.vertexCount:N0} vertices, {result.Materials.Length} material(s) saved to {_savePath}"
+                    + (skippedUdon > 0 ? $"\n{skippedUdon} source(s) with UdonSharpBehaviour kept active, renderer hidden." : "");
                 _statusType = MessageType.Info;
-                Debug.Log($"[Tsvrc] Mesh combined \u2192 {_savePath}  ({result.Materials.Length} material(s), {combinedMesh.vertexCount} vertices)");
+                Debug.Log($"[Tsvrc] Mesh combined to {_savePath} ({result.Materials.Length} material(s), {visualMesh.vertexCount} vertices)"
+                    + (skippedUdon > 0 ? $" {skippedUdon} Udon source(s) kept active, MeshRenderer disabled." : ""));
             }
             catch (System.Exception ex)
             {
-                // Destroy the mesh only if it was never handed off to the AssetDatabase.
-                if (combinedMesh != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(combinedMesh)))
-                    Object.DestroyImmediate(combinedMesh);
+                // Destroy the combined GameObject if it was created before the exception.
+                // DestroyImmediate removes it from the scene immediately; the dangling
+                // RegisterCreatedObjectUndo entry becomes a no-op, which is acceptable.
+                if (go != null) Object.DestroyImmediate(go);
+                if (visualMesh != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(visualMesh)))
+                    Object.DestroyImmediate(visualMesh);
+                if (collisionMesh != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(collisionMesh)))
+                    Object.DestroyImmediate(collisionMesh);
 
                 _statusMessage = $"Combine failed: {ex.Message}";
                 _statusType = MessageType.Error;
                 Debug.LogException(ex);
+            }
+        }
+
+        /// <summary>Saves <paramref name="asset"/> to <paramref name="path"/>, overwriting any existing asset. Creates the parent directory if it does not exist.</summary>
+        private static void SaveAsset(Object asset, string path)
+        {
+            var dir = System.IO.Path.GetDirectoryName(path)?.Replace('\\', '/');
+            if (!string.IsNullOrEmpty(dir) && !AssetDatabase.IsValidFolder(dir))
+                System.IO.Directory.CreateDirectory(dir);
+
+            if (AssetDatabase.LoadAssetAtPath<Object>(path) != null)
+                AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(asset, path);
+        }
+
+        /// <summary>Copies collider properties from <paramref name="source"/> onto a new component added to <paramref name="target"/>.</summary>
+        private static void CopyCollider(Collider source, GameObject target)
+        {
+            if (source is BoxCollider box)
+            {
+                var c = target.AddComponent<BoxCollider>();
+                c.center = box.center;
+                c.size = box.size;
+                c.isTrigger = box.isTrigger;
+                c.sharedMaterial = box.sharedMaterial;
+            }
+            else if (source is SphereCollider sphere)
+            {
+                var c = target.AddComponent<SphereCollider>();
+                c.center = sphere.center;
+                c.radius = sphere.radius;
+                c.isTrigger = sphere.isTrigger;
+                c.sharedMaterial = sphere.sharedMaterial;
+            }
+            else if (source is CapsuleCollider capsule)
+            {
+                var c = target.AddComponent<CapsuleCollider>();
+                c.center = capsule.center;
+                c.radius = capsule.radius;
+                c.height = capsule.height;
+                c.direction = capsule.direction;
+                c.isTrigger = capsule.isTrigger;
+                c.sharedMaterial = capsule.sharedMaterial;
+            }
+            else if (source is MeshCollider mc)
+            {
+                var c = target.AddComponent<MeshCollider>();
+                // Both cookingOptions and convex must be assigned before sharedMesh because Unity
+                // runs PhysX mesh cooking the moment sharedMesh is set, using whatever options are current.
+                c.cookingOptions = mc.cookingOptions;
+                c.convex = mc.convex;
+                c.sharedMesh = mc.sharedMesh;
+                c.isTrigger = mc.isTrigger;
+                c.sharedMaterial = mc.sharedMaterial;
             }
         }
 
@@ -257,7 +384,7 @@ namespace Tsvrc.Editor
             return _validCache;
         }
 
-        // Cached per-frame (reset at start of OnGUI) to avoid redundant string ops per repaint.
+        /// <summary>Returns the current save path validation error, recomputed once per repaint and cached.</summary>
         private string GetPathError()
         {
             if (!_pathErrorDirty) return _cachedPathError;
