@@ -227,11 +227,13 @@ namespace Tsvrc.Editor
                 w.Line("_tsBatchIndex = 0;");
                 w.Line("_tsBatchRunning = true;");
                 w.Line("_TsApplyTranslationBatch();");
-                w.Line("for (int _tsLi = 0; _tsLi < _tsLangListeners.Length; _tsLi++) _tsLangListeners[_tsLi].SendCustomEvent(_tsLangCallbacks[_tsLi]);");
+                w.Line("for (int _tsLi = 0; _tsLi < _tsLangListeners.Length; _tsLi++) { if (_tsLangListeners[_tsLi] != null) _tsLangListeners[_tsLi].SendCustomEvent(_tsLangCallbacks[_tsLi]); }");
             }
 
             using (w.Method("public void SubscribeLanguageChanged(UdonSharpBehaviour listener, string callback)"))
             {
+                w.Line("if (listener == null) return;");
+                w.Line("for (int _tsLi = 0; _tsLi < _tsLangListeners.Length; _tsLi++) if (_tsLangListeners[_tsLi] == listener && _tsLangCallbacks[_tsLi] == callback) return;");
                 w.Line("_tsLangListeners = TsArray.Add(_tsLangListeners, new UdonSharpBehaviour[] { listener });");
                 w.Line("_tsLangCallbacks = TsArray.Add(_tsLangCallbacks, new string[] { callback });");
             }
