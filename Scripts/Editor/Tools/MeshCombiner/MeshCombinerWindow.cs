@@ -23,6 +23,11 @@ namespace Tsvrc.Editor
         private readonly HashSet<MeshFilter> _seenSet = new HashSet<MeshFilter>();
         private bool _validDirty = true;
 
+        // GameObjects that have colliders but no MeshFilter, collected by LoadFromSelection.
+        // They contribute colliders only and are not shown as editable slots in the UI.
+        private readonly List<GameObject> _colliderOnlySources = new List<GameObject>();
+        private readonly HashSet<GameObject> _seenColliderSet = new HashSet<GameObject>();
+
         // ValidateSavePath result cached per-frame to avoid redundant string checks.
         private string _cachedPathError;
         private bool _pathErrorDirty = true;
@@ -66,9 +71,10 @@ namespace Tsvrc.Editor
 
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button(new GUIContent("Load from Selection",
-                "Replaces the current list with all MeshFilters found in the selected scene objects (including children).")))
+                "Replaces the current list with all MeshFilters found in the selected scene objects (including children).\n" +
+                "Also collects GameObjects that have colliders but no MeshFilter.")))
             {
-                if (_sources.Count == 0 || EditorUtility.DisplayDialog(
+                if (_sources.Count == 0 && _colliderOnlySources.Count == 0 || EditorUtility.DisplayDialog(
                         "Replace sources?",
                         "This will replace the current source list with the scene selection. Continue?",
                         "Replace", "Cancel"))
@@ -79,6 +85,8 @@ namespace Tsvrc.Editor
             if (GUILayout.Button(new GUIContent("Clear", "Remove all entries from the list."), GUILayout.Width(52)))
             {
                 _sources.Clear();
+                _colliderOnlySources.Clear();
+                _seenColliderSet.Clear();
                 InvalidateCache();
                 _statusMessage = null;
             }
@@ -112,7 +120,8 @@ namespace Tsvrc.Editor
             }
 
             var valid = GetValid();
-            EditorGUILayout.LabelField($"{valid.Count} valid source(s) of {_sources.Count} slot(s)", EditorStyles.miniLabel);
+            var colliderOnlyText = _colliderOnlySources.Count > 0 ? $" + {_colliderOnlySources.Count} collider-only" : "";
+            EditorGUILayout.LabelField($"{valid.Count} valid source(s){colliderOnlyText} of {_sources.Count} slot(s)", EditorStyles.miniLabel);
         }
 
         private void DrawSettings()
@@ -141,7 +150,8 @@ namespace Tsvrc.Editor
             _deactivateSources = EditorGUILayout.Toggle(
                 new GUIContent("Deactivate Sources",
                     "Deactivate source GameObjects after combining. Undoable.\n" +
-                    "Sources that have an UdonSharpBehaviour are not deactivated — their MeshRenderer is disabled instead " +
+                    "GameObjects with only colliders (no MeshFilter) are also deactivated, but only when Combine Colliders is enabled.\n" +
+                    "Sources with an UdonSharpBehaviour are not deactivated. On MeshFilter sources their MeshRenderer is disabled instead " +
                     "so the Udon script and its collider remain active."),
                 _deactivateSources);
 
@@ -160,6 +170,7 @@ namespace Tsvrc.Editor
                 new GUIContent("Combine Colliders",
                     "Merge solid MeshColliders into a single collision mesh asset (saved alongside the visual mesh). " +
                     "Box, Sphere, Capsule, and trigger MeshColliders are recreated as child GameObjects under the combined object. " +
+                    "GameObjects with colliders but no MeshFilter are included automatically when loading from selection. " +
                     "Disabled colliders and colliders on objects with UdonSharpBehaviour are excluded."),
                 _combineColliders);
         }
@@ -183,10 +194,26 @@ namespace Tsvrc.Editor
         {
             _sources.Clear();
             _seenSet.Clear();
+            _colliderOnlySources.Clear();
+            _seenColliderSet.Clear();
+
+            // First pass: collect all GameObjects that have a MeshFilter so we can exclude them
+            // from the collider-only list (their colliders are handled via the MeshFilter path).
+            var meshFilterGOs = new HashSet<GameObject>();
             foreach (var go in Selection.gameObjects)
                 foreach (var mf in go.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    meshFilterGOs.Add(mf.gameObject);
                     if (_seenSet.Add(mf))
                         _sources.Add(mf);
+                }
+
+            // Second pass: collect GameObjects that have a Collider but no MeshFilter.
+            foreach (var go in Selection.gameObjects)
+                foreach (var col in go.GetComponentsInChildren<Collider>(true))
+                    if (!meshFilterGOs.Contains(col.gameObject) && _seenColliderSet.Add(col.gameObject))
+                        _colliderOnlySources.Add(col.gameObject);
+
             InvalidateCache();
             _statusMessage = null;
         }
@@ -214,7 +241,7 @@ namespace Tsvrc.Editor
             GameObject go = null;
             try
             {
-                var result = MeshCombinerTool.Combine(valid, _root, new MeshCombinerTool.CombineOptions
+                var result = MeshCombinerTool.Combine(valid, _colliderOnlySources, _root, new MeshCombinerTool.CombineOptions
                 {
                     RecalculateNormals = _recalculateNormals,
                     ExcludeEditorOnly = _excludeEditorOnly,
@@ -286,6 +313,17 @@ namespace Tsvrc.Editor
                         Undo.RecordObject(mf.gameObject, "Combine Meshes");
                         mf.gameObject.SetActive(false);
                     }
+
+                    foreach (var colGO in _colliderOnlySources)
+                    {
+                        if (colGO == null) continue;
+                        // Only deactivate collider-only GOs when their colliders were actually combined.
+                        // Deactivating them without combining their colliders would remove physics with no replacement.
+                        if (!_combineColliders) continue;
+                        if (colGO.GetComponent<UdonSharpBehaviour>() != null) { skippedUdon++; continue; }
+                        Undo.RecordObject(colGO, "Combine Meshes");
+                        colGO.SetActive(false);
+                    }
                 }
 
                 // Collapse all registered undo operations into the single group opened at the top.
@@ -294,10 +332,10 @@ namespace Tsvrc.Editor
                 Selection.activeGameObject = go;
 
                 _statusMessage = $"Done: {visualMesh.vertexCount:N0} vertices, {result.Materials.Length} material(s) saved to {_savePath}"
-                    + (skippedUdon > 0 ? $"\n{skippedUdon} source(s) with UdonSharpBehaviour kept active, renderer hidden." : "");
+                    + (skippedUdon > 0 ? $"\n{skippedUdon} source(s) with UdonSharpBehaviour kept active." : "");
                 _statusType = MessageType.Info;
                 Debug.Log($"[Tsvrc] Mesh combined to {_savePath} ({result.Materials.Length} material(s), {visualMesh.vertexCount} vertices)"
-                    + (skippedUdon > 0 ? $" {skippedUdon} Udon source(s) kept active, MeshRenderer disabled." : ""));
+                    + (skippedUdon > 0 ? $" {skippedUdon} Udon source(s) kept active." : ""));
             }
             catch (System.Exception ex)
             {

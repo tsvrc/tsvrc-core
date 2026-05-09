@@ -42,12 +42,13 @@ namespace Tsvrc.Editor
         /// are returned in <see cref="CombineResult.PrimitiveColliders"/> for the caller to reconstruct as child GameObjects.
         /// Sources with an UdonSharpBehaviour are excluded from collider collection so their physics events keep working.
         /// </summary>
-        /// <param name="filters">Source MeshFilters to combine.</param>
+        /// <param name="filters">Source MeshFilters to combine for the visual mesh.</param>
+        /// <param name="colliderOnlySources">Additional GameObjects that contribute colliders only (no MeshFilter required). Pass null or empty to skip.</param>
         /// <param name="root">Transform that defines the local space of the output mesh. Pass null to use world space.</param>
         /// <param name="options">Options controlling normalization, filtering, and collider handling.</param>
         /// <returns>Combined meshes and materials ready to be applied to a MeshFilter and MeshRenderer.</returns>
         /// <exception cref="System.InvalidOperationException">Thrown when no renderable submeshes are found in the sources.</exception>
-        internal static CombineResult Combine(IList<MeshFilter> filters, Transform root, CombineOptions options)
+        internal static CombineResult Combine(IList<MeshFilter> filters, IList<GameObject> colliderOnlySources, Transform root, CombineOptions options)
         {
             var rootInverse = root != null ? root.worldToLocalMatrix : Matrix4x4.identity;
 
@@ -117,6 +118,31 @@ namespace Tsvrc.Editor
                         {
                             primitives.Add(col);
                         }
+                    }
+                }
+            }
+
+            // Process GameObjects that contribute colliders but have no MeshFilter.
+            // These follow the same rules as colliders on MeshFilter sources.
+            if (options.IncludeColliders && colliderOnlySources != null)
+            {
+                foreach (var colGO in colliderOnlySources)
+                {
+                    if (colGO == null) continue;
+                    if (options.ExcludeEditorOnly && colGO.CompareTag("EditorOnly")) continue;
+                    if (colGO.GetComponent<UdonSharpBehaviour>() != null) continue;
+
+                    var colMatrix = rootInverse * colGO.transform.localToWorldMatrix;
+                    foreach (var col in colGO.GetComponents<Collider>())
+                    {
+                        if (!col.enabled) continue;
+                        if (col is MeshCollider mc)
+                        {
+                            if (mc.isTrigger) { if (mc.sharedMesh != null) primitives.Add(col); }
+                            else if (mc.sharedMesh != null)
+                                collisionInstances.Add(new CombineInstance { mesh = mc.sharedMesh, transform = colMatrix });
+                        }
+                        else { primitives.Add(col); }
                     }
                 }
             }
