@@ -89,6 +89,7 @@ namespace Tsvrc.Editor
 
         internal override IEnumerable<string> GetUsings()
         {
+            yield return "Tsvrc.Core"; // for public TsvrcInstance Instance property
             if (_field != null && !string.IsNullOrEmpty(_field.Namespace))
                 yield return _field.Namespace;
         }
@@ -97,6 +98,7 @@ namespace Tsvrc.Editor
         {
             if (_field == null) return;
             w.Line($"[ReadOnly] [SerializeField] private {_field.Type} _coreTsvrcInstance;");
+            w.Line("public TsvrcInstance Instance => _coreTsvrcInstance;");
         }
 
         internal override void WriteStartBody(CsWriter w)
