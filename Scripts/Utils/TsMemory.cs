@@ -14,6 +14,9 @@ namespace Tsvrc.Utils
     /// Unregistered keys are ephemeral. Access via <c>_ts.Memory</c>.
     /// </summary>
     /// <remarks>
+    /// <b>Synced change notifications:</b> Subscribe to <see cref="OnSyncedChangedEvent"/> via
+    /// <c>TsSubscribe(this, TsMemory.OnSyncedChangedEvent, nameof(YourCallback))</c> to be notified
+    /// whenever the synced store is updated from the network. Not emitted for local <see cref="Set"/> calls.<br/><br/>
     /// <b>PlayerData size limit:</b> VRChat allows 100 KB of PlayerData per player per world.
     /// VRChat compresses data before storing it, so easily compressible data may exceed 100 KB uncompressed.
     /// If the limit is exceeded, VRChat logs an error and the write is silently dropped, no exception is thrown.
@@ -225,11 +228,20 @@ namespace Tsvrc.Utils
 
         #region Sync
 
+        /// <summary>Event name for synced store change notifications. See class remarks for usage.</summary>
+        public const string OnSyncedChangedEvent = "OnSyncedChanged";
+
+        /// <summary>
+        /// Called by VRChat when synced data arrives from the network owner.
+        /// Deserializes <see cref="_syncedJson"/> into the synced store and emits
+        /// <see cref="OnSyncedChangedEvent"/> to all subscribers.
+        /// </summary>
         public override void OnDeserialization()
         {
             DataToken result = TsJson.DeserializeToken(_syncedJson);
-            if (result.TokenType == TokenType.DataDictionary)
-                _syncedStore = result.DataDictionary;
+            if (result.TokenType != TokenType.DataDictionary) return;
+            _syncedStore = result.DataDictionary;
+            TsEmit(OnSyncedChangedEvent);
         }
 
         public override void OnPlayerRestored(VRCPlayerApi player)
