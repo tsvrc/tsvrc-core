@@ -99,5 +99,95 @@ namespace Tsvrc.UI.Utils
                 }
             }
         }
+
+        /// <summary>
+        /// Draws a filled circle directly into a pre-allocated <see cref="Color32"/> pixel buffer.
+        /// Bounds are pre-clamped outside the inner loop to avoid per-pixel branching, making
+        /// this significantly faster than <see cref="DrawCircle"/> when drawing many circles
+        /// before a single <c>Texture2D.Apply()</c> call.
+        /// </summary>
+        /// <param name="buffer">Pixel buffer to write into. Must have length bufferWidth * bufferHeight.</param>
+        /// <param name="bufferWidth">Width of the buffer in pixels.</param>
+        /// <param name="bufferHeight">Height of the buffer in pixels.</param>
+        /// <param name="cx">Circle center X in pixel coordinates.</param>
+        /// <param name="cy">Circle center Y in pixel coordinates.</param>
+        /// <param name="radius">Circle radius in pixels.</param>
+        /// <param name="color">Fill color.</param>
+        public static void DrawCircleToBuffer(Color32[] buffer, int bufferWidth, int bufferHeight, int cx, int cy, int radius, Color32 color)
+        {
+            int radiusSq = radius * radius;
+
+            int pyMin = Mathf.Max(cy - radius, 0);
+            int pyMax = Mathf.Min(cy + radius, bufferHeight - 1);
+            int pxMin = Mathf.Max(cx - radius, 0);
+            int pxMax = Mathf.Min(cx + radius, bufferWidth - 1);
+
+            for (int py = pyMin; py <= pyMax; py++)
+            {
+                int dy        = py - cy;
+                int rowOffset = py * bufferWidth;
+
+                for (int px = pxMin; px <= pxMax; px++)
+                {
+                    int dx = px - cx;
+                    if (dx * dx + dy * dy <= radiusSq)
+                        buffer[rowOffset + px] = color;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Draws a filled, heading-aware triangle directly into a pre-allocated <see cref="Color32"/>
+        /// pixel buffer. The tip points in the direction given by <paramref name="headingDegrees"/>
+        /// (0° = up/north, 90° = right/east, clockwise — matching Unity's Y-axis rotation convention).
+        /// The triangle is inscribed in a (2×<paramref name="halfWidth"/>) × (2×<paramref name="halfHeight"/>)
+        /// bounding box centered on (<paramref name="cx"/>, <paramref name="cy"/>), where y=0 is the
+        /// bottom of the buffer (Unity <c>SetPixels32</c> convention).
+        /// </summary>
+        public static void DrawTriangleToBuffer(Color32[] buffer, int bufferWidth, int bufferHeight,
+            int cx, int cy, int halfWidth, int halfHeight, float headingDegrees, Color32 color)
+        {
+            float rad  = headingDegrees * Mathf.Deg2Rad;
+            float cosA = Mathf.Cos(rad);
+            float sinA = Mathf.Sin(rad);
+
+            // Local vertices (tip up, y=0 at bottom):
+            //   tip   = ( 0,         +halfHeight)
+            //   left  = (-halfWidth, -halfHeight)
+            //   right = (+halfWidth, -halfHeight)
+            // CW rotation by headingDegrees: x' = x*cos + y*sin,  y' = -x*sin + y*cos
+            float tipX   = cx + halfHeight * sinA;
+            float tipY   = cy + halfHeight * cosA;
+            float leftX  = cx + (-halfWidth * cosA - halfHeight * sinA);
+            float leftY  = cy + ( halfWidth * sinA - halfHeight * cosA);
+            float rightX = cx + ( halfWidth * cosA - halfHeight * sinA);
+            float rightY = cy + (-halfWidth * sinA - halfHeight * cosA);
+
+            int minX = Mathf.Max(0,             Mathf.FloorToInt(Mathf.Min(tipX, Mathf.Min(leftX, rightX))));
+            int maxX = Mathf.Min(bufferWidth  - 1, Mathf.CeilToInt(Mathf.Max(tipX, Mathf.Max(leftX, rightX))));
+            int minY = Mathf.Max(0,             Mathf.FloorToInt(Mathf.Min(tipY, Mathf.Min(leftY, rightY))));
+            int maxY = Mathf.Min(bufferHeight - 1, Mathf.CeilToInt(Mathf.Max(tipY, Mathf.Max(leftY, rightY))));
+
+            for (int py = minY; py <= maxY; py++)
+            {
+                int rowOffset = py * bufferWidth;
+                float fpy = py;
+
+                for (int px = minX; px <= maxX; px++)
+                {
+                    float fpx = px;
+                    // Edge functions (cross products). Point is inside when all three
+                    // have the same sign (or zero), i.e., no mix of positive and negative.
+                    float d1 = (leftX  - tipX)   * (fpy - tipY)   - (leftY  - tipY)   * (fpx - tipX);
+                    float d2 = (rightX - leftX)  * (fpy - leftY)  - (rightY - leftY)  * (fpx - leftX);
+                    float d3 = (tipX   - rightX) * (fpy - rightY) - (tipY   - rightY) * (fpx - rightX);
+
+                    bool hasNeg = d1 < 0f || d2 < 0f || d3 < 0f;
+                    bool hasPos = d1 > 0f || d2 > 0f || d3 > 0f;
+                    if (!(hasNeg && hasPos))
+                        buffer[rowOffset + px] = color;
+                }
+            }
+        }
     }
 }
