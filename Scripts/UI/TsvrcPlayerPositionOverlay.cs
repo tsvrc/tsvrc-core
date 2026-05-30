@@ -1,5 +1,4 @@
 using Tsvrc.Network;
-using Tsvrc.Player;
 using Tsvrc.UI.Utils;
 using UdonSharp;
 using UnityEngine;
@@ -26,10 +25,19 @@ namespace Tsvrc.UI
     ///
     /// Every client runs its own local draw loop. No rendering state is synced over the network.
     ///
+    /// <b>Tick architecture</b>
+    /// <list type="bullet">
+    ///   <item><b>Remote tick</b> (<see cref="RemoteUpdateInterval"/>): resolves all tracked
+    ///         players and caches their pixel positions. Does not draw or flush.</item>
+    ///   <item><b>Blink tick</b> (<see cref="MarkerOnDuration"/>, <see cref="MarkerOffDuration"/>):
+    ///         alternates between drawing markers from the position cache and clearing the texture,
+    ///         creating a periodic appear/disappear cycle independent of position refresh rate.</item>
+    /// </list>
+    ///
     /// Typical usage:
     /// <list type="number">
-    ///   <item>Call <see cref="Setup"/> to configure texture dimensions and world mapping.
-    ///         Optional if inspector defaults are acceptable.</item>
+    ///   <item>Call <see cref="Setup"/> from code to configure texture dimensions and world
+    ///         mapping. Must be called before <see cref="StartOverlay"/>.</item>
     ///   <item>Call <see cref="StartOverlay"/> from the owner to begin tracking and drawing.</item>
     ///   <item>Use <see cref="PlayerTracker.AddTrackedPlayers"/> and
     ///         <see cref="PlayerTracker.RemoveTrackedPlayers"/> to change the displayed set at runtime.</item>
@@ -37,16 +45,16 @@ namespace Tsvrc.UI
     /// </list>
     ///
     /// Subscribe to <see cref="OnOverlayUpdatedEvent"/> via <c>TsSubscribe</c> to receive a
-    /// callback after each draw cycle.
+    /// callback after each draw cycle (including after a clear).
     ///
-    /// Local and remote players each support an independent marker shape and color.
+    /// Local and remote players each support an independent marker shape and colour.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsvrcPlayerPositionOverlay : PlayerTracker
     {
         /// <summary>
-        /// Emitted via <see cref="TsvrcBehaviour.TsEmit"/> after every draw cycle completes.
-        /// Read the updated texture from <see cref="OverlayImage"/> inside your callback.
+        /// Emitted via <see cref="TsvrcBehaviour.TsEmit"/> after every draw cycle completes,
+        /// including when the overlay is cleared. Read <see cref="OverlayImage"/> in your callback.
         /// </summary>
         public const string OnOverlayUpdatedEvent = "OnOverlayUpdated";
 
@@ -60,53 +68,34 @@ namespace Tsvrc.UI
             "Bilinear / Trilinear = smooth when the RawImage is scaled larger than the texture.")]
         public FilterMode OverlayFilterMode = FilterMode.Point;
 
-        [Header("Texture Setup")]
-        [Tooltip("Overlay texture width in pixels. Used when Setup() is not called before StartOverlay().")]
-        [Min(1)] public int TextureWidth = 512;
-
-        [Tooltip("Overlay texture height in pixels. Used when Setup() is not called before StartOverlay().")]
-        [Min(1)] public int TextureHeight = 512;
-
-        [Tooltip("World-space bottom-left corner of the mapped area (XZ plane). Pixel (0,0) maps here.")]
-        public Vector3 WorldOrigin;
-
-        [Header("Scale")]
-        [Tooltip("Pixels per world unit along the X axis. Changes take effect on the next tick.")]
-        [Min(0.001f)] public float PixelsPerUnitX = 1f;
-
-        [Tooltip("Pixels per world unit along the Z axis. Changes take effect on the next tick.")]
-        [Min(0.001f)] public float PixelsPerUnitZ = 1f;
-
         [Header("Local Player")]
         [Tooltip("Shape used to draw the local player marker in the overlay texture.")]
         public MarkerShape LocalPlayerShape = MarkerShape.Circle;
         public Color LocalPlayerColor = Color.yellow;
-        [Tooltip("Local player marker width in texture pixels. Changes take effect on the next tick.")]
+        [Tooltip("Local player marker width in texture pixels. Changes take effect on the next remote tick.")]
         [Min(1f)] public float LocalMarkerWidth = 12f;
-        [Tooltip("Local player marker height in texture pixels. Changes take effect on the next tick.")]
+        [Tooltip("Local player marker height in texture pixels. Changes take effect on the next remote tick.")]
         [Min(1f)] public float LocalMarkerHeight = 12f;
 
         [Header("Remote Players")]
         [Tooltip("Shape used to draw remote player markers in the overlay texture.")]
         public MarkerShape RemotePlayerShape = MarkerShape.Circle;
         public Color RemotePlayerColor = Color.red;
-        [Tooltip("Remote player marker width in texture pixels. Changes take effect on the next tick.")]
+        [Tooltip("Remote player marker width in texture pixels. Changes take effect on the next remote tick.")]
         [Min(1f)] public float RemoteMarkerWidth = 12f;
-        [Tooltip("Remote player marker height in texture pixels. Changes take effect on the next tick.")]
+        [Tooltip("Remote player marker height in texture pixels. Changes take effect on the next remote tick.")]
         [Min(1f)] public float RemoteMarkerHeight = 12f;
 
         [Header("Performance")]
-        [Tooltip("How often the texture refreshes for the local player, in seconds. Lower values make your own marker more responsive.")]
-        [Min(0.05f)] public float LocalUpdateInterval = 0.1f;
-
-        [Tooltip("How often the texture refreshes for remote players, in seconds.")]
+        [Tooltip("How often remote player markers refresh, in seconds.")]
         [Min(0.05f)] public float RemoteUpdateInterval = 0.3f;
 
-        [Tooltip(
-          "How many update cycles a marker trail takes to fade completely.\n" +
-          "Fade time in seconds ≈ FadeMultiplier × min(LocalUpdateInterval, RemoteUpdateInterval).\n" +
-          "Higher values = longer sonar trails. Lower values = snappier, shorter trails.")]
-        [Min(1f)] public float FadeMultiplier = 4f;
+        [Header("Marker Timing")]
+        [Tooltip("How long player markers stay visible before the overlay clears, in seconds.")]
+        [Min(0.1f)] public float MarkerOnDuration = 2f;
+
+        [Tooltip("How long the overlay stays blank before markers reappear, in seconds.")]
+        [Min(0.1f)] public float MarkerOffDuration = 1f;
 
         private Texture2D _overlayTexture;
         private int _textureWidth;
@@ -114,30 +103,58 @@ namespace Tsvrc.UI
         private Vector3 _worldOrigin;
         private float _pixelsPerUnitX;
         private float _pixelsPerUnitZ;
-        // Circle radius is derived from the marker width and height each tick,
-        // so changes made in the inspector take effect without a new Setup() call.
+        // Radii are derived from marker dimensions each remote tick so inspector edits
+        // take effect without a new Setup() call.
         private int _localMarkerRadius;
         private int _remoteMarkerRadius;
 
-        // Pre-allocated buffers. Reused every tick to avoid GC pressure.
+        // Pre-allocated buffers, reused every tick to avoid GC pressure.
+        // _playerBuffer    : tracked players resolved from LastPlayerIds (output of _ResolveTrackedPlayers).
+        // _allPlayersBuffer: all instance players from VRCPlayerApi.GetPlayers() (input, no-alloc).
         private Color32[] _pixelBuffer;
-        private VRCPlayerApi[] _playerBuffer; // VRChat caps an instance at 82 players
+        private VRCPlayerApi[] _playerBuffer;     // max 82 (VRChat instance cap)
+        private VRCPlayerApi[] _allPlayersBuffer; // max 82
 
-        // These are recached at the start of each tick so inspector edits take effect immediately.
+        // Recached at the start of each remote tick so inspector edits take effect
+        // without requiring a new Setup() call. Blink tick uses the latest cached values.
         private Color32 _localColor32;
         private Color32 _remoteColor32;
-        private Vector2 _overlayRectSize;
-        // Per-channel multiplier for the sonar fade. Applied as (channel * _decayFactor) >> 8
-        // so the decay loop stays integer-only and avoids float math per pixel.
-        private byte _decayFactor;
+
+        // Blink state, toggled by the blink tick.
+        private bool _markersVisible;
+        // True iff _pixelBuffer is all zeros AND the GPU texture already displays blank.
+        // Guards two expensive operations in every hide cycle and in _ClearAndFlush:
+        //   1. Array.Clear: CPU memset of the full pixel buffer
+        //   2. SetPixels32 + Apply: full CPU to GPU texture upload
+        // Source: Unity 2022.3 docs. "Apply is an expensive operation because it copies all
+        // the pixels in the texture even if you've only changed some."
+        // Set false only when pixels are actually drawn; set true only after clearing the
+        // CPU buffer AND uploading the blank image to the GPU.
+        private bool _bufferIsClean = true;
+
+        // Per-frame position cache populated by the remote tick and consumed by the local tick.
+        // Stores the last-known pixel position of each tracked player so the local tick can
+        // rebuild the full buffer without calling VRCPlayerApi.GetPlayers() again.
+        private int[] _cachedPxArr;
+        private int[] _cachedPyArr;
+        private float[] _cachedHeadings;   // only used when MarkerShape == Triangle
+        private bool[] _cachedIsLocalArr;
+        private int _cachedPlayerCount;
+
+        // Cached triangle half-sizes, populated by Setup() and refreshed each remote tick
+        // via _RecacheFields(). Avoids Mathf.RoundToInt inside _DrawPlayerAtPixel per call.
+        private int _localHalfW;
+        private int _localHalfH;
+        private int _remoteHalfW;
+        private int _remoteHalfH;
 
         private bool _isSetup;
         private bool _isOverlayUpdating;
 
-        // Double-tick guard: each schedule call increments the counter, each fired event decrements it.
-        // If the counter is still above zero when a tick fires, a newer tick is already queued
-        // and this one is stale. Discarding it prevents duplicate draw cycles.
-        private int _scheduledLocalTickCount;
+        // Double-tick guard: each schedule call increments the counter; each fired event
+        // decrements it. If the counter is still > 0 when a tick fires a newer tick is already
+        // queued so the current one is stale and is discarded, preventing duplicate draw cycles.
+        private int _scheduledBlinkTickCount;
         private int _scheduledRemoteTickCount;
 
         /// <summary>
@@ -174,14 +191,14 @@ namespace Tsvrc.UI
             _textureWidth = width;
             _textureHeight = height;
             _worldOrigin = worldOrigin;
-            // Write back to the inspector fields so they reflect the active configuration
-            // and the auto-setup fallback in StartOverlay picks up the right values on re-entry.
-            PixelsPerUnitX = pixelsPerUnitX;
-            PixelsPerUnitZ = pixelsPerUnitZ;
             _pixelsPerUnitX = pixelsPerUnitX;
             _pixelsPerUnitZ = pixelsPerUnitZ;
             _localMarkerRadius = Mathf.Max(1, Mathf.RoundToInt(Mathf.Min(LocalMarkerWidth, LocalMarkerHeight) / 2f));
             _remoteMarkerRadius = Mathf.Max(1, Mathf.RoundToInt(Mathf.Min(RemoteMarkerWidth, RemoteMarkerHeight) / 2f));
+            _localHalfW = Mathf.Max(1, Mathf.RoundToInt(LocalMarkerWidth / 2f));
+            _localHalfH = Mathf.Max(1, Mathf.RoundToInt(LocalMarkerHeight / 2f));
+            _remoteHalfW = Mathf.Max(1, Mathf.RoundToInt(RemoteMarkerWidth / 2f));
+            _remoteHalfH = Mathf.Max(1, Mathf.RoundToInt(RemoteMarkerHeight / 2f));
             _localColor32 = LocalPlayerColor;
             _remoteColor32 = RemotePlayerColor;
 
@@ -191,33 +208,58 @@ namespace Tsvrc.UI
             _overlayTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
             _overlayTexture.filterMode = OverlayFilterMode;
 
-            // Color32 defaults to (0,0,0,0) which is fully transparent, so no explicit fill is needed.
+            // Color32 zero-initialises to (0,0,0,0), fully transparent, so no explicit fill needed.
             _pixelBuffer = new Color32[width * height];
+            _bufferIsClean = true;
             _overlayTexture.SetPixels32(_pixelBuffer);
-            _overlayTexture.Apply();
+            // false = do not recalculate mipmaps; the texture was created without them.
+            // Source: Unity docs. "Apply is an expensive operation... set updateMipmaps to false
+            // if you've already updated the mipmap levels."
+            _overlayTexture.Apply(false);
 
             OverlayImage.texture = _overlayTexture;
             OverlayImage.color = Color.white;
 
             if (_playerBuffer == null)
                 _playerBuffer = new VRCPlayerApi[82];
+            // Separate buffer for the no-alloc VRCPlayerApi.GetPlayers() call.
+            if (_allPlayersBuffer == null)
+                _allPlayersBuffer = new VRCPlayerApi[82];
 
-            _overlayRectSize = OverlayImage.rectTransform.rect.size;
+            // Position cache for the local-tick full-rebuild (allocated once, reused every tick).
+            if (_cachedPxArr == null)
+            {
+                _cachedPxArr = new int[82];
+                _cachedPyArr = new int[82];
+                _cachedHeadings = new float[82];
+                _cachedIsLocalArr = new bool[82];
+            }
+            _cachedPlayerCount = 0;
 
             _isSetup = true;
 
             if (IsProcessRunning())
+            {
+                // Restart the running overlay so the new texture dimensions and world mapping
+                // take effect immediately. _StopOverlay clears the running flag; the pending
+                // blink/remote ticks will fire and skip (counter guard + !_isOverlayUpdating);
+                // _StartOverlay then queues fresh ticks against the new buffers.
+                _StopOverlay();
                 _StartOverlay();
+            }
         }
 
         /// <summary>
         /// Starts the overlay and begins tracking the given player IDs.
-        /// If <see cref="Setup"/> was not called first, inspector values are used as defaults.
+        /// <see cref="Setup"/> must be called from code before this.
         /// </summary>
         public void StartOverlay(string[] playerIds)
         {
             if (!_isSetup)
-                Setup(TextureWidth, TextureHeight, WorldOrigin, PixelsPerUnitX, PixelsPerUnitZ);
+            {
+                Debug.LogError("[TsvrcPlayerPositionOverlay] Setup() must be called before StartOverlay().");
+                return;
+            }
             StartPlayerTracking(playerIds);
         }
 
@@ -231,23 +273,14 @@ namespace Tsvrc.UI
 
         protected override void OnTrackingStarted(string[] playerIds)
         {
-            if (!_isSetup)
-                Setup(TextureWidth, TextureHeight, WorldOrigin, PixelsPerUnitX, PixelsPerUnitZ);
-            // Setup() can return early without setting _isSetup when OverlayImage is null.
-            // Checking _isSetup here prevents _StartOverlay from scheduling ticks that would
-            // then crash trying to access OverlayImage.rectTransform on a null reference.
-            if (_isSetup)
-                _StartOverlay();
+            if (!_isSetup) return;
+            _StartOverlay();
         }
 
         protected override void OnTrackingDeserialization()
         {
-            if (!IsProcessRunning()) return;
-            if (!_isSetup)
-                Setup(TextureWidth, TextureHeight, WorldOrigin, PixelsPerUnitX, PixelsPerUnitZ);
-            // Same null-safety check as OnTrackingStarted.
-            if (_isSetup && !_isOverlayUpdating)
-                _StartOverlay();
+            if (!IsProcessRunning() || !_isSetup || _isOverlayUpdating) return;
+            _StartOverlay();
         }
 
         protected override void OnTrackingStopped(string[] playerIds)
@@ -263,91 +296,158 @@ namespace Tsvrc.UI
         }
 
         /// <summary>
-        /// Refreshes the overlay texture for the local player.
-        /// Fires every <see cref="LocalUpdateInterval"/> seconds. Do not call directly.
+        /// Blink tick. Alternates between drawing all tracked player markers and clearing the
+        /// texture, creating a periodic appear/disappear cycle. When visible, remote positions
+        /// are drawn from the integer cache (no <c>VRCPlayerApi.GetPlayers</c> call) and the
+        /// local player is redrawn at its current world position (one <c>GetPosition</c> call).
+        /// When hidden, the texture is cleared. The next tick is scheduled with
+        /// <see cref="MarkerOnDuration"/> after a show or <see cref="MarkerOffDuration"/> after
+        /// a hide. Do not call directly.
         /// </summary>
-        public void _OnLocalTick()
+        public void _OnBlinkTick()
         {
-            _scheduledLocalTickCount--;
-            if (_scheduledLocalTickCount > 0 || !_isOverlayUpdating) return;
+            _scheduledBlinkTickCount--;
+            if (_scheduledBlinkTickCount > 0 || !_isOverlayUpdating) return;
 
-            _RecacheFields();
+            _markersVisible = !_markersVisible;
 
-            int count = _ResolveTrackedPlayers();
-            _DecayBuffer();
-            for (int i = 0; i < count; i++)
+            // Track whether _pixelBuffer actually changed this tick.
+            // Only upload to the GPU when something changed. Source: Unity docs,
+            // "Apply is an expensive operation because it copies all the pixels in the
+            // texture even if you've only changed some." Uploading an unchanged texture
+            // wastes a full CPU to GPU copy every tick.
+            bool bufferModified = false;
+
+            if (_markersVisible)
             {
-                VRCPlayerApi player = _playerBuffer[i];
-                if (player != null && player.IsValid()) _DrawPlayer(player);
+                // Show cycle: the buffer is guaranteed clean from the preceding hide or Setup,
+                // so no Array.Clear is needed here.
+
+                // Recache colours so inspector changes are picked up on each show.
+                _localColor32 = LocalPlayerColor;
+                _remoteColor32 = RemotePlayerColor;
+
+                // Draw remote players from the integer cache. No VRCPlayerApi calls needed.
+                // Skip the local player slot since it is redrawn fresh below.
+                bool localPlayerTracked = false;
+                for (int i = 0; i < _cachedPlayerCount; i++)
+                {
+                    if (_cachedIsLocalArr[i])
+                    {
+                        localPlayerTracked = true;
+                        continue;
+                    }
+                    _DrawPlayerAtPixel(
+                        _cachedPxArr[i], _cachedPyArr[i],
+                        false, _cachedHeadings[i], _remoteColor32);
+                    bufferModified = true;
+                }
+
+                // Draw local player at its actual current position (one cheap API call).
+                if (localPlayerTracked)
+                {
+                    VRCPlayerApi localPlayer = Networking.LocalPlayer;
+                    if (localPlayer != null && localPlayer.IsValid())
+                    {
+                        _DrawPlayer(localPlayer);
+                        bufferModified = true;
+                    }
+                }
+
+                if (bufferModified)
+                    _bufferIsClean = false;
+            }
+            else
+            {
+                // Hide cycle: remove drawn markers so the texture shows blank.
+                // Guard prevents a wasted clear + GPU upload when no markers were drawn
+                // in the preceding show cycle (e.g. no tracked players in the instance).
+                if (!_bufferIsClean)
+                {
+                    System.Array.Clear(_pixelBuffer, 0, _pixelBuffer.Length);
+                    _bufferIsClean = true;
+                    bufferModified = true;
+                }
             }
 
-            _FlushTexture();
-            _ScheduleNextLocalTick();
+            // Only pay the CPU to GPU upload cost when the buffer actually changed.
+            // Always emit the event so subscribers are notified on every cycle.
+            if (bufferModified)
+                _FlushTexture();
+            else
+                TsEmit(OnOverlayUpdatedEvent);
+
+            _ScheduleNextBlinkTick();
         }
 
         /// <summary>
-        /// Entry point of each remote-player refresh cycle.
-        /// Scheduled every <see cref="RemoteUpdateInterval"/> seconds. Do not call directly.
+        /// Authoritative remote tick. Resolves all tracked players via a single
+        /// <c>VRCPlayerApi.GetPlayers</c> call and caches their pixel positions and headings for
+        /// the blink tick. Does not draw or flush; all drawing is handled by
+        /// <see cref="_OnBlinkTick"/>. Fires every <see cref="RemoteUpdateInterval"/> seconds.
+        /// Do not call directly.
         /// </summary>
         public void _OnRemoteTick()
         {
             _scheduledRemoteTickCount--;
             if (_scheduledRemoteTickCount > 0 || !_isOverlayUpdating) return;
 
+            // Recache inspector-editable fields so runtime changes take effect without Setup().
             _RecacheFields();
 
+            // Resolve tracked IDs to live VRCPlayerApi references (one GetPlayers call, no alloc).
             int count = _ResolveTrackedPlayers();
-            _DecayBuffer();
+
+            // Populate the blink-tick position cache. No draw, no flush.
+            // Cache stores only valid players (compacted) so the blink tick needs no null checks.
+            int cacheCount = 0;
             for (int i = 0; i < count; i++)
             {
                 VRCPlayerApi player = _playerBuffer[i];
-                if (player != null && player.IsValid()) _DrawPlayer(player);
-            }
+                if (player == null || !player.IsValid()) continue;
 
-            _FlushTexture();
+                Vector3 pos = player.GetPosition();
+                bool isLocal = player.isLocal;
+                MarkerShape shape = isLocal ? LocalPlayerShape : RemotePlayerShape;
+                // Only call GetRotation() for triangle markers. The quaternion-to-Euler
+                // conversion is wasted for circles, which ignore the heading entirely.
+                float heading = shape == MarkerShape.Triangle
+                    ? player.GetRotation().eulerAngles.y : 0f;
+                int px = Mathf.Clamp(
+                    Mathf.RoundToInt((pos.x - _worldOrigin.x) * _pixelsPerUnitX),
+                    0, _textureWidth - 1);
+                int py = Mathf.Clamp(
+                    Mathf.RoundToInt((pos.z - _worldOrigin.z) * _pixelsPerUnitZ),
+                    0, _textureHeight - 1);
+
+                _cachedPxArr[cacheCount] = px;
+                _cachedPyArr[cacheCount] = py;
+                _cachedHeadings[cacheCount] = heading;
+                _cachedIsLocalArr[cacheCount] = isLocal;
+                cacheCount++;
+            }
+            _cachedPlayerCount = cacheCount;
+
             _ScheduleNextRemoteTick();
         }
 
 
         private void _RecacheFields()
         {
-            _overlayRectSize = OverlayImage.rectTransform.rect.size;
             _localColor32 = LocalPlayerColor;
             _remoteColor32 = RemotePlayerColor;
-            _pixelsPerUnitX = PixelsPerUnitX;
-            _pixelsPerUnitZ = PixelsPerUnitZ;
             _localMarkerRadius = Mathf.Max(1, Mathf.RoundToInt(Mathf.Min(LocalMarkerWidth, LocalMarkerHeight) / 2f));
             _remoteMarkerRadius = Mathf.Max(1, Mathf.RoundToInt(Mathf.Min(RemoteMarkerWidth, RemoteMarkerHeight) / 2f));
-
-            // The decay factor is chosen so that after FadeMultiplier ticks a trail pixel drops
-            // from full brightness (255) to roughly 8, which is visually indistinguishable from black.
-            // Using integer math here keeps the per-pixel decay loop free of float operations.
-            float d = Mathf.Pow(8f / 255f, 1f / Mathf.Max(1f, FadeMultiplier));
-            _decayFactor = (byte)Mathf.Clamp(Mathf.RoundToInt(d * 256f), 0, 255);
+            // Triangle half-sizes, cached so _DrawPlayerAtPixel skips per-call Mathf.RoundToInt.
+            _localHalfW = Mathf.Max(1, Mathf.RoundToInt(LocalMarkerWidth / 2f));
+            _localHalfH = Mathf.Max(1, Mathf.RoundToInt(LocalMarkerHeight / 2f));
+            _remoteHalfW = Mathf.Max(1, Mathf.RoundToInt(RemoteMarkerWidth / 2f));
+            _remoteHalfH = Mathf.Max(1, Mathf.RoundToInt(RemoteMarkerHeight / 2f));
         }
 
-        /// <summary>
-        /// Dims all existing pixels in the buffer by the precomputed decay factor.
-        /// This replaces a hard clear, so old marker positions fade gradually rather than
-        /// disappearing instantly. Players who have not moved are redrawn at full brightness
-        /// on the same tick, so only trails from previous positions actually fade.
-        /// Background pixels (alpha == 0) are skipped to keep the loop fast.
-        /// </summary>
-        private void _DecayBuffer()
-        {
-            byte df = _decayFactor;
-            for (int i = 0; i < _pixelBuffer.Length; i++)
-            {
-                Color32 c = _pixelBuffer[i];
-                if (c.a == 0) continue; // most pixels are background, skip them
-                _pixelBuffer[i] = new Color32(
-                    (byte)((c.r * df) >> 8),
-                    (byte)((c.g * df) >> 8),
-                    (byte)((c.b * df) >> 8),
-                    (byte)((c.a * df) >> 8));
-            }
-        }
-
+        // Thin wrapper: computes pixel position from world position then delegates to _DrawPlayerAtPixel.
+        // Called by the local tick for the fresh local-player draw (only place a VRCPlayerApi is
+        // needed at draw time).
         private void _DrawPlayer(VRCPlayerApi player)
         {
             Vector3 pos = player.GetPosition();
@@ -357,20 +457,24 @@ namespace Tsvrc.UI
             int py = Mathf.Clamp(
                 Mathf.RoundToInt((pos.z - _worldOrigin.z) * _pixelsPerUnitZ),
                 0, _textureHeight - 1);
-
             bool isLocal = player.isLocal;
-            Color32 color = isLocal ? _localColor32 : _remoteColor32;
             MarkerShape shape = isLocal ? LocalPlayerShape : RemotePlayerShape;
+            // Only call GetRotation() when the shape actually uses the heading.
+            float heading = shape == MarkerShape.Triangle
+                ? player.GetRotation().eulerAngles.y : 0f;
+            _DrawPlayerAtPixel(px, py, isLocal, heading,
+                isLocal ? _localColor32 : _remoteColor32);
+        }
 
+        // Core pixel-space draw. Accepts pre-computed coordinates so the blink tick can draw
+        // remote players from cache without any VRCPlayerApi calls.
+        private void _DrawPlayerAtPixel(int px, int py, bool isLocal, float heading, Color32 color)
+        {
+            MarkerShape shape = isLocal ? LocalPlayerShape : RemotePlayerShape;
             if (shape == MarkerShape.Triangle)
             {
-                float heading = player.GetRotation().eulerAngles.y;
-                int halfW = isLocal
-                    ? Mathf.Max(1, Mathf.RoundToInt(LocalMarkerWidth / 2f))
-                    : Mathf.Max(1, Mathf.RoundToInt(RemoteMarkerWidth / 2f));
-                int halfH = isLocal
-                    ? Mathf.Max(1, Mathf.RoundToInt(LocalMarkerHeight / 2f))
-                    : Mathf.Max(1, Mathf.RoundToInt(RemoteMarkerHeight / 2f));
+                int halfW = isLocal ? _localHalfW : _remoteHalfW;
+                int halfH = isLocal ? _localHalfH : _remoteHalfH;
                 TextureGraphics2D.DrawTriangleToBuffer(
                     _pixelBuffer, _textureWidth, _textureHeight, px, py, halfW, halfH, heading, color);
             }
@@ -387,7 +491,10 @@ namespace Tsvrc.UI
             if (_overlayTexture != null)
             {
                 _overlayTexture.SetPixels32(_pixelBuffer);
-                _overlayTexture.Apply();
+                // false = skip mipmap update; this texture was created without mipmaps.
+                // Source: Unity docs. Apply() is expensive, and updateMipmaps=false avoids
+                // recalculating mip levels that do not exist.
+                _overlayTexture.Apply(false);
             }
             TsEmit(OnOverlayUpdatedEvent);
         }
@@ -396,7 +503,12 @@ namespace Tsvrc.UI
         {
             if (_isOverlayUpdating) return;
             _isOverlayUpdating = true;
-            _ScheduleNextLocalTick();
+            // Reset cache so blink ticks don't draw stale positions from a previous run.
+            _cachedPlayerCount = 0;
+            _markersVisible = false;
+            // Delay the first blink slightly so the remote tick can populate the cache first.
+            _scheduledBlinkTickCount++;
+            SendCustomEventDelayedSeconds(nameof(_OnBlinkTick), RemoteUpdateInterval + 0.05f);
             _ScheduleNextRemoteTick();
         }
 
@@ -405,10 +517,12 @@ namespace Tsvrc.UI
             _isOverlayUpdating = false;
         }
 
-        private void _ScheduleNextLocalTick()
+        private void _ScheduleNextBlinkTick()
         {
-            _scheduledLocalTickCount++;
-            SendCustomEventDelayedSeconds(nameof(_OnLocalTick), LocalUpdateInterval);
+            _scheduledBlinkTickCount++;
+            // After a show, schedule the hide; after a hide, schedule the show.
+            float delay = _markersVisible ? MarkerOnDuration : MarkerOffDuration;
+            SendCustomEventDelayedSeconds(nameof(_OnBlinkTick), delay);
         }
 
         private void _ScheduleNextRemoteTick()
@@ -418,29 +532,84 @@ namespace Tsvrc.UI
         }
 
         /// <summary>
-        /// Looks up live <see cref="VRCPlayerApi"/> references for each ID in
-        /// <see cref="PlayerTracker.LastPlayerIds"/> and writes them into <see cref="_playerBuffer"/>.
-        /// Returns the number of valid players found. No allocations.
+        /// Resolves <see cref="PlayerTracker.LastPlayerIds"/> to live <see cref="VRCPlayerApi"/>
+        /// references and writes them into <see cref="_playerBuffer"/>.
+        /// Returns the number of valid players found.
+        ///
+        /// <b>Zero allocation</b>: calls <c>VRCPlayerApi.GetPlayers(_allPlayersBuffer)</c> once,
+        /// then for each tracked ID parses the trailing <c>playerId</c> integer from the
+        /// <c>"displayName#playerId"</c> string (zero alloc, character arithmetic) and matches
+        /// it against <c>VRCPlayerApi.playerId</c> (an <c>int</c> field, no allocation).
+        /// Avoids the previous O(N×M) pattern of calling <c>TsPlayer.GetPlayerID</c> inside the
+        /// inner loop, which allocated a new heap string for every (tracked × instance) player pair.
         /// </summary>
         private int _ResolveTrackedPlayers()
         {
             string[] ids = LastPlayerIds;
+            if (ids.Length == 0) return 0;
+
+            // Fill the pre-allocated buffer with all current instance players. No allocation.
+            // VRCPlayerApi.GetPlayers() writes in-place and pads with null beyond player count.
+            int totalCount = VRCPlayerApi.GetPlayerCount();
+            VRCPlayerApi.GetPlayers(_allPlayersBuffer);
+
             int count = 0;
             for (int i = 0; i < ids.Length && count < _playerBuffer.Length; i++)
             {
-                VRCPlayerApi p = TsPlayer.FindPlayerByID(ids[i]);
-                if (p == null || !p.IsValid()) continue;
-                _playerBuffer[count++] = p;
+                // Parse the int suffix of "displayName#playerId" once. Zero allocation.
+                // Comparing against playerId (an int) avoids building GetPlayerID strings
+                // in the inner loop, which would create O(N×M) heap allocations per tick.
+                int targetIntId = _ParsePlayerIntId(ids[i]);
+                if (targetIntId < 0) continue; // malformed ID, skip
+                for (int j = 0; j < totalCount; j++)
+                {
+                    VRCPlayerApi p = _allPlayersBuffer[j];
+                    if (p == null || !p.IsValid()) continue;
+                    if (p.playerId == targetIntId)
+                    {
+                        _playerBuffer[count++] = p;
+                        break;
+                    }
+                }
             }
             return count;
+        }
+
+        // Parses the trailing int after the last '#' in a "displayName#playerId" string
+        // without allocating. Returns -1 for a malformed or missing suffix.
+        private int _ParsePlayerIntId(string id)
+        {
+            int hashPos = -1;
+            for (int i = id.Length - 1; i >= 0; i--)
+            {
+                if (id[i] == '#') { hashPos = i; break; }
+            }
+            if (hashPos < 0 || hashPos == id.Length - 1) return -1;
+            int result = 0;
+            for (int i = hashPos + 1; i < id.Length; i++)
+            {
+                char c = id[i];
+                if (c < '0' || c > '9') return -1;
+                result = result * 10 + (c - '0');
+            }
+            return result;
         }
 
         private void _ClearAndFlush()
         {
             if (_overlayTexture == null || _pixelBuffer == null) return;
-            System.Array.Clear(_pixelBuffer, 0, _pixelBuffer.Length);
-            _overlayTexture.SetPixels32(_pixelBuffer);
-            _overlayTexture.Apply();
+            // Only upload to GPU if the buffer contained drawn markers to clear.
+            // If _bufferIsClean is already true the GPU texture is already blank,
+            // so SetPixels32 + Apply would copy an unchanged buffer for no effect.
+            if (!_bufferIsClean)
+            {
+                System.Array.Clear(_pixelBuffer, 0, _pixelBuffer.Length);
+                _bufferIsClean = true;
+                _overlayTexture.SetPixels32(_pixelBuffer);
+                _overlayTexture.Apply(false);
+            }
+            // Always notify subscribers regardless of whether the GPU was updated.
+            TsEmit(OnOverlayUpdatedEvent);
         }
 
     }
