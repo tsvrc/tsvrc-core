@@ -2,8 +2,16 @@ using UdonSharp;
 
 namespace Tsvrc.Utils
 {
+    /// <summary>
+    /// Static helpers for common array operations on types that Udon cannot express generically.
+    /// Each method allocates a new array and leaves the original unchanged.
+    /// </summary>
     public class TsArray
     {
+        /// <summary>
+        /// Returns a new array containing all elements of <paramref name="original"/>
+        /// followed by all elements of <paramref name="items"/>.
+        /// </summary>
         public static string[] Add(string[] original, string[] items)
         {
             int originalLen = original.Length;
@@ -16,6 +24,10 @@ namespace Tsvrc.Utils
             return result;
         }
 
+        /// <summary>
+        /// Returns a new array with every element that appears in <paramref name="items"/> removed
+        /// from <paramref name="original"/>. Order is preserved. All matching occurrences are removed.
+        /// </summary>
         public static string[] Remove(string[] original, string[] items)
         {
             int originalLen = original.Length;
@@ -44,6 +56,7 @@ namespace Tsvrc.Utils
             return result;
         }
 
+        /// <summary>Returns true if <paramref name="value"/> exists in <paramref name="array"/>.</summary>
         public static bool Contains(string[] array, string value)
         {
             int len = array.Length;
@@ -52,6 +65,10 @@ namespace Tsvrc.Utils
             return false;
         }
 
+        /// <summary>
+        /// Returns a new array containing all elements of <paramref name="original"/>
+        /// followed by all elements of <paramref name="items"/>.
+        /// </summary>
         public static UdonSharpBehaviour[] Add(UdonSharpBehaviour[] original, UdonSharpBehaviour[] items)
         {
             int originalLen = original.Length;
@@ -64,6 +81,10 @@ namespace Tsvrc.Utils
             return result;
         }
 
+        /// <summary>
+        /// Returns a new array with every element that appears in <paramref name="items"/> removed
+        /// from <paramref name="original"/>. Order is preserved. All matching occurrences are removed.
+        /// </summary>
         public static UdonSharpBehaviour[] Remove(UdonSharpBehaviour[] original, UdonSharpBehaviour[] items)
         {
             int originalLen = original.Length;
@@ -92,6 +113,7 @@ namespace Tsvrc.Utils
             return result;
         }
 
+        /// <summary>Returns true if <paramref name="value"/> exists in <paramref name="array"/>.</summary>
         public static bool Contains(UdonSharpBehaviour[] array, UdonSharpBehaviour value)
         {
             int len = array.Length;
