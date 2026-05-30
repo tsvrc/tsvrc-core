@@ -2,8 +2,20 @@ using UnityEngine;
 
 namespace Tsvrc.UI.Utils
 {
+    /// <summary>
+    /// Static utility for pixel-level drawing on Unity textures.
+    /// Buffer-based methods (names ending in ToBuffer) write to CPU memory only and need
+    /// a <see cref="FlushBuffer"/> call to upload the result to the GPU.
+    /// The texture-based overloads call SetPixel directly and are slower but do not require
+    /// a pre-allocated buffer.
+    /// </summary>
     public static class TextureGraphics2D
     {
+        /// <summary>
+        /// Fills a texture with a solid color. Allocates a temporary pixel array and calls
+        /// SetPixels32, but does not call Apply. If you already have a buffer, use
+        /// <see cref="FillBuffer"/> followed by <see cref="FlushBuffer"/> instead.
+        /// </summary>
         public static void FillTexture(Texture2D texture, Color fillColor)
         {
             Color32[] pixels = new Color32[texture.width * texture.height];
@@ -13,15 +25,24 @@ namespace Tsvrc.UI.Utils
             texture.SetPixels32(pixels);
         }
 
+        /// <summary>
+        /// Clears a texture to fully transparent (0,0,0,0). Allocates a temporary pixel array
+        /// and calls SetPixels32, but does not call Apply. If you already have a buffer, use
+        /// <see cref="ClearBuffer"/> followed by <see cref="FlushBuffer"/> instead.
+        /// </summary>
         public static void ClearTexture(Texture2D texture)
         {
             Color32[] clearPixels = new Color32[texture.width * texture.height];
             texture.SetPixels32(clearPixels);
         }
 
+        /// <summary>
+        /// Draws a line with thickness on a texture using Bresenham's algorithm. Calls SetPixel
+        /// for each point with a per-pixel bounds check. Does not call Apply.
+        /// When drawing multiple lines before a single upload, use <see cref="DrawLineToBuffer"/> instead.
+        /// </summary>
         public static void DrawLine(Texture2D texture, int x0, int y0, int x1, int y1, int thickness, Color color)
         {
-            // Bresenham's line algorithm with thickness
             int dx = Mathf.Abs(x1 - x0);
             int dy = Mathf.Abs(y1 - y0);
             int sx = x0 < x1 ? 1 : -1;
@@ -30,7 +51,6 @@ namespace Tsvrc.UI.Utils
 
             while (true)
             {
-                // Draw thick point
                 for (int tx = -thickness / 2; tx <= thickness / 2; tx++)
                 {
                     for (int ty = -thickness / 2; ty <= thickness / 2; ty++)
@@ -58,6 +78,11 @@ namespace Tsvrc.UI.Utils
             }
         }
 
+        /// <summary>
+        /// Draws a horizontal line with thickness on a texture. Calls SetPixel per pixel with a
+        /// per-pixel bounds check. Does not call Apply.
+        /// When drawing multiple lines before a single upload, use <see cref="DrawHorizontalLineToBuffer"/> instead.
+        /// </summary>
         public static void DrawHorizontalLine(Texture2D texture, int x, int y, int length, int thickness, Color color)
         {
             for (int i = 0; i < length; i++)
@@ -70,6 +95,11 @@ namespace Tsvrc.UI.Utils
             }
         }
 
+        /// <summary>
+        /// Draws a vertical line with thickness on a texture. Calls SetPixel per pixel with a
+        /// per-pixel bounds check. Does not call Apply.
+        /// When drawing multiple lines before a single upload, use <see cref="DrawVerticalLineToBuffer"/> instead.
+        /// </summary>
         public static void DrawVerticalLine(Texture2D texture, int x, int y, int length, int thickness, Color color)
         {
             for (int i = 0; i < length; i++)
@@ -82,6 +112,11 @@ namespace Tsvrc.UI.Utils
             }
         }
 
+        /// <summary>
+        /// Draws a filled circle on a texture. Calls SetPixel per pixel with a per-pixel bounds check.
+        /// Does not call Apply.
+        /// When drawing multiple shapes before a single upload, use <see cref="DrawCircleToBuffer"/> instead.
+        /// </summary>
         public static void DrawCircle(Texture2D texture, int x, int y, int radius, Color color)
         {
             for (int i = -radius; i <= radius; i++)
@@ -139,7 +174,7 @@ namespace Tsvrc.UI.Utils
         /// <summary>
         /// Draws a filled, heading-aware triangle directly into a pre-allocated <see cref="Color32"/>
         /// pixel buffer. The tip points in the direction given by <paramref name="headingDegrees"/>
-        /// (0° = up/north, 90° = right/east, clockwise — matching Unity's Y-axis rotation convention).
+        /// (0° = up/north, 90° = right/east clockwise, matching Unity's Y-axis rotation convention).
         /// The triangle is inscribed in a (2×<paramref name="halfWidth"/>) × (2×<paramref name="halfHeight"/>)
         /// bounding box centered on (<paramref name="cx"/>, <paramref name="cy"/>), where y=0 is the
         /// bottom of the buffer (Unity <c>SetPixels32</c> convention).
@@ -187,6 +222,107 @@ namespace Tsvrc.UI.Utils
                     if (!(hasNeg && hasPos))
                         buffer[rowOffset + px] = color;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Clears a pixel buffer to fully transparent (0,0,0,0).
+        /// Does not upload to GPU. Call <see cref="FlushBuffer"/> afterward to upload.
+        /// </summary>
+        public static void ClearBuffer(Color32[] buffer)
+        {
+            System.Array.Clear(buffer, 0, buffer.Length);
+        }
+
+        /// <summary>
+        /// Fills every pixel in a buffer with the given color.
+        /// Does not upload to GPU. Call <see cref="FlushBuffer"/> afterward to upload.
+        /// </summary>
+        public static void FillBuffer(Color32[] buffer, Color32 color)
+        {
+            for (int i = 0; i < buffer.Length; i++)
+                buffer[i] = color;
+        }
+
+        /// <summary>
+        /// Uploads a pre-allocated pixel buffer to a Texture2D without recalculating mipmaps.
+        /// Unity docs warn that <c>Apply()</c> is expensive because it copies all pixels even if
+        /// only a few changed, so callers should batch all buffer writes before calling this once.
+        /// Passing <c>false</c> skips mip recalculation for textures created without a mip chain.
+        /// </summary>
+        public static void FlushBuffer(Texture2D texture, Color32[] buffer)
+        {
+            texture.SetPixels32(buffer);
+            texture.Apply(false);
+        }
+
+        /// <summary>
+        /// Draws a filled horizontal span into a pre-allocated pixel buffer.
+        /// Bounds are pre-clamped outside the inner loop to avoid per-pixel branching.
+        /// </summary>
+        public static void DrawHorizontalLineToBuffer(Color32[] buffer, int bufferWidth, int bufferHeight,
+            int x, int y, int length, int thickness, Color32 color)
+        {
+            int xStart = Mathf.Max(x, 0);
+            int xEnd   = Mathf.Min(x + length,    bufferWidth);
+            int yStart = Mathf.Max(y, 0);
+            int yEnd   = Mathf.Min(y + thickness,  bufferHeight);
+            for (int py = yStart; py < yEnd; py++)
+            {
+                int rowOffset = py * bufferWidth;
+                for (int px = xStart; px < xEnd; px++)
+                    buffer[rowOffset + px] = color;
+            }
+        }
+
+        /// <summary>
+        /// Draws a filled vertical span into a pre-allocated pixel buffer.
+        /// Bounds are pre-clamped outside the inner loop to avoid per-pixel branching.
+        /// </summary>
+        public static void DrawVerticalLineToBuffer(Color32[] buffer, int bufferWidth, int bufferHeight,
+            int x, int y, int length, int thickness, Color32 color)
+        {
+            int xStart = Mathf.Max(x, 0);
+            int xEnd   = Mathf.Min(x + thickness,  bufferWidth);
+            int yStart = Mathf.Max(y, 0);
+            int yEnd   = Mathf.Min(y + length,      bufferHeight);
+            for (int py = yStart; py < yEnd; py++)
+            {
+                int rowOffset = py * bufferWidth;
+                for (int px = xStart; px < xEnd; px++)
+                    buffer[rowOffset + px] = color;
+            }
+        }
+
+        /// <summary>
+        /// Draws a line with thickness into a pre-allocated pixel buffer using Bresenham's algorithm.
+        /// Per-point bounding boxes are pre-clamped to avoid per-pixel branching.
+        /// </summary>
+        public static void DrawLineToBuffer(Color32[] buffer, int bufferWidth, int bufferHeight,
+            int x0, int y0, int x1, int y1, int thickness, Color32 color)
+        {
+            int dx   = Mathf.Abs(x1 - x0);
+            int dy   = Mathf.Abs(y1 - y0);
+            int sx   = x0 < x1 ? 1 : -1;
+            int sy   = y0 < y1 ? 1 : -1;
+            int err  = dx - dy;
+            int half = thickness / 2;
+            while (true)
+            {
+                int txMin = Mathf.Max(x0 - half, 0);
+                int txMax = Mathf.Min(x0 + half, bufferWidth  - 1);
+                int tyMin = Mathf.Max(y0 - half, 0);
+                int tyMax = Mathf.Min(y0 + half, bufferHeight - 1);
+                for (int ty = tyMin; ty <= tyMax; ty++)
+                {
+                    int rowOffset = ty * bufferWidth;
+                    for (int tx = txMin; tx <= txMax; tx++)
+                        buffer[rowOffset + tx] = color;
+                }
+                if (x0 == x1 && y0 == y1) break;
+                int e2 = 2 * err;
+                if (e2 > -dy) { err -= dy; x0 += sx; }
+                if (e2 <  dx) { err += dx; y0 += sy; }
             }
         }
     }
