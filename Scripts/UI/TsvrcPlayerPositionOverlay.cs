@@ -211,11 +211,7 @@ namespace Tsvrc.UI
             // Color32 zero-initialises to (0,0,0,0), fully transparent, so no explicit fill needed.
             _pixelBuffer = new Color32[width * height];
             _bufferIsClean = true;
-            _overlayTexture.SetPixels32(_pixelBuffer);
-            // false = do not recalculate mipmaps; the texture was created without them.
-            // Source: Unity docs. "Apply is an expensive operation... set updateMipmaps to false
-            // if you've already updated the mipmap levels."
-            _overlayTexture.Apply(false);
+            TextureGraphics2D.FlushBuffer(_overlayTexture, _pixelBuffer);
 
             OverlayImage.texture = _overlayTexture;
             OverlayImage.color = Color.white;
@@ -364,7 +360,7 @@ namespace Tsvrc.UI
                 // in the preceding show cycle (e.g. no tracked players in the instance).
                 if (!_bufferIsClean)
                 {
-                    System.Array.Clear(_pixelBuffer, 0, _pixelBuffer.Length);
+                    TextureGraphics2D.ClearBuffer(_pixelBuffer);
                     _bufferIsClean = true;
                     bufferModified = true;
                 }
@@ -489,13 +485,7 @@ namespace Tsvrc.UI
         private void _FlushTexture()
         {
             if (_overlayTexture != null)
-            {
-                _overlayTexture.SetPixels32(_pixelBuffer);
-                // false = skip mipmap update; this texture was created without mipmaps.
-                // Source: Unity docs. Apply() is expensive, and updateMipmaps=false avoids
-                // recalculating mip levels that do not exist.
-                _overlayTexture.Apply(false);
-            }
+                TextureGraphics2D.FlushBuffer(_overlayTexture, _pixelBuffer);
             TsEmit(OnOverlayUpdatedEvent);
         }
 
@@ -603,10 +593,9 @@ namespace Tsvrc.UI
             // so SetPixels32 + Apply would copy an unchanged buffer for no effect.
             if (!_bufferIsClean)
             {
-                System.Array.Clear(_pixelBuffer, 0, _pixelBuffer.Length);
+                TextureGraphics2D.ClearBuffer(_pixelBuffer);
                 _bufferIsClean = true;
-                _overlayTexture.SetPixels32(_pixelBuffer);
-                _overlayTexture.Apply(false);
+                TextureGraphics2D.FlushBuffer(_overlayTexture, _pixelBuffer);
             }
             // Always notify subscribers regardless of whether the GPU was updated.
             TsEmit(OnOverlayUpdatedEvent);
