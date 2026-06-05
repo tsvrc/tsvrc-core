@@ -361,6 +361,26 @@ namespace Tsvrc.Process
             return GetElapsedMilliseconds() * 0.001f;
         }
 
+        /// <summary>
+        /// Returns remaining milliseconds until the timer completes.
+        /// Returns 0 when the timer is open-ended (no duration set), already completed, or the elapsed time exceeds the duration.
+        /// </summary>
+        public int GetRemainingMilliseconds()
+        {
+            if (_durationMs <= 0) return 0;
+            int remaining = _durationMs - GetElapsedMilliseconds();
+            return remaining < 0 ? 0 : remaining;
+        }
+
+        /// <summary>
+        /// Returns remaining seconds until the timer completes.
+        /// Returns 0 when the timer is open-ended, already completed, or the elapsed time exceeds the duration.
+        /// </summary>
+        public float GetRemainingSeconds()
+        {
+            return GetRemainingMilliseconds() * 0.001f;
+        }
+
         /// <summary>Called on each local client when the timer starts.</summary>
         protected virtual void OnTimerStarted() { }
         /// <summary>Called on each local client when the timer stops before completion.</summary>
