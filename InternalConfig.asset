@@ -15,6 +15,7 @@ MonoBehaviour:
   Singletons: []
   PoolPrefabs:
   - {fileID: -1197653813904076162, guid: 4e9f3cdbd4eebf1408aea8c85707d3f3, type: 3}
+  - {fileID: 904728548572175217, guid: 5d7c5bf1c5d628e4d966bf4b8e7224ba, type: 3}
   Factories:
   - GroupName: 
     Prefabs:
