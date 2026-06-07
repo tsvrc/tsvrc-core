@@ -16,6 +16,9 @@ MonoBehaviour:
   PoolPrefabs:
   - {fileID: -1197653813904076162, guid: 4e9f3cdbd4eebf1408aea8c85707d3f3, type: 3}
   - {fileID: 904728548572175217, guid: 5d7c5bf1c5d628e4d966bf4b8e7224ba, type: 3}
+  - {fileID: 6105096152705169628, guid: d3017005a095a4b4898c4ba2885a9839, type: 3}
+  - {fileID: -9092729703651741013, guid: 4a39ae8ed67ac1d45bc5907497be584f, type: 3}
+  - {fileID: -8422451999444563390, guid: b48a2040f97bddd4fbaef83d8386149d, type: 3}
   Factories:
   - GroupName: 
     Prefabs:
