@@ -1,0 +1,310 @@
+#if UNITY_EDITOR
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using Newtonsoft.Json;
+using Tsvrc.Core;
+using UnityEditor;
+using UnityEngine;
+
+namespace Tsvrc.Editor.V2
+{
+    internal class TranslationModule : TsvrcModule
+    {
+        internal const string ConfigAssetPath = "Assets/TsvrcGenerated/TranslationConfig.asset";
+
+        private const string CacheFile = "translation-cache.json";
+        private const int BatchSize = 20;
+
+        // Matches TMP GameObjects named with a single underscore on each side, e.g. "_greeting_" or "_btn_label_".
+        // This naming convention marks the object as a translation target auto-wired during the wire phase.
+        private static readonly Regex TmpTargetPattern = new Regex(@"^_[^_].*[^_]_$|^_[^_]_$", RegexOptions.Compiled);
+
+        private List<LanguageEntry> _languages = new List<LanguageEntry>();
+
+        internal override string FileName => "Translation.cs";
+
+        internal override void OnDomainReloaded()
+        {
+            var previous = LoadCache();
+            var config = AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath);
+            _languages = config != null ? ParseLanguageFiles(config) : new List<LanguageEntry>();
+            LogDelta(previous, _languages.Select(l => l.Key).ToList());
+            SaveCache(_languages.Select(l => l.Key).ToList());
+        }
+
+        internal override string GenerateCode()
+        {
+            if (_languages.Count == 0) return string.Empty;
+
+            var w = new CsWriter();
+            w.AutoGenHeader();
+            w.BlankLine();
+            w.Usings(new[] { "UnityEngine", "TMPro", "UdonSharp", "Tsvrc.Utils" });
+
+            using (w.Namespace(ScaffoldModule.CompiledNamespace))
+            {
+                w.Line($"public enum Language {{ {string.Join(", ", BuildEnumNames())} }}");
+                w.BlankLine();
+
+                using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
+                {
+                    foreach (var lang in _languages)
+                    {
+                        var id = SanitizeIdentifier(lang.Key);
+                        var keyLits = lang.Entries.Keys.Select(k => $"\"{EscapeString(k)}\"");
+                        var valLits = lang.Entries.Values.Select(v => $"\"{EscapeString(v)}\"");
+                        w.Line($"private string[] _tsKeys_{id} = new string[] {{ {string.Join(", ", keyLits)} }};");
+                        w.Line($"private string[] _tsVals_{id} = new string[] {{ {string.Join(", ", valLits)} }};");
+                    }
+
+                    w.Line("private string[] _tsCurrentKeys;");
+                    w.Line("private string[] _tsCurrentVals;");
+                    w.Line("private int _tsCurrentLang = -1;");
+                    w.Line("[HideInInspector] [SerializeField] private TextMeshProUGUI[] _translationTargets;");
+                    w.Line("private int _tsBatchIndex;");
+                    w.Line("private bool _tsBatchRunning;");
+                    w.Line("private UdonSharpBehaviour[] _tsLangListeners = new UdonSharpBehaviour[0];");
+                    w.Line("private string[] _tsLangCallbacks = new string[0];");
+                    w.BlankLine();
+
+                    using (w.Method("public void SetLanguage(Language lang)"))
+                    {
+                        w.Line("int _tsIdx = (int)lang;");
+                        w.Line("if (_tsIdx == _tsCurrentLang) return;");
+                        for (int i = 0; i < _languages.Count; i++)
+                        {
+                            var id = SanitizeIdentifier(_languages[i].Key);
+                            string prefix = i == 0 ? "if" : "else if";
+                            w.Line($"{prefix} (_tsIdx == {i}) {{ _tsCurrentKeys = _tsKeys_{id}; _tsCurrentVals = _tsVals_{id}; }}");
+                        }
+                        w.Line($"else {{ Debug.LogError($\"[TsvrcGenerated] Language index {{{{_tsIdx}}}} is not available.\"); return; }}");
+                        w.Line("_tsCurrentLang = _tsIdx;");
+                        w.Line("_tsBatchIndex = 0;");
+                        w.Line("_tsBatchRunning = true;");
+                        w.Line("_TsApplyTranslationBatch();");
+                        w.Line("for (int _tsLi = 0; _tsLi < _tsLangListeners.Length; _tsLi++) { if (_tsLangListeners[_tsLi] != null) _tsLangListeners[_tsLi].SendCustomEvent(_tsLangCallbacks[_tsLi]); }");
+                    }
+
+                    using (w.Method("public void SubscribeLanguageChanged(UdonSharpBehaviour listener, string callback)"))
+                    {
+                        w.Line("if (listener == null) return;");
+                        w.Line("for (int _tsLi = 0; _tsLi < _tsLangListeners.Length; _tsLi++) if (_tsLangListeners[_tsLi] == listener && _tsLangCallbacks[_tsLi] == callback) return;");
+                        w.Line("_tsLangListeners = TsArray.Add(_tsLangListeners, new UdonSharpBehaviour[] { listener });");
+                        w.Line("_tsLangCallbacks = TsArray.Add(_tsLangCallbacks, new string[] { callback });");
+                    }
+
+                    using (w.Method("public string Translate(string key)"))
+                    {
+                        w.Line("if (_tsCurrentKeys == null) { Debug.LogWarning(\"[TsvrcGenerated] Translate called before SetLanguage.\"); return key; }");
+                        using (w.Block("for (int _tsI = 0; _tsI < _tsCurrentKeys.Length; _tsI++)"))
+                            w.Line("if (_tsCurrentKeys[_tsI] == key) return _tsCurrentVals[_tsI];");
+                        w.Line("return key;");
+                    }
+
+                    using (w.Method("public string Translate(string key, string param)"))
+                    {
+                        w.Line("if (_tsCurrentKeys == null) { Debug.LogWarning(\"[TsvrcGenerated] Translate called before SetLanguage.\"); return key; }");
+                        using (w.Block("for (int _tsI = 0; _tsI < _tsCurrentKeys.Length; _tsI++)"))
+                            w.Line("if (_tsCurrentKeys[_tsI] == key) return _tsCurrentVals[_tsI].Replace(\"{value}\", param);");
+                        w.Line("return key;");
+                    }
+
+                    using (w.Method("public void _TsApplyTranslationBatch()"))
+                    {
+                        w.Line("if (!_tsBatchRunning || _tsCurrentKeys == null) return;");
+                        w.Line($"int _tsEnd = Mathf.Min(_tsBatchIndex + {BatchSize}, _translationTargets.Length);");
+                        using (w.Block("for (int _tsI = _tsBatchIndex; _tsI < _tsEnd; _tsI++)"))
+                        {
+                            w.Line("if (_translationTargets[_tsI] == null) continue;");
+                            w.Line("string _tsName = _translationTargets[_tsI].gameObject.name;");
+                            using (w.Block("for (int _tsJ = 0; _tsJ < _tsCurrentKeys.Length; _tsJ++)"))
+                            {
+                                using (w.Block("if (_tsCurrentKeys[_tsJ] == _tsName)"))
+                                {
+                                    w.Line("_translationTargets[_tsI].text = _tsCurrentVals[_tsJ];");
+                                    w.Line("break;");
+                                }
+                            }
+                        }
+                        w.Line("_tsBatchIndex = _tsEnd;");
+                        using (w.Block("if (_tsBatchIndex < _translationTargets.Length)"))
+                            w.Line("SendCustomEventDelayedFrames(\"_TsApplyTranslationBatch\", 1);");
+                        w.Line("else _tsBatchRunning = false;");
+                    }
+                }
+            }
+
+            return w.ToString();
+        }
+
+        internal override void AfterFilesStable()
+        {
+            EnsureConfig();
+        }
+
+        internal override void Wire(SerializedObject target)
+        {
+            if (_languages.Count == 0) return;
+
+            var targets = new List<TMPro.TextMeshProUGUI>();
+            foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TextMeshProUGUI>(true))
+                if (TmpTargetPattern.IsMatch(tmp.gameObject.name))
+                    targets.Add(tmp);
+
+            var prop = target.FindProperty("_translationTargets");
+            if (prop == null)
+            {
+                Debug.LogWarning("[TranslationModule] '_translationTargets' not found on TsvrcGenerated.");
+                return;
+            }
+            prop.arraySize = targets.Count;
+            for (int i = 0; i < targets.Count; i++)
+                prop.GetArrayElementAtIndex(i).objectReferenceValue = targets[i];
+        }
+
+
+        private static List<LanguageEntry> ParseLanguageFiles(TranslationConfig2 config)
+        {
+            var result = new List<LanguageEntry>();
+            if (config.LanguageFiles == null) return result;
+
+            foreach (var asset in config.LanguageFiles)
+            {
+                if (asset == null) continue;
+                var entry = ParseLanguageJson(asset.name, asset.text);
+                if (entry.HasValue) result.Add(entry.Value);
+            }
+            return result;
+        }
+
+        private static LanguageEntry? ParseLanguageJson(string assetName, string json)
+        {
+            try
+            {
+                var root = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+
+                if (root == null || !root.TryGetValue("key", out var keyObj) || keyObj == null)
+                {
+                    Debug.LogError($"[TranslationModule] '{assetName}' is missing 'key'.");
+                    return null;
+                }
+                if (!root.TryGetValue("label", out var labelObj) || labelObj == null)
+                {
+                    Debug.LogError($"[TranslationModule] '{assetName}' is missing 'label'.");
+                    return null;
+                }
+                if (!root.TryGetValue("entries", out var entriesObj)
+                    || !(entriesObj is Newtonsoft.Json.Linq.JObject jEntries))
+                {
+                    Debug.LogError($"[TranslationModule] '{assetName}' is missing 'entries' object.");
+                    return null;
+                }
+
+                var entries = new Dictionary<string, string>();
+                foreach (var kv in jEntries)
+                    entries[kv.Key] = kv.Value is Newtonsoft.Json.Linq.JObject obj
+                        ? obj["label"]?.ToString() ?? ""
+                        : kv.Value?.ToString() ?? "";
+
+                return new LanguageEntry
+                {
+                    Key = keyObj.ToString(),
+                    Label = labelObj.ToString(),
+                    Entries = entries,
+                };
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[TranslationModule] Failed to parse '{assetName}': {ex.Message}");
+                return null;
+            }
+        }
+
+
+        private List<string> BuildEnumNames()
+        {
+            var names = new List<string>();
+            var seen = new HashSet<string>();
+            foreach (var lang in _languages)
+            {
+                var baseName = SanitizeIdentifier(lang.Label);
+                string name = baseName;
+                if (seen.Contains(name))
+                {
+                    name = baseName + "_" + SanitizeIdentifier(lang.Key);
+                    int n = 2;
+                    while (seen.Contains(name))
+                        name = baseName + "_" + SanitizeIdentifier(lang.Key) + n++;
+                }
+                seen.Add(name);
+                names.Add(name);
+            }
+            return names;
+        }
+
+        private static string SanitizeIdentifier(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "_";
+            var sb = new StringBuilder();
+            foreach (char c in s)
+            {
+                if (char.IsLetterOrDigit(c)) sb.Append(c);
+                else if (sb.Length > 0) sb.Append('_');
+            }
+            if (sb.Length == 0) return "_";
+            if (char.IsDigit(sb[0])) sb.Insert(0, '_');
+            return sb.ToString();
+        }
+
+        private static string EscapeString(string s)
+            => s.Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r")
+                .Replace("\t", "\\t");
+
+
+        private static TranslationConfig2 EnsureConfig()
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath);
+            if (existing != null) return existing;
+
+            var config = ScriptableObject.CreateInstance<TranslationConfig2>();
+            AssetDatabase.CreateAsset(config, ConfigAssetPath);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[TranslationModule] Created TranslationConfig2 at {ConfigAssetPath}");
+            return config;
+        }
+
+
+        private static List<string> LoadCache()
+        {
+            var json = TsvrcGenerator.ReadCacheFile(CacheFile);
+            if (json == null) return new List<string>();
+            try { return JsonConvert.DeserializeObject<List<string>>(json) ?? new List<string>(); }
+            catch { return new List<string>(); }
+        }
+
+        private static void SaveCache(List<string> keys)
+            => TsvrcGenerator.WriteCacheFile(CacheFile, JsonConvert.SerializeObject(keys));
+
+        private static void LogDelta(List<string> previous, List<string> current)
+        {
+            foreach (var k in current.Where(k => !previous.Contains(k)))
+                Debug.Log($"[TranslationModule] Language added: '{k}'");
+            foreach (var k in previous.Where(k => !current.Contains(k)))
+                Debug.Log($"[TranslationModule] Language removed: '{k}'");
+        }
+
+        private struct LanguageEntry
+        {
+            public string Key;
+            public string Label;
+            public Dictionary<string, string> Entries;
+        }
+    }
+}
+#endif
