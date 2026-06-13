@@ -15,7 +15,6 @@ namespace Tsvrc.Editor.V2
     {
         internal const string ConfigAssetPath = "Assets/TsvrcGenerated/TranslationConfig.asset";
 
-        private const string CacheFile = "translation-cache.json";
         private const int BatchSize = 20;
 
         // Matches TMP GameObjects named with a single underscore on each side, e.g. "_greeting_" or "_btn_label_".
@@ -35,12 +34,8 @@ namespace Tsvrc.Editor.V2
 
         internal override void OnDomainReloaded()
         {
-            var previous = LoadCache();
             var config = AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath);
             _languages = config != null ? ParseLanguageFiles(config) : new List<LanguageEntry>();
-            var currentKeys = _languages.Select(l => l.Key).ToList();
-            LogDelta(previous, currentKeys);
-            SaveCache(currentKeys);
         }
 
         internal override string GenerateCode()
@@ -309,25 +304,6 @@ namespace Tsvrc.Editor.V2
             AssetDatabase.CreateAsset(config, ConfigAssetPath);
             AssetDatabase.SaveAssets();
             Debug.Log($"[TranslationModule] Created TranslationConfig2 at {ConfigAssetPath}");
-        }
-
-        private static List<string> LoadCache()
-        {
-            var json = TsvrcGenerator.ReadCacheFile(CacheFile);
-            if (json == null) return new List<string>();
-            try { return JsonConvert.DeserializeObject<List<string>>(json) ?? new List<string>(); }
-            catch { return new List<string>(); }
-        }
-
-        private static void SaveCache(List<string> keys)
-            => TsvrcGenerator.WriteCacheFile(CacheFile, JsonConvert.SerializeObject(keys));
-
-        private static void LogDelta(List<string> previous, List<string> current)
-        {
-            foreach (var k in current.Where(k => !previous.Contains(k)))
-                Debug.Log($"[TranslationModule] Language added: '{k}'");
-            foreach (var k in previous.Where(k => !current.Contains(k)))
-                Debug.Log($"[TranslationModule] Language removed: '{k}'");
         }
 
         private struct LanguageEntry
