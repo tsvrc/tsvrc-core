@@ -106,9 +106,9 @@ namespace Tsvrc.Editor.V2
             var so = new SerializedObject(component);
             foreach (var module in modules)
                 module.Wire(so);
-            so.ApplyModifiedProperties();
 
-            EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
+            if (so.ApplyModifiedProperties())
+                EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
         }
 
         private static bool WriteIfChanged(string assetPath, string content)

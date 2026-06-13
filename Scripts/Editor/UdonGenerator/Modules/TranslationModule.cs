@@ -172,11 +172,7 @@ namespace Tsvrc.Editor.V2
             _knownTargetNames = NamesOf(targets);
 
             var prop = target.FindProperty("_translationTargets");
-            if (prop == null)
-            {
-                Debug.LogWarning("[TranslationModule] '_translationTargets' not found on TsvrcGenerated.");
-                return;
-            }
+            if (prop == null) return;
             prop.arraySize = targets.Count;
             for (int i = 0; i < targets.Count; i++)
                 prop.GetArrayElementAtIndex(i).objectReferenceValue = targets[i];
@@ -218,21 +214,12 @@ namespace Tsvrc.Editor.V2
                 var root = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
 
                 if (root == null || !root.TryGetValue("key", out var keyObj) || keyObj == null)
-                {
-                    Debug.LogError($"[TranslationModule] '{assetName}' is missing 'key'.");
                     return null;
-                }
                 if (!root.TryGetValue("label", out var labelObj) || labelObj == null)
-                {
-                    Debug.LogError($"[TranslationModule] '{assetName}' is missing 'label'.");
                     return null;
-                }
                 if (!root.TryGetValue("entries", out var entriesObj)
                     || !(entriesObj is Newtonsoft.Json.Linq.JObject jEntries))
-                {
-                    Debug.LogError($"[TranslationModule] '{assetName}' is missing 'entries' object.");
                     return null;
-                }
 
                 var entries = new Dictionary<string, string>();
                 foreach (var kv in jEntries)
@@ -247,9 +234,8 @@ namespace Tsvrc.Editor.V2
                     Entries = entries,
                 };
             }
-            catch (Exception ex)
+            catch
             {
-                Debug.LogError($"[TranslationModule] Failed to parse '{assetName}': {ex.Message}");
                 return null;
             }
         }
@@ -303,7 +289,6 @@ namespace Tsvrc.Editor.V2
             var config = ScriptableObject.CreateInstance<TranslationConfig2>();
             AssetDatabase.CreateAsset(config, ConfigAssetPath);
             AssetDatabase.SaveAssets();
-            Debug.Log($"[TranslationModule] Created TranslationConfig2 at {ConfigAssetPath}");
         }
 
         private struct LanguageEntry
