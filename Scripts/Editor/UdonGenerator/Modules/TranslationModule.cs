@@ -24,6 +24,13 @@ namespace Tsvrc.Editor.V2
 
         private List<LanguageEntry> _languages = new List<LanguageEntry>();
 
+        // Keys across all loaded language files — only TMP objects whose name is a known key get wired.
+        private static HashSet<string> _translationKeys = new HashSet<string>(StringComparer.Ordinal);
+
+        // Baseline set of matched TMP target names from the last wire pass.
+        // Compared on hierarchy events to avoid re-wiring on unrelated scene changes.
+        private static HashSet<string> _knownTargetNames = new HashSet<string>(StringComparer.Ordinal);
+
         internal override string FileName => "Translation.cs";
 
         internal override void OnDomainReloaded()
@@ -31,13 +38,20 @@ namespace Tsvrc.Editor.V2
             var previous = LoadCache();
             var config = AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath);
             _languages = config != null ? ParseLanguageFiles(config) : new List<LanguageEntry>();
-            LogDelta(previous, _languages.Select(l => l.Key).ToList());
-            SaveCache(_languages.Select(l => l.Key).ToList());
+            var currentKeys = _languages.Select(l => l.Key).ToList();
+            LogDelta(previous, currentKeys);
+            SaveCache(currentKeys);
         }
 
         internal override string GenerateCode()
         {
             if (_languages.Count == 0) return string.Empty;
+
+            var presentNames = new HashSet<string>(
+                UnityEngine.Object.FindObjectsOfType<TMPro.TextMeshProUGUI>(true)
+                    .Where(t => TmpTargetPattern.IsMatch(t.gameObject.name))
+                    .Select(t => t.gameObject.name),
+                StringComparer.Ordinal);
 
             var w = new CsWriter();
             w.AutoGenHeader();
@@ -54,8 +68,9 @@ namespace Tsvrc.Editor.V2
                     foreach (var lang in _languages)
                     {
                         var id = SanitizeIdentifier(lang.Key);
-                        var keyLits = lang.Entries.Keys.Select(k => $"\"{EscapeString(k)}\"");
-                        var valLits = lang.Entries.Values.Select(v => $"\"{EscapeString(v)}\"");
+                        var usedKeys = lang.Entries.Keys.Where(k => presentNames.Contains(k)).ToList();
+                        var keyLits = usedKeys.Select(k => $"\"{EscapeString(k)}\"");
+                        var valLits = usedKeys.Select(k => $"\"{EscapeString(lang.Entries[k])}\"");
                         w.Line($"private string[] _tsKeys_{id} = new string[] {{ {string.Join(", ", keyLits)} }};");
                         w.Line($"private string[] _tsVals_{id} = new string[] {{ {string.Join(", ", valLits)} }};");
                     }
@@ -63,7 +78,7 @@ namespace Tsvrc.Editor.V2
                     w.Line("private string[] _tsCurrentKeys;");
                     w.Line("private string[] _tsCurrentVals;");
                     w.Line("private int _tsCurrentLang = -1;");
-                    w.Line("[HideInInspector] [SerializeField] private TextMeshProUGUI[] _translationTargets;");
+                    w.Line("[SerializeField] private TextMeshProUGUI[] _translationTargets;");
                     w.Line("private int _tsBatchIndex;");
                     w.Line("private bool _tsBatchRunning;");
                     w.Line("private UdonSharpBehaviour[] _tsLangListeners = new UdonSharpBehaviour[0];");
@@ -143,16 +158,23 @@ namespace Tsvrc.Editor.V2
         internal override void AfterFilesStable()
         {
             EnsureConfig();
+            _translationKeys = BuildTranslationKeys(_languages);
+            _knownTargetNames = NamesOf(FindTmpTargets());
+        }
+
+        internal override void OnSceneHierarchyChanged()
+        {
+            var current = NamesOf(FindTmpTargets());
+            if (!current.SetEquals(_knownTargetNames))
+                TsvrcGenerator.ScheduleRerun();
         }
 
         internal override void Wire(SerializedObject target)
         {
             if (_languages.Count == 0) return;
 
-            var targets = new List<TMPro.TextMeshProUGUI>();
-            foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TextMeshProUGUI>(true))
-                if (TmpTargetPattern.IsMatch(tmp.gameObject.name))
-                    targets.Add(tmp);
+            var targets = FindTmpTargets();
+            _knownTargetNames = NamesOf(targets);
 
             var prop = target.FindProperty("_translationTargets");
             if (prop == null)
@@ -165,6 +187,20 @@ namespace Tsvrc.Editor.V2
                 prop.GetArrayElementAtIndex(i).objectReferenceValue = targets[i];
         }
 
+        private static List<TMPro.TextMeshProUGUI> FindTmpTargets()
+        {
+            var result = new List<TMPro.TextMeshProUGUI>();
+            foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TextMeshProUGUI>(true))
+                if (TmpTargetPattern.IsMatch(tmp.gameObject.name) && _translationKeys.Contains(tmp.gameObject.name))
+                    result.Add(tmp);
+            return result;
+        }
+
+        private static HashSet<string> NamesOf(List<TMPro.TextMeshProUGUI> targets)
+            => new HashSet<string>(targets.Select(t => t.gameObject.name), StringComparer.Ordinal);
+
+        private static HashSet<string> BuildTranslationKeys(List<LanguageEntry> languages)
+            => new HashSet<string>(languages.SelectMany(l => l.Entries.Keys), StringComparer.Ordinal);
 
         private static List<LanguageEntry> ParseLanguageFiles(TranslationConfig2 config)
         {
@@ -223,7 +259,6 @@ namespace Tsvrc.Editor.V2
             }
         }
 
-
         private List<string> BuildEnumNames()
         {
             var names = new List<string>();
@@ -266,19 +301,15 @@ namespace Tsvrc.Editor.V2
                 .Replace("\r", "\\r")
                 .Replace("\t", "\\t");
 
-
-        private static TranslationConfig2 EnsureConfig()
+        private static void EnsureConfig()
         {
-            var existing = AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath);
-            if (existing != null) return existing;
+            if (AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath) != null) return;
 
             var config = ScriptableObject.CreateInstance<TranslationConfig2>();
             AssetDatabase.CreateAsset(config, ConfigAssetPath);
             AssetDatabase.SaveAssets();
             Debug.Log($"[TranslationModule] Created TranslationConfig2 at {ConfigAssetPath}");
-            return config;
         }
-
 
         private static List<string> LoadCache()
         {

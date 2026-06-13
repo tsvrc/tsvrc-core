@@ -14,11 +14,29 @@ namespace Tsvrc.Editor.V2
         private const string GeneratedFolder = "Assets/TsvrcGenerated";
         private const string CacheFolder = "Assets/.tsvrc";
 
+        private static List<TsvrcModule> _activeModules;
+        private static bool _rerunPending;
+
         [MenuItem("Tsvrc/V2/Manual Compile")]
         public static void Compile() => AfterDomainReload();
 
+        internal static void ScheduleRerun()
+        {
+            if (_rerunPending) return;
+            _rerunPending = true;
+            EditorApplication.delayCall += RunScheduledRerun;
+        }
+
+        private static void RunScheduledRerun()
+        {
+            _rerunPending = false;
+            AfterDomainReload();
+        }
+
         internal static void AfterDomainReload()
         {
+            EditorApplication.hierarchyChanged -= OnHierarchyChanged;
+
             var modules = CreateModules();
 
             foreach (var module in modules)
@@ -44,6 +62,16 @@ namespace Tsvrc.Editor.V2
                 module.AfterFilesStable();
 
             RunWire(modules);
+
+            _activeModules = modules;
+            EditorApplication.hierarchyChanged += OnHierarchyChanged;
+        }
+
+        private static void OnHierarchyChanged()
+        {
+            if (_activeModules == null) return;
+            foreach (var module in _activeModules)
+                module.OnSceneHierarchyChanged();
         }
 
         internal static List<TsvrcModule> CreateModules()
