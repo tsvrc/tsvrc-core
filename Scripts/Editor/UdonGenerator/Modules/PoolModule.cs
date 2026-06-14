@@ -6,6 +6,7 @@ using System.Reflection;
 using Tsvrc.Core;
 using UdonSharp;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -13,33 +14,39 @@ namespace Tsvrc.Editor.V2
 {
     internal class PoolModule : TsvrcModule
     {
-        private const string CacheFile = "pool-cache.json";
-
         private List<PoolField> _currentFields = new List<PoolField>();
+        private HashSet<string> _configuredTypeNames = new HashSet<string>(StringComparer.Ordinal);
 
-        internal override string FileName => "Pool.cs";
-        internal override string StartMethodCall => _currentFields.Count > 0 ? "TsInitPool()" : null;
+        internal override string FileName => "TsvrcPoolBehaviour.cs";
+        internal override IEnumerable<string> WatchedAssets() => new[] { ScaffoldModule.ConfigPath };
 
-        internal override void OnDomainReloaded()
+        internal override void LoadConfig()
         {
-            var previous = LoadCache();
             _currentFields = DetectWirePoolFields();
-            LogDelta(previous, _currentFields);
-            SaveCache(_currentFields);
+            var config = AssetDatabase.LoadAssetAtPath<TsvrcConfig2>(ScaffoldModule.ConfigPath);
+            _configuredTypeNames = ResolveConfiguredTypeNames(config);
+        }
+
+        internal override bool AfterFilesStable()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<TsvrcConfig2>(ScaffoldModule.ConfigPath);
+            bool configArrayHasSlots = config?.PooledObjects != null && config.PooledObjects.Length > 0;
+            var live = ResolveConfiguredTypeNames(config);
+
+            if (configArrayHasSlots && live.Count == 0) return false;
+            if (live.SetEquals(_configuredTypeNames)) return false;
+
+            _configuredTypeNames = live;
+            return true;
         }
 
         internal override string GenerateCode()
         {
-            if (_currentFields.Count == 0) return string.Empty;
+            var slotsByType = BuildActiveSlots();
+            if (slotsByType.Count == 0)
+                return BuildStub();
 
-            var slotsByType = new Dictionary<string, (string Namespace, int Count)>(StringComparer.Ordinal);
-            foreach (var f in _currentFields)
-            {
-                slotsByType.TryGetValue(f.FieldTypeName, out var entry);
-                slotsByType[f.FieldTypeName] = (f.FieldTypeNamespace, entry.Count + 1);
-            }
-
-            var usings = new List<string> { "UnityEngine" };
+            var usings = new List<string> { "UdonSharp", "UnityEngine" };
             foreach (var (ns, _) in slotsByType.Values)
                 if (!string.IsNullOrEmpty(ns) && !usings.Contains(ns))
                     usings.Add(ns);
@@ -50,29 +57,79 @@ namespace Tsvrc.Editor.V2
             w.Usings(usings);
 
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
+            using (w.Block($"public class {ScaffoldModule.PoolClassName} : UdonSharpBehaviour"))
             {
                 foreach (var kvp in slotsByType.OrderBy(x => x.Key))
                     for (int i = 0; i < kvp.Value.Count; i++)
                         w.Line($"[SerializeField] private {kvp.Key} {SlotFieldName(kvp.Key, i)};");
 
-                using (w.Method("private void TsInitPool()")) { }
+                using (w.Method("void Start()"))
+                {
+                    foreach (var kvp in slotsByType.OrderBy(x => x.Key))
+                    {
+                        if (!IsTsvrcBehaviourType(kvp.Key, kvp.Value.Namespace)) continue;
+                        for (int i = 0; i < kvp.Value.Count; i++)
+                            w.Line($"{SlotFieldName(kvp.Key, i)}.gameObject.SetActive(false);");
+                    }
+                }
             }
 
             return w.ToString();
         }
 
-        internal override void Wire(SerializedObject target)
+        private static string BuildStub()
         {
-            var compiled = target.targetObject as Component;
-            if (compiled == null) return;
+            var w = new CsWriter();
+            w.AutoGenHeader();
+            w.BlankLine();
+            w.Usings(new[] { "UdonSharp", "UnityEngine" });
+            using (w.Namespace(ScaffoldModule.CompiledNamespace))
+            using (w.Block($"public class {ScaffoldModule.PoolClassName} : UdonSharpBehaviour"))
+            using (w.Method("void Start()"))
+            { }
+            return w.ToString();
+        }
 
-            var existingContainer = compiled.transform.Find("Pool");
-            if (existingContainer != null)
-                Undo.DestroyObjectImmediate(existingContainer.gameObject);
+        private Dictionary<string, (string Namespace, int Count)> BuildActiveSlots()
+        {
+            var slotsByType = new Dictionary<string, (string Namespace, int Count)>(StringComparer.Ordinal);
+            foreach (var f in _currentFields)
+            {
+                if (!_configuredTypeNames.Contains(f.FieldTypeName)) continue;
+                slotsByType.TryGetValue(f.FieldTypeName, out var entry);
+                slotsByType[f.FieldTypeName] = (f.FieldTypeNamespace, entry.Count + 1);
+            }
+            return slotsByType;
+        }
+
+        internal override bool OnSceneHierarchyChanged()
+        {
+            if (_configuredTypeNames.Count == 0) return false;
+            var poolType = ScaffoldModule.FindPoolType();
+            if (poolType == null) return false;
+            var poolComp = (Component)UnityEngine.Object.FindObjectOfType(poolType, true);
+            if (poolComp == null) return false;
+            return poolComp.transform.Find("Pool") == null;
+        }
+
+        internal override void Wire(Scene scene)
+        {
+            var poolType = ScaffoldModule.FindPoolType();
+            if (poolType == null) return;
+
+            var poolComp = (Component)UnityEngine.Object.FindObjectOfType(poolType, true);
+            if (poolComp == null) return;
 
             var config = AssetDatabase.LoadAssetAtPath<TsvrcConfig2>(ScaffoldModule.ConfigPath);
             var poolEntries = ResolvePoolEntries(config);
+            bool configArrayHasSlots = config?.PooledObjects != null && config.PooledObjects.Length > 0;
+
+            if (configArrayHasSlots && poolEntries.Count == 0) return;
+
+            var existingContainer = poolComp.transform.Find("Pool");
+            if (existingContainer != null)
+                Undo.DestroyObjectImmediate(existingContainer.gameObject);
+
             if (poolEntries.Count == 0) return;
 
             var slotCountByType = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -82,7 +139,8 @@ namespace Tsvrc.Editor.V2
                 slotCountByType[f.FieldTypeName] = c + 1;
             }
 
-            var wireTargetsByType = CollectWireTargetsByType(compiled.gameObject.scene);
+            var wireTargetsByType = CollectWireTargetsByType(scene);
+            var so = new SerializedObject(poolComp);
             GameObject poolContainer = null;
 
             foreach (var (prefabComponent, typeName) in poolEntries)
@@ -99,7 +157,7 @@ namespace Tsvrc.Editor.V2
                     {
                         poolContainer = new GameObject("Pool");
                         Undo.RegisterCreatedObjectUndo(poolContainer, "Create Pool Container");
-                        poolContainer.transform.SetParent(compiled.transform, false);
+                        poolContainer.transform.SetParent(poolComp.transform, false);
                     }
 
                     var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefabComponent.gameObject, poolContainer.transform);
@@ -120,11 +178,11 @@ namespace Tsvrc.Editor.V2
                         continue;
                     }
 
-                    var initProp = target.FindProperty(SlotFieldName(typeName, i));
+                    var initProp = so.FindProperty(SlotFieldName(typeName, i));
                     if (initProp != null)
                         initProp.objectReferenceValue = instanceComponent;
                     else
-                        Debug.LogWarning($"[PoolModule] Field '{SlotFieldName(typeName, i)}' not found on TsvrcGenerated. Force compile to regenerate.");
+                        Debug.LogWarning($"[PoolModule] Field '{SlotFieldName(typeName, i)}' not found on {ScaffoldModule.PoolClassName}. Force compile to regenerate.");
 
                     if (targets != null && i < targets.Count)
                     {
@@ -147,10 +205,26 @@ namespace Tsvrc.Editor.V2
                 else if (targetCount > slotCount)
                     Debug.LogWarning($"[PoolModule] '{typeName}': {targetCount} [WirePool] target(s), {slotCount} slot(s) — {targetCount - slotCount} component(s) will keep stale references.");
             }
+
+            if (so.ApplyModifiedProperties())
+                EditorSceneManager.MarkSceneDirty(poolComp.gameObject.scene);
         }
 
         private static string SlotFieldName(string typeName, int index) => $"_pool_{typeName}_{index}";
 
+        private static bool IsTsvrcBehaviourType(string shortName, string ns)
+        {
+            string fullName = string.IsNullOrEmpty(ns) ? shortName : $"{ns}.{shortName}";
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType(fullName);
+                if (type == null) continue;
+                for (var t = type.BaseType; t != null; t = t.BaseType)
+                    if (t.Name == "TsvrcBehaviour") return true;
+                return false;
+            }
+            return false;
+        }
 
         private static List<PoolField> DetectWirePoolFields()
         {
@@ -166,8 +240,6 @@ namespace Tsvrc.Editor.V2
                         if (IsWirePoolField(field))
                             found.Add(new PoolField
                             {
-                                TypeName = type.FullName,
-                                FieldName = field.Name,
                                 FieldTypeName = field.FieldType.Name,
                                 FieldTypeNamespace = field.FieldType.Namespace ?? string.Empty,
                             });
@@ -183,6 +255,20 @@ namespace Tsvrc.Editor.V2
                 || field.GetCustomAttributes(false).Any(a => a.GetType().Name == "SerializeField");
         }
 
+        private static HashSet<string> ResolveConfiguredTypeNames(TsvrcConfig2 config)
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            if (config?.PooledObjects == null) return names;
+            foreach (var obj in config.PooledObjects)
+            {
+                if (obj == null || !EditorUtility.IsPersistent(obj)) continue;
+                var component = obj as UdonSharpBehaviour
+                    ?? (obj as GameObject)?.GetComponent<UdonSharpBehaviour>();
+                if (component != null)
+                    names.Add(component.GetType().Name);
+            }
+            return names;
+        }
 
         private static List<(Component, string)> ResolvePoolEntries(TsvrcConfig2 config)
         {
@@ -239,47 +325,10 @@ namespace Tsvrc.Editor.V2
             return result;
         }
 
-
-        private static List<PoolField> LoadCache()
+        private struct PoolField
         {
-            string json = TsvrcGenerator.ReadCacheFile(CacheFile);
-            if (string.IsNullOrEmpty(json)) return new List<PoolField>();
-            try { return JsonUtility.FromJson<PoolCache>(json).fields ?? new List<PoolField>(); }
-            catch { return new List<PoolField>(); }
-        }
-
-        private static void SaveCache(List<PoolField> fields)
-            => TsvrcGenerator.WriteCacheFile(CacheFile, JsonUtility.ToJson(new PoolCache { fields = fields }, true));
-
-        private static void LogDelta(List<PoolField> previous, List<PoolField> current)
-        {
-            var previousIds = previous.Select(f => f.Id).ToHashSet();
-            var currentIds = current.Select(f => f.Id).ToHashSet();
-
-            foreach (var f in current.Where(f => !previousIds.Contains(f.Id)))
-                Debug.Log($"[PoolModule] [WirePool] added: {f.TypeName}.{f.FieldName}");
-
-            foreach (var f in previous.Where(f => !currentIds.Contains(f.Id)))
-                Debug.Log($"[PoolModule] [WirePool] removed: {f.TypeName}.{f.FieldName}");
-
-            if (current.Count == 0)
-                Debug.Log("[PoolModule] No [WirePool] fields found.");
-        }
-
-        [Serializable]
-        private class PoolField
-        {
-            public string TypeName;
-            public string FieldName;
             public string FieldTypeName;
             public string FieldTypeNamespace;
-            public string Id => $"{TypeName}.{FieldName}";
-        }
-
-        [Serializable]
-        private class PoolCache
-        {
-            public List<PoolField> fields = new List<PoolField>();
         }
     }
 }

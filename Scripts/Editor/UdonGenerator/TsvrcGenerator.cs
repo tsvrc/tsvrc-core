@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Tsvrc.Editor.V2
@@ -12,104 +11,134 @@ namespace Tsvrc.Editor.V2
     internal static class TsvrcGenerator
     {
         private const string GeneratedFolder = "Assets/TsvrcGenerated";
-        private const string CacheFolder = "Assets/.tsvrc";
+
+        internal static HashSet<string> WatchedPaths { get; private set; } = new HashSet<string>();
 
         private static List<TsvrcModule> _activeModules;
         private static bool _rerunPending;
+        private static bool _isWiring;
 
-        [MenuItem("Tsvrc/V2/Manual Compile")]
-        public static void Compile() => AfterDomainReload();
+        [MenuItem("Tsvrc/Generate")]
+        public static void ManualGenerate()
+        {
+            Debug.Log("[TsvrcGenerator] === Manual Generate ===");
+            Run();
+        }
+
+        internal static void AfterDomainReload(bool skipRefresh = false) => Run(skipRefresh);
+
+        internal static void Run(bool skipRefresh = false)
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            EditorApplication.hierarchyChanged -= OnHierarchyChanged;
+            Undo.postprocessModifications -= OnPostprocessModifications;
+            _activeModules = null;
+
+            var modules = CreateModules();
+
+            foreach (var module in modules)
+                module.LoadConfig();
+
+            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var module in modules)
+                foreach (var path in module.WatchedAssets())
+                    paths.Add(path);
+            WatchedPaths = paths;
+
+            bool anyWritten = false;
+            foreach (var module in modules)
+                anyWritten |= WriteIfChanged($"{GeneratedFolder}/{module.FileName}", module.GenerateCode());
+
+            if (anyWritten && !skipRefresh)
+            {
+                AssetDatabase.Refresh();
+                return;
+            }
+
+            bool stableChanged = false;
+            foreach (var module in modules)
+                stableChanged |= module.AfterFilesStable();
+
+            if (stableChanged)
+            {
+                bool stableWritten = false;
+                foreach (var module in modules)
+                    stableWritten |= WriteIfChanged($"{GeneratedFolder}/{module.FileName}", module.GenerateCode());
+                if (stableWritten && !skipRefresh)
+                {
+                    AssetDatabase.Refresh();
+                    return;
+                }
+            }
+
+            var compiledType = ScaffoldModule.FindCompiledType();
+            if (compiledType != null)
+            {
+                var component = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+                if (component != null)
+                {
+                    var scene = component.gameObject.scene;
+                    _isWiring = true;
+                    try { foreach (var module in modules) module.Wire(scene); }
+                    finally { _isWiring = false; }
+                }
+            }
+
+            _activeModules = modules;
+            EditorApplication.hierarchyChanged += OnHierarchyChanged;
+            Undo.postprocessModifications += OnPostprocessModifications;
+        }
 
         internal static void ScheduleRerun()
         {
             if (_rerunPending) return;
             _rerunPending = true;
-            EditorApplication.delayCall += RunScheduledRerun;
+            EditorApplication.delayCall += RunScheduled;
         }
 
-        private static void RunScheduledRerun()
+        private static void RunScheduled()
         {
             _rerunPending = false;
-            AfterDomainReload();
-        }
-
-        internal static void AfterDomainReload()
-        {
-            EditorApplication.hierarchyChanged -= OnHierarchyChanged;
-
-            var modules = CreateModules();
-
-            foreach (var module in modules)
-                module.OnDomainReloaded();
-
-            bool anyWritten = false;
-            foreach (var module in modules)
-            {
-                if (module.FileName == null) continue;
-                var path = $"{GeneratedFolder}/{module.FileName}";
-                var code = module.GenerateCode();
-                anyWritten |= string.IsNullOrEmpty(code) ? DeleteIfExists(path) : WriteIfChanged(path, code);
-            }
-
-            if (anyWritten)
-            {
-                // AssetDatabase.Refresh() triggers a domain reload; AfterFilesStable runs on the next stable pass.
-                AssetDatabase.Refresh();
-                return;
-            }
-
-            foreach (var module in modules)
-                module.AfterFilesStable();
-
-            RunWire(modules);
-
-            _activeModules = modules;
-            EditorApplication.hierarchyChanged += OnHierarchyChanged;
+            Run();
         }
 
         private static void OnHierarchyChanged()
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (_activeModules == null) return;
+            bool changed = false;
             foreach (var module in _activeModules)
-                module.OnSceneHierarchyChanged();
+                changed |= module.OnSceneHierarchyChanged();
+            if (changed)
+                ScheduleRerun();
         }
 
-        internal static List<TsvrcModule> CreateModules()
+        private static UndoPropertyModification[] OnPostprocessModifications(UndoPropertyModification[] modifications)
         {
-            var contentModules = new List<TsvrcModule> { new PoolModule(), new TranslationModule() };
-            var all = new List<TsvrcModule>(contentModules.Count + 1) { new ScaffoldModule(contentModules) };
-            all.AddRange(contentModules);
-            return all;
+            if (_isWiring || EditorApplication.isPlayingOrWillChangePlaymode || _activeModules == null)
+                return modifications;
+            foreach (var mod in modifications)
+            {
+                var target = mod.currentValue?.target;
+                if (target == null) continue;
+                var typeName = target.GetType().Name;
+                if (typeName == ScaffoldModule.CompiledClassName ||
+                    typeName == ScaffoldModule.PoolClassName ||
+                    typeName == ScaffoldModule.TranslationClassName)
+                {
+                    ScheduleRerun();
+                    return modifications;
+                }
+            }
+            return modifications;
         }
 
-        internal static string ReadCacheFile(string fileName)
+        private static List<TsvrcModule> CreateModules() => new List<TsvrcModule>
         {
-            string fullPath = ToFullPath($"{CacheFolder}/{fileName}");
-            return File.Exists(fullPath) ? File.ReadAllText(fullPath, Encoding.UTF8) : null;
-        }
-
-        internal static void WriteCacheFile(string fileName, string content)
-        {
-            string fullPath = ToFullPath($"{CacheFolder}/{fileName}");
-            Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
-            File.WriteAllText(fullPath, content, Encoding.UTF8);
-        }
-
-        private static void RunWire(List<TsvrcModule> modules)
-        {
-            var compiledType = Type.GetType(ScaffoldModule.CompiledTypeFullName);
-            if (compiledType == null) return;
-
-            var component = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
-            if (component == null) return;
-
-            var so = new SerializedObject(component);
-            foreach (var module in modules)
-                module.Wire(so);
-
-            if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
-        }
+            new PoolModule(),
+            new TranslationModule(),
+            new ScaffoldModule(),
+        };
 
         private static bool WriteIfChanged(string assetPath, string content)
         {
@@ -118,13 +147,6 @@ namespace Tsvrc.Editor.V2
                 return false;
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
             File.WriteAllText(fullPath, content, Encoding.UTF8);
-            return true;
-        }
-
-        private static bool DeleteIfExists(string assetPath)
-        {
-            if (!File.Exists(ToFullPath(assetPath))) return false;
-            AssetDatabase.DeleteAsset(assetPath);
             return true;
         }
 

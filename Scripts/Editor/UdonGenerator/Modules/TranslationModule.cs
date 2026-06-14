@@ -7,46 +7,49 @@ using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Tsvrc.Core;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Tsvrc.Editor.V2
 {
     internal class TranslationModule : TsvrcModule
     {
         internal const string ConfigAssetPath = "Assets/TsvrcGenerated/TranslationConfig.asset";
-
         private const int BatchSize = 20;
 
-        // Matches TMP GameObjects named with a single underscore on each side, e.g. "_greeting_" or "_btn_label_".
-        // This naming convention marks the object as a translation target auto-wired during the wire phase.
+        // Matches TMP GameObjects named with a single underscore on each side, e.g. "_greeting_".
         private static readonly Regex TmpTargetPattern = new Regex(@"^_[^_].*[^_]_$|^_[^_]_$", RegexOptions.Compiled);
 
         private List<LanguageEntry> _languages = new List<LanguageEntry>();
+        private HashSet<string> _translationKeys = new HashSet<string>(StringComparer.Ordinal);
+        private HashSet<string> _effectiveKeys = new HashSet<string>(StringComparer.Ordinal);
 
-        // Keys across all loaded language files — only TMP objects whose name is a known key get wired.
-        private static HashSet<string> _translationKeys = new HashSet<string>(StringComparer.Ordinal);
+        internal override string FileName => "TsvrcTranslationBehaviour.cs";
 
-        // Baseline set of matched TMP target names from the last wire pass.
-        // Compared on hierarchy events to avoid re-wiring on unrelated scene changes.
-        private static HashSet<string> _knownTargetNames = new HashSet<string>(StringComparer.Ordinal);
+        internal override IEnumerable<string> WatchedAssets()
+        {
+            var paths = new List<string> { ConfigAssetPath };
+            var config = AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath);
+            if (config?.LanguageFiles != null)
+                foreach (var asset in config.LanguageFiles)
+                    if (asset != null)
+                        paths.Add(AssetDatabase.GetAssetPath(asset));
+            return paths;
+        }
 
-        internal override string FileName => "Translation.cs";
-
-        internal override void OnDomainReloaded()
+        internal override void LoadConfig()
         {
             var config = AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath);
             _languages = config != null ? ParseLanguageFiles(config) : new List<LanguageEntry>();
+            _translationKeys = BuildTranslationKeys(_languages);
+            _effectiveKeys = NamesOf(FindTmpTargets());
         }
 
         internal override string GenerateCode()
         {
-            if (_languages.Count == 0) return string.Empty;
-
-            var presentNames = new HashSet<string>(
-                UnityEngine.Object.FindObjectsOfType<TMPro.TextMeshProUGUI>(true)
-                    .Where(t => TmpTargetPattern.IsMatch(t.gameObject.name))
-                    .Select(t => t.gameObject.name),
-                StringComparer.Ordinal);
+            if (_languages.Count == 0)
+                return BuildStub();
 
             var w = new CsWriter();
             w.AutoGenHeader();
@@ -58,14 +61,14 @@ namespace Tsvrc.Editor.V2
                 w.Line($"public enum Language {{ {string.Join(", ", BuildEnumNames())} }}");
                 w.BlankLine();
 
-                using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
+                using (w.Block($"public class {ScaffoldModule.TranslationClassName} : UdonSharpBehaviour"))
                 {
                     foreach (var lang in _languages)
                     {
                         var id = SanitizeIdentifier(lang.Key);
-                        var usedKeys = lang.Entries.Keys.Where(k => presentNames.Contains(k)).ToList();
-                        var keyLits = usedKeys.Select(k => $"\"{EscapeString(k)}\"");
-                        var valLits = usedKeys.Select(k => $"\"{EscapeString(lang.Entries[k])}\"");
+                        var keys = lang.Entries.Keys.Where(k => _effectiveKeys.Contains(k)).ToList();
+                        var keyLits = keys.Select(k => $"\"{EscapeString(k)}\"");
+                        var valLits = keys.Select(k => $"\"{EscapeString(lang.Entries[k])}\"");
                         w.Line($"private string[] _tsKeys_{id} = new string[] {{ {string.Join(", ", keyLits)} }};");
                         w.Line($"private string[] _tsVals_{id} = new string[] {{ {string.Join(", ", valLits)} }};");
                     }
@@ -79,6 +82,8 @@ namespace Tsvrc.Editor.V2
                     w.Line("private UdonSharpBehaviour[] _tsLangListeners = new UdonSharpBehaviour[0];");
                     w.Line("private string[] _tsLangCallbacks = new string[0];");
                     w.BlankLine();
+
+                    using (w.Method("void Start()")) { }
 
                     using (w.Method("public void SetLanguage(Language lang)"))
                     {
@@ -150,35 +155,69 @@ namespace Tsvrc.Editor.V2
             return w.ToString();
         }
 
-        internal override void AfterFilesStable()
+        private static string BuildStub()
+        {
+            var w = new CsWriter();
+            w.AutoGenHeader();
+            w.BlankLine();
+            w.Usings(new[] { "UdonSharp", "UnityEngine" });
+            using (w.Namespace(ScaffoldModule.CompiledNamespace))
+            {
+                w.Line("public enum Language { }");
+                w.BlankLine();
+                using (w.Block($"public class {ScaffoldModule.TranslationClassName} : UdonSharpBehaviour"))
+                {
+                    using (w.Method("void Start()")) { }
+                    using (w.Method("public void SetLanguage(Language lang)")) { }
+                    using (w.Method("public string Translate(string key)")) { w.Line("return key;"); }
+                    using (w.Method("public string Translate(string key, string param)")) { w.Line("return key;"); }
+                    using (w.Method("public void SubscribeLanguageChanged(UdonSharpBehaviour listener, string callback)")) { }
+                    using (w.Method("public void _TsApplyTranslationBatch()")) { }
+                }
+            }
+            return w.ToString();
+        }
+
+        internal override bool AfterFilesStable()
         {
             EnsureConfig();
-            _translationKeys = BuildTranslationKeys(_languages);
-            _knownTargetNames = NamesOf(FindTmpTargets());
+            var live = NamesOf(FindTmpTargets());
+            if (live.SetEquals(_effectiveKeys)) return false;
+            _effectiveKeys = live;
+            return true;
         }
 
-        internal override void OnSceneHierarchyChanged()
+        internal override bool OnSceneHierarchyChanged()
         {
-            var current = NamesOf(FindTmpTargets());
-            if (!current.SetEquals(_knownTargetNames))
-                TsvrcGenerator.ScheduleRerun();
+            var live = NamesOf(FindTmpTargets());
+            if (live.SetEquals(_effectiveKeys)) return false;
+            _effectiveKeys = live;
+            return true;
         }
 
-        internal override void Wire(SerializedObject target)
+        internal override void Wire(Scene scene)
         {
             if (_languages.Count == 0) return;
 
-            var targets = FindTmpTargets();
-            _knownTargetNames = NamesOf(targets);
+            var transType = ScaffoldModule.FindTranslationType();
+            if (transType == null) return;
 
-            var prop = target.FindProperty("_translationTargets");
+            var transComp = (Component)UnityEngine.Object.FindObjectOfType(transType, true);
+            if (transComp == null) return;
+
+            var targets = FindTmpTargets();
+
+            var so = new SerializedObject(transComp);
+            var prop = so.FindProperty("_translationTargets");
             if (prop == null) return;
             prop.arraySize = targets.Count;
             for (int i = 0; i < targets.Count; i++)
                 prop.GetArrayElementAtIndex(i).objectReferenceValue = targets[i];
+            if (so.ApplyModifiedProperties())
+                EditorSceneManager.MarkSceneDirty(transComp.gameObject.scene);
         }
 
-        private static List<TMPro.TextMeshProUGUI> FindTmpTargets()
+        private List<TMPro.TextMeshProUGUI> FindTmpTargets()
         {
             var result = new List<TMPro.TextMeshProUGUI>();
             foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TextMeshProUGUI>(true))
@@ -285,7 +324,6 @@ namespace Tsvrc.Editor.V2
         private static void EnsureConfig()
         {
             if (AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath) != null) return;
-
             var config = ScriptableObject.CreateInstance<TranslationConfig2>();
             AssetDatabase.CreateAsset(config, ConfigAssetPath);
             AssetDatabase.SaveAssets();
