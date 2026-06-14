@@ -60,9 +60,12 @@ namespace {CompiledNamespace}
             EnsureUdonSharpProgramAsset(ScaffoldFilePath, GeneratedAssetPath);
             EnsureUdonSharpProgramAsset(PoolBehaviourFilePath, PoolBehaviourAssetPath);
             EnsureUdonSharpProgramAsset(TranslationBehaviourFilePath, TranslationBehaviourAssetPath);
-            EnsureRootSceneObject();
-            EnsureChildSceneObject("TsvrcPool", FindPoolType());
-            EnsureChildSceneObject("TsvrcTranslation", FindTranslationType());
+            var root = EnsureRootSceneObject();
+            if (root != null)
+            {
+                EnsureChildSceneObject("TsvrcPool", FindPoolType(), root);
+                EnsureChildSceneObject("TsvrcTranslation", FindTranslationType(), root);
+            }
             return false;
         }
 
@@ -99,31 +102,13 @@ namespace {CompiledNamespace}
                 EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
         }
 
-        internal static Type FindCompiledType()
-        {
-            var fullName = CompiledNamespace + "." + CompiledClassName;
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var type = assembly.GetType(fullName);
-                if (type != null) return type;
-            }
-            return null;
-        }
+        internal static Type FindCompiledType() => FindType(CompiledClassName);
+        internal static Type FindPoolType() => FindType(PoolClassName);
+        internal static Type FindTranslationType() => FindType(TranslationClassName);
 
-        internal static Type FindPoolType()
+        private static Type FindType(string className)
         {
-            var fullName = CompiledNamespace + "." + PoolClassName;
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var type = assembly.GetType(fullName);
-                if (type != null) return type;
-            }
-            return null;
-        }
-
-        internal static Type FindTranslationType()
-        {
-            var fullName = CompiledNamespace + "." + TranslationClassName;
+            var fullName = CompiledNamespace + "." + className;
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 var type = assembly.GetType(fullName);
@@ -168,10 +153,10 @@ namespace {CompiledNamespace}
             }
         }
 
-        private static void EnsureRootSceneObject()
+        private static Component EnsureRootSceneObject()
         {
             var compiledType = FindCompiledType();
-            if (compiledType == null) return;
+            if (compiledType == null) return null;
 
             var instances = UnityEngine.Object.FindObjectsOfType(compiledType, true)
                 .Cast<Component>().ToList();
@@ -184,7 +169,7 @@ namespace {CompiledNamespace}
                 EditorSceneManager.MarkSceneDirty(scene);
             }
 
-            if (instances.Count > 0) return;
+            if (instances.Count > 0) return instances[0];
 
             var namedObjects = FindSceneGameObjects(CompiledClassName);
             if (namedObjects.Count > 0)
@@ -197,7 +182,7 @@ namespace {CompiledNamespace}
                 }
                 UdonSharpUndo.AddComponent(namedObjects[0], compiledType);
                 EditorSceneManager.MarkSceneDirty(namedObjects[0].scene);
-                return;
+                return namedObjects[0].GetComponent(compiledType) as Component;
             }
 
             var go = new GameObject(CompiledClassName);
@@ -206,17 +191,12 @@ namespace {CompiledNamespace}
             UdonSharpUndo.AddComponent(go, compiledType);
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
             Debug.Log($"[TsvrcGenerator] Created {CompiledClassName} in scene.");
+            return go.GetComponent(compiledType) as Component;
         }
 
-        private static void EnsureChildSceneObject(string childName, Type componentType)
+        private static void EnsureChildSceneObject(string childName, Type componentType, Component root)
         {
             if (componentType == null) return;
-
-            var compiledType = FindCompiledType();
-            if (compiledType == null) return;
-
-            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
-            if (root == null) return;
 
             var existing = root.transform.Find(childName);
             if (existing != null && existing.GetComponent(componentType) != null) return;

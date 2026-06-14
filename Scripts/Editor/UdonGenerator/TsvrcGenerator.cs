@@ -45,31 +45,13 @@ namespace Tsvrc.Editor.V2
                     paths.Add(path);
             WatchedPaths = paths;
 
-            bool anyWritten = false;
-            foreach (var module in modules)
-                anyWritten |= WriteIfChanged($"{GeneratedFolder}/{module.FileName}", module.GenerateCode());
-
-            if (anyWritten && !skipRefresh)
-            {
-                AssetDatabase.Refresh();
-                return;
-            }
+            if (WriteModules(modules) && !skipRefresh) { AssetDatabase.Refresh(); return; }
 
             bool stableChanged = false;
             foreach (var module in modules)
                 stableChanged |= module.AfterFilesStable();
 
-            if (stableChanged)
-            {
-                bool stableWritten = false;
-                foreach (var module in modules)
-                    stableWritten |= WriteIfChanged($"{GeneratedFolder}/{module.FileName}", module.GenerateCode());
-                if (stableWritten && !skipRefresh)
-                {
-                    AssetDatabase.Refresh();
-                    return;
-                }
-            }
+            if (stableChanged && WriteModules(modules) && !skipRefresh) { AssetDatabase.Refresh(); return; }
 
             var compiledType = ScaffoldModule.FindCompiledType();
             if (compiledType != null)
@@ -139,6 +121,14 @@ namespace Tsvrc.Editor.V2
             new TranslationModule(),
             new ScaffoldModule(),
         };
+
+        private static bool WriteModules(List<TsvrcModule> modules)
+        {
+            bool written = false;
+            foreach (var module in modules)
+                written |= WriteIfChanged($"{GeneratedFolder}/{module.FileName}", module.GenerateCode());
+            return written;
+        }
 
         private static bool WriteIfChanged(string assetPath, string content)
         {

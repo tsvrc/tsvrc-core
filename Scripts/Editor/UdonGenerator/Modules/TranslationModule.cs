@@ -24,6 +24,7 @@ namespace Tsvrc.Editor.V2
         private List<LanguageEntry> _languages = new List<LanguageEntry>();
         private HashSet<string> _translationKeys = new HashSet<string>(StringComparer.Ordinal);
         private HashSet<string> _effectiveKeys = new HashSet<string>(StringComparer.Ordinal);
+        private List<TMPro.TextMeshProUGUI> _cachedTmpTargets = new List<TMPro.TextMeshProUGUI>();
 
         internal override string FileName => "TsvrcTranslationBehaviour.cs";
 
@@ -43,7 +44,8 @@ namespace Tsvrc.Editor.V2
             var config = AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath);
             _languages = config != null ? ParseLanguageFiles(config) : new List<LanguageEntry>();
             _translationKeys = BuildTranslationKeys(_languages);
-            _effectiveKeys = NamesOf(FindTmpTargets());
+            _cachedTmpTargets = FindTmpTargets();
+            _effectiveKeys = NamesOf(_cachedTmpTargets);
         }
 
         internal override string GenerateCode()
@@ -178,18 +180,13 @@ namespace Tsvrc.Editor.V2
             return w.ToString();
         }
 
-        internal override bool AfterFilesStable()
-        {
-            EnsureConfig();
-            var live = NamesOf(FindTmpTargets());
-            if (live.SetEquals(_effectiveKeys)) return false;
-            _effectiveKeys = live;
-            return true;
-        }
+        internal override bool AfterFilesStable() { EnsureConfig(); return SyncEffectiveKeys(); }
+        internal override bool OnSceneHierarchyChanged() => SyncEffectiveKeys();
 
-        internal override bool OnSceneHierarchyChanged()
+        private bool SyncEffectiveKeys()
         {
-            var live = NamesOf(FindTmpTargets());
+            _cachedTmpTargets = FindTmpTargets();
+            var live = NamesOf(_cachedTmpTargets);
             if (live.SetEquals(_effectiveKeys)) return false;
             _effectiveKeys = live;
             return true;
@@ -205,14 +202,12 @@ namespace Tsvrc.Editor.V2
             var transComp = (Component)UnityEngine.Object.FindObjectOfType(transType, true);
             if (transComp == null) return;
 
-            var targets = FindTmpTargets();
-
             var so = new SerializedObject(transComp);
             var prop = so.FindProperty("_translationTargets");
             if (prop == null) return;
-            prop.arraySize = targets.Count;
-            for (int i = 0; i < targets.Count; i++)
-                prop.GetArrayElementAtIndex(i).objectReferenceValue = targets[i];
+            prop.arraySize = _cachedTmpTargets.Count;
+            for (int i = 0; i < _cachedTmpTargets.Count; i++)
+                prop.GetArrayElementAtIndex(i).objectReferenceValue = _cachedTmpTargets[i];
             if (so.ApplyModifiedProperties())
                 EditorSceneManager.MarkSceneDirty(transComp.gameObject.scene);
         }

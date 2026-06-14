@@ -132,21 +132,16 @@ namespace Tsvrc.Editor.V2
 
             if (poolEntries.Count == 0) return;
 
-            var slotCountByType = new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (var f in _currentFields)
-            {
-                slotCountByType.TryGetValue(f.FieldTypeName, out int c);
-                slotCountByType[f.FieldTypeName] = c + 1;
-            }
-
+            var activeSlots = BuildActiveSlots();
             var wireTargetsByType = CollectWireTargetsByType(scene);
             var so = new SerializedObject(poolComp);
             GameObject poolContainer = null;
 
             foreach (var (prefabComponent, typeName) in poolEntries)
             {
-                if (!slotCountByType.TryGetValue(typeName, out int slotCount) || slotCount == 0)
+                if (!activeSlots.TryGetValue(typeName, out var slotEntry) || slotEntry.Count == 0)
                     continue;
+                int slotCount = slotEntry.Count;
 
                 wireTargetsByType.TryGetValue(typeName, out var targets);
                 var sourceType = prefabComponent.GetType();
@@ -236,7 +231,7 @@ namespace Tsvrc.Editor.V2
                 catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
 
                 foreach (var type in types)
-                    foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+                    foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
                         if (IsWirePoolField(field))
                             found.Add(new PoolField
                             {
@@ -249,11 +244,13 @@ namespace Tsvrc.Editor.V2
 
         private static bool IsWirePoolField(FieldInfo field)
         {
-            if (!field.GetCustomAttributes(false).Any(a => a.GetType().Name == "WirePoolAttribute"))
-                return false;
-            return field.IsPublic
-                || field.GetCustomAttributes(false).Any(a => a.GetType().Name == "SerializeField");
+            var attrs = field.GetCustomAttributes(false);
+            if (!attrs.Any(a => a.GetType().Name == "WirePoolAttribute")) return false;
+            return field.IsPublic || attrs.Any(a => a.GetType().Name == "SerializeField");
         }
+
+        private static UdonSharpBehaviour ResolveComponent(UnityEngine.Object obj)
+            => obj as UdonSharpBehaviour ?? (obj as GameObject)?.GetComponent<UdonSharpBehaviour>();
 
         private static HashSet<string> ResolveConfiguredTypeNames(TsvrcConfig2 config)
         {
@@ -262,8 +259,7 @@ namespace Tsvrc.Editor.V2
             foreach (var obj in config.PooledObjects)
             {
                 if (obj == null || !EditorUtility.IsPersistent(obj)) continue;
-                var component = obj as UdonSharpBehaviour
-                    ?? (obj as GameObject)?.GetComponent<UdonSharpBehaviour>();
+                var component = ResolveComponent(obj);
                 if (component != null)
                     names.Add(component.GetType().Name);
             }
@@ -284,8 +280,7 @@ namespace Tsvrc.Editor.V2
                     continue;
                 }
 
-                var component = obj as UdonSharpBehaviour
-                    ?? (obj as GameObject)?.GetComponent<UdonSharpBehaviour>();
+                var component = ResolveComponent(obj);
                 if (component == null)
                 {
                     Debug.LogWarning($"[PoolModule] '{obj.name}' has no UdonSharpBehaviour. Skipping.");
