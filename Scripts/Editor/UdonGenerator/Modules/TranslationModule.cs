@@ -253,12 +253,21 @@ namespace Tsvrc.Editor.V2
                 var root = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
 
                 if (root == null || !root.TryGetValue("key", out var keyObj) || keyObj == null)
+                {
+                    Debug.LogError($"[TranslationModule] '{assetName}' is missing the 'key' field.");
                     return null;
+                }
                 if (!root.TryGetValue("label", out var labelObj) || labelObj == null)
+                {
+                    Debug.LogError($"[TranslationModule] '{assetName}' is missing the 'label' field.");
                     return null;
+                }
                 if (!root.TryGetValue("entries", out var entriesObj)
                     || !(entriesObj is Newtonsoft.Json.Linq.JObject jEntries))
+                {
+                    Debug.LogError($"[TranslationModule] '{assetName}' is missing the 'entries' object.");
                     return null;
+                }
 
                 var entries = new Dictionary<string, string>();
                 foreach (var kv in jEntries)
@@ -273,8 +282,9 @@ namespace Tsvrc.Editor.V2
                     Entries = entries,
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.LogError($"[TranslationModule] Failed to parse '{assetName}': {ex.Message}");
                 return null;
             }
         }
