@@ -19,26 +19,8 @@ namespace Tsvrc.Editor
             string[] movedFromAssetPaths,
             bool didDomainReload)
         {
-            // Skip events fired because Tsvrc itself triggered a domain reload.
-            if (didDomainReload) return;
-
-            var changed = new HashSet<string>(importedAssets);
-            foreach (var p in deletedAssets) changed.Add(p);
-            foreach (var p in movedAssets) changed.Add(p);
-            foreach (var p in movedFromAssetPaths) changed.Add(p);
-
-            if (RequiresFullCompile(changed))
-            {
-                // JSON data asset changed, no domain reload follows, delayCall is safe.
-                EditorApplication.delayCall += () => TsvrcCompiler.Compile();
-                return;
-            }
-            if (RequiresSourceCompile(changed))
-            {
-                // .cs file changed, Unity will trigger a domain reload after this callback returns,
-                // wiping any delayCall. Persist via EditorPrefs so TsvrcWirer picks it up post-reload.
-                TsvrcWirer.ScheduleCompile();
-            }
+            // Auto-recompile disabled: V1 compiler is pending removal.
+            // Use Tsvrc > Tools > Force Compile to compile manually.
         }
 
         private static bool RequiresFullCompile(HashSet<string> changed)

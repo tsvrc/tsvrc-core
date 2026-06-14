@@ -74,11 +74,6 @@ namespace Tsvrc.Editor
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
             TsvrcCompiler.LogSuccess();
-
-            // A source file saved during the Compile -> Refresh -> domain reload cycle arrives
-            // with didDomainReload=true, which TsvrcWatcher skips. Check here so it is not lost.
-            if (TsvrcCompiler.WouldChangeSource())
-                EditorApplication.delayCall += () => TsvrcCompiler.Compile();
         }
 
         // UdonSharp requires a .asset program file alongside the .cs before a component can be added.
