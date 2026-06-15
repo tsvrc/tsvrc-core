@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Tsvrc.Core;
 using UdonSharp;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -14,35 +13,32 @@ namespace Tsvrc.Editor.V2
 {
     internal class PoolModule : TsvrcModule
     {
+        private const string BuiltinConfigPath = "Assets/Tsvrc/TsvrcBuiltinConfig.asset";
+
+        private bool _hasAnyConfigured;
         private List<PoolField> _currentFields = new List<PoolField>();
         private HashSet<string> _configuredTypeNames = new HashSet<string>(StringComparer.Ordinal);
+        private List<(Component prefab, string typeName)> _poolEntries = new List<(Component, string)>();
+        private Dictionary<string, (string Namespace, int Count)> _activeSlots = new Dictionary<string, (string, int)>(StringComparer.Ordinal);
 
         internal override string FileName => "TsvrcPoolBehaviour.cs";
-        internal override IEnumerable<string> WatchedAssets() => new[] { ScaffoldModule.ConfigPath };
+
+        internal override IEnumerable<string> WatchedAssets() => new[] { ScaffoldModule.ConfigPath, BuiltinConfigPath };
 
         internal override void LoadConfig()
         {
             _currentFields = DetectWirePoolFields();
-            var config = AssetDatabase.LoadAssetAtPath<TsvrcConfig2>(ScaffoldModule.ConfigPath);
-            _configuredTypeNames = ResolveConfiguredTypeNames(config);
-        }
-
-        internal override bool AfterFilesStable()
-        {
-            var config = AssetDatabase.LoadAssetAtPath<TsvrcConfig2>(ScaffoldModule.ConfigPath);
-            bool configArrayHasSlots = config?.PooledObjects != null && config.PooledObjects.Length > 0;
-            var live = ResolveConfiguredTypeNames(config);
-
-            if (configArrayHasSlots && live.Count == 0) return false;
-            if (live.SetEquals(_configuredTypeNames)) return false;
-
-            _configuredTypeNames = live;
-            return true;
+            var userConfig = AssetDatabase.LoadAssetAtPath<TsvrcConfig>(ScaffoldModule.ConfigPath);
+            var builtinConfig = AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(BuiltinConfigPath);
+            _hasAnyConfigured = (userConfig?.PooledObjects?.Length > 0)
+                             || (builtinConfig?.PoolPrefabs?.Length > 0);
+            (_configuredTypeNames, _poolEntries) = ResolveConfig(userConfig, builtinConfig);
+            _activeSlots = BuildActiveSlots();
         }
 
         internal override string GenerateCode()
         {
-            var slotsByType = BuildActiveSlots();
+            var slotsByType = _activeSlots;
             if (slotsByType.Count == 0)
                 return BuildStub();
 
@@ -112,7 +108,7 @@ namespace Tsvrc.Editor.V2
             return poolComp.transform.Find("Pool") == null;
         }
 
-        internal override void Wire(Scene scene)
+        internal override void Wire()
         {
             var poolType = ScaffoldModule.FindPoolType();
             if (poolType == null) return;
@@ -120,24 +116,20 @@ namespace Tsvrc.Editor.V2
             var poolComp = (Component)UnityEngine.Object.FindObjectOfType(poolType, true);
             if (poolComp == null) return;
 
-            var config = AssetDatabase.LoadAssetAtPath<TsvrcConfig2>(ScaffoldModule.ConfigPath);
-            var poolEntries = ResolvePoolEntries(config);
-            bool configArrayHasSlots = config?.PooledObjects != null && config.PooledObjects.Length > 0;
-
-            if (configArrayHasSlots && poolEntries.Count == 0) return;
+            if (_hasAnyConfigured && _poolEntries.Count == 0) return;
 
             var existingContainer = poolComp.transform.Find("Pool");
             if (existingContainer != null)
                 Undo.DestroyObjectImmediate(existingContainer.gameObject);
 
-            if (poolEntries.Count == 0) return;
+            if (_poolEntries.Count == 0) return;
 
-            var activeSlots = BuildActiveSlots();
-            var wireTargetsByType = CollectWireTargetsByType(scene);
+            var activeSlots = _activeSlots;
+            var wireTargetsByType = CollectWireTargetsByType(poolComp.gameObject.scene);
             var so = new SerializedObject(poolComp);
             GameObject poolContainer = null;
 
-            foreach (var (prefabComponent, typeName) in poolEntries)
+            foreach (var (prefabComponent, typeName) in _poolEntries)
             {
                 if (!activeSlots.TryGetValue(typeName, out var slotEntry) || slotEntry.Count == 0)
                     continue;
@@ -252,45 +244,50 @@ namespace Tsvrc.Editor.V2
         private static UdonSharpBehaviour ResolveComponent(UnityEngine.Object obj)
             => obj as UdonSharpBehaviour ?? (obj as GameObject)?.GetComponent<UdonSharpBehaviour>();
 
-        private static HashSet<string> ResolveConfiguredTypeNames(TsvrcConfig2 config)
+        // Single pass over both config sources: produces the type-name set (for slot generation)
+        // and the ordered prefab entry list (for wiring) simultaneously.
+        // Builtins come first so they always occupy lower slot indices.
+        private static (HashSet<string> typeNames, List<(Component prefab, string typeName)> entries)
+            ResolveConfig(TsvrcConfig userConfig, TsvrcBuiltinConfig builtinConfig)
         {
             var names = new HashSet<string>(StringComparer.Ordinal);
-            if (config?.PooledObjects == null) return names;
-            foreach (var obj in config.PooledObjects)
-            {
-                if (obj == null || !EditorUtility.IsPersistent(obj)) continue;
-                var component = ResolveComponent(obj);
-                if (component != null)
-                    names.Add(component.GetType().Name);
-            }
-            return names;
-        }
+            var entries = new List<(Component, string)>();
 
-        private static List<(Component, string)> ResolvePoolEntries(TsvrcConfig2 config)
-        {
-            var result = new List<(Component, string)>();
-            if (config?.PooledObjects == null) return result;
-
-            foreach (var obj in config.PooledObjects)
-            {
-                if (obj == null) continue;
-                if (!EditorUtility.IsPersistent(obj))
+            if (builtinConfig?.PoolPrefabs != null)
+                foreach (var proc in builtinConfig.PoolPrefabs)
                 {
-                    Debug.LogWarning($"[PoolModule] '{obj.name}' is a scene object. Pool entries must be prefab assets. Skipping.");
-                    continue;
+                    if (proc == null) continue;
+                    if (!EditorUtility.IsPersistent(proc))
+                    {
+                        Debug.LogWarning($"[PoolModule] Builtin '{proc.name}' is a scene object. Pool entries must be prefab assets. Skipping.");
+                        continue;
+                    }
+                    var typeName = proc.GetType().Name;
+                    names.Add(typeName);
+                    entries.Add((proc, typeName));
                 }
 
-                var component = ResolveComponent(obj);
-                if (component == null)
+            if (userConfig?.PooledObjects != null)
+                foreach (var obj in userConfig.PooledObjects)
                 {
-                    Debug.LogWarning($"[PoolModule] '{obj.name}' has no UdonSharpBehaviour. Skipping.");
-                    continue;
+                    if (obj == null) continue;
+                    if (!EditorUtility.IsPersistent(obj))
+                    {
+                        Debug.LogWarning($"[PoolModule] '{obj.name}' is a scene object. Pool entries must be prefab assets. Skipping.");
+                        continue;
+                    }
+                    var component = ResolveComponent(obj);
+                    if (component == null)
+                    {
+                        Debug.LogWarning($"[PoolModule] '{obj.name}' has no UdonSharpBehaviour. Skipping.");
+                        continue;
+                    }
+                    var typeName = component.GetType().Name;
+                    names.Add(typeName);
+                    entries.Add((component, typeName));
                 }
 
-                result.Add((component, component.GetType().Name));
-            }
-
-            return result;
+            return (names, entries);
         }
 
         private static Dictionary<string, List<(MonoBehaviour, string)>> CollectWireTargetsByType(Scene scene)

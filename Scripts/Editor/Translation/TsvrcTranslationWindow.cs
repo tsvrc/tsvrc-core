@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
-using Tsvrc.Core;
+using Tsvrc.Editor.V2;
+using TranslationModuleV2 = Tsvrc.Editor.V2.TranslationModule;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,12 +12,11 @@ namespace Tsvrc.Editor
     // Open via Tsvrc > Translation.
     internal class TsvrcTranslationWindow : EditorWindow
     {
-        private const string ConfigAssetPath = "Assets/CompiledTsvrc/TranslationConfig.asset";
         private static readonly Regex TargetPattern = new Regex(@"^_[^_].*[^_]_$|^_[^_]_$", RegexOptions.Compiled);
         private static readonly Regex KeyRegex = new Regex(@"""key""\s*:\s*""([^""]+)""", RegexOptions.Compiled);
         private static readonly Regex LabelRegex = new Regex(@"""label""\s*:\s*""([^""]+)""", RegexOptions.Compiled);
 
-        private TranslationConfig _config;
+        private TsvrcTranslationConfig _config;
         private SerializedObject _so;
         private Vector2 _scroll;
         private int _tmpTargetCount = -1; // -1 = stale; invalidated by hierarchy changes
@@ -53,7 +53,7 @@ namespace Tsvrc.Editor
 
         private void Reload()
         {
-            _config = AssetDatabase.LoadAssetAtPath<TranslationConfig>(ConfigAssetPath);
+            _config = AssetDatabase.LoadAssetAtPath<TsvrcTranslationConfig>(TranslationModuleV2.ConfigAssetPath);
             _so = _config != null ? new SerializedObject(_config) : null;
             _peekCache.Clear();
         }
@@ -65,8 +65,10 @@ namespace Tsvrc.Editor
 
             if (_config == null)
             {
-                EditorGUILayout.HelpBox("No TranslationConfig asset found.\nCreate one to start configuring language files.", MessageType.Info);
-                if (GUILayout.Button("Create TranslationConfig"))
+                EditorGUILayout.HelpBox(
+                    $"No translation config found at {TranslationModuleV2.ConfigAssetPath}.\nCreate one to start configuring language files.",
+                    MessageType.Info);
+                if (GUILayout.Button("Create Translation Config"))
                     CreateConfig();
                 return;
             }
@@ -74,7 +76,7 @@ namespace Tsvrc.Editor
             _so.Update();
 
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"Config: {ConfigAssetPath}", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField($"Config: {TranslationModuleV2.ConfigAssetPath}", EditorStyles.miniLabel);
             if (GUILayout.Button("Select", GUILayout.Width(54)))
                 Selection.activeObject = _config;
             EditorGUILayout.EndHorizontal();
@@ -171,12 +173,12 @@ namespace Tsvrc.Editor
 
         private void CreateConfig()
         {
-            var dir = Path.GetDirectoryName(ConfigAssetPath);
+            var dir = Path.GetDirectoryName(TranslationModuleV2.ConfigAssetPath);
             if (!AssetDatabase.IsValidFolder(dir))
                 AssetDatabase.CreateFolder(Path.GetDirectoryName(dir), Path.GetFileName(dir));
 
-            var instance = CreateInstance<TranslationConfig>();
-            AssetDatabase.CreateAsset(instance, ConfigAssetPath);
+            var instance = CreateInstance<TsvrcTranslationConfig>();
+            AssetDatabase.CreateAsset(instance, TranslationModuleV2.ConfigAssetPath);
             AssetDatabase.SaveAssets();
             Reload();
         }
@@ -221,4 +223,3 @@ namespace Tsvrc.Editor
     }
 }
 #endif
-

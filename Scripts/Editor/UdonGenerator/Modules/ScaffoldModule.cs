@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Tsvrc.Core;
 using UdonSharp;
 using UdonSharpEditor;
 using UnityEditor;
@@ -14,7 +13,7 @@ namespace Tsvrc.Editor.V2
 {
     internal class ScaffoldModule : TsvrcModule
     {
-        internal const string ConfigPath = "Assets/TsvrcGenerated/CoreConfig.asset";
+        internal const string ConfigPath = "Assets/TsvrcGenerated/TsvrcConfig.asset";
         internal const string CompiledNamespace = "Tsvrc.Core.Generated";
         internal const string CompiledClassName = "TsvrcGenerated";
         internal const string PoolClassName = "TsvrcPoolBehaviour";
@@ -56,7 +55,6 @@ namespace {CompiledNamespace}
 
         internal override bool AfterFilesStable()
         {
-            LoadOrCreateConfig();
             EnsureUdonSharpProgramAsset(ScaffoldFilePath, GeneratedAssetPath);
             EnsureUdonSharpProgramAsset(PoolBehaviourFilePath, PoolBehaviourAssetPath);
             EnsureUdonSharpProgramAsset(TranslationBehaviourFilePath, TranslationBehaviourAssetPath);
@@ -83,7 +81,7 @@ namespace {CompiledNamespace}
             return false;
         }
 
-        internal override void Wire(Scene scene)
+        internal override void Wire()
         {
             var compiledType = FindCompiledType();
             var poolType = FindPoolType();
@@ -115,18 +113,6 @@ namespace {CompiledNamespace}
                 if (type != null) return type;
             }
             return null;
-        }
-
-        internal static TsvrcConfig2 LoadOrCreateConfig()
-        {
-            var existing = AssetDatabase.LoadAssetAtPath<TsvrcConfig2>(ConfigPath);
-            if (existing != null) return existing;
-
-            var config = ScriptableObject.CreateInstance<TsvrcConfig2>();
-            AssetDatabase.CreateAsset(config, ConfigPath);
-            AssetDatabase.SaveAssets();
-            Debug.Log($"[TsvrcGenerator] Created config at {ConfigPath}");
-            return config;
         }
 
         private static void EnsureUdonSharpProgramAsset(string scriptPath, string assetPath)

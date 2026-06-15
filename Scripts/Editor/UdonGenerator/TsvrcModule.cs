@@ -1,7 +1,6 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine.SceneManagement;
 
 namespace Tsvrc.Editor.V2
 {
@@ -13,7 +12,7 @@ namespace Tsvrc.Editor.V2
         internal abstract void LoadConfig();
         internal abstract string GenerateCode();
         internal virtual bool AfterFilesStable() => false;
-        internal virtual void Wire(Scene scene) { }
+        internal virtual void Wire() { }
         internal virtual bool OnSceneHierarchyChanged() => false;
     }
 }

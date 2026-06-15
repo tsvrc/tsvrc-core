@@ -5,22 +5,21 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
-using Tsvrc.Core;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace Tsvrc.Editor.V2
 {
     internal class TranslationModule : TsvrcModule
     {
-        internal const string ConfigAssetPath = "Assets/TsvrcGenerated/TranslationConfig.asset";
+        internal const string ConfigAssetPath = "Assets/TsvrcGenerated/TsvrcTranslationConfig.asset";
         private const int BatchSize = 20;
 
         // Matches TMP GameObjects named with a single underscore on each side, e.g. "_greeting_".
         private static readonly Regex TmpTargetPattern = new Regex(@"^_[^_].*[^_]_$|^_[^_]_$", RegexOptions.Compiled);
 
+        private TsvrcTranslationConfig _config;
         private List<LanguageEntry> _languages = new List<LanguageEntry>();
         private HashSet<string> _translationKeys = new HashSet<string>(StringComparer.Ordinal);
         private HashSet<string> _effectiveKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -31,9 +30,8 @@ namespace Tsvrc.Editor.V2
         internal override IEnumerable<string> WatchedAssets()
         {
             var paths = new List<string> { ConfigAssetPath };
-            var config = AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath);
-            if (config?.LanguageFiles != null)
-                foreach (var asset in config.LanguageFiles)
+            if (_config?.LanguageFiles != null)
+                foreach (var asset in _config.LanguageFiles)
                     if (asset != null)
                         paths.Add(AssetDatabase.GetAssetPath(asset));
             return paths;
@@ -41,8 +39,8 @@ namespace Tsvrc.Editor.V2
 
         internal override void LoadConfig()
         {
-            var config = AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath);
-            _languages = config != null ? ParseLanguageFiles(config) : new List<LanguageEntry>();
+            _config = AssetDatabase.LoadAssetAtPath<TsvrcTranslationConfig>(ConfigAssetPath);
+            _languages = _config != null ? ParseLanguageFiles(_config) : new List<LanguageEntry>();
             _translationKeys = BuildTranslationKeys(_languages);
             _cachedTmpTargets = FindTmpTargets();
             _effectiveKeys = NamesOf(_cachedTmpTargets);
@@ -180,19 +178,20 @@ namespace Tsvrc.Editor.V2
             return w.ToString();
         }
 
-        internal override bool AfterFilesStable() { EnsureConfig(); return SyncEffectiveKeys(); }
+        internal override bool AfterFilesStable() => SyncEffectiveKeys();
         internal override bool OnSceneHierarchyChanged() => SyncEffectiveKeys();
 
         private bool SyncEffectiveKeys()
         {
-            _cachedTmpTargets = FindTmpTargets();
-            var live = NamesOf(_cachedTmpTargets);
+            var fresh = FindTmpTargets();
+            var live = NamesOf(fresh);
             if (live.SetEquals(_effectiveKeys)) return false;
+            _cachedTmpTargets = fresh;
             _effectiveKeys = live;
             return true;
         }
 
-        internal override void Wire(Scene scene)
+        internal override void Wire()
         {
             if (_languages.Count == 0) return;
 
@@ -227,7 +226,7 @@ namespace Tsvrc.Editor.V2
         private static HashSet<string> BuildTranslationKeys(List<LanguageEntry> languages)
             => new HashSet<string>(languages.SelectMany(l => l.Entries.Keys), StringComparer.Ordinal);
 
-        private static List<LanguageEntry> ParseLanguageFiles(TranslationConfig2 config)
+        private static List<LanguageEntry> ParseLanguageFiles(TsvrcTranslationConfig config)
         {
             var result = new List<LanguageEntry>();
             if (config.LanguageFiles == null) return result;
@@ -325,14 +324,6 @@ namespace Tsvrc.Editor.V2
                 .Replace("\n", "\\n")
                 .Replace("\r", "\\r")
                 .Replace("\t", "\\t");
-
-        private static void EnsureConfig()
-        {
-            if (AssetDatabase.LoadAssetAtPath<TranslationConfig2>(ConfigAssetPath) != null) return;
-            var config = ScriptableObject.CreateInstance<TranslationConfig2>();
-            AssetDatabase.CreateAsset(config, ConfigAssetPath);
-            AssetDatabase.SaveAssets();
-        }
 
         private struct LanguageEntry
         {

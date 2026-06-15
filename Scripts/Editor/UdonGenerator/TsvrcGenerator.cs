@@ -17,6 +17,7 @@ namespace Tsvrc.Editor.V2
         private static List<TsvrcModule> _activeModules;
         private static bool _rerunPending;
         private static bool _isWiring;
+        private static bool _justFinishedWiring;
 
         [MenuItem("Tsvrc/Generate")]
         public static void ManualGenerate()
@@ -54,15 +55,15 @@ namespace Tsvrc.Editor.V2
             if (stableChanged && WriteModules(modules) && !skipRefresh) { AssetDatabase.Refresh(); return; }
 
             var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType != null)
+            if (compiledType != null && UnityEngine.Object.FindObjectOfType(compiledType, true) != null)
             {
-                var component = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
-                if (component != null)
+                _isWiring = true;
+                try { foreach (var module in modules) module.Wire(); }
+                finally
                 {
-                    var scene = component.gameObject.scene;
-                    _isWiring = true;
-                    try { foreach (var module in modules) module.Wire(scene); }
-                    finally { _isWiring = false; }
+                    _isWiring = false;
+                    _justFinishedWiring = true;
+                    EditorApplication.delayCall += () => _justFinishedWiring = false;
                 }
             }
 
@@ -97,7 +98,7 @@ namespace Tsvrc.Editor.V2
 
         private static UndoPropertyModification[] OnPostprocessModifications(UndoPropertyModification[] modifications)
         {
-            if (_isWiring || EditorApplication.isPlayingOrWillChangePlaymode || _activeModules == null)
+            if (_isWiring || _justFinishedWiring || EditorApplication.isPlayingOrWillChangePlaymode || _activeModules == null)
                 return modifications;
             foreach (var mod in modifications)
             {

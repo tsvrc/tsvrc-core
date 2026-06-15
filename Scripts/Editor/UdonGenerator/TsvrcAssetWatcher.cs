@@ -10,8 +10,10 @@ namespace Tsvrc.Editor.V2
             string[] importedAssets,
             string[] deletedAssets,
             string[] movedAssets,
-            string[] movedFromAssets)
+            string[] movedFromAssets,
+            bool didDomainReload)
         {
+            if (didDomainReload) return;
             var watched = TsvrcGenerator.WatchedPaths;
             if (watched.Count == 0) return;
 
