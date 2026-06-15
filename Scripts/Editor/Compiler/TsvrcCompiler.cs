@@ -26,11 +26,9 @@ namespace Tsvrc.Editor
         {
             new MemoryModule(),
             new SingletonModule(),
-            new PoolModule(),
             new ConstructModule(),
             new InstanceModule(),
             new FactoryModule(),
-            new TranslationModule(),
         };
 
         [MenuItem("Tsvrc/Tools/Force Compile")]
