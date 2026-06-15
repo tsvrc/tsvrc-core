@@ -9,6 +9,8 @@ namespace Tsvrc.Editor
     {
         internal abstract string Description { get; }
         internal abstract void OnGUI(SerializedObject so);
+
+        protected static bool DeleteButton() => GUILayout.Button("✕", GUILayout.Width(22));
     }
 
     // Shared list tab for Singletons, Pool, and Constructs. Subclasses only need to supply the property name.
@@ -26,7 +28,7 @@ namespace Tsvrc.Editor
                 var element = prop.GetArrayElementAtIndex(i);
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.PropertyField(element, GUIContent.none);
-                if (GUILayout.Button("✕", GUILayout.Width(22)))
+                if (DeleteButton())
                     toDelete = i;
                 EditorGUILayout.EndHorizontal();
             }

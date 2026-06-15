@@ -241,9 +241,6 @@ namespace Tsvrc.Editor.V2
             return field.IsPublic || attrs.Any(a => a.GetType().Name == "SerializeField");
         }
 
-        private static UdonSharpBehaviour ResolveComponent(UnityEngine.Object obj)
-            => obj as UdonSharpBehaviour ?? (obj as GameObject)?.GetComponent<UdonSharpBehaviour>();
-
         // Single pass over both config sources: produces the type-name set (for slot generation)
         // and the ordered prefab entry list (for wiring) simultaneously.
         // Builtins come first so they always occupy lower slot indices.
@@ -276,15 +273,9 @@ namespace Tsvrc.Editor.V2
                         Debug.LogWarning($"[PoolModule] '{obj.name}' is a scene object. Pool entries must be prefab assets. Skipping.");
                         continue;
                     }
-                    var component = ResolveComponent(obj);
-                    if (component == null)
-                    {
-                        Debug.LogWarning($"[PoolModule] '{obj.name}' has no UdonSharpBehaviour. Skipping.");
-                        continue;
-                    }
-                    var typeName = component.GetType().Name;
+                    var typeName = obj.GetType().Name;
                     names.Add(typeName);
-                    entries.Add((component, typeName));
+                    entries.Add((obj, typeName));
                 }
 
             return (names, entries);

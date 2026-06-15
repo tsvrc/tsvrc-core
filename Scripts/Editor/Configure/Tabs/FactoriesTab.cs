@@ -46,7 +46,7 @@ namespace Tsvrc.Editor
                 expanded = EditorGUILayout.Foldout(expanded, foldoutLabel, true);
                 _foldouts[i] = expanded;
                 GUI.changed = prevChanged;
-                if (GUILayout.Button("✕", GUILayout.Width(22)))
+                if (DeleteButton())
                     toDelete = i;
                 EditorGUILayout.EndHorizontal();
 

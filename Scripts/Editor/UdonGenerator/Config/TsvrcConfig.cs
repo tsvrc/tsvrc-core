@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using Tsvrc.Core;
+using UdonSharp;
 using UnityEngine;
 
 namespace Tsvrc.Editor.V2
@@ -8,7 +9,7 @@ namespace Tsvrc.Editor.V2
     {
         public TsvrcInstance Instance;
         public Object[] Singletons;
-        public Object[] PooledObjects;
+        public UdonSharpBehaviour[] PooledObjects;
         public TsvrcBehaviour[] Constructs;
         public TsvrcFactoryGroup[] Factories;
     }
