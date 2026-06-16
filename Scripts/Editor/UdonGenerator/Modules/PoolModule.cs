@@ -213,9 +213,14 @@ namespace Tsvrc.Editor.V2
             return false;
         }
 
+        // Deduplicated by (declaring type full name, field name): Unity's AppDomain can carry stale
+        // duplicate copies of the same assembly across successive recompiles (domain reload doesn't
+        // always fully unload the previous version before the next one loads), which would otherwise
+        // make every [WirePool] field count once per duplicate and inflate slot counts on every edit.
         private static List<PoolField> DetectWirePoolFields()
         {
             var found = new List<PoolField>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 Type[] types;
@@ -224,12 +229,15 @@ namespace Tsvrc.Editor.V2
 
                 foreach (var type in types)
                     foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
-                        if (IsWirePoolField(field))
-                            found.Add(new PoolField
-                            {
-                                FieldTypeName = field.FieldType.Name,
-                                FieldTypeNamespace = field.FieldType.Namespace ?? string.Empty,
-                            });
+                    {
+                        if (!IsWirePoolField(field)) continue;
+                        if (!seen.Add($"{type.FullName}.{field.Name}")) continue;
+                        found.Add(new PoolField
+                        {
+                            FieldTypeName = field.FieldType.Name,
+                            FieldTypeNamespace = field.FieldType.Namespace ?? string.Empty,
+                        });
+                    }
             }
             return found;
         }

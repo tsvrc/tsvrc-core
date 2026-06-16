@@ -147,9 +147,14 @@ namespace Tsvrc.Editor.V2
 
         // Returns (type, ambiguous). type is null when there are zero or more than one candidates;
         // ambiguous distinguishes "nothing to wire" from "leave the current wiring alone".
+        //
+        // Deduplicated by full name: Unity's AppDomain can carry stale duplicate copies of the same
+        // assembly across successive recompiles, which would otherwise make a single real subclass
+        // look "ambiguous" just because it was seen twice.
         private static (Type, bool) DetectInstanceType()
         {
             var candidates = new List<Type>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 Type[] types;
@@ -158,7 +163,8 @@ namespace Tsvrc.Editor.V2
 
                 foreach (var type in types)
                     if (type != typeof(TsvrcInstance) && !type.IsAbstract && typeof(TsvrcInstance).IsAssignableFrom(type))
-                        candidates.Add(type);
+                        if (seen.Add(type.FullName))
+                            candidates.Add(type);
             }
 
             if (candidates.Count > 1)

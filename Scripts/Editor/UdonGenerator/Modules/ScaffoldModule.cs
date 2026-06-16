@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Tsvrc.Utils;
 using UdonSharp;
 using UdonSharpEditor;
 using UnityEditor;
@@ -25,6 +26,8 @@ namespace Tsvrc.Editor.V2
         private const string PoolBehaviourAssetPath = "Assets/TsvrcGenerated/TsvrcPoolBehaviour.asset";
         private const string TranslationBehaviourFilePath = "Assets/TsvrcGenerated/TsvrcTranslationBehaviour.cs";
         private const string TranslationBehaviourAssetPath = "Assets/TsvrcGenerated/TsvrcTranslationBehaviour.asset";
+        private const string MemoryScriptPath = "Assets/Tsvrc/Scripts/Utils/TsMemory.cs";
+        private const string MemoryAssetPath = "Assets/Tsvrc/Scripts/Utils/TsMemory.asset";
 
         internal override string FileName => "TsvrcGenerated.cs";
 
@@ -46,10 +49,12 @@ namespace {CompiledNamespace}
         [SerializeField] private {PoolClassName} _pool;
         [SerializeField] private {TranslationClassName} _translation;
         [ReadOnly] [SerializeField] private TsvrcInstance _instance;
+        [SerializeField] private TsMemory _memory;
 
         void Start() {{ }}
 
         public TsvrcInstance Instance => _instance;
+        public TsMemory Memory => _memory;
         public void SetLanguage(Language lang) {{ _translation.SetLanguage(lang); }}
         public string Translate(string key) {{ return _translation.Translate(key); }}
         public string Translate(string key, string param) {{ return _translation.Translate(key, param); }}
@@ -62,11 +67,13 @@ namespace {CompiledNamespace}
             EnsureUdonSharpProgramAsset(ScaffoldFilePath, GeneratedAssetPath);
             EnsureUdonSharpProgramAsset(PoolBehaviourFilePath, PoolBehaviourAssetPath);
             EnsureUdonSharpProgramAsset(TranslationBehaviourFilePath, TranslationBehaviourAssetPath);
+            EnsureUdonSharpProgramAsset(MemoryScriptPath, MemoryAssetPath);
             var root = EnsureRootSceneObject();
             if (root != null)
             {
                 EnsureChildSceneObject("TsvrcPool", FindPoolType(), root);
                 EnsureChildSceneObject("TsvrcTranslation", FindTranslationType(), root);
+                EnsureChildSceneObject("TsvrcMemory", typeof(TsMemory), root);
             }
             return false;
         }
@@ -82,6 +89,7 @@ namespace {CompiledNamespace}
             var root = ((Component)instances[0]).transform;
             if (root.Find("TsvrcPool") == null) return true;
             if (root.Find("TsvrcTranslation") == null) return true;
+            if (root.Find("TsvrcMemory") == null) return true;
             return false;
         }
 
@@ -95,11 +103,13 @@ namespace {CompiledNamespace}
             var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
             var pool = (Component)UnityEngine.Object.FindObjectOfType(poolType, true);
             var trans = (Component)UnityEngine.Object.FindObjectOfType(transType, true);
+            var memory = (Component)UnityEngine.Object.FindObjectOfType(typeof(TsMemory), true);
             if (root == null || pool == null || trans == null) return;
 
             var so = new SerializedObject(root);
             so.FindProperty("_pool").objectReferenceValue = pool;
             so.FindProperty("_translation").objectReferenceValue = trans;
+            so.FindProperty("_memory").objectReferenceValue = memory;
             if (so.ApplyModifiedProperties())
                 EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
         }
