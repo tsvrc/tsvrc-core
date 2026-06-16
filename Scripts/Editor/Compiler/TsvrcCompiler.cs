@@ -24,7 +24,6 @@ namespace Tsvrc.Editor
         // Add new modules here to extend the compiler.
         internal static List<TsvrcModule> CreateModules() => new List<TsvrcModule>
         {
-            new MemoryModule(),
             new SingletonModule(),
             new ConstructModule(),
             new FactoryModule(),
