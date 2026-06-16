@@ -27,7 +27,6 @@ namespace Tsvrc.Editor
             new MemoryModule(),
             new SingletonModule(),
             new ConstructModule(),
-            new InstanceModule(),
             new FactoryModule(),
         };
 

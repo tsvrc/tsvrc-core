@@ -120,6 +120,7 @@ namespace Tsvrc.Editor.V2
         {
             new PoolModule(),
             new TranslationModule(),
+            new InstanceModule(),
             new ScaffoldModule(),
         };
 
@@ -127,7 +128,10 @@ namespace Tsvrc.Editor.V2
         {
             bool written = false;
             foreach (var module in modules)
+            {
+                if (module.FileName == null) continue;
                 written |= WriteIfChanged($"{GeneratedFolder}/{module.FileName}", module.GenerateCode());
+            }
             return written;
         }
 
