@@ -161,7 +161,7 @@ namespace Tsvrc.Editor.V2
                         continue;
                     }
 
-                    string name = TsvrcResolver.Deduplicate(prefix + Sanitize(prefab.name), usedNames);
+                    string name = Deduplicate(prefix + Sanitize(prefab.name), usedNames);
                     usedNames.Add(name);
 
                     var behaviour = prefab.GetComponent<TsvrcBehaviour>();
@@ -182,6 +182,15 @@ namespace Tsvrc.Editor.V2
         }
 
         private static string FieldName(string name) => $"_factory{name}";
+
+        private static string Deduplicate(string baseName, HashSet<string> usedNames)
+        {
+            string name = baseName;
+            int suffix = 2;
+            while (usedNames.Contains(name))
+                name = $"{baseName}{suffix++}";
+            return name;
+        }
 
         // Strips __Alias__ markers, splits on non-alphanumeric separators, PascalCases each word,
         // and prepends '_' if the result starts with a digit.

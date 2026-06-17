@@ -26,7 +26,7 @@ namespace Tsvrc.Editor.V2
     {
         private const string BuiltinConfigPath = "Assets/Tsvrc/TsvrcBuiltinConfig.asset";
 
-        private List<TsvrcField> _currentFields = new List<TsvrcField>();
+        private List<SingletonEntry> _entries = new List<SingletonEntry>();
 
         internal override string FileName => "TsvrcSingletonBehaviour.cs";
 
@@ -40,18 +40,18 @@ namespace Tsvrc.Editor.V2
             var combined = (sceneConfig?.Singletons ?? Array.Empty<UnityEngine.Object>())
                 .Union(builtinConfig?.Singletons ?? Array.Empty<UnityEngine.Object>());
 
-            _currentFields = TsvrcResolver.Resolve(combined);
+            _entries = Resolve(combined);
         }
 
         internal override string GenerateCode()
         {
-            if (_currentFields.Count == 0)
+            if (_entries.Count == 0)
                 return BuildStub();
 
             var usings = new List<string> { "UdonSharp", "UnityEngine" };
-            foreach (var field in _currentFields)
-                if (!string.IsNullOrEmpty(field.Namespace) && !usings.Contains(field.Namespace))
-                    usings.Add(field.Namespace);
+            foreach (var entry in _entries)
+                if (!string.IsNullOrEmpty(entry.Namespace) && !usings.Contains(entry.Namespace))
+                    usings.Add(entry.Namespace);
 
             var w = new CsWriter();
             w.AutoGenHeader();
@@ -61,10 +61,10 @@ namespace Tsvrc.Editor.V2
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
             using (w.Block($"public class {ScaffoldModule.SingletonClassName} : UdonSharpBehaviour"))
             {
-                foreach (var field in _currentFields.OrderBy(f => f.Name))
+                foreach (var entry in _entries.OrderBy(e => e.Name))
                 {
                     w.Summary("Tsvrc singleton.");
-                    w.Line($"[HideInInspector] [SerializeField] public {field.Type} {field.Name};");
+                    w.Line($"[HideInInspector] [SerializeField] public {entry.TypeName} {entry.Name};");
                 }
 
                 using (w.Method("void Start()")) { }
@@ -95,19 +95,88 @@ namespace Tsvrc.Editor.V2
             if (singletonComp == null) return;
 
             var so = new SerializedObject(singletonComp);
-            foreach (var field in _currentFields)
+            foreach (var entry in _entries)
             {
-                var prop = so.FindProperty(field.Name);
+                var prop = so.FindProperty(entry.Name);
                 if (prop == null)
                 {
-                    Debug.LogWarning($"[SingletonModule] Field '{field.Name}' not found on {ScaffoldModule.SingletonClassName}. Force compile to regenerate.");
+                    Debug.LogWarning($"[SingletonModule] Field '{entry.Name}' not found on {ScaffoldModule.SingletonClassName}. Force compile to regenerate.");
                     continue;
                 }
-                prop.objectReferenceValue = field.SourceObject;
+                prop.objectReferenceValue = entry.SourceObject;
             }
 
             if (so.ApplyModifiedProperties())
                 EditorSceneManager.MarkSceneDirty(singletonComp.gameObject.scene);
+        }
+
+        private static List<SingletonEntry> Resolve(IEnumerable<UnityEngine.Object> objects)
+        {
+            var entries = new List<SingletonEntry>();
+            var usedNames = new HashSet<string>(StringComparer.Ordinal);
+            var seen = new HashSet<UnityEngine.Object>();
+
+            foreach (var obj in objects)
+            {
+                if (obj == null)
+                {
+                    Debug.LogWarning("[SingletonModule] Null entry in config, remove the missing-script slot.");
+                    continue;
+                }
+                if (!seen.Add(obj))
+                {
+                    Debug.LogWarning($"[SingletonModule] Duplicate entry '{obj.name}' in config, remove the duplicate.");
+                    continue;
+                }
+
+                var type = obj.GetType();
+                string goName = obj is Component c ? c.gameObject.name : (obj is GameObject go ? go.name : string.Empty);
+                string baseName = DeriveName(type, goName);
+                string name = Deduplicate(baseName, usedNames);
+                usedNames.Add(name);
+
+                entries.Add(new SingletonEntry
+                {
+                    Name = name,
+                    TypeName = type.Name,
+                    Namespace = type.Namespace ?? string.Empty,
+                    SourceObject = obj,
+                });
+            }
+
+            return entries;
+        }
+
+        private static string DeriveName(Type type, string goName)
+        {
+            if (type == typeof(Animator))
+                return (AliasName(goName) ?? goName) + "Animator";
+            return AliasName(goName) ?? type.Name;
+        }
+
+        // __Foo__ on the GameObject overrides the generated field name to Foo.
+        private static string AliasName(string goName)
+        {
+            if (goName != null && goName.StartsWith("__") && goName.EndsWith("__") && goName.Length > 4)
+                return goName.Substring(2, goName.Length - 4);
+            return null;
+        }
+
+        private static string Deduplicate(string baseName, HashSet<string> usedNames)
+        {
+            string name = baseName;
+            int suffix = 2;
+            while (usedNames.Contains(name))
+                name = $"{baseName}{suffix++}";
+            return name;
+        }
+
+        private struct SingletonEntry
+        {
+            public string Name;
+            public string TypeName;
+            public string Namespace;
+            public UnityEngine.Object SourceObject;
         }
     }
 }
