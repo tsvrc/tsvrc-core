@@ -109,6 +109,8 @@ namespace Tsvrc.Editor.V2
                     typeName == ScaffoldModule.PoolClassName ||
                     typeName == ScaffoldModule.TranslationClassName ||
                     typeName == ScaffoldModule.SingletonClassName ||
+                    typeName == ScaffoldModule.ConstructClassName ||
+                    typeName == ScaffoldModule.FactoryClassName ||
                     typeName == nameof(TsvrcConfig))
                 {
                     ScheduleRerun();
@@ -124,6 +126,8 @@ namespace Tsvrc.Editor.V2
             new TranslationModule(),
             new InstanceModule(),
             new SingletonModule(),
+            new ConstructModule(),
+            new FactoryModule(),
             new ScaffoldModule(),
         };
 

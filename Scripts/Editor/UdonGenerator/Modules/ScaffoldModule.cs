@@ -19,6 +19,8 @@ namespace Tsvrc.Editor.V2
         internal const string PoolClassName = "TsvrcPoolBehaviour";
         internal const string TranslationClassName = "TsvrcTranslationBehaviour";
         internal const string SingletonClassName = "TsvrcSingletonBehaviour";
+        internal const string ConstructClassName = "TsvrcConstructBehaviour";
+        internal const string FactoryClassName = "TsvrcFactoryBehaviour";
 
         private const string ScaffoldFilePath = "Assets/TsvrcGenerated/TsvrcGenerated.cs";
         private const string GeneratedAssetPath = "Assets/TsvrcGenerated/TsvrcGenerated.asset";
@@ -28,6 +30,10 @@ namespace Tsvrc.Editor.V2
         private const string TranslationBehaviourAssetPath = "Assets/TsvrcGenerated/TsvrcTranslationBehaviour.asset";
         private const string SingletonBehaviourFilePath = "Assets/TsvrcGenerated/TsvrcSingletonBehaviour.cs";
         private const string SingletonBehaviourAssetPath = "Assets/TsvrcGenerated/TsvrcSingletonBehaviour.asset";
+        private const string ConstructBehaviourFilePath = "Assets/TsvrcGenerated/TsvrcConstructBehaviour.cs";
+        private const string ConstructBehaviourAssetPath = "Assets/TsvrcGenerated/TsvrcConstructBehaviour.asset";
+        private const string FactoryBehaviourFilePath = "Assets/TsvrcGenerated/TsvrcFactoryBehaviour.cs";
+        private const string FactoryBehaviourAssetPath = "Assets/TsvrcGenerated/TsvrcFactoryBehaviour.asset";
         private const string MemoryScriptPath = "Assets/Tsvrc/Scripts/Utils/TsMemory.cs";
         private const string MemoryAssetPath = "Assets/Tsvrc/Scripts/Utils/TsMemory.asset";
 
@@ -53,12 +59,16 @@ namespace {CompiledNamespace}
         [ReadOnly] [SerializeField] private TsvrcInstance _instance;
         [SerializeField] private TsMemory _memory;
         [SerializeField] private {SingletonClassName} _singleton;
+        [SerializeField] private {ConstructClassName} _construct;
+        [SerializeField] private {FactoryClassName} _factory;
 
         void Start() {{ }}
 
         public TsvrcInstance Instance => _instance;
         public TsMemory Memory => _memory;
         public {SingletonClassName} Singleton => _singleton;
+        public {ConstructClassName} Construct => _construct;
+        public {FactoryClassName} Factory => _factory;
         public void SetLanguage(Language lang) {{ _translation.SetLanguage(lang); }}
         public string Translate(string key) {{ return _translation.Translate(key); }}
         public string Translate(string key, string param) {{ return _translation.Translate(key, param); }}
@@ -73,6 +83,8 @@ namespace {CompiledNamespace}
             EnsureUdonSharpProgramAsset(TranslationBehaviourFilePath, TranslationBehaviourAssetPath);
             EnsureUdonSharpProgramAsset(MemoryScriptPath, MemoryAssetPath);
             EnsureUdonSharpProgramAsset(SingletonBehaviourFilePath, SingletonBehaviourAssetPath);
+            EnsureUdonSharpProgramAsset(ConstructBehaviourFilePath, ConstructBehaviourAssetPath);
+            EnsureUdonSharpProgramAsset(FactoryBehaviourFilePath, FactoryBehaviourAssetPath);
             var root = EnsureRootSceneObject();
             if (root != null)
             {
@@ -80,6 +92,8 @@ namespace {CompiledNamespace}
                 EnsureChildSceneObject("TsvrcTranslation", FindTranslationType(), root);
                 EnsureChildSceneObject("TsvrcMemory", typeof(TsMemory), root);
                 EnsureChildSceneObject("TsvrcSingleton", FindSingletonType(), root);
+                EnsureChildSceneObject("TsvrcConstruct", FindConstructType(), root);
+                EnsureChildSceneObject("TsvrcFactory", FindFactoryType(), root);
                 EnsureChildSceneObject("TsvrcConfig", typeof(TsvrcConfig), root, isUdonSharp: false, editorOnly: true);
             }
             return false;
@@ -98,6 +112,8 @@ namespace {CompiledNamespace}
             if (root.Find("TsvrcTranslation") == null) return true;
             if (root.Find("TsvrcMemory") == null) return true;
             if (root.Find("TsvrcSingleton") == null) return true;
+            if (root.Find("TsvrcConstruct") == null) return true;
+            if (root.Find("TsvrcFactory") == null) return true;
             if (root.Find("TsvrcConfig") == null) return true;
             return false;
         }
@@ -110,12 +126,16 @@ namespace {CompiledNamespace}
             if (compiledType == null || poolType == null || transType == null) return;
 
             var singletonType = FindSingletonType();
+            var constructType = FindConstructType();
+            var factoryType = FindFactoryType();
 
             var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
             var pool = (Component)UnityEngine.Object.FindObjectOfType(poolType, true);
             var trans = (Component)UnityEngine.Object.FindObjectOfType(transType, true);
             var memory = (Component)UnityEngine.Object.FindObjectOfType(typeof(TsMemory), true);
             var singleton = singletonType != null ? (Component)UnityEngine.Object.FindObjectOfType(singletonType, true) : null;
+            var construct = constructType != null ? (Component)UnityEngine.Object.FindObjectOfType(constructType, true) : null;
+            var factory = factoryType != null ? (Component)UnityEngine.Object.FindObjectOfType(factoryType, true) : null;
             if (root == null || pool == null || trans == null) return;
 
             var so = new SerializedObject(root);
@@ -123,6 +143,8 @@ namespace {CompiledNamespace}
             so.FindProperty("_translation").objectReferenceValue = trans;
             so.FindProperty("_memory").objectReferenceValue = memory;
             so.FindProperty("_singleton").objectReferenceValue = singleton;
+            so.FindProperty("_construct").objectReferenceValue = construct;
+            so.FindProperty("_factory").objectReferenceValue = factory;
             if (so.ApplyModifiedProperties())
                 EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
         }
@@ -131,6 +153,8 @@ namespace {CompiledNamespace}
         internal static Type FindPoolType() => FindType(PoolClassName);
         internal static Type FindTranslationType() => FindType(TranslationClassName);
         internal static Type FindSingletonType() => FindType(SingletonClassName);
+        internal static Type FindConstructType() => FindType(ConstructClassName);
+        internal static Type FindFactoryType() => FindType(FactoryClassName);
 
         private static Type FindType(string className)
         {
