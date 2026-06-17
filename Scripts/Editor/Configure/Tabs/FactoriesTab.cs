@@ -58,7 +58,7 @@ namespace Tsvrc.Editor
                     string currentName = groupNameProp.stringValue;
                     string preview = string.IsNullOrWhiteSpace(currentName)
                         ? "Create…"
-                        : $"Create{FactoryModule.Sanitize(currentName)}…";
+                        : $"Create{SanitizeGroupName(currentName)}…";
                     EditorGUILayout.LabelField($"Prefix:  {preview}", EditorStyles.miniLabel);
                     EditorGUILayout.PropertyField(prefabsProp, LabelPrefabs, true);
                     EditorGUI.indentLevel--;
@@ -85,6 +85,22 @@ namespace Tsvrc.Editor
                 // Auto-expand the new group so the user can immediately name it.
                 _foldouts[newIndex] = true;
             }
+        }
+
+        private static string SanitizeGroupName(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return string.Empty;
+            if (raw.StartsWith("__") && raw.EndsWith("__") && raw.Length > 4)
+                raw = raw.Substring(2, raw.Length - 4);
+            var sb = new System.Text.StringBuilder();
+            bool cap = true;
+            foreach (char ch in raw)
+            {
+                if (char.IsLetterOrDigit(ch)) { sb.Append(cap ? char.ToUpper(ch) : ch); cap = false; }
+                else cap = true;
+            }
+            if (sb.Length > 0 && char.IsDigit(sb[0])) sb.Insert(0, '_');
+            return sb.ToString();
         }
 
         private void ShiftFoldoutsAfterDelete(int deletedIndex)
