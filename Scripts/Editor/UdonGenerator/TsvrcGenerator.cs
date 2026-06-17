@@ -107,7 +107,9 @@ namespace Tsvrc.Editor.V2
                 var typeName = target.GetType().Name;
                 if (typeName == ScaffoldModule.CompiledClassName ||
                     typeName == ScaffoldModule.PoolClassName ||
-                    typeName == ScaffoldModule.TranslationClassName)
+                    typeName == ScaffoldModule.TranslationClassName ||
+                    typeName == ScaffoldModule.SingletonClassName ||
+                    typeName == nameof(TsvrcConfig))
                 {
                     ScheduleRerun();
                     return modifications;
@@ -121,6 +123,7 @@ namespace Tsvrc.Editor.V2
             new PoolModule(),
             new TranslationModule(),
             new InstanceModule(),
+            new SingletonModule(),
             new ScaffoldModule(),
         };
 

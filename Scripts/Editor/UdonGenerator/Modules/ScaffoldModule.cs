@@ -14,11 +14,11 @@ namespace Tsvrc.Editor.V2
 {
     internal class ScaffoldModule : TsvrcModule
     {
-        internal const string ConfigPath = "Assets/TsvrcGenerated/TsvrcConfig.asset";
         internal const string CompiledNamespace = "Tsvrc.Core.Generated";
         internal const string CompiledClassName = "TsvrcGenerated";
         internal const string PoolClassName = "TsvrcPoolBehaviour";
         internal const string TranslationClassName = "TsvrcTranslationBehaviour";
+        internal const string SingletonClassName = "TsvrcSingletonBehaviour";
 
         private const string ScaffoldFilePath = "Assets/TsvrcGenerated/TsvrcGenerated.cs";
         private const string GeneratedAssetPath = "Assets/TsvrcGenerated/TsvrcGenerated.asset";
@@ -26,6 +26,8 @@ namespace Tsvrc.Editor.V2
         private const string PoolBehaviourAssetPath = "Assets/TsvrcGenerated/TsvrcPoolBehaviour.asset";
         private const string TranslationBehaviourFilePath = "Assets/TsvrcGenerated/TsvrcTranslationBehaviour.cs";
         private const string TranslationBehaviourAssetPath = "Assets/TsvrcGenerated/TsvrcTranslationBehaviour.asset";
+        private const string SingletonBehaviourFilePath = "Assets/TsvrcGenerated/TsvrcSingletonBehaviour.cs";
+        private const string SingletonBehaviourAssetPath = "Assets/TsvrcGenerated/TsvrcSingletonBehaviour.asset";
         private const string MemoryScriptPath = "Assets/Tsvrc/Scripts/Utils/TsMemory.cs";
         private const string MemoryAssetPath = "Assets/Tsvrc/Scripts/Utils/TsMemory.asset";
 
@@ -50,11 +52,13 @@ namespace {CompiledNamespace}
         [SerializeField] private {TranslationClassName} _translation;
         [ReadOnly] [SerializeField] private TsvrcInstance _instance;
         [SerializeField] private TsMemory _memory;
+        [SerializeField] private {SingletonClassName} _singleton;
 
         void Start() {{ }}
 
         public TsvrcInstance Instance => _instance;
         public TsMemory Memory => _memory;
+        public {SingletonClassName} Singleton => _singleton;
         public void SetLanguage(Language lang) {{ _translation.SetLanguage(lang); }}
         public string Translate(string key) {{ return _translation.Translate(key); }}
         public string Translate(string key, string param) {{ return _translation.Translate(key, param); }}
@@ -68,12 +72,15 @@ namespace {CompiledNamespace}
             EnsureUdonSharpProgramAsset(PoolBehaviourFilePath, PoolBehaviourAssetPath);
             EnsureUdonSharpProgramAsset(TranslationBehaviourFilePath, TranslationBehaviourAssetPath);
             EnsureUdonSharpProgramAsset(MemoryScriptPath, MemoryAssetPath);
+            EnsureUdonSharpProgramAsset(SingletonBehaviourFilePath, SingletonBehaviourAssetPath);
             var root = EnsureRootSceneObject();
             if (root != null)
             {
                 EnsureChildSceneObject("TsvrcPool", FindPoolType(), root);
                 EnsureChildSceneObject("TsvrcTranslation", FindTranslationType(), root);
                 EnsureChildSceneObject("TsvrcMemory", typeof(TsMemory), root);
+                EnsureChildSceneObject("TsvrcSingleton", FindSingletonType(), root);
+                EnsureChildSceneObject("TsvrcConfig", typeof(TsvrcConfig), root, isUdonSharp: false, editorOnly: true);
             }
             return false;
         }
@@ -90,6 +97,8 @@ namespace {CompiledNamespace}
             if (root.Find("TsvrcPool") == null) return true;
             if (root.Find("TsvrcTranslation") == null) return true;
             if (root.Find("TsvrcMemory") == null) return true;
+            if (root.Find("TsvrcSingleton") == null) return true;
+            if (root.Find("TsvrcConfig") == null) return true;
             return false;
         }
 
@@ -100,16 +109,20 @@ namespace {CompiledNamespace}
             var transType = FindTranslationType();
             if (compiledType == null || poolType == null || transType == null) return;
 
+            var singletonType = FindSingletonType();
+
             var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
             var pool = (Component)UnityEngine.Object.FindObjectOfType(poolType, true);
             var trans = (Component)UnityEngine.Object.FindObjectOfType(transType, true);
             var memory = (Component)UnityEngine.Object.FindObjectOfType(typeof(TsMemory), true);
+            var singleton = singletonType != null ? (Component)UnityEngine.Object.FindObjectOfType(singletonType, true) : null;
             if (root == null || pool == null || trans == null) return;
 
             var so = new SerializedObject(root);
             so.FindProperty("_pool").objectReferenceValue = pool;
             so.FindProperty("_translation").objectReferenceValue = trans;
             so.FindProperty("_memory").objectReferenceValue = memory;
+            so.FindProperty("_singleton").objectReferenceValue = singleton;
             if (so.ApplyModifiedProperties())
                 EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
         }
@@ -117,6 +130,7 @@ namespace {CompiledNamespace}
         internal static Type FindCompiledType() => FindType(CompiledClassName);
         internal static Type FindPoolType() => FindType(PoolClassName);
         internal static Type FindTranslationType() => FindType(TranslationClassName);
+        internal static Type FindSingletonType() => FindType(SingletonClassName);
 
         private static Type FindType(string className)
         {
@@ -194,27 +208,59 @@ namespace {CompiledNamespace}
             return go.GetComponent(compiledType) as Component;
         }
 
-        private static void EnsureChildSceneObject(string childName, Type componentType, Component root)
+        // isUdonSharp selects AddComponent path: UdonSharpUndo.AddComponent is required for
+        // UdonSharpBehaviour types (it also sets up the hidden backing UdonBehaviour); plain
+        // MonoBehaviours (e.g. TsvrcConfig, never compiled to Udon) use the regular Undo
+        // API instead. editorOnly enforces (and self-heals) the "EditorOnly" tag on the child's
+        // GameObject so it's guaranteed stripped from the VRChat build - used for compile-time-
+        // only config holders that must never ship as part of the generated runtime hierarchy.
+        private static void EnsureChildSceneObject(string childName, Type componentType, Component root, bool isUdonSharp = true, bool editorOnly = false)
         {
             if (componentType == null) return;
 
             var existing = root.transform.Find(childName);
-            if (existing != null && existing.GetComponent(componentType) != null) return;
+            GameObject childGo;
 
             if (existing == null)
             {
-                var childGo = new GameObject(childName);
+                childGo = new GameObject(childName);
                 Undo.RegisterCreatedObjectUndo(childGo, $"Create {childName}");
                 childGo.transform.SetParent(root.transform, false);
-                UdonSharpUndo.AddComponent(childGo, componentType);
+                AddChildComponent(childGo, componentType, isUdonSharp);
                 EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
                 Debug.Log($"[TsvrcGenerator] Created {childName} child under {CompiledClassName}.");
             }
             else
             {
-                UdonSharpUndo.AddComponent(existing.gameObject, componentType);
+                childGo = existing.gameObject;
+                if (existing.GetComponent(componentType) == null)
+                {
+                    AddChildComponent(childGo, componentType, isUdonSharp);
+                    EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+                }
+            }
+
+            if (editorOnly && childGo.tag != "EditorOnly")
+            {
+                childGo.tag = "EditorOnly";
                 EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
             }
+        }
+
+        private static void AddChildComponent(GameObject go, Type componentType, bool isUdonSharp)
+        {
+            if (isUdonSharp)
+            {
+                // UdonSharpUndo.AddComponent is required for UdonSharpBehaviour types - it also
+                // sets up the hidden backing UdonBehaviour, which a plain AddComponent would miss.
+                UdonSharpUndo.AddComponent(go, componentType);
+                return;
+            }
+
+            // Undo.AddComponent only has a generic <T> overload, which can't be used with a
+            // runtime Type. Add directly and register the result for undo instead.
+            var component = go.AddComponent(componentType);
+            Undo.RegisterCreatedObjectUndo(component, $"Add {componentType.Name}");
         }
 
         private static List<GameObject> FindSceneGameObjects(string name)

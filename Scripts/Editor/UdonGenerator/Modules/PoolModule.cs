@@ -23,12 +23,14 @@ namespace Tsvrc.Editor.V2
 
         internal override string FileName => "TsvrcPoolBehaviour.cs";
 
-        internal override IEnumerable<string> WatchedAssets() => new[] { ScaffoldModule.ConfigPath, BuiltinConfigPath };
+        internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
 
         internal override void LoadConfig()
         {
             _currentFields = DetectWirePoolFields();
-            var userConfig = AssetDatabase.LoadAssetAtPath<TsvrcConfig>(ScaffoldModule.ConfigPath);
+            // TsvrcConfig is a scene component (PooledObjects/Singletons/Constructs need to be
+            // able to hold scene-object references), not an asset - found, not loaded.
+            var userConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
             var builtinConfig = AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(BuiltinConfigPath);
             _hasAnyConfigured = (userConfig?.PooledObjects?.Length > 0)
                              || (builtinConfig?.PoolPrefabs?.Length > 0);
