@@ -16,6 +16,13 @@ namespace Tsvrc.Editor.V2
         internal virtual bool AfterFilesStable() => false;
         internal virtual void Wire() { }
         internal virtual bool OnSceneHierarchyChanged() => false;
+
+        // Returns field names this module will declare on TsvrcGenerated (via a partial).
+        // Used by TsvrcGenerator to detect cross-module naming conflicts after LoadConfig().
+        internal virtual IEnumerable<string> ExposedFieldNames() => Enumerable.Empty<string>();
+
+        // Called with the set of conflicting names so the module can remove them and log errors.
+        internal virtual void ExcludeFieldNames(IEnumerable<string> names) { }
     }
 }
 #endif

@@ -13,7 +13,20 @@ namespace Tsvrc.Editor.V2
     {
         private List<ConstructEntry> _entries = new List<ConstructEntry>();
 
-        internal override string FileName => "TsvrcConstructBehaviour.cs";
+        internal override string FileName => "TsvrcGeneratedConstruct.cs";
+
+        internal override IEnumerable<string> ExposedFieldNames() => _entries.Select(e => e.Name);
+
+        internal override void ExcludeFieldNames(IEnumerable<string> names)
+        {
+            var excluded = new HashSet<string>(names, StringComparer.Ordinal);
+            _entries.RemoveAll(e =>
+            {
+                if (!excluded.Contains(e.Name)) return false;
+                Debug.LogError($"[ConstructModule] Field name '{e.Name}' conflicts with another module. Use __Alias__ syntax on the GameObject to assign a unique name.");
+                return true;
+            });
+        }
 
         internal override void LoadConfig()
         {
@@ -26,7 +39,7 @@ namespace Tsvrc.Editor.V2
             if (_entries.Count == 0)
                 return BuildStub();
 
-            var usings = new List<string> { "UdonSharp", "UnityEngine" };
+            var usings = new List<string> { "UnityEngine" };
             foreach (var entry in _entries)
                 if (!string.IsNullOrEmpty(entry.Namespace) && !usings.Contains(entry.Namespace))
                     usings.Add(entry.Namespace);
@@ -37,12 +50,10 @@ namespace Tsvrc.Editor.V2
             w.Usings(usings);
 
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public class {ScaffoldModule.ConstructClassName} : UdonSharpBehaviour"))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
                 foreach (var entry in _entries.OrderBy(e => e.Name))
                     w.Line($"[HideInInspector] [SerializeField] public {entry.TypeName} {entry.Name};");
-
-                using (w.Method("void Start()")) { }
             }
 
             return w.ToString();
@@ -53,23 +64,21 @@ namespace Tsvrc.Editor.V2
             var w = new CsWriter();
             w.AutoGenHeader();
             w.BlankLine();
-            w.Usings(new[] { "UdonSharp", "UnityEngine" });
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public class {ScaffoldModule.ConstructClassName} : UdonSharpBehaviour"))
-            using (w.Method("void Start()"))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             { }
             return w.ToString();
         }
 
         internal override void Wire()
         {
-            var constructType = ScaffoldModule.FindConstructType();
-            if (constructType == null) return;
+            var compiledType = ScaffoldModule.FindCompiledType();
+            if (compiledType == null) return;
 
-            var constructComp = (Component)UnityEngine.Object.FindObjectOfType(constructType, true);
-            if (constructComp == null) return;
+            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            if (root == null) return;
 
-            var so = new SerializedObject(constructComp);
+            var so = new SerializedObject(root);
             foreach (var entry in _entries)
             {
                 if (entry.SourceObject == null)
@@ -81,7 +90,7 @@ namespace Tsvrc.Editor.V2
                 var prop = so.FindProperty(entry.Name);
                 if (prop == null)
                 {
-                    Debug.LogWarning($"[ConstructModule] Field '{entry.Name}' not found on {ScaffoldModule.ConstructClassName}. Force compile to regenerate.");
+                    Debug.LogWarning($"[ConstructModule] Field '{entry.Name}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
                     continue;
                 }
 
@@ -89,7 +98,7 @@ namespace Tsvrc.Editor.V2
             }
 
             if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(constructComp.gameObject.scene);
+                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
         }
 
         private static List<ConstructEntry> Resolve(TsvrcBehaviour[] constructs)

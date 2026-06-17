@@ -13,7 +13,7 @@ namespace Tsvrc.Editor.V2
     {
         private List<FactoryEntry> _entries = new List<FactoryEntry>();
 
-        internal override string FileName => "TsvrcFactoryBehaviour.cs";
+        internal override string FileName => "TsvrcGeneratedFactory.cs";
 
         internal override void LoadConfig()
         {
@@ -36,12 +36,10 @@ namespace Tsvrc.Editor.V2
             w.Usings(usings);
 
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public class {ScaffoldModule.FactoryClassName} : UdonSharpBehaviour"))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
                 foreach (var entry in _entries)
                     w.Line($"[SerializeField] private GameObject {FieldName(entry.Name)};");
-
-                using (w.Method("void Start()")) { }
 
                 foreach (var entry in _entries)
                 {
@@ -68,8 +66,7 @@ namespace Tsvrc.Editor.V2
             w.BlankLine();
             w.Usings(new[] { "UdonSharp", "UnityEngine" });
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public class {ScaffoldModule.FactoryClassName} : UdonSharpBehaviour"))
-            using (w.Method("void Start()"))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             { }
             return w.ToString();
         }
@@ -77,28 +74,28 @@ namespace Tsvrc.Editor.V2
         internal override bool OnSceneHierarchyChanged()
         {
             if (_entries.Count == 0) return false;
-            var factoryType = ScaffoldModule.FindFactoryType();
-            if (factoryType == null) return false;
-            var factoryComp = (Component)UnityEngine.Object.FindObjectOfType(factoryType, true);
-            if (factoryComp == null) return false;
-            return factoryComp.transform.Find("Factories") == null;
+            var compiledType = ScaffoldModule.FindCompiledType();
+            if (compiledType == null) return false;
+            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            if (root == null) return false;
+            return root.transform.Find("Factories") == null;
         }
 
         internal override void Wire()
         {
-            var factoryType = ScaffoldModule.FindFactoryType();
-            if (factoryType == null) return;
+            var compiledType = ScaffoldModule.FindCompiledType();
+            if (compiledType == null) return;
 
-            var factoryComp = (Component)UnityEngine.Object.FindObjectOfType(factoryType, true);
-            if (factoryComp == null) return;
+            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            if (root == null) return;
 
-            var existing = factoryComp.transform.Find("Factories");
+            var existing = root.transform.Find("Factories");
             if (existing != null)
                 Undo.DestroyObjectImmediate(existing.gameObject);
 
             if (_entries.Count == 0) return;
 
-            var so = new SerializedObject(factoryComp);
+            var so = new SerializedObject(root);
             GameObject factoriesContainer = null;
 
             foreach (var entry in _entries)
@@ -106,7 +103,7 @@ namespace Tsvrc.Editor.V2
                 var prop = so.FindProperty(FieldName(entry.Name));
                 if (prop == null)
                 {
-                    Debug.LogWarning($"[FactoryModule] Field '{FieldName(entry.Name)}' not found on {ScaffoldModule.FactoryClassName}. Force compile to regenerate.");
+                    Debug.LogWarning($"[FactoryModule] Field '{FieldName(entry.Name)}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
                     continue;
                 }
 
@@ -114,7 +111,7 @@ namespace Tsvrc.Editor.V2
                 {
                     factoriesContainer = new GameObject("Factories");
                     Undo.RegisterCreatedObjectUndo(factoriesContainer, "Create Factories Container");
-                    factoriesContainer.transform.SetParent(factoryComp.transform, false);
+                    factoriesContainer.transform.SetParent(root.transform, false);
                 }
 
                 var instance = (GameObject)PrefabUtility.InstantiatePrefab(entry.PrefabAsset, factoriesContainer.transform);
@@ -132,7 +129,7 @@ namespace Tsvrc.Editor.V2
             }
 
             if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(factoryComp.gameObject.scene);
+                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
         }
 
         private static List<FactoryEntry> BuildEntries()

@@ -21,7 +21,7 @@ namespace Tsvrc.Editor.V2
         private List<(Component prefab, string typeName)> _poolEntries = new List<(Component, string)>();
         private Dictionary<string, (string Namespace, int Count)> _activeSlots = new Dictionary<string, (string, int)>(StringComparer.Ordinal);
 
-        internal override string FileName => "TsvrcPoolBehaviour.cs";
+        internal override string FileName => "TsvrcGeneratedPool.cs";
 
         internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
 
@@ -55,13 +55,13 @@ namespace Tsvrc.Editor.V2
             w.Usings(usings);
 
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public class {ScaffoldModule.PoolClassName} : UdonSharpBehaviour"))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
                 foreach (var kvp in slotsByType.OrderBy(x => x.Key))
                     for (int i = 0; i < kvp.Value.Count; i++)
                         w.Line($"[SerializeField] private {kvp.Key} {SlotFieldName(kvp.Key, i)};");
 
-                using (w.Method("void Start()"))
+                using (w.Method("public void _TsPoolStart()"))
                 {
                     foreach (var kvp in slotsByType.OrderBy(x => x.Key))
                     {
@@ -82,8 +82,8 @@ namespace Tsvrc.Editor.V2
             w.BlankLine();
             w.Usings(new[] { "UdonSharp", "UnityEngine" });
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public class {ScaffoldModule.PoolClassName} : UdonSharpBehaviour"))
-            using (w.Method("void Start()"))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
+            using (w.Method("public void _TsPoolStart()"))
             { }
             return w.ToString();
         }
@@ -103,32 +103,32 @@ namespace Tsvrc.Editor.V2
         internal override bool OnSceneHierarchyChanged()
         {
             if (_configuredTypeNames.Count == 0) return false;
-            var poolType = ScaffoldModule.FindPoolType();
-            if (poolType == null) return false;
-            var poolComp = (Component)UnityEngine.Object.FindObjectOfType(poolType, true);
-            if (poolComp == null) return false;
-            return poolComp.transform.Find("Pool") == null;
+            var compiledType = ScaffoldModule.FindCompiledType();
+            if (compiledType == null) return false;
+            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            if (root == null) return false;
+            return root.transform.Find("Pool") == null;
         }
 
         internal override void Wire()
         {
-            var poolType = ScaffoldModule.FindPoolType();
-            if (poolType == null) return;
+            var compiledType = ScaffoldModule.FindCompiledType();
+            if (compiledType == null) return;
 
-            var poolComp = (Component)UnityEngine.Object.FindObjectOfType(poolType, true);
-            if (poolComp == null) return;
+            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            if (root == null) return;
 
             if (_hasAnyConfigured && _poolEntries.Count == 0) return;
 
-            var existingContainer = poolComp.transform.Find("Pool");
+            var existingContainer = root.transform.Find("Pool");
             if (existingContainer != null)
                 Undo.DestroyObjectImmediate(existingContainer.gameObject);
 
             if (_poolEntries.Count == 0) return;
 
             var activeSlots = _activeSlots;
-            var wireTargetsByType = CollectWireTargetsByType(poolComp.gameObject.scene);
-            var so = new SerializedObject(poolComp);
+            var wireTargetsByType = CollectWireTargetsByType(root.gameObject.scene);
+            var so = new SerializedObject(root);
             GameObject poolContainer = null;
 
             foreach (var (prefabComponent, typeName) in _poolEntries)
@@ -146,7 +146,7 @@ namespace Tsvrc.Editor.V2
                     {
                         poolContainer = new GameObject("Pool");
                         Undo.RegisterCreatedObjectUndo(poolContainer, "Create Pool Container");
-                        poolContainer.transform.SetParent(poolComp.transform, false);
+                        poolContainer.transform.SetParent(root.transform, false);
                     }
 
                     var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefabComponent.gameObject, poolContainer.transform);
@@ -171,7 +171,7 @@ namespace Tsvrc.Editor.V2
                     if (initProp != null)
                         initProp.objectReferenceValue = instanceComponent;
                     else
-                        Debug.LogWarning($"[PoolModule] Field '{SlotFieldName(typeName, i)}' not found on {ScaffoldModule.PoolClassName}. Force compile to regenerate.");
+                        Debug.LogWarning($"[PoolModule] Field '{SlotFieldName(typeName, i)}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
 
                     if (targets != null && i < targets.Count)
                     {
@@ -196,7 +196,7 @@ namespace Tsvrc.Editor.V2
             }
 
             if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(poolComp.gameObject.scene);
+                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
         }
 
         private static string SlotFieldName(string typeName, int index) => $"_pool_{typeName}_{index}";

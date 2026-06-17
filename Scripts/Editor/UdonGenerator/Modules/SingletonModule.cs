@@ -28,9 +28,22 @@ namespace Tsvrc.Editor.V2
 
         private List<SingletonEntry> _entries = new List<SingletonEntry>();
 
-        internal override string FileName => "TsvrcSingletonBehaviour.cs";
+        internal override string FileName => "TsvrcGeneratedSingleton.cs";
 
         internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
+
+        internal override IEnumerable<string> ExposedFieldNames() => _entries.Select(e => e.Name);
+
+        internal override void ExcludeFieldNames(IEnumerable<string> names)
+        {
+            var excluded = new HashSet<string>(names, StringComparer.Ordinal);
+            _entries.RemoveAll(e =>
+            {
+                if (!excluded.Contains(e.Name)) return false;
+                Debug.LogError($"[SingletonModule] Field name '{e.Name}' conflicts with another module. Use __Alias__ syntax on the GameObject to assign a unique name.");
+                return true;
+            });
+        }
 
         internal override void LoadConfig()
         {
@@ -48,7 +61,7 @@ namespace Tsvrc.Editor.V2
             if (_entries.Count == 0)
                 return BuildStub();
 
-            var usings = new List<string> { "UdonSharp", "UnityEngine" };
+            var usings = new List<string> { "UnityEngine" };
             foreach (var entry in _entries)
                 if (!string.IsNullOrEmpty(entry.Namespace) && !usings.Contains(entry.Namespace))
                     usings.Add(entry.Namespace);
@@ -59,15 +72,13 @@ namespace Tsvrc.Editor.V2
             w.Usings(usings);
 
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public class {ScaffoldModule.SingletonClassName} : UdonSharpBehaviour"))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
                 foreach (var entry in _entries.OrderBy(e => e.Name))
                 {
                     w.Summary("Tsvrc singleton.");
                     w.Line($"[HideInInspector] [SerializeField] public {entry.TypeName} {entry.Name};");
                 }
-
-                using (w.Method("void Start()")) { }
             }
 
             return w.ToString();
@@ -78,36 +89,34 @@ namespace Tsvrc.Editor.V2
             var w = new CsWriter();
             w.AutoGenHeader();
             w.BlankLine();
-            w.Usings(new[] { "UdonSharp", "UnityEngine" });
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public class {ScaffoldModule.SingletonClassName} : UdonSharpBehaviour"))
-            using (w.Method("void Start()"))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             { }
             return w.ToString();
         }
 
         internal override void Wire()
         {
-            var singletonType = ScaffoldModule.FindSingletonType();
-            if (singletonType == null) return;
+            var compiledType = ScaffoldModule.FindCompiledType();
+            if (compiledType == null) return;
 
-            var singletonComp = (Component)UnityEngine.Object.FindObjectOfType(singletonType, true);
-            if (singletonComp == null) return;
+            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            if (root == null) return;
 
-            var so = new SerializedObject(singletonComp);
+            var so = new SerializedObject(root);
             foreach (var entry in _entries)
             {
                 var prop = so.FindProperty(entry.Name);
                 if (prop == null)
                 {
-                    Debug.LogWarning($"[SingletonModule] Field '{entry.Name}' not found on {ScaffoldModule.SingletonClassName}. Force compile to regenerate.");
+                    Debug.LogWarning($"[SingletonModule] Field '{entry.Name}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
                     continue;
                 }
                 prop.objectReferenceValue = entry.SourceObject;
             }
 
             if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(singletonComp.gameObject.scene);
+                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
         }
 
         private static List<SingletonEntry> Resolve(IEnumerable<UnityEngine.Object> objects)

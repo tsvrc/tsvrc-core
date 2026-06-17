@@ -31,6 +31,24 @@ namespace Tsvrc.Editor.V2
         private Type _detectedType;
         private bool _ambiguous;
 
+        internal override string FileName => "TsvrcGeneratedInstance.cs";
+
+        internal override string GenerateCode()
+        {
+            var w = new CsWriter();
+            w.AutoGenHeader();
+            w.BlankLine();
+            w.Usings(new[] { "Tsvrc.Core", "Tsvrc.Utils", "UdonSharp", "UnityEngine" });
+            using (w.Namespace(ScaffoldModule.CompiledNamespace))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
+            {
+                w.Line("[ReadOnly] [SerializeField] private TsvrcInstance _instance;");
+                w.BlankLine();
+                w.Line("public TsvrcInstance Instance => _instance;");
+            }
+            return w.ToString();
+        }
+
         internal override void LoadConfig()
         {
             (_detectedType, _ambiguous) = DetectInstanceType();

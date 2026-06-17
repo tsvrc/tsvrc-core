@@ -25,7 +25,7 @@ namespace Tsvrc.Editor.V2
         private HashSet<string> _effectiveKeys = new HashSet<string>(StringComparer.Ordinal);
         private List<TMPro.TextMeshProUGUI> _cachedTmpTargets = new List<TMPro.TextMeshProUGUI>();
 
-        internal override string FileName => "TsvrcTranslationBehaviour.cs";
+        internal override string FileName => "TsvrcGeneratedTranslation.cs";
 
         internal override IEnumerable<string> WatchedAssets()
         {
@@ -61,7 +61,7 @@ namespace Tsvrc.Editor.V2
                 w.Line($"public enum Language {{ {string.Join(", ", BuildEnumNames())} }}");
                 w.BlankLine();
 
-                using (w.Block($"public class {ScaffoldModule.TranslationClassName} : UdonSharpBehaviour"))
+                using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
                 {
                     foreach (var lang in _languages)
                     {
@@ -82,8 +82,6 @@ namespace Tsvrc.Editor.V2
                     w.Line("private UdonSharpBehaviour[] _tsLangListeners = new UdonSharpBehaviour[0];");
                     w.Line("private string[] _tsLangCallbacks = new string[0];");
                     w.BlankLine();
-
-                    using (w.Method("void Start()")) { }
 
                     using (w.Method("public void SetLanguage(Language lang)"))
                     {
@@ -165,9 +163,8 @@ namespace Tsvrc.Editor.V2
             {
                 w.Line("public enum Language { }");
                 w.BlankLine();
-                using (w.Block($"public class {ScaffoldModule.TranslationClassName} : UdonSharpBehaviour"))
+                using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
                 {
-                    using (w.Method("void Start()")) { }
                     using (w.Method("public void SetLanguage(Language lang)")) { }
                     using (w.Method("public string Translate(string key)")) { w.Line("return key;"); }
                     using (w.Method("public string Translate(string key, string param)")) { w.Line("return key;"); }
@@ -195,20 +192,20 @@ namespace Tsvrc.Editor.V2
         {
             if (_languages.Count == 0) return;
 
-            var transType = ScaffoldModule.FindTranslationType();
-            if (transType == null) return;
+            var compiledType = ScaffoldModule.FindCompiledType();
+            if (compiledType == null) return;
 
-            var transComp = (Component)UnityEngine.Object.FindObjectOfType(transType, true);
-            if (transComp == null) return;
+            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            if (root == null) return;
 
-            var so = new SerializedObject(transComp);
+            var so = new SerializedObject(root);
             var prop = so.FindProperty("_translationTargets");
             if (prop == null) return;
             prop.arraySize = _cachedTmpTargets.Count;
             for (int i = 0; i < _cachedTmpTargets.Count; i++)
                 prop.GetArrayElementAtIndex(i).objectReferenceValue = _cachedTmpTargets[i];
             if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(transComp.gameObject.scene);
+                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
         }
 
         private List<TMPro.TextMeshProUGUI> FindTmpTargets()

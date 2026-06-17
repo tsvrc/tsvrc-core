@@ -40,6 +40,16 @@ namespace Tsvrc.Editor.V2
             foreach (var module in modules)
                 module.LoadConfig();
 
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var duplicates = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var module in modules)
+                foreach (var name in module.ExposedFieldNames())
+                    if (!seen.Add(name))
+                        duplicates.Add(name);
+            if (duplicates.Count > 0)
+                foreach (var module in modules)
+                    module.ExcludeFieldNames(duplicates);
+
             var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var module in modules)
                 foreach (var path in module.WatchedAssets())
@@ -106,11 +116,6 @@ namespace Tsvrc.Editor.V2
                 if (target == null) continue;
                 var typeName = target.GetType().Name;
                 if (typeName == ScaffoldModule.CompiledClassName ||
-                    typeName == ScaffoldModule.PoolClassName ||
-                    typeName == ScaffoldModule.TranslationClassName ||
-                    typeName == ScaffoldModule.SingletonClassName ||
-                    typeName == ScaffoldModule.ConstructClassName ||
-                    typeName == ScaffoldModule.FactoryClassName ||
                     typeName == nameof(TsvrcConfig))
                 {
                     ScheduleRerun();
@@ -122,6 +127,7 @@ namespace Tsvrc.Editor.V2
 
         private static List<TsvrcModule> CreateModules() => new List<TsvrcModule>
         {
+            new MemoryModule(),
             new PoolModule(),
             new TranslationModule(),
             new InstanceModule(),
