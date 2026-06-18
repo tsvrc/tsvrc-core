@@ -59,7 +59,7 @@ namespace Tsvrc.Editor.V2
             {
                 foreach (var kvp in slotsByType.OrderBy(x => x.Key))
                     for (int i = 0; i < kvp.Value.Count; i++)
-                        w.Line($"[SerializeField] private {kvp.Key} {SlotFieldName(kvp.Key, i)};");
+                        w.Line($"[HideInInspector] [SerializeField] private {kvp.Key} {SlotFieldName(kvp.Key, i)};");
 
                 using (w.Method("public void _TsPoolStart()"))
                 {
@@ -67,7 +67,7 @@ namespace Tsvrc.Editor.V2
                     {
                         if (!IsTsvrcBehaviourType(kvp.Key, kvp.Value.Namespace)) continue;
                         for (int i = 0; i < kvp.Value.Count; i++)
-                            w.Line($"{SlotFieldName(kvp.Key, i)}.gameObject.SetActive(false);");
+                            w.Line($"{SlotFieldName(kvp.Key, i)}.TsConstruct(this);");
                     }
                 }
             }

@@ -10,14 +10,14 @@ namespace Tsvrc.Editor.V2
 {
     // One-shot copy of V1's real config data into V2's config containers. Triggered manually
     // from the Tsvrc > Configure window's "Migrate from V1" button - not run automatically,
-    // since it overwrites whatever is currently there. Only copies fields V2's schema already
-    // has a home for; V1 fields with no V2 equivalent yet (e.g. InternalTsvrcConfig.Factories,
-    // since FactoryModule hasn't been migrated) are intentionally left untouched.
+    // since it overwrites whatever is currently there.
     //
     // Everything (Singletons, PooledObjects, Constructs, Factories) goes onto the single scene
     // TsvrcConfig (see its own doc comment for why it's a scene component and not an asset).
     // The library-internal/builtin side (TsvrcBuiltinConfig) is a separate genuine asset and is
-    // migrated from V1's InternalTsvrcConfig asset separately.
+    // migrated from V1's InternalTsvrcConfig asset separately (Singletons, PoolPrefabs, Factories).
+    // V1's TsvrcConfig.Instance has no V2 equivalent field — InstanceModule auto-detects the
+    // TsvrcInstance subclass in the project, so no explicit migration is needed.
     //
     // Mutates exclusively through SerializedObject/SerializedProperty, never raw field
     // assignment, consistent with every other mutation in this codebase.
@@ -89,6 +89,13 @@ namespace Tsvrc.Editor.V2
             var so = new SerializedObject(v2Builtin);
             SetObjectArray(so, "Singletons", v1Internal.Singletons ?? Array.Empty<UnityEngine.Object>());
             SetObjectArray(so, "PoolPrefabs", v1Internal.PoolPrefabs ?? Array.Empty<TsvrcProcess>());
+            SetObjectArray(so, "Factories", v1Internal.Factories ?? Array.Empty<TsvrcFactoryGroup>(),
+                (element, factory) =>
+                {
+                    element.FindPropertyRelative("GroupName").stringValue = factory.GroupName;
+                    var prefabsProp = element.FindPropertyRelative("Prefabs");
+                    SetObjectArray(prefabsProp, factory.Prefabs ?? Array.Empty<UnityEngine.Object>());
+                });
             so.ApplyModifiedProperties();
         }
 

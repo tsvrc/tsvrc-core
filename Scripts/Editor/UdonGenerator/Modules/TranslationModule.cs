@@ -76,7 +76,7 @@ namespace Tsvrc.Editor.V2
                     w.Line("private string[] _tsCurrentKeys;");
                     w.Line("private string[] _tsCurrentVals;");
                     w.Line("private int _tsCurrentLang = -1;");
-                    w.Line("[SerializeField] private TextMeshProUGUI[] _translationTargets;");
+                    w.Line("[HideInInspector] [SerializeField] private TextMeshProUGUI[] _translationTargets;");
                     w.Line("private int _tsBatchIndex;");
                     w.Line("private bool _tsBatchRunning;");
                     w.Line("private UdonSharpBehaviour[] _tsLangListeners = new UdonSharpBehaviour[0];");

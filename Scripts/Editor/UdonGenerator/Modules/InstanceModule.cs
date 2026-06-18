@@ -19,9 +19,8 @@ namespace Tsvrc.Editor.V2
     // wiring is self-recovering without any user action. See InstanceModule-Design.md for the
     // full scenario analysis behind these choices.
     //
-    // This module owns no generated file of its own; the resolved reference is wired straight
-    // into TsvrcGenerated._instance (see ScaffoldModule). TsConstruct()/OnInstanceStart()
-    // invocation depends on the old CompiledTsvrc lifecycle and is intentionally not generated yet.
+    // Generates _TsInstanceStart() which calls TsConstruct(this) then OnInstanceStart() on the
+    // resolved instance.
     internal class InstanceModule : TsvrcModule
     {
         private const string ChildName = "TsvrcInstance";
@@ -45,6 +44,12 @@ namespace Tsvrc.Editor.V2
                 w.Line("[ReadOnly] [SerializeField] private TsvrcInstance _instance;");
                 w.BlankLine();
                 w.Line("public TsvrcInstance Instance => _instance;");
+                w.BlankLine();
+                using (w.Method("public void _TsInstanceStart()"))
+                {
+                    w.Line("_instance.TsConstruct(this);");
+                    w.Line("_instance.OnInstanceStart();");
+                }
             }
             return w.ToString();
         }

@@ -24,9 +24,12 @@ namespace Tsvrc.Editor.V2
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
             using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
-                w.Line("[SerializeField] private TsMemory _memory;");
+                w.Line("[ReadOnly] [SerializeField] private TsMemory _memory;");
                 w.BlankLine();
                 w.Line("public TsMemory Memory => _memory;");
+                w.BlankLine();
+                using (w.Method("public void _TsMemoryStart()"))
+                    w.Line("_memory.TsConstruct(this);");
             }
             return w.ToString();
         }

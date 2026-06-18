@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Tsvrc.Core;
 using UnityEditor;
@@ -15,9 +16,15 @@ namespace Tsvrc.Editor.V2
 
         internal override string FileName => "TsvrcGeneratedFactory.cs";
 
+        private const string BuiltinConfigPath = "Assets/Tsvrc/TsvrcBuiltinConfig.asset";
+
+        internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
+
         internal override void LoadConfig()
         {
-            _entries = BuildEntries();
+            var userConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
+            var builtinConfig = AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(BuiltinConfigPath);
+            _entries = BuildEntries(userConfig, builtinConfig);
         }
 
         internal override string GenerateCode()
@@ -39,7 +46,7 @@ namespace Tsvrc.Editor.V2
             using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
                 foreach (var entry in _entries)
-                    w.Line($"[SerializeField] private GameObject {FieldName(entry.Name)};");
+                    w.Line($"[HideInInspector] [SerializeField] private GameObject {FieldName(entry.Name)};");
 
                 foreach (var entry in _entries)
                 {
@@ -49,9 +56,19 @@ namespace Tsvrc.Editor.V2
                         w.Line("if (go == null) return null;");
                         w.Line("go.SetActive(true);");
                         if (entry.TypeName == "GameObject")
+                        {
                             w.Line("return go;");
+                        }
+                        else if (entry.IsTsvrcBehaviour)
+                        {
+                            w.Line($"var instance = go.GetComponent<{entry.TypeName}>();");
+                            w.Line("if (instance != null) instance.TsConstruct(this);");
+                            w.Line("return instance;");
+                        }
                         else
+                        {
                             w.Line($"return go.GetComponent<{entry.TypeName}>();");
+                        }
                     }
                 }
             }
@@ -132,15 +149,15 @@ namespace Tsvrc.Editor.V2
                 EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
         }
 
-        private static List<FactoryEntry> BuildEntries()
+        private static List<FactoryEntry> BuildEntries(TsvrcConfig config, TsvrcBuiltinConfig builtinConfig)
         {
-            var config = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
-            if (config?.Factories == null) return new List<FactoryEntry>();
-
             var usedNames = new HashSet<string>(StringComparer.Ordinal);
             var entries = new List<FactoryEntry>();
 
-            foreach (var group in config.Factories)
+            var allGroups = (builtinConfig?.Factories ?? Array.Empty<TsvrcFactoryGroup>())
+                .Concat(config?.Factories ?? Array.Empty<TsvrcFactoryGroup>());
+
+            foreach (var group in allGroups)
             {
                 if (group?.Prefabs == null) continue;
                 string prefix = string.IsNullOrEmpty(group.GroupName) ? string.Empty : Sanitize(group.GroupName);
@@ -170,6 +187,7 @@ namespace Tsvrc.Editor.V2
                         Name = name,
                         TypeName = typeName,
                         TypeNamespace = typeNamespace,
+                        IsTsvrcBehaviour = behaviour != null,
                         PrefabAsset = prefab,
                     });
                 }
@@ -223,6 +241,7 @@ namespace Tsvrc.Editor.V2
             public string Name;
             public string TypeName;
             public string TypeNamespace;
+            public bool IsTsvrcBehaviour;
             public GameObject PrefabAsset;
         }
     }

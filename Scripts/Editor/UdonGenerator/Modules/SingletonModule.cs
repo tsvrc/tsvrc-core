@@ -19,9 +19,8 @@ namespace Tsvrc.Editor.V2
     // from TsvrcBuiltinConfig (which is a genuine asset).
     //
     // Deliberately does not replicate V1's call-site-stub feature (every configured singleton
-    // is always a real field) or its TsConstruct/TsStart invocation (V1's SingletonModule keeps
-    // running in parallel and remains the sole caller of those until it is retired - same
-    // reasoning as InstanceModule's existing deferral).
+    // is always a real field). Generates _TsSingletonStart() which calls TsConstruct(this) on
+    // any singleton that is a TsvrcBehaviour.
     internal class SingletonModule : TsvrcModule
     {
         private const string BuiltinConfigPath = "Assets/Tsvrc/TsvrcBuiltinConfig.asset";
@@ -50,8 +49,18 @@ namespace Tsvrc.Editor.V2
             var sceneConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
             var builtinConfig = AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(BuiltinConfigPath);
 
-            var combined = (sceneConfig?.Singletons ?? Array.Empty<UnityEngine.Object>())
-                .Union(builtinConfig?.Singletons ?? Array.Empty<UnityEngine.Object>());
+            var sceneSingletons = Array.Empty<UnityEngine.Object>();
+            if (sceneConfig != null)
+            {
+                var so = new SerializedObject(sceneConfig);
+                var prop = so.FindProperty("Singletons");
+                sceneSingletons = new UnityEngine.Object[prop.arraySize];
+                for (int i = 0; i < prop.arraySize; i++)
+                    sceneSingletons[i] = prop.GetArrayElementAtIndex(i).objectReferenceValue;
+            }
+
+            var combined = sceneSingletons
+                .Concat(builtinConfig?.Singletons ?? Array.Empty<UnityEngine.Object>());
 
             _entries = Resolve(combined);
         }
@@ -79,6 +88,15 @@ namespace Tsvrc.Editor.V2
                     w.Summary("Tsvrc singleton.");
                     w.Line($"[HideInInspector] [SerializeField] public {entry.TypeName} {entry.Name};");
                 }
+
+                using (w.Method("public void _TsSingletonStart()"))
+                {
+                    foreach (var entry in _entries.OrderBy(e => e.Name))
+                    {
+                        if (!IsTsvrcBehaviourType(entry.TypeName, entry.Namespace)) continue;
+                        w.Line($"{entry.Name}.TsConstruct(this);");
+                    }
+                }
             }
 
             return w.ToString();
@@ -91,8 +109,23 @@ namespace Tsvrc.Editor.V2
             w.BlankLine();
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
             using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
+            using (w.Method("public void _TsSingletonStart()"))
             { }
             return w.ToString();
+        }
+
+        private static bool IsTsvrcBehaviourType(string shortName, string ns)
+        {
+            string fullName = string.IsNullOrEmpty(ns) ? shortName : $"{ns}.{shortName}";
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType(fullName);
+                if (type == null) continue;
+                for (var t = type.BaseType; t != null; t = t.BaseType)
+                    if (t.Name == "TsvrcBehaviour") return true;
+                return false;
+            }
+            return false;
         }
 
         internal override void Wire()

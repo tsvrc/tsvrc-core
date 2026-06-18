@@ -31,10 +31,11 @@ using UnityEngine;
 
 namespace {CompiledNamespace}
 {{
+    [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     [AddComponentMenu("""")]
     public partial class {CompiledClassName} : UdonSharpBehaviour
     {{
-        void Start() {{ _TsPoolStart(); }}
+        void Start() {{ _TsMemoryStart(); _TsSingletonStart(); _TsPoolStart(); _TsConstructStart(); _TsInstanceStart(); }}
     }}
 }}";
 

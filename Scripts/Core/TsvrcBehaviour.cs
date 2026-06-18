@@ -1,4 +1,5 @@
 using Tsvrc.Core.Compiled;
+using Tsvrc.Core.Generated;
 using Tsvrc.Utils;
 using UdonSharp;
 
@@ -10,23 +11,23 @@ namespace Tsvrc.Core
     /// </summary>
     public class TsvrcBehaviour : UdonSharpBehaviour
     {
-        protected CompiledTsvrc _ts;
+        protected TsvrcGenerated _ts;
 
         private UdonSharpBehaviour[] _subListeners = new UdonSharpBehaviour[0];
         private string[] _subKeys = new string[0];
         private string[] _subCallbacks = new string[0];
 
         /// <summary>
-        /// Assigns the <see cref="CompiledTsvrc"/> reference and calls <see cref="TsStart"/>.
+        /// Assigns the <see cref="TsvrcGenerated"/> reference and calls <see cref="TsStart"/>.
         /// </summary>
-        public void TsConstruct(CompiledTsvrc tsvrc)
+        public void TsConstruct(TsvrcGenerated tsvrc)
         {
             _ts = tsvrc;
             TsStart();
         }
 
         /// <summary>
-        /// Propagates the <see cref="CompiledTsvrc"/> reference from an existing
+        /// Propagates the <see cref="TsvrcGenerated"/> reference from an existing
         /// <see cref="TsvrcBehaviour"/> and fully constructs this behaviour.
         /// </summary>
         public void TsConstruct(TsvrcBehaviour parent)

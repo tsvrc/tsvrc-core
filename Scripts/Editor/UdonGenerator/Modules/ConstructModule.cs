@@ -15,7 +15,7 @@ namespace Tsvrc.Editor.V2
 
         internal override string FileName => "TsvrcGeneratedConstruct.cs";
 
-        internal override IEnumerable<string> ExposedFieldNames() => _entries.Select(e => e.Name);
+        internal override IEnumerable<string> ExposedFieldNames() => Enumerable.Empty<string>();
 
         internal override void ExcludeFieldNames(IEnumerable<string> names)
         {
@@ -31,7 +31,13 @@ namespace Tsvrc.Editor.V2
         internal override void LoadConfig()
         {
             var sceneConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
-            _entries = Resolve(sceneConfig?.Constructs);
+            if (sceneConfig == null) { _entries = new List<ConstructEntry>(); return; }
+            var so = new SerializedObject(sceneConfig);
+            var prop = so.FindProperty("Constructs");
+            var constructs = new TsvrcBehaviour[prop.arraySize];
+            for (int i = 0; i < prop.arraySize; i++)
+                constructs[i] = prop.GetArrayElementAtIndex(i).objectReferenceValue as TsvrcBehaviour;
+            _entries = Resolve(constructs);
         }
 
         internal override string GenerateCode()
@@ -53,7 +59,13 @@ namespace Tsvrc.Editor.V2
             using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
                 foreach (var entry in _entries.OrderBy(e => e.Name))
-                    w.Line($"[HideInInspector] [SerializeField] public {entry.TypeName} {entry.Name};");
+                    w.Line($"[HideInInspector] [SerializeField] private {entry.TypeName} {FieldName(entry.Name)};");
+
+                using (w.Method("public void _TsConstructStart()"))
+                {
+                    foreach (var entry in _entries.OrderBy(e => e.Name))
+                        w.Line($"{FieldName(entry.Name)}.TsConstruct(this);");
+                }
             }
 
             return w.ToString();
@@ -66,6 +78,7 @@ namespace Tsvrc.Editor.V2
             w.BlankLine();
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
             using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
+            using (w.Method("public void _TsConstructStart()"))
             { }
             return w.ToString();
         }
@@ -87,10 +100,10 @@ namespace Tsvrc.Editor.V2
                     continue;
                 }
 
-                var prop = so.FindProperty(entry.Name);
+                var prop = so.FindProperty(FieldName(entry.Name));
                 if (prop == null)
                 {
-                    Debug.LogWarning($"[ConstructModule] Field '{entry.Name}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
+                    Debug.LogWarning($"[ConstructModule] Field '{FieldName(entry.Name)}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
                     continue;
                 }
 
@@ -139,6 +152,8 @@ namespace Tsvrc.Editor.V2
 
             return entries;
         }
+
+        private static string FieldName(string name) => $"_construct{name}";
 
         // __Foo__ on the GameObject overrides the generated field name to Foo.
         private static string AliasName(string goName)
