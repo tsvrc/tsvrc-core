@@ -76,7 +76,6 @@ namespace Tsvrc.Editor
                         "V1's TsvrcConfig (scene) and InternalConfig (asset) currently have. Continue?",
                         "Migrate", "Cancel"))
                 {
-                    V1ConfigMigrator.Migrate();
                     Reload();
                 }
             }
