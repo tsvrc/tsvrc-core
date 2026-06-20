@@ -68,6 +68,10 @@ namespace Tsvrc.Editor
             foreach (var module in modules)
                 foreach (var path in module.WatchedAssets())
                     paths.Add(path);
+            // Generated files are always watched so deleting any of them triggers a rerun.
+            foreach (var module in modules)
+                if (module.FileName != null)
+                    paths.Add($"{GeneratedFolder}/{module.FileName}");
             WatchedPaths = paths;
 
             if (WriteModules(modules) && !skipRefresh) { AssetDatabase.Refresh(); return; }
@@ -76,7 +80,11 @@ namespace Tsvrc.Editor
             foreach (var module in modules)
                 stableChanged |= module.AfterFilesStable();
 
-            if (stableChanged && WriteModules(modules) && !skipRefresh) { AssetDatabase.Refresh(); return; }
+            // stableChanged alone (e.g. a program asset was recreated) is enough to need a
+            // Refresh even if no .cs file changed — UdonSharp won't re-link the backing
+            // UdonBehaviour until it processes the new asset.
+            bool filesWritten = WriteModules(modules);
+            if ((filesWritten || stableChanged) && !skipRefresh) { AssetDatabase.Refresh(); return; }
 
             var compiledType = ScaffoldModule.FindCompiledType();
             if (compiledType != null && UnityEngine.Object.FindObjectOfType(compiledType, true) != null)

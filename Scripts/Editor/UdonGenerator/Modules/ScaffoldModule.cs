@@ -25,6 +25,8 @@ namespace Tsvrc.Editor
 
         internal override string FileName => "TsvrcGenerated.cs";
 
+        internal override IEnumerable<string> WatchedAssets() => new[] { GeneratedAssetPath };
+
         internal override void LoadConfig() { }
 
         internal override string GenerateCode() =>
@@ -53,11 +55,12 @@ namespace {CompiledNamespace}
 
         internal override bool AfterFilesStable()
         {
+            bool programAssetMissing = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(GeneratedAssetPath) == null;
             EnsureUdonSharpProgramAsset(ScaffoldFilePath, GeneratedAssetPath);
             var root = EnsureRootSceneObject();
             if (root != null)
                 EnsureChildSceneObject("TsvrcConfig", typeof(TsvrcConfig), root, isUdonSharp: false, editorOnly: true);
-            return false;
+            return programAssetMissing;
         }
 
         internal override bool OnSceneHierarchyChanged()

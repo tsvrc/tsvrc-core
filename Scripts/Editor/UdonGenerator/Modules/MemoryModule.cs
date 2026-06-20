@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using Tsvrc.Utils;
 using UnityEditor;
 using UnityEngine;
@@ -14,6 +15,8 @@ namespace Tsvrc.Editor
         private const string MemoryAssetPath = "Assets/Tsvrc/Scripts/Utils/TsMemory.asset";
 
         internal override string FileName => "TsvrcGeneratedMemory.cs";
+
+        internal override IEnumerable<string> WatchedAssets() => new[] { MemoryAssetPath };
 
         internal override void LoadConfig() { }
 
@@ -38,13 +41,14 @@ namespace Tsvrc.Editor
 
         internal override bool AfterFilesStable()
         {
+            bool programAssetMissing = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(MemoryAssetPath) == null;
             ScaffoldModule.EnsureUdonSharpProgramAsset(MemoryScriptPath, MemoryAssetPath);
 
             var root = FindRoot();
-            if (root == null) return false;
+            if (root == null) return programAssetMissing;
 
             ScaffoldModule.EnsureChildSceneObject("TsvrcMemory", typeof(TsMemory), root);
-            return false;
+            return programAssetMissing;
         }
 
         internal override void Wire()

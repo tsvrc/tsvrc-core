@@ -30,6 +30,12 @@ namespace Tsvrc.Editor
 
         internal override string FileName => "TsvrcGeneratedInstance.cs";
 
+        internal override IEnumerable<string> WatchedAssets()
+        {
+            if (_detectedType != null)
+                yield return $"{GeneratedFolder}/{_detectedType.Name}.asset";
+        }
+
         internal override string GenerateCode()
         {
             var w = new UdonWriter();
