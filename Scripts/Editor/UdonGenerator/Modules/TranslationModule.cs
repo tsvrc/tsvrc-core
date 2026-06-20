@@ -69,7 +69,7 @@ namespace Tsvrc.Editor
                     foreach (var lang in _languages)
                     {
                         var id = SanitizeIdentifier(lang.Key);
-                        var keys = lang.Entries.Keys.Where(k => _effectiveKeys.Contains(k)).ToList();
+                        var keys = lang.Entries.Keys.ToList();
                         var keyLits = keys.Select(k => $"\"{EscapeString(k)}\"");
                         var valLits = keys.Select(k => $"\"{EscapeString(lang.Entries[k])}\"");
                         w.Line($"private string[] _tsKeys_{id} = new string[] {{ {string.Join(", ", keyLits)} }};");
