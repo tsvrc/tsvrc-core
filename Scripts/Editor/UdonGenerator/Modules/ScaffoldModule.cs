@@ -11,6 +11,10 @@ using UnityEngine.SceneManagement;
 
 namespace Tsvrc.Editor.V2
 {
+    // Manages the TsvrcGenerated root GameObject and its UdonSharpProgramAsset. This
+    // module's generated file (TsvrcGenerated.cs) declares the partial class that all
+    // other modules extend; it must always be written first and compiled before any
+    // Wire() pass can locate the root object via FindCompiledType().
     internal class ScaffoldModule : TsvrcModule
     {
         internal const string CompiledNamespace = "Tsvrc.Core.Generated";
@@ -190,8 +194,6 @@ namespace {CompiledNamespace}
         {
             if (isUdonSharp)
             {
-                // UdonSharpUndo.AddComponent is required for UdonSharpBehaviour types - it also
-                // sets up the hidden backing UdonBehaviour, which a plain AddComponent would miss.
                 UdonSharpUndo.AddComponent(go, componentType);
                 return;
             }

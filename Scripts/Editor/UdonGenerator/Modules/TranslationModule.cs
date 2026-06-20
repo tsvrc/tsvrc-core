@@ -10,6 +10,10 @@ using UnityEngine;
 
 namespace Tsvrc.Editor.V2
 {
+    // Generates the Language enum, SetLanguage(), Translate(), and _TsApplyTranslationBatch()
+    // on TsvrcGenerated from JSON language files. Translation targets are discovered by
+    // scanning the scene for TextMeshProUGUI components whose GameObject name matches the
+    // _key_ pattern and appears in at least one language file.
     internal class TranslationModule : TsvrcModule
     {
         internal const string ConfigAssetPath = "Assets/TsvrcGenerated/TsvrcTranslationConfig.asset";

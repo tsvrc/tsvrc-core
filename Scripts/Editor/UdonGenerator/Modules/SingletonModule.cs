@@ -7,19 +7,15 @@ using UnityEngine;
 
 namespace Tsvrc.Editor.V2
 {
-    // Generates a holder behaviour (TsvrcSingletonBehaviour) with one public field per
-    // configured singleton, wired by direct reference. See SingletonModule-Design.md for the
-    // full scenario analysis behind these choices.
+    // Generates one public field on TsvrcGenerated per configured singleton, wired by
+    // direct reference. Generates _TsSingletonStart() which calls TsConstruct(this) on
+    // any singleton that is a TsvrcBehaviour.
     //
     // Singletons are scene objects by nature, so they're read from TsvrcConfig - a scene
     // component ScaffoldModule auto-creates/heals under TsvrcGenerated, not an asset (an asset
     // cannot hold a reference to a scene object: no stable cross-file address for it). Builtin/
     // library-internal singletons are expected to be asset-type objects, so those still come
     // from TsvrcBuiltinConfig (which is a genuine asset).
-    //
-    // Deliberately does not replicate V1's call-site-stub feature (every configured singleton
-    // is always a real field). Generates _TsSingletonStart() which calls TsConstruct(this) on
-    // any singleton that is a TsvrcBehaviour.
     internal class SingletonModule : TsvrcModule
     {
         private List<SingletonEntry> _entries = new List<SingletonEntry>();

@@ -10,6 +10,10 @@ using UnityEngine.SceneManagement;
 
 namespace Tsvrc.Editor.V2
 {
+    // Generates per-type pool slots on TsvrcGenerated and instantiates the configured
+    // prefabs under a "Pool" child object at wire time. Slot count is driven by the
+    // number of [WirePool] fields found across all loaded assemblies, not by the prefab
+    // count — each [WirePool] field gets its own dedicated instance.
     internal class PoolModule : TsvrcModule
     {
         private bool _hasAnyConfigured;
@@ -110,6 +114,9 @@ namespace Tsvrc.Editor.V2
             var root = FindRoot();
             if (root == null) return;
 
+            // Config is non-empty but all entries were invalid (null, scene objects, etc.).
+            // Do not destroy an existing Pool container in this state — it may be valid from
+            // a previous run and the config error is likely transient.
             if (_hasAnyConfigured && _poolEntries.Count == 0) return;
 
             var existingContainer = root.transform.Find("Pool");
@@ -228,9 +235,9 @@ namespace Tsvrc.Editor.V2
             return field.IsPublic || attrs.Any(a => a.GetType().Name == "SerializeField");
         }
 
-        // Single pass over both config sources: produces the type-name set (for slot generation)
-        // and the ordered prefab entry list (for wiring) simultaneously.
-        // Builtins come first so they always occupy lower slot indices.
+        // Builtins are processed before user config so builtin types always occupy the
+        // lower slot indices — slot 0 for a given type is always the same prefab regardless
+        // of how many user entries are added.
         private static (HashSet<string> typeNames, List<(Component prefab, string typeName)> entries)
             ResolveConfig(TsvrcConfig userConfig, TsvrcBuiltinConfig builtinConfig)
         {

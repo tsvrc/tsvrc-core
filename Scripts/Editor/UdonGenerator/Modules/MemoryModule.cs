@@ -5,6 +5,9 @@ using UnityEngine;
 
 namespace Tsvrc.Editor.V2
 {
+    // Generates the _memory field and _TsMemoryStart() on TsvrcGenerated, and wires
+    // the scene TsMemory component into it. Every other system accesses shared memory
+    // through TsvrcGenerated.Memory; this module ensures that reference is always set.
     internal class MemoryModule : TsvrcModule
     {
         private const string MemoryScriptPath = "Assets/Tsvrc/Scripts/Utils/TsMemory.cs";

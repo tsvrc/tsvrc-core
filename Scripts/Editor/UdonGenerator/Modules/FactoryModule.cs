@@ -9,6 +9,10 @@ using UnityEngine;
 
 namespace Tsvrc.Editor.V2
 {
+    // Generates a Create{Name}(Transform parent) factory method per configured prefab.
+    // At wire time, instantiates each prefab under a "Factories" child (inactive by
+    // default) so TsvrcGenerated can hand out instances on demand without a Resources
+    // load. Builtin and user factory groups are merged; group names become a name prefix.
     internal class FactoryModule : TsvrcModule
     {
         private List<FactoryEntry> _entries = new List<FactoryEntry>();

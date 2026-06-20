@@ -15,8 +15,7 @@ namespace Tsvrc.Editor.V2
     // Handles the single TsvrcInstance for the world. There is no manual override: the module
     // scans loaded assemblies for a TsvrcInstance subclass and fully owns a single child object
     // named "TsvrcInstance" under TsvrcGenerated, creating/repairing/removing it as needed so the
-    // wiring is self-recovering without any user action. See InstanceModule-Design.md for the
-    // full scenario analysis behind these choices.
+    // wiring is self-recovering without any user action.
     //
     // Generates _TsInstanceStart() which calls TsConstruct(this) then OnInstanceStart() on the
     // resolved instance.

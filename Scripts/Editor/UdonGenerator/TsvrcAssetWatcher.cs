@@ -4,6 +4,9 @@ using UnityEditor;
 
 namespace Tsvrc.Editor.V2
 {
+    // Triggers a generator rerun when any asset that a module has declared as watched
+    // (via WatchedAssets()) is imported, deleted, or moved. Domain reload events are
+    // excluded because TsvrcDomainReloadHandler already handles those.
     internal class TsvrcAssetWatcher : AssetPostprocessor
     {
         static void OnPostprocessAllAssets(
@@ -13,6 +16,7 @@ namespace Tsvrc.Editor.V2
             string[] movedFromAssets,
             bool didDomainReload)
         {
+            // TsvrcDomainReloadHandler.cs owns post-reload runs.
             if (didDomainReload) return;
             var watched = TsvrcGenerator.WatchedPaths;
             if (watched.Count == 0) return;

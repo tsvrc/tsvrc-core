@@ -8,6 +8,9 @@ using UnityEngine;
 
 namespace Tsvrc.Editor.V2
 {
+    // Generates a _construct{Name} field per TsvrcBehaviour listed in TsvrcConfig.Constructs,
+    // and wires each directly from the scene. At runtime, _TsConstructStart() calls
+    // TsConstruct(this) on every wired behaviour in field-name order.
     internal class ConstructModule : TsvrcModule
     {
         private List<ConstructEntry> _entries = new List<ConstructEntry>();

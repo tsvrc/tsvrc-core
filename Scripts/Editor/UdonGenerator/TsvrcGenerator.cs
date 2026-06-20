@@ -8,6 +8,15 @@ using UnityEngine;
 
 namespace Tsvrc.Editor.V2
 {
+    // Orchestrates all generator modules. A single Run() pass:
+    //   1. Calls LoadConfig() on every module (reads scene and asset state).
+    //   2. Resolves cross-module field name conflicts via ExposedFieldNames/ExcludeFieldNames.
+    //   3. Writes generated .cs files via WriteModules(); if any file changed, triggers
+    //      AssetDatabase.Refresh() and returns — Unity must recompile before wiring.
+    //   4. Calls AfterFilesStable() (creates scene objects that depend on compiled types).
+    //      If that triggers another write, refreshes again.
+    //   5. Calls Wire() on every module to assign scene references into serialized fields.
+    //   6. Subscribes to hierarchy/undo events to detect incremental changes and rerun.
     internal static class TsvrcGenerator
     {
         private const string GeneratedFolder = "Assets/TsvrcGenerated";
@@ -16,6 +25,11 @@ namespace Tsvrc.Editor.V2
 
         private static List<TsvrcModule> _activeModules;
         private static bool _rerunPending;
+        // Wire() assigns SerializedObject properties, which fires OnPostprocessModifications.
+        // _isWiring suppresses the rerun during the Wire pass itself.
+        // _justFinishedWiring suppresses it for one editor frame after Wire() returns,
+        // because Unity commits serialized changes asynchronously and the modification
+        // event can arrive after _isWiring is already cleared.
         private static bool _isWiring;
         private static bool _justFinishedWiring;
 
@@ -108,6 +122,9 @@ namespace Tsvrc.Editor.V2
 
         private static UndoPropertyModification[] OnPostprocessModifications(UndoPropertyModification[] modifications)
         {
+            // Ignore modifications triggered by our own Wire() pass (both during and for one
+            // frame after) and play-mode transitions. Only re-run when the user or an external
+            // tool actually changed TsvrcGenerated or TsvrcConfig properties.
             if (_isWiring || _justFinishedWiring || EditorApplication.isPlayingOrWillChangePlaymode || _activeModules == null)
                 return modifications;
             foreach (var mod in modifications)
@@ -125,6 +142,8 @@ namespace Tsvrc.Editor.V2
             return modifications;
         }
 
+        // Module order within a Run() pass does not affect correctness — each module reads
+        // from independent scene/asset sources and writes to independent serialized fields.
         private static List<TsvrcModule> CreateModules() => new List<TsvrcModule>
         {
             new MemoryModule(),
@@ -148,6 +167,9 @@ namespace Tsvrc.Editor.V2
             return written;
         }
 
+        // Content comparison before writing avoids touching the file when output is identical,
+        // which would otherwise trigger an AssetDatabase.Refresh() and a full reimport cycle
+        // on every Run() even when nothing changed.
         private static bool WriteIfChanged(string assetPath, string content)
         {
             string fullPath = ToFullPath(assetPath);
