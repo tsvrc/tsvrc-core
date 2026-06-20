@@ -34,7 +34,7 @@ namespace Tsvrc.Editor.V2
 
         internal override string GenerateCode()
         {
-            var w = new CsWriter();
+            var w = new UdonWriter();
             w.AutoGenHeader();
             w.BlankLine();
             w.Usings(new[] { "Tsvrc.Core", "Tsvrc.Utils", "UdonSharp", "UnityEngine" });

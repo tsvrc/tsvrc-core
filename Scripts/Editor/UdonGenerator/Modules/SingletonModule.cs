@@ -75,7 +75,7 @@ namespace Tsvrc.Editor.V2
                 if (!string.IsNullOrEmpty(entry.Namespace) && !usings.Contains(entry.Namespace))
                     usings.Add(entry.Namespace);
 
-            var w = new CsWriter();
+            var w = new UdonWriter();
             w.AutoGenHeader();
             w.BlankLine();
             w.Usings(usings);
@@ -104,7 +104,7 @@ namespace Tsvrc.Editor.V2
 
         private static string BuildStub()
         {
-            var w = new CsWriter();
+            var w = new UdonWriter();
             w.AutoGenHeader();
             w.BlankLine();
             using (w.Namespace(ScaffoldModule.CompiledNamespace))

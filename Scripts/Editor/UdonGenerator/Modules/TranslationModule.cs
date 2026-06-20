@@ -51,7 +51,7 @@ namespace Tsvrc.Editor.V2
             if (_languages.Count == 0)
                 return BuildStub();
 
-            var w = new CsWriter();
+            var w = new UdonWriter();
             w.AutoGenHeader();
             w.BlankLine();
             w.Usings(new[] { "UnityEngine", "TMPro", "UdonSharp", "Tsvrc.Utils" });
@@ -155,7 +155,7 @@ namespace Tsvrc.Editor.V2
 
         private static string BuildStub()
         {
-            var w = new CsWriter();
+            var w = new UdonWriter();
             w.AutoGenHeader();
             w.BlankLine();
             w.Usings(new[] { "UdonSharp", "UnityEngine" });

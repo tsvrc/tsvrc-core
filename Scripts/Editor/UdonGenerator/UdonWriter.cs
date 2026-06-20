@@ -7,7 +7,7 @@ namespace Tsvrc.Editor
 {
     // Builds indented C# source as a string. Block() and Method() return a scope
     // that writes the closing brace when disposed, so callers use them with 'using'.
-    internal sealed class CsWriter
+    internal sealed class UdonWriter
     {
         private const string IndentUnit = "    ";
 
@@ -89,10 +89,10 @@ namespace Tsvrc.Editor
 
         private sealed class BlockScope : IDisposable
         {
-            private readonly CsWriter _writer;
+            private readonly UdonWriter _writer;
             private bool _disposed;
 
-            internal BlockScope(CsWriter writer) { _writer = writer; }
+            internal BlockScope(UdonWriter writer) { _writer = writer; }
 
             public void Dispose()
             {

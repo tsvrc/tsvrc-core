@@ -37,7 +37,7 @@ namespace Tsvrc.Editor.V2
                 if (!string.IsNullOrEmpty(entry.TypeNamespace) && !usings.Contains(entry.TypeNamespace))
                     usings.Add(entry.TypeNamespace);
 
-            var w = new CsWriter();
+            var w = new UdonWriter();
             w.AutoGenHeader();
             w.BlankLine();
             w.Usings(usings);
@@ -78,7 +78,7 @@ namespace Tsvrc.Editor.V2
 
         private static string BuildStub()
         {
-            var w = new CsWriter();
+            var w = new UdonWriter();
             w.AutoGenHeader();
             w.BlankLine();
             w.Usings(new[] { "UdonSharp", "UnityEngine" });
