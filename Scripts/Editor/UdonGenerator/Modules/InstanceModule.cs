@@ -8,7 +8,6 @@ using Tsvrc.Core;
 using UdonSharp;
 using UdonSharpEditor;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Tsvrc.Editor.V2
@@ -125,13 +124,6 @@ namespace Tsvrc.Editor.V2
             SetInstanceField(root, component);
         }
 
-        private static Component FindRoot()
-        {
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null) return null;
-            return (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
-        }
-
         private static void SetInstanceField(Component root, UdonSharpBehaviour value)
         {
             var so = new SerializedObject(root);
@@ -145,8 +137,7 @@ namespace Tsvrc.Editor.V2
             if (prop.objectReferenceValue == (UnityEngine.Object)value) return;
 
             prop.objectReferenceValue = value;
-            if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+            ApplyAndMarkDirty(so, root);
         }
 
         private static UdonSharpBehaviour CreateComponent(GameObject go, Type type)
@@ -159,7 +150,7 @@ namespace Tsvrc.Editor.V2
             }
 
             string programAssetPath = $"{GeneratedFolder}/{type.Name}.asset";
-            if (!EnsureUdonSharpProgramAsset(scriptAssetPath, programAssetPath))
+            if (!ScaffoldModule.EnsureUdonSharpProgramAsset(scriptAssetPath, programAssetPath))
             {
                 Debug.LogWarning($"[InstanceModule] Could not create program asset for '{type.Name}'.");
                 return null;
@@ -209,21 +200,6 @@ namespace Tsvrc.Editor.V2
                     return path;
             }
             return null;
-        }
-
-        private static bool EnsureUdonSharpProgramAsset(string scriptPath, string assetPath)
-        {
-            if (AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>(assetPath) != null)
-                return true;
-
-            var monoScript = AssetDatabase.LoadAssetAtPath<MonoScript>(scriptPath);
-            if (monoScript == null) return false;
-
-            var programAsset = ScriptableObject.CreateInstance<UdonSharpProgramAsset>();
-            programAsset.sourceCsScript = monoScript;
-            AssetDatabase.CreateAsset(programAsset, assetPath);
-            AssetDatabase.SaveAssetIfDirty(programAsset);
-            return true;
         }
     }
 }

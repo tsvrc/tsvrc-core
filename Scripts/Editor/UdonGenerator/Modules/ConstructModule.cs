@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Tsvrc.Core;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Tsvrc.Editor.V2
@@ -14,19 +13,6 @@ namespace Tsvrc.Editor.V2
         private List<ConstructEntry> _entries = new List<ConstructEntry>();
 
         internal override string FileName => "TsvrcGeneratedConstruct.cs";
-
-        internal override IEnumerable<string> ExposedFieldNames() => Enumerable.Empty<string>();
-
-        internal override void ExcludeFieldNames(IEnumerable<string> names)
-        {
-            var excluded = new HashSet<string>(names, StringComparer.Ordinal);
-            _entries.RemoveAll(e =>
-            {
-                if (!excluded.Contains(e.Name)) return false;
-                Debug.LogError($"[ConstructModule] Field name '{e.Name}' conflicts with another module. Use __Alias__ syntax on the GameObject to assign a unique name.");
-                return true;
-            });
-        }
 
         internal override void LoadConfig()
         {
@@ -85,10 +71,7 @@ namespace Tsvrc.Editor.V2
 
         internal override void Wire()
         {
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null) return;
-
-            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            var root = FindRoot();
             if (root == null) return;
 
             var so = new SerializedObject(root);
@@ -110,8 +93,7 @@ namespace Tsvrc.Editor.V2
                 prop.objectReferenceValue = entry.SourceObject;
             }
 
-            if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+            ApplyAndMarkDirty(so, root);
         }
 
         private static List<ConstructEntry> Resolve(TsvrcBehaviour[] constructs)
@@ -154,23 +136,6 @@ namespace Tsvrc.Editor.V2
         }
 
         private static string FieldName(string name) => $"_construct{name}";
-
-        // __Foo__ on the GameObject overrides the generated field name to Foo.
-        private static string AliasName(string goName)
-        {
-            if (goName != null && goName.StartsWith("__") && goName.EndsWith("__") && goName.Length > 4)
-                return goName.Substring(2, goName.Length - 4);
-            return null;
-        }
-
-        private static string Deduplicate(string baseName, HashSet<string> usedNames)
-        {
-            string name = baseName;
-            int suffix = 2;
-            while (usedNames.Contains(name))
-                name = $"{baseName}{suffix++}";
-            return name;
-        }
 
         private struct ConstructEntry
         {

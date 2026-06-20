@@ -1,7 +1,6 @@
 #if UNITY_EDITOR
 using Tsvrc.Utils;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Tsvrc.Editor.V2
@@ -38,9 +37,7 @@ namespace Tsvrc.Editor.V2
         {
             ScaffoldModule.EnsureUdonSharpProgramAsset(MemoryScriptPath, MemoryAssetPath);
 
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null) return false;
-            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            var root = FindRoot();
             if (root == null) return false;
 
             ScaffoldModule.EnsureChildSceneObject("TsvrcMemory", typeof(TsMemory), root);
@@ -49,10 +46,7 @@ namespace Tsvrc.Editor.V2
 
         internal override void Wire()
         {
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null) return;
-
-            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            var root = FindRoot();
             if (root == null) return;
 
             var memory = (Component)UnityEngine.Object.FindObjectOfType(typeof(TsMemory), true);
@@ -66,15 +60,12 @@ namespace Tsvrc.Editor.V2
             }
             if (prop.objectReferenceValue == (UnityEngine.Object)memory) return;
             prop.objectReferenceValue = memory;
-            if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+            ApplyAndMarkDirty(so, root);
         }
 
         internal override bool OnSceneHierarchyChanged()
         {
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null) return false;
-            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            var root = FindRoot();
             if (root == null) return false;
             return root.transform.Find("TsvrcMemory") == null;
         }

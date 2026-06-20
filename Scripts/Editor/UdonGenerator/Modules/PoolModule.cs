@@ -5,7 +5,6 @@ using System.Linq;
 using System.Reflection;
 using UdonSharp;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -13,8 +12,6 @@ namespace Tsvrc.Editor.V2
 {
     internal class PoolModule : TsvrcModule
     {
-        private const string BuiltinConfigPath = "Assets/Tsvrc/TsvrcBuiltinConfig.asset";
-
         private bool _hasAnyConfigured;
         private List<PoolField> _currentFields = new List<PoolField>();
         private HashSet<string> _configuredTypeNames = new HashSet<string>(StringComparer.Ordinal);
@@ -103,19 +100,14 @@ namespace Tsvrc.Editor.V2
         internal override bool OnSceneHierarchyChanged()
         {
             if (_configuredTypeNames.Count == 0) return false;
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null) return false;
-            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            var root = FindRoot();
             if (root == null) return false;
             return root.transform.Find("Pool") == null;
         }
 
         internal override void Wire()
         {
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null) return;
-
-            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            var root = FindRoot();
             if (root == null) return;
 
             if (_hasAnyConfigured && _poolEntries.Count == 0) return;
@@ -195,25 +187,10 @@ namespace Tsvrc.Editor.V2
                     Debug.LogWarning($"[PoolModule] '{typeName}': {targetCount} [WirePool] target(s), {slotCount} slot(s) — {targetCount - slotCount} component(s) will keep stale references.");
             }
 
-            if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+            ApplyAndMarkDirty(so, root);
         }
 
         private static string SlotFieldName(string typeName, int index) => $"_pool_{typeName}_{index}";
-
-        private static bool IsTsvrcBehaviourType(string shortName, string ns)
-        {
-            string fullName = string.IsNullOrEmpty(ns) ? shortName : $"{ns}.{shortName}";
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var type = assembly.GetType(fullName);
-                if (type == null) continue;
-                for (var t = type.BaseType; t != null; t = t.BaseType)
-                    if (t.Name == "TsvrcBehaviour") return true;
-                return false;
-            }
-            return false;
-        }
 
         // Deduplicated by (declaring type full name, field name): Unity's AppDomain can carry stale
         // duplicate copies of the same assembly across successive recompiles (domain reload doesn't

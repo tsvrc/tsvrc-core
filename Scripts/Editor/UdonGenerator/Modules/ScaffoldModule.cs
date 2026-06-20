@@ -35,7 +35,14 @@ namespace {CompiledNamespace}
     [AddComponentMenu("""")]
     public partial class {CompiledClassName} : UdonSharpBehaviour
     {{
-        void Start() {{ _TsMemoryStart(); _TsSingletonStart(); _TsPoolStart(); _TsConstructStart(); _TsInstanceStart(); }}
+        void Start()
+        {{
+            _TsMemoryStart();
+            _TsSingletonStart();
+            _TsPoolStart();
+            _TsConstructStart();
+            _TsInstanceStart();
+        }}
     }}
 }}";
 
@@ -74,10 +81,10 @@ namespace {CompiledNamespace}
             return null;
         }
 
-        internal static void EnsureUdonSharpProgramAsset(string scriptPath, string assetPath)
+        internal static bool EnsureUdonSharpProgramAsset(string scriptPath, string assetPath)
         {
             var monoScript = AssetDatabase.LoadAssetAtPath<MonoScript>(scriptPath);
-            if (monoScript == null) return;
+            if (monoScript == null) return false;
 
             var programAsset = AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>(assetPath);
             if (programAsset == null)
@@ -87,7 +94,7 @@ namespace {CompiledNamespace}
                 AssetDatabase.CreateAsset(programAsset, assetPath);
                 AssetDatabase.SaveAssetIfDirty(programAsset);
                 Debug.Log($"[TsvrcGenerator] Created program asset at {assetPath}");
-                return;
+                return true;
             }
 
             if (programAsset.sourceCsScript != monoScript)
@@ -96,6 +103,7 @@ namespace {CompiledNamespace}
                 EditorUtility.SetDirty(programAsset);
                 AssetDatabase.SaveAssetIfDirty(programAsset);
             }
+            return true;
         }
 
         private static Component EnsureRootSceneObject()

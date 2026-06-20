@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Tsvrc.Editor.V2
@@ -23,8 +22,6 @@ namespace Tsvrc.Editor.V2
     // any singleton that is a TsvrcBehaviour.
     internal class SingletonModule : TsvrcModule
     {
-        private const string BuiltinConfigPath = "Assets/Tsvrc/TsvrcBuiltinConfig.asset";
-
         private List<SingletonEntry> _entries = new List<SingletonEntry>();
 
         internal override string FileName => "TsvrcGeneratedSingleton.cs";
@@ -114,26 +111,9 @@ namespace Tsvrc.Editor.V2
             return w.ToString();
         }
 
-        private static bool IsTsvrcBehaviourType(string shortName, string ns)
-        {
-            string fullName = string.IsNullOrEmpty(ns) ? shortName : $"{ns}.{shortName}";
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var type = assembly.GetType(fullName);
-                if (type == null) continue;
-                for (var t = type.BaseType; t != null; t = t.BaseType)
-                    if (t.Name == "TsvrcBehaviour") return true;
-                return false;
-            }
-            return false;
-        }
-
         internal override void Wire()
         {
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null) return;
-
-            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            var root = FindRoot();
             if (root == null) return;
 
             var so = new SerializedObject(root);
@@ -148,8 +128,7 @@ namespace Tsvrc.Editor.V2
                 prop.objectReferenceValue = entry.SourceObject;
             }
 
-            if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+            ApplyAndMarkDirty(so, root);
         }
 
         private static List<SingletonEntry> Resolve(IEnumerable<UnityEngine.Object> objects)
@@ -194,23 +173,6 @@ namespace Tsvrc.Editor.V2
             if (type == typeof(Animator))
                 return (AliasName(goName) ?? goName) + "Animator";
             return AliasName(goName) ?? type.Name;
-        }
-
-        // __Foo__ on the GameObject overrides the generated field name to Foo.
-        private static string AliasName(string goName)
-        {
-            if (goName != null && goName.StartsWith("__") && goName.EndsWith("__") && goName.Length > 4)
-                return goName.Substring(2, goName.Length - 4);
-            return null;
-        }
-
-        private static string Deduplicate(string baseName, HashSet<string> usedNames)
-        {
-            string name = baseName;
-            int suffix = 2;
-            while (usedNames.Contains(name))
-                name = $"{baseName}{suffix++}";
-            return name;
         }
 
         private struct SingletonEntry

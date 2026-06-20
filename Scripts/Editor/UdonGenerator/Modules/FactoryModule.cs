@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using Tsvrc.Core;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Tsvrc.Editor.V2
@@ -15,8 +14,6 @@ namespace Tsvrc.Editor.V2
         private List<FactoryEntry> _entries = new List<FactoryEntry>();
 
         internal override string FileName => "TsvrcGeneratedFactory.cs";
-
-        private const string BuiltinConfigPath = "Assets/Tsvrc/TsvrcBuiltinConfig.asset";
 
         internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
 
@@ -91,19 +88,14 @@ namespace Tsvrc.Editor.V2
         internal override bool OnSceneHierarchyChanged()
         {
             if (_entries.Count == 0) return false;
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null) return false;
-            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            var root = FindRoot();
             if (root == null) return false;
             return root.transform.Find("Factories") == null;
         }
 
         internal override void Wire()
         {
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null) return;
-
-            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            var root = FindRoot();
             if (root == null) return;
 
             var existing = root.transform.Find("Factories");
@@ -145,8 +137,7 @@ namespace Tsvrc.Editor.V2
                 prop.objectReferenceValue = instance;
             }
 
-            if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+            ApplyAndMarkDirty(so, root);
         }
 
         private static List<FactoryEntry> BuildEntries(TsvrcConfig config, TsvrcBuiltinConfig builtinConfig)
@@ -197,15 +188,6 @@ namespace Tsvrc.Editor.V2
         }
 
         private static string FieldName(string name) => $"_factory{name}";
-
-        private static string Deduplicate(string baseName, HashSet<string> usedNames)
-        {
-            string name = baseName;
-            int suffix = 2;
-            while (usedNames.Contains(name))
-                name = $"{baseName}{suffix++}";
-            return name;
-        }
 
         // Strips __Alias__ markers, splits on non-alphanumeric separators, PascalCases each word,
         // and prepends '_' if the result starts with a digit.

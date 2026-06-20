@@ -6,7 +6,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Tsvrc.Editor.V2
@@ -192,10 +191,7 @@ namespace Tsvrc.Editor.V2
         {
             if (_languages.Count == 0) return;
 
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null) return;
-
-            var root = (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            var root = FindRoot();
             if (root == null) return;
 
             var so = new SerializedObject(root);
@@ -204,8 +200,7 @@ namespace Tsvrc.Editor.V2
             prop.arraySize = _cachedTmpTargets.Count;
             for (int i = 0; i < _cachedTmpTargets.Count; i++)
                 prop.GetArrayElementAtIndex(i).objectReferenceValue = _cachedTmpTargets[i];
-            if (so.ApplyModifiedProperties())
-                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+            ApplyAndMarkDirty(so, root);
         }
 
         private List<TMPro.TextMeshProUGUI> FindTmpTargets()
