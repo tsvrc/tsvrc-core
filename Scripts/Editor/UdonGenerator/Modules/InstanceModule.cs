@@ -105,12 +105,15 @@ namespace Tsvrc.Editor
                 childGo = existingChild.gameObject;
                 component = childGo.GetComponent(_detectedType) as UdonSharpBehaviour;
 
-                // Wrong/stale component (type renamed, or manually removed and something else
-                // added): drop whatever UdonSharpBehaviours are sitting on it and add the right
-                // one. UdonSharpUndo.DestroyImmediate is required here (not a plain Undo destroy)
-                // because UdonSharp components have a hidden backing UdonBehaviour that a plain
-                // destroy would orphan.
-                if (component == null)
+                string programAssetPath = $"{GeneratedFolder}/{_detectedType.Name}.asset";
+                bool programAssetMissing = AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>(programAssetPath) == null;
+
+                // Recreate when: wrong/stale component type (renamed or manually replaced),
+                // OR the program asset was deleted — in that case the backing UdonBehaviour's
+                // programSource is null and UdonSharp's sanitize pass will error on next compile.
+                // UdonSharpUndo.DestroyImmediate is required (not plain Undo) because UdonSharp
+                // components carry a hidden backing UdonBehaviour that a plain destroy would orphan.
+                if (component == null || programAssetMissing)
                 {
                     foreach (var stale in childGo.GetComponents<UdonSharpBehaviour>())
                         UdonSharpUndo.DestroyImmediate(stale);
