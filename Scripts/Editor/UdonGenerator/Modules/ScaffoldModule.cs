@@ -9,7 +9,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Manages the TsvrcGenerated root GameObject and its UdonSharpProgramAsset. This
     // module's generated file (TsvrcGenerated.cs) declares the partial class that all

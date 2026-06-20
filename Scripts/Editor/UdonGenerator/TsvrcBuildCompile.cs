@@ -1,7 +1,7 @@
 #if UNITY_EDITOR
 using VRC.SDKBase.Editor.BuildPipeline;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Ensures generated files and scene wiring are up to date before every VRChat world build.
     // Runs at order -99 so it settles before UdonSharp's build pass (order 0 by default).

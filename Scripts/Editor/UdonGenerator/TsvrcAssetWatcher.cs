@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Triggers a generator rerun when any asset that a module has declared as watched
     // (via WatchedAssets()) is imported, deleted, or moved. Domain reload events are

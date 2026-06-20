@@ -6,7 +6,7 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Orchestrates all generator modules. A single Run() pass:
     //   1. Calls LoadConfig() on every module (reads scene and asset state).

@@ -8,7 +8,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Generates per-type pool slots on TsvrcGenerated and instantiates the configured
     // prefabs under a "Pool" child object at wire time. Slot count is driven by the

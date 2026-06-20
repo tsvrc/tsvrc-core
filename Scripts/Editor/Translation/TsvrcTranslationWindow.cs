@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
-using Tsvrc.Editor.V2;
-using TranslationModuleV2 = Tsvrc.Editor.V2.TranslationModule;
 using UnityEditor;
 using UnityEngine;
 
@@ -53,7 +51,7 @@ namespace Tsvrc.Editor
 
         private void Reload()
         {
-            _config = AssetDatabase.LoadAssetAtPath<TsvrcTranslationConfig>(TranslationModuleV2.ConfigAssetPath);
+            _config = AssetDatabase.LoadAssetAtPath<TsvrcTranslationConfig>(TranslationModule.ConfigAssetPath);
             _so = _config != null ? new SerializedObject(_config) : null;
             _peekCache.Clear();
         }
@@ -66,7 +64,7 @@ namespace Tsvrc.Editor
             if (_config == null)
             {
                 EditorGUILayout.HelpBox(
-                    $"No translation config found at {TranslationModuleV2.ConfigAssetPath}.\nCreate one to start configuring language files.",
+                    $"No translation config found at {TranslationModule.ConfigAssetPath}.\nCreate one to start configuring language files.",
                     MessageType.Info);
                 if (GUILayout.Button("Create Translation Config"))
                     CreateConfig();
@@ -76,7 +74,7 @@ namespace Tsvrc.Editor
             _so.Update();
 
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"Config: {TranslationModuleV2.ConfigAssetPath}", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField($"Config: {TranslationModule.ConfigAssetPath}", EditorStyles.miniLabel);
             if (GUILayout.Button("Select", GUILayout.Width(54)))
                 Selection.activeObject = _config;
             EditorGUILayout.EndHorizontal();
@@ -173,12 +171,12 @@ namespace Tsvrc.Editor
 
         private void CreateConfig()
         {
-            var dir = Path.GetDirectoryName(TranslationModuleV2.ConfigAssetPath);
+            var dir = Path.GetDirectoryName(TranslationModule.ConfigAssetPath);
             if (!AssetDatabase.IsValidFolder(dir))
                 AssetDatabase.CreateFolder(Path.GetDirectoryName(dir), Path.GetFileName(dir));
 
             var instance = CreateInstance<TsvrcTranslationConfig>();
-            AssetDatabase.CreateAsset(instance, TranslationModuleV2.ConfigAssetPath);
+            AssetDatabase.CreateAsset(instance, TranslationModule.ConfigAssetPath);
             AssetDatabase.SaveAssets();
             Reload();
         }

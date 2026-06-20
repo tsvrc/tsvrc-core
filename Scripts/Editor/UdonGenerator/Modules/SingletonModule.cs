@@ -5,7 +5,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Generates one public field on TsvrcGenerated per configured singleton, wired by
     // direct reference. Generates _TsSingletonStart() which calls TsConstruct(this) on

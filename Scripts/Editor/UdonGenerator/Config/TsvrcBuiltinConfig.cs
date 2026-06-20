@@ -2,7 +2,7 @@
 using Tsvrc.Core;
 using UnityEngine;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     public class TsvrcBuiltinConfig : ScriptableObject
     {

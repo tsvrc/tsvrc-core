@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 using UnityEditor;
 using UnityEngine;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Generates the Language enum, SetLanguage(), Translate(), and _TsApplyTranslationBatch()
     // on TsvrcGenerated from JSON language files. Translation targets are discovered by

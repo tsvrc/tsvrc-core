@@ -6,7 +6,7 @@ using Tsvrc.Core;
 using UnityEditor;
 using UnityEngine;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Generates a _construct{Name} field per TsvrcBehaviour listed in TsvrcConfig.Constructs,
     // and wires each directly from the scene. At runtime, _TsConstructStart() calls

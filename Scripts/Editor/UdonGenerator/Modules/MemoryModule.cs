@@ -3,7 +3,7 @@ using Tsvrc.Utils;
 using UnityEditor;
 using UnityEngine;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Generates the _memory field and _TsMemoryStart() on TsvrcGenerated, and wires
     // the scene TsMemory component into it. Every other system accesses shared memory

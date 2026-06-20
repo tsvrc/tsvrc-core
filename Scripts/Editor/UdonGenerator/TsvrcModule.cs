@@ -6,7 +6,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Abstract base for all generator passes. Each module is responsible for one slice
     // of the TsvrcGenerated partial class: generating its code fragment, wiring scene

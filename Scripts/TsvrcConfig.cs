@@ -2,7 +2,7 @@ using Tsvrc.Core;
 using UdonSharp;
 using UnityEngine;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Single scene-based config for everything PoolModule/SingletonModule/(future)Construct-
     // /FactoryModule need. Singletons/Constructs are scene-object references, which only a

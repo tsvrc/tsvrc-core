@@ -7,7 +7,7 @@ using Tsvrc.Core;
 using UnityEditor;
 using UnityEngine;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Generates a Create{Name}(Transform parent) factory method per configured prefab.
     // At wire time, instantiates each prefab under a "Factories" child (inactive by

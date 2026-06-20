@@ -1,5 +1,4 @@
 #if UNITY_EDITOR
-using Tsvrc.Editor.V2;
 using UnityEditor;
 using UnityEngine;
 

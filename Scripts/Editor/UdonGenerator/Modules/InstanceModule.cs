@@ -10,7 +10,7 @@ using UdonSharpEditor;
 using UnityEditor;
 using UnityEngine;
 
-namespace Tsvrc.Editor.V2
+namespace Tsvrc.Editor
 {
     // Handles the single TsvrcInstance for the world. There is no manual override: the module
     // scans loaded assemblies for a TsvrcInstance subclass and fully owns a single child object
