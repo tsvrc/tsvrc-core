@@ -33,10 +33,10 @@ namespace Tsvrc.Editor
         private static bool _isWiring;
         private static bool _justFinishedWiring;
 
-        [MenuItem("Tsvrc/Generate")]
+        [MenuItem("Tsvrc/Force Regenerate")]
         public static void ManualGenerate()
         {
-            Debug.Log("[TsvrcGenerator] === Manual Generate ===");
+            Debug.Log("[TsvrcGenerator] === Force Regenerate ===");
             Run();
         }
 

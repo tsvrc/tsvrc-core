@@ -66,19 +66,8 @@ namespace Tsvrc.Editor
             _so.ApplyModifiedProperties();
 
             EditorGUILayout.Space(8);
-            if (GUILayout.Button("Migrate from V1 Config"))
-            {
-                if (EditorUtility.DisplayDialog(
-                        "Migrate from V1 Config",
-                        "This overwrites Singletons, PooledObjects, Constructs and Factories on this " +
-                        "TsvrcConfig (and the builtin config's Singletons/PoolPrefabs) with whatever " +
-                        "V1's TsvrcConfig (scene) and InternalConfig (asset) currently have. Continue?",
-                        "Migrate", "Cancel"))
-                {
-                    Reload();
-                }
-            }
-            if (GUILayout.Button("Generate Now"))
+            EditorGUILayout.LabelField(string.Empty, GUI.skin.horizontalSlider);
+            if (GUILayout.Button("Force Regenerate"))
             {
                 TsvrcGenerator.ManualGenerate();
                 GUIUtility.ExitGUI();
@@ -88,10 +77,10 @@ namespace Tsvrc.Editor
         private void DrawNoConfig()
         {
             EditorGUILayout.HelpBox(
-                "No TsvrcConfig found in the scene. It's auto-created under TsvrcGenerated - run " +
-                "Tsvrc > Generate (or click below) to create it.",
+                "No TsvrcConfig found in the scene. It is auto-created under TsvrcGenerated — press Force Regenerate below to create it.",
                 MessageType.Info);
-            if (GUILayout.Button("Generate Now"))
+            EditorGUILayout.LabelField(string.Empty, GUI.skin.horizontalSlider);
+            if (GUILayout.Button("Force Regenerate"))
             {
                 TsvrcGenerator.ManualGenerate();
                 GUIUtility.ExitGUI();
