@@ -36,8 +36,8 @@ namespace Tsvrc.Editor
         [MenuItem("Tsvrc/Force Regenerate")]
         public static void ManualGenerate()
         {
-            Debug.Log("[TsvrcGenerator] === Force Regenerate ===");
             Run();
+            Debug.Log("[Tsvrc] Regenerated.");
         }
 
         internal static void AfterDomainReload(bool skipRefresh = false) => Run(skipRefresh);
