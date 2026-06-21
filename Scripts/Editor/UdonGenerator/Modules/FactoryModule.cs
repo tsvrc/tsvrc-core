@@ -103,10 +103,18 @@ namespace Tsvrc.Editor
             if (root == null) return;
 
             var existing = root.transform.Find("Factories");
+
+            if (_entries.Count == 0)
+            {
+                if (existing != null)
+                    Undo.DestroyObjectImmediate(existing.gameObject);
+                return;
+            }
+
+            if (IsFactoriesAlreadyWired(root, existing)) return;
+
             if (existing != null)
                 Undo.DestroyObjectImmediate(existing.gameObject);
-
-            if (_entries.Count == 0) return;
 
             var so = new SerializedObject(root);
             GameObject factoriesContainer = null;
@@ -189,6 +197,30 @@ namespace Tsvrc.Editor
             }
 
             return entries;
+        }
+
+        private bool IsFactoriesAlreadyWired(Component root, Transform existing)
+        {
+            if (existing == null || existing.childCount != _entries.Count) return false;
+
+            SerializedObject so = null;
+
+            foreach (var entry in _entries)
+            {
+                var childTransform = existing.Find(entry.Name);
+                if (childTransform == null) return false;
+
+                if (PrefabUtility.GetCorrespondingObjectFromSource(childTransform.gameObject) != entry.PrefabAsset)
+                    return false;
+
+                if (childTransform.gameObject.activeSelf) return false;
+
+                if (so == null) so = new SerializedObject(root);
+                var prop = so.FindProperty(FieldName(entry.Name));
+                if (prop == null || prop.objectReferenceValue != (UnityEngine.Object)childTransform.gameObject) return false;
+            }
+
+            return true;
         }
 
         private static string FieldName(string name) => $"_factory{name}";

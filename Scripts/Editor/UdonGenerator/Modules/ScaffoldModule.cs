@@ -1,7 +1,9 @@
 #if UNITY_EDITOR
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UdonSharp;
 using UdonSharpEditor;
 using UnityEditor;
@@ -20,8 +22,9 @@ namespace Tsvrc.Editor
         internal const string CompiledNamespace = "Tsvrc.Core.Generated";
         internal const string CompiledClassName = "TsvrcGenerated";
 
-        private const string ScaffoldFilePath = "Assets/TsvrcGenerated/TsvrcGenerated.cs";
-        private const string GeneratedAssetPath = "Assets/TsvrcGenerated/TsvrcGenerated.asset";
+        private const string GeneratedFolder = "Assets/TsvrcGenerated";
+        private const string ScaffoldFilePath = GeneratedFolder + "/TsvrcGenerated.cs";
+        private const string GeneratedAssetPath = GeneratedFolder + "/TsvrcGenerated.asset";
 
         internal override string FileName => "TsvrcGenerated.cs";
 
@@ -60,7 +63,57 @@ namespace {CompiledNamespace}
             var root = EnsureRootSceneObject();
             if (root != null)
                 EnsureChildSceneObject("TsvrcConfig", typeof(TsvrcConfig), root, isUdonSharp: false, editorOnly: true);
-            return programAssetMissing;
+
+            // fieldDefinitions order in the program asset is non-deterministic across compilations,
+            // causing unnecessary file changes on every domain reload — normalize to sorted order.
+            bool normalized = false;
+            foreach (var guid in AssetDatabase.FindAssets("t:UdonSharpProgramAsset", new[] { GeneratedFolder }))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                normalized |= NormalizeProgramAsset(AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>(path));
+            }
+
+            return programAssetMissing || normalized;
+        }
+
+        // Sorts fieldDefinitions to a stable order. Returns true if the asset was modified and saved.
+        internal static bool NormalizeProgramAsset(UdonSharpProgramAsset asset)
+        {
+            if (asset == null) return false;
+
+            FieldInfo fi = null;
+            for (var t = asset.GetType(); t != null && fi == null; t = t.BaseType)
+                fi = t.GetField("fieldDefinitions", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (fi == null) return false;
+
+            if (!(fi.GetValue(asset) is IDictionary fieldDefs) || fieldDefs.Count == 0) return false;
+
+            string prevKey = null;
+            bool needsSort = false;
+            foreach (DictionaryEntry e in fieldDefs)
+            {
+                string key = e.Key as string;
+                if (prevKey != null && string.Compare(prevKey, key, StringComparison.Ordinal) > 0)
+                {
+                    needsSort = true;
+                    break;
+                }
+                prevKey = key;
+            }
+            if (!needsSort) return false;
+
+            var pairs = new List<(string key, object val)>();
+            foreach (DictionaryEntry e in fieldDefs)
+                pairs.Add(((string)e.Key, e.Value));
+            pairs.Sort((a, b) => string.Compare(a.key, b.key, StringComparison.Ordinal));
+
+            var sorted = (IDictionary)Activator.CreateInstance(fieldDefs.GetType());
+            foreach (var (k, v) in pairs) sorted[k] = v;
+
+            fi.SetValue(asset, sorted);
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssetIfDirty(asset);
+            return true;
         }
 
         internal override bool OnSceneHierarchyChanged()

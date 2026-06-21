@@ -120,19 +120,27 @@ namespace Tsvrc.Editor
             if (_hasAnyConfigured && _poolEntries.Count == 0) return;
 
             var existingContainer = root.transform.Find("Pool");
+
+            if (_poolEntries.Count == 0)
+            {
+                if (existingContainer != null)
+                    Undo.DestroyObjectImmediate(existingContainer.gameObject);
+                return;
+            }
+
+            var wireTargetsByType = CollectWireTargetsByType(root.gameObject.scene);
+
+            if (IsPoolAlreadyWired(root, existingContainer, wireTargetsByType)) return;
+
             if (existingContainer != null)
                 Undo.DestroyObjectImmediate(existingContainer.gameObject);
 
-            if (_poolEntries.Count == 0) return;
-
-            var activeSlots = _activeSlots;
-            var wireTargetsByType = CollectWireTargetsByType(root.gameObject.scene);
             var so = new SerializedObject(root);
             GameObject poolContainer = null;
 
             foreach (var (prefabComponent, typeName) in _poolEntries)
             {
-                if (!activeSlots.TryGetValue(typeName, out var slotEntry) || slotEntry.Count == 0)
+                if (!_activeSlots.TryGetValue(typeName, out var slotEntry) || slotEntry.Count == 0)
                     continue;
                 int slotCount = slotEntry.Count;
 
@@ -195,6 +203,52 @@ namespace Tsvrc.Editor
             }
 
             ApplyAndMarkDirty(so, root);
+        }
+
+        private bool IsPoolAlreadyWired(Component root, Transform existingContainer, Dictionary<string, List<(MonoBehaviour, string)>> wireTargets)
+        {
+            if (existingContainer == null) return false;
+
+            int expectedTotal = _activeSlots.Values.Sum(v => v.Count);
+            if (existingContainer.childCount != expectedTotal) return false;
+
+            SerializedObject so = null;
+
+            foreach (var (prefabComponent, typeName) in _poolEntries)
+            {
+                if (!_activeSlots.TryGetValue(typeName, out var slotEntry) || slotEntry.Count == 0)
+                    continue;
+
+                var prefabGo = prefabComponent.gameObject;
+                var prefabType = prefabComponent.GetType();
+                wireTargets.TryGetValue(typeName, out var targets);
+
+                for (int i = 0; i < slotEntry.Count; i++)
+                {
+                    var childTransform = existingContainer.Find($"{typeName}_{i}");
+                    if (childTransform == null) return false;
+
+                    if (PrefabUtility.GetCorrespondingObjectFromSource(childTransform.gameObject) != prefabGo)
+                        return false;
+
+                    var childComp = childTransform.GetComponent(prefabType);
+                    if (childComp == null) return false;
+
+                    if (so == null) so = new SerializedObject(root);
+                    var prop = so.FindProperty(SlotFieldName(typeName, i));
+                    if (prop == null || prop.objectReferenceValue != childComp) return false;
+
+                    if (targets != null && i < targets.Count)
+                    {
+                        var (behaviour, fieldName) = targets[i];
+                        var targetSo = new SerializedObject(behaviour);
+                        var targetProp = targetSo.FindProperty(fieldName);
+                        if (targetProp == null || targetProp.objectReferenceValue != childComp) return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         private static string SlotFieldName(string typeName, int index) => $"_pool_{typeName}_{index}";
