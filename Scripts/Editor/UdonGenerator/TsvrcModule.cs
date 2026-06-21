@@ -25,6 +25,9 @@ namespace Tsvrc.Editor
         // into another module's class). WriteModules() skips writing in that case.
         internal virtual string FileName => null;
         internal virtual IEnumerable<string> WatchedAssets() => Enumerable.Empty<string>();
+        // Short type names (e.g. "GameManager") whose serialized-property modifications should
+        // trigger a generator rerun. Populated by modules that wire references onto user behaviours.
+        internal virtual IEnumerable<string> WatchedComponentTypeNames() => Enumerable.Empty<string>();
 
         internal abstract void LoadConfig();
         internal virtual string GenerateCode() => null;

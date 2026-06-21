@@ -21,14 +21,17 @@ namespace Tsvrc.Editor
         private HashSet<string> _configuredTypeNames = new HashSet<string>(StringComparer.Ordinal);
         private List<(Component prefab, string typeName)> _poolEntries = new List<(Component, string)>();
         private Dictionary<string, (string Namespace, int Count)> _activeSlots = new Dictionary<string, (string, int)>(StringComparer.Ordinal);
+        private HashSet<string> _wirePoolDeclaringTypeNames = new HashSet<string>(StringComparer.Ordinal);
 
         internal override string FileName => "TsvrcGeneratedPool.cs";
 
         internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
 
+        internal override IEnumerable<string> WatchedComponentTypeNames() => _wirePoolDeclaringTypeNames;
+
         internal override void LoadConfig()
         {
-            _currentFields = DetectWirePoolFields();
+            (_currentFields, _wirePoolDeclaringTypeNames) = DetectWirePoolFields();
             // TsvrcConfig is a scene component (PooledObjects/Singletons/Constructs need to be
             // able to hold scene-object references), not an asset - found, not loaded.
             var userConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
@@ -103,10 +106,13 @@ namespace Tsvrc.Editor
 
         internal override bool OnSceneHierarchyChanged()
         {
-            if (_configuredTypeNames.Count == 0) return false;
             var root = FindRoot();
             if (root == null) return false;
-            return root.transform.Find("Pool") == null;
+            var pool = root.transform.Find("Pool");
+            if (_poolEntries.Count == 0) return pool != null;
+            if (pool == null) return true;
+            int expected = _activeSlots.Values.Sum(v => v.Count);
+            return pool.childCount != expected;
         }
 
         internal override void Wire()
@@ -257,9 +263,10 @@ namespace Tsvrc.Editor
         // duplicate copies of the same assembly across successive recompiles (domain reload doesn't
         // always fully unload the previous version before the next one loads), which would otherwise
         // make every [WirePool] field count once per duplicate and inflate slot counts on every edit.
-        private static List<PoolField> DetectWirePoolFields()
+        private static (List<PoolField> fields, HashSet<string> declaringTypeNames) DetectWirePoolFields()
         {
             var found = new List<PoolField>();
+            var declaringTypeNames = new HashSet<string>(StringComparer.Ordinal);
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -277,9 +284,10 @@ namespace Tsvrc.Editor
                             FieldTypeName = field.FieldType.Name,
                             FieldTypeNamespace = field.FieldType.Namespace ?? string.Empty,
                         });
+                        declaringTypeNames.Add(type.Name);
                     }
             }
-            return found;
+            return (found, declaringTypeNames);
         }
 
         private static bool IsWirePoolField(FieldInfo field)

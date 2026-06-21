@@ -19,6 +19,7 @@ MonoBehaviour:
   - {fileID: 6105096152705169628, guid: d3017005a095a4b4898c4ba2885a9839, type: 3}
   - {fileID: -9092729703651741013, guid: 4a39ae8ed67ac1d45bc5907497be584f, type: 3}
   - {fileID: -8422451999444563390, guid: b48a2040f97bddd4fbaef83d8386149d, type: 3}
+  - {fileID: -7723276961423239022, guid: be930027a70efd14cb173ae966d71654, type: 3}
   Factories:
   - GroupName: 
     Prefabs:

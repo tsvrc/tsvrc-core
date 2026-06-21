@@ -24,6 +24,7 @@ namespace Tsvrc.Editor
         internal static HashSet<string> WatchedPaths { get; private set; } = new HashSet<string>();
 
         private static List<TsvrcModule> _activeModules;
+        private static HashSet<string> _watchedComponentTypeNames = new HashSet<string>(StringComparer.Ordinal);
         private static bool _rerunPending;
         // Wire() assigns SerializedObject properties, which fires OnPostprocessModifications.
         // _isWiring suppresses the rerun during the Wire pass itself.
@@ -99,6 +100,16 @@ namespace Tsvrc.Editor
                 }
             }
 
+            var watchedTypes = new HashSet<string>(StringComparer.Ordinal)
+            {
+                ScaffoldModule.CompiledClassName,
+                nameof(TsvrcConfig),
+            };
+            foreach (var module in modules)
+                foreach (var name in module.WatchedComponentTypeNames())
+                    watchedTypes.Add(name);
+            _watchedComponentTypeNames = watchedTypes;
+
             _activeModules = modules;
             EditorApplication.hierarchyChanged += OnHierarchyChanged;
             Undo.postprocessModifications += OnPostprocessModifications;
@@ -139,9 +150,7 @@ namespace Tsvrc.Editor
             {
                 var target = mod.currentValue?.target;
                 if (target == null) continue;
-                var typeName = target.GetType().Name;
-                if (typeName == ScaffoldModule.CompiledClassName ||
-                    typeName == nameof(TsvrcConfig))
+                if (_watchedComponentTypeNames.Contains(target.GetType().Name))
                 {
                     ScheduleRerun();
                     return modifications;
