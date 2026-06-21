@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace Tsvrc.Core
 {
@@ -9,9 +10,12 @@ namespace Tsvrc.Core
     ///
     /// If the pooled type is a TsvrcBehaviour subclass, the pool slots will have TsConstruct called
     /// at scene start. For other types, they are simply wired as references.
+    ///
+    /// Fields with this attribute are read-only in the inspector — assignment is managed
+    /// exclusively by the Tsvrc generator.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-    public class WirePoolAttribute : Attribute
+    public class WirePoolAttribute : PropertyAttribute
     {
         /// <summary>
         /// Optional description of what this pool is for.

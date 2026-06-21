@@ -11,47 +11,162 @@ using UnityEngine.SceneManagement;
 namespace Tsvrc.Editor
 {
     // Generates per-type pool slots on TsvrcGenerated and instantiates the configured
-    // prefabs under a "Pool" child object at wire time. Slot count is driven by the
-    // number of [WirePool] fields found across all loaded assemblies, not by the prefab
-    // count — each [WirePool] field gets its own dedicated instance.
+    // prefabs under a "Pool" child object at wire time. Slot counts are derived from
+    // a dependency graph: external scene refs + contributions from parent pool types,
+    // so nested [WirePool] fields inside pool types produce the correct slot totals.
+    // Wiring is two-phase: instantiate first, then collect targets (including the new
+    // instances) and assign [WirePool] fields on all of them.
     internal class PoolModule : TsvrcModule
     {
         private bool _hasAnyConfigured;
-        private List<PoolField> _currentFields = new List<PoolField>();
-        private HashSet<string> _configuredTypeNames = new HashSet<string>(StringComparer.Ordinal);
         private List<(Component prefab, string typeName)> _poolEntries = new List<(Component, string)>();
-        private Dictionary<string, (string Namespace, int Count)> _activeSlots = new Dictionary<string, (string, int)>(StringComparer.Ordinal);
-        private HashSet<string> _wirePoolDeclaringTypeNames = new HashSet<string>(StringComparer.Ordinal);
+        private Dictionary<string, PoolTypeInfo> _poolTypeInfos = new Dictionary<string, PoolTypeInfo>(StringComparer.Ordinal);
+        private HashSet<string> _watchedTypeNames = new HashSet<string>(StringComparer.Ordinal);
+
+        private class PoolTypeInfo
+        {
+            public Component Prefab;
+            public string TypeName;
+            public string TypeNamespace;
+            public int ExternalCount;
+            public Dictionary<string, int> InternalDeps = new Dictionary<string, int>(StringComparer.Ordinal);
+            public int TotalSlots;
+        }
 
         internal override string FileName => "TsvrcGeneratedPool.cs";
 
         internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
 
-        internal override IEnumerable<string> WatchedComponentTypeNames() => _wirePoolDeclaringTypeNames;
+        internal override IEnumerable<string> WatchedComponentTypeNames() => _watchedTypeNames;
 
         internal override void LoadConfig()
         {
-            (_currentFields, _wirePoolDeclaringTypeNames) = DetectWirePoolFields();
-            // TsvrcConfig is a scene component (PooledObjects/Singletons/Constructs need to be
-            // able to hold scene-object references), not an asset - found, not loaded.
             var userConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
             var builtinConfig = AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(BuiltinConfigPath);
             _hasAnyConfigured = (userConfig?.PooledObjects?.Length > 0)
                              || (builtinConfig?.PoolPrefabs?.Length > 0);
-            (_configuredTypeNames, _poolEntries) = ResolveConfig(userConfig, builtinConfig);
-            _activeSlots = BuildActiveSlots();
+
+            _poolEntries = ResolveConfig(userConfig, builtinConfig);
+
+            // Same type may appear in both builtinConfig and userConfig; keep first occurrence
+            // (builtins come first in ResolveConfig, so builtin slots always have lower indices).
+            var seenEntryTypes = new HashSet<string>(StringComparer.Ordinal);
+            _poolEntries = _poolEntries.Where(e => seenEntryTypes.Add(e.typeName)).ToList();
+
+            _poolTypeInfos = new Dictionary<string, PoolTypeInfo>(StringComparer.Ordinal);
+            _watchedTypeNames = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var (prefab, typeName) in _poolEntries)
+            {
+                _poolTypeInfos[typeName] = new PoolTypeInfo
+                {
+                    Prefab = prefab,
+                    TypeName = typeName,
+                    TypeNamespace = prefab.GetType().Namespace ?? string.Empty,
+                };
+            }
+
+            ScanExternalRefs();
+            ScanInternalDeps();
+            ComputeTotalSlots();
+        }
+
+        // Count [WirePool] fields on non-pool scene behaviour instances; each field-per-instance
+        // contributes one external slot for the referenced type.
+        private void ScanExternalRefs()
+        {
+            var scene = SceneManager.GetActiveScene();
+            foreach (var rootGo in scene.GetRootGameObjects())
+                foreach (var behaviour in rootGo.GetComponentsInChildren<MonoBehaviour>(true))
+                {
+                    if (_poolTypeInfos.ContainsKey(behaviour.GetType().Name)) continue;
+                    for (var t = behaviour.GetType(); t != null && t != typeof(MonoBehaviour) && t != typeof(UdonSharpBehaviour); t = t.BaseType)
+                        foreach (var field in t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+                        {
+                            if (!IsWirePoolField(field)) continue;
+                            if (field.FieldType.IsArray || field.FieldType.IsGenericType) continue;
+                            if (!_poolTypeInfos.TryGetValue(field.FieldType.Name, out var info)) continue;
+                            info.ExternalCount++;
+                            _watchedTypeNames.Add(t.Name);
+                        }
+                }
+        }
+
+        // Reflect each configured pool type's class for its own [WirePool] fields pointing at
+        // other pool types; these become InternalDeps entries driving the slot count formula.
+        private void ScanInternalDeps()
+        {
+            foreach (var info in _poolTypeInfos.Values)
+            {
+                for (var t = info.Prefab.GetType(); t != null && t != typeof(MonoBehaviour) && t != typeof(UdonSharpBehaviour); t = t.BaseType)
+                    foreach (var field in t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+                    {
+                        if (!IsWirePoolField(field)) continue;
+                        if (field.FieldType.IsArray || field.FieldType.IsGenericType) continue;
+                        var depName = field.FieldType.Name;
+                        if (!_poolTypeInfos.ContainsKey(depName)) continue;
+                        info.InternalDeps.TryGetValue(depName, out var count);
+                        info.InternalDeps[depName] = count + 1;
+                        _watchedTypeNames.Add(t.Name);
+                    }
+            }
+        }
+
+        // Topological DFS: totalSlots(T) = externalCount(T) + Σ_P wiresFromP(T) × totalSlots(P)
+        // Must resolve parent slots before child slots (parent = pool type that references T).
+        private void ComputeTotalSlots()
+        {
+            // reverseMap[dep] = list of (parentTypeName, fieldCount in parent referencing dep)
+            var reverseMap = new Dictionary<string, List<(string, int)>>(StringComparer.Ordinal);
+            foreach (var info in _poolTypeInfos.Values)
+                foreach (var (depName, count) in info.InternalDeps)
+                {
+                    if (!reverseMap.TryGetValue(depName, out var list))
+                        reverseMap[depName] = list = new List<(string, int)>();
+                    list.Add((info.TypeName, count));
+                }
+
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            var inStack = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var typeName in _poolTypeInfos.Keys.ToList())
+                ComputeForType(typeName, visited, inStack, reverseMap);
+        }
+
+        private int ComputeForType(string typeName, HashSet<string> visited, HashSet<string> inStack,
+            Dictionary<string, List<(string, int)>> reverseMap)
+        {
+            if (visited.Contains(typeName))
+                return _poolTypeInfos[typeName].TotalSlots;
+            if (inStack.Contains(typeName))
+            {
+                Debug.LogError($"[PoolModule] Circular dependency detected involving '{typeName}'. Excluding from pool generation.");
+                return 0;
+            }
+            if (!_poolTypeInfos.TryGetValue(typeName, out var info))
+                return 0;
+
+            inStack.Add(typeName);
+            int total = info.ExternalCount;
+            if (reverseMap.TryGetValue(typeName, out var parents))
+                foreach (var (parentName, fieldCount) in parents)
+                    total += fieldCount * ComputeForType(parentName, visited, inStack, reverseMap);
+
+            inStack.Remove(typeName);
+            visited.Add(typeName);
+            info.TotalSlots = total;
+            return total;
         }
 
         internal override string GenerateCode()
         {
-            var slotsByType = _activeSlots;
-            if (slotsByType.Count == 0)
+            var eligible = _poolTypeInfos.Values.Where(i => i.TotalSlots > 0).OrderBy(i => i.TypeName).ToList();
+            if (eligible.Count == 0)
                 return BuildStub();
 
             var usings = new List<string> { "UdonSharp", "UnityEngine" };
-            foreach (var (ns, _) in slotsByType.Values)
-                if (!string.IsNullOrEmpty(ns) && !usings.Contains(ns))
-                    usings.Add(ns);
+            foreach (var info in eligible)
+                if (!string.IsNullOrEmpty(info.TypeNamespace) && !usings.Contains(info.TypeNamespace))
+                    usings.Add(info.TypeNamespace);
 
             var w = new UdonWriter();
             w.AutoGenHeader();
@@ -61,17 +176,17 @@ namespace Tsvrc.Editor
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
             using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
-                foreach (var kvp in slotsByType.OrderBy(x => x.Key))
-                    for (int i = 0; i < kvp.Value.Count; i++)
-                        w.Line($"[HideInInspector] [SerializeField] private {kvp.Key} {SlotFieldName(kvp.Key, i)};");
+                foreach (var info in eligible)
+                    for (int i = 0; i < info.TotalSlots; i++)
+                        w.Line($"[HideInInspector] [SerializeField] private {info.TypeName} {SlotFieldName(info.TypeName, i)};");
 
                 using (w.Method("public void _TsPoolStart()"))
                 {
-                    foreach (var kvp in slotsByType.OrderBy(x => x.Key))
+                    foreach (var info in eligible)
                     {
-                        if (!IsTsvrcBehaviourType(kvp.Key, kvp.Value.Namespace)) continue;
-                        for (int i = 0; i < kvp.Value.Count; i++)
-                            w.Line($"{SlotFieldName(kvp.Key, i)}.TsConstruct(this);");
+                        if (!IsTsvrcBehaviourType(info.TypeName, info.TypeNamespace)) continue;
+                        for (int i = 0; i < info.TotalSlots; i++)
+                            w.Line($"{SlotFieldName(info.TypeName, i)}.TsConstruct(this);");
                     }
                 }
             }
@@ -92,18 +207,6 @@ namespace Tsvrc.Editor
             return w.ToString();
         }
 
-        private Dictionary<string, (string Namespace, int Count)> BuildActiveSlots()
-        {
-            var slotsByType = new Dictionary<string, (string Namespace, int Count)>(StringComparer.Ordinal);
-            foreach (var f in _currentFields)
-            {
-                if (!_configuredTypeNames.Contains(f.FieldTypeName)) continue;
-                slotsByType.TryGetValue(f.FieldTypeName, out var entry);
-                slotsByType[f.FieldTypeName] = (f.FieldTypeNamespace, entry.Count + 1);
-            }
-            return slotsByType;
-        }
-
         internal override bool OnSceneHierarchyChanged()
         {
             var root = FindRoot();
@@ -111,7 +214,7 @@ namespace Tsvrc.Editor
             var pool = root.transform.Find("Pool");
             if (_poolEntries.Count == 0) return pool != null;
             if (pool == null) return true;
-            int expected = _activeSlots.Values.Sum(v => v.Count);
+            int expected = _poolTypeInfos.Values.Sum(v => v.TotalSlots);
             return pool.childCount != expected;
         }
 
@@ -120,9 +223,6 @@ namespace Tsvrc.Editor
             var root = FindRoot();
             if (root == null) return;
 
-            // Config is non-empty but all entries were invalid (null, scene objects, etc.).
-            // Do not destroy an existing Pool container in this state — it may be valid from
-            // a previous run and the config error is likely transient.
             if (_hasAnyConfigured && _poolEntries.Count == 0) return;
 
             var existingContainer = root.transform.Find("Pool");
@@ -134,6 +234,8 @@ namespace Tsvrc.Editor
                 return;
             }
 
+            // Pool instances from a prior run are already in the scene, so CollectWireTargetsByType
+            // discovers their internal [WirePool] fields too — IsPoolAlreadyWired can validate them.
             var wireTargetsByType = CollectWireTargetsByType(root.gameObject.scene);
 
             if (IsPoolAlreadyWired(root, existingContainer, wireTargetsByType)) return;
@@ -143,17 +245,19 @@ namespace Tsvrc.Editor
 
             var so = new SerializedObject(root);
             GameObject poolContainer = null;
+            var allInstances = new Dictionary<string, List<Component>>(StringComparer.Ordinal);
 
+            // Phase 1: instantiate all pool slots and assign _pool_* fields on TsvrcGenerated.
             foreach (var (prefabComponent, typeName) in _poolEntries)
             {
-                if (!_activeSlots.TryGetValue(typeName, out var slotEntry) || slotEntry.Count == 0)
+                if (!_poolTypeInfos.TryGetValue(typeName, out var info) || info.TotalSlots == 0)
                     continue;
-                int slotCount = slotEntry.Count;
 
-                wireTargetsByType.TryGetValue(typeName, out var targets);
                 var sourceType = prefabComponent.GetType();
+                var instances = new List<Component>();
+                allInstances[typeName] = instances;
 
-                for (int i = 0; i < slotCount; i++)
+                for (int i = 0; i < info.TotalSlots; i++)
                 {
                     if (poolContainer == null)
                     {
@@ -166,6 +270,7 @@ namespace Tsvrc.Editor
                     if (instance == null)
                     {
                         Debug.LogWarning($"[PoolModule] Failed to instantiate prefab '{typeName}' (slot {i}).");
+                        instances.Add(null);
                         continue;
                     }
 
@@ -177,35 +282,53 @@ namespace Tsvrc.Editor
                     {
                         Debug.LogWarning($"[PoolModule] Instance '{instance.name}' is missing component '{sourceType.Name}'. Skipping slot {i}.");
                         Undo.DestroyObjectImmediate(instance);
+                        instances.Add(null);
                         continue;
                     }
+
+                    instances.Add(instanceComponent);
 
                     var initProp = so.FindProperty(SlotFieldName(typeName, i));
                     if (initProp != null)
                         initProp.objectReferenceValue = instanceComponent;
                     else
                         Debug.LogWarning($"[PoolModule] Field '{SlotFieldName(typeName, i)}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
+                }
+            }
 
-                    if (targets != null && i < targets.Count)
+            // Phase 2: collect wire targets again now that pool instances exist in the scene,
+            // then assign all [WirePool] fields (including internal ones on pool instances).
+            var updatedWireTargets = CollectWireTargetsByType(root.gameObject.scene);
+
+            foreach (var (_, typeName) in _poolEntries)
+            {
+                if (!allInstances.TryGetValue(typeName, out var instances)) continue;
+
+                var info = _poolTypeInfos[typeName];
+                updatedWireTargets.TryGetValue(typeName, out var targets);
+                int targetCount = targets?.Count ?? 0;
+
+                for (int i = 0; i < info.TotalSlots; i++)
+                {
+                    if (i >= instances.Count || instances[i] == null) continue;
+                    if (targets == null || i >= targets.Count) continue;
+
+                    var (behaviour, fieldName) = targets[i];
+                    var behaviourSo = new SerializedObject(behaviour);
+                    var prop = behaviourSo.FindProperty(fieldName);
+                    if (prop != null)
                     {
-                        var (behaviour, fieldName) = targets[i];
-                        var behaviourSo = new SerializedObject(behaviour);
-                        var prop = behaviourSo.FindProperty(fieldName);
-                        if (prop != null)
-                        {
-                            prop.objectReferenceValue = instanceComponent;
-                            behaviourSo.ApplyModifiedProperties();
-                        }
-                        else
-                            Debug.LogWarning($"[PoolModule] '{behaviour.GetType().Name}.{fieldName}' has [WirePool] but is not serialized. Make it public or add [SerializeField].");
+                        prop.objectReferenceValue = instances[i];
+                        behaviourSo.ApplyModifiedProperties();
                     }
+                    else
+                        Debug.LogWarning($"[PoolModule] '{behaviour.GetType().Name}.{fieldName}' has [WirePool] but is not serialized. Make it public or add [SerializeField].");
                 }
 
-                int targetCount = targets?.Count ?? 0;
-                if (targetCount < slotCount)
-                    Debug.LogWarning($"[PoolModule] '{typeName}': {slotCount} slot(s), {targetCount} [WirePool] target(s) — {slotCount - targetCount} slot(s) unassigned.");
-                else if (targetCount > slotCount)
-                    Debug.LogWarning($"[PoolModule] '{typeName}': {targetCount} [WirePool] target(s), {slotCount} slot(s) — {targetCount - slotCount} component(s) will keep stale references.");
+                if (targetCount < info.TotalSlots)
+                    Debug.LogWarning($"[PoolModule] '{typeName}': {info.TotalSlots} slot(s), {targetCount} [WirePool] target(s) — {info.TotalSlots - targetCount} slot(s) unassigned.");
+                else if (targetCount > info.TotalSlots)
+                    Debug.LogWarning($"[PoolModule] '{typeName}': {targetCount} [WirePool] target(s), {info.TotalSlots} slot(s) — {targetCount - info.TotalSlots} component(s) will keep stale references.");
             }
 
             ApplyAndMarkDirty(so, root);
@@ -215,21 +338,21 @@ namespace Tsvrc.Editor
         {
             if (existingContainer == null) return false;
 
-            int expectedTotal = _activeSlots.Values.Sum(v => v.Count);
+            int expectedTotal = _poolTypeInfos.Values.Sum(v => v.TotalSlots);
             if (existingContainer.childCount != expectedTotal) return false;
 
             SerializedObject so = null;
 
             foreach (var (prefabComponent, typeName) in _poolEntries)
             {
-                if (!_activeSlots.TryGetValue(typeName, out var slotEntry) || slotEntry.Count == 0)
+                if (!_poolTypeInfos.TryGetValue(typeName, out var info) || info.TotalSlots == 0)
                     continue;
 
                 var prefabGo = prefabComponent.gameObject;
                 var prefabType = prefabComponent.GetType();
                 wireTargets.TryGetValue(typeName, out var targets);
 
-                for (int i = 0; i < slotEntry.Count; i++)
+                for (int i = 0; i < info.TotalSlots; i++)
                 {
                     var childTransform = existingContainer.Find($"{typeName}_{i}");
                     if (childTransform == null) return false;
@@ -259,37 +382,6 @@ namespace Tsvrc.Editor
 
         private static string SlotFieldName(string typeName, int index) => $"_pool_{typeName}_{index}";
 
-        // Deduplicated by (declaring type full name, field name): Unity's AppDomain can carry stale
-        // duplicate copies of the same assembly across successive recompiles (domain reload doesn't
-        // always fully unload the previous version before the next one loads), which would otherwise
-        // make every [WirePool] field count once per duplicate and inflate slot counts on every edit.
-        private static (List<PoolField> fields, HashSet<string> declaringTypeNames) DetectWirePoolFields()
-        {
-            var found = new List<PoolField>();
-            var declaringTypeNames = new HashSet<string>(StringComparer.Ordinal);
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                Type[] types;
-                try { types = assembly.GetTypes(); }
-                catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
-
-                foreach (var type in types)
-                    foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
-                    {
-                        if (!IsWirePoolField(field)) continue;
-                        if (!seen.Add($"{type.FullName}.{field.Name}")) continue;
-                        found.Add(new PoolField
-                        {
-                            FieldTypeName = field.FieldType.Name,
-                            FieldTypeNamespace = field.FieldType.Namespace ?? string.Empty,
-                        });
-                        declaringTypeNames.Add(type.Name);
-                    }
-            }
-            return (found, declaringTypeNames);
-        }
-
         private static bool IsWirePoolField(FieldInfo field)
         {
             var attrs = field.GetCustomAttributes(false);
@@ -300,10 +392,8 @@ namespace Tsvrc.Editor
         // Builtins are processed before user config so builtin types always occupy the
         // lower slot indices — slot 0 for a given type is always the same prefab regardless
         // of how many user entries are added.
-        private static (HashSet<string> typeNames, List<(Component prefab, string typeName)> entries)
-            ResolveConfig(TsvrcConfig userConfig, TsvrcBuiltinConfig builtinConfig)
+        private static List<(Component prefab, string typeName)> ResolveConfig(TsvrcConfig userConfig, TsvrcBuiltinConfig builtinConfig)
         {
-            var names = new HashSet<string>(StringComparer.Ordinal);
             var entries = new List<(Component, string)>();
 
             if (builtinConfig?.PoolPrefabs != null)
@@ -315,9 +405,7 @@ namespace Tsvrc.Editor
                         Debug.LogWarning($"[PoolModule] Builtin '{proc.name}' is a scene object. Pool entries must be prefab assets. Skipping.");
                         continue;
                     }
-                    var typeName = proc.GetType().Name;
-                    names.Add(typeName);
-                    entries.Add((proc, typeName));
+                    entries.Add((proc, proc.GetType().Name));
                 }
 
             if (userConfig?.PooledObjects != null)
@@ -329,12 +417,10 @@ namespace Tsvrc.Editor
                         Debug.LogWarning($"[PoolModule] '{obj.name}' is a scene object. Pool entries must be prefab assets. Skipping.");
                         continue;
                     }
-                    var typeName = obj.GetType().Name;
-                    names.Add(typeName);
-                    entries.Add((obj, typeName));
+                    entries.Add((obj, obj.GetType().Name));
                 }
 
-            return (names, entries);
+            return entries;
         }
 
         private static Dictionary<string, List<(MonoBehaviour, string)>> CollectWireTargetsByType(Scene scene)
@@ -342,11 +428,9 @@ namespace Tsvrc.Editor
             var result = new Dictionary<string, List<(MonoBehaviour, string)>>(StringComparer.Ordinal);
 
             foreach (var rootGo in scene.GetRootGameObjects())
-            {
                 foreach (var behaviour in rootGo.GetComponentsInChildren<MonoBehaviour>(true))
                 {
                     for (var t = behaviour.GetType(); t != null && t != typeof(MonoBehaviour) && t != typeof(UdonSharpBehaviour); t = t.BaseType)
-                    {
                         foreach (var field in t.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
                         {
                             if (!field.GetCustomAttributes(false).Any(a => a.GetType().Name == "WirePoolAttribute")) continue;
@@ -357,17 +441,9 @@ namespace Tsvrc.Editor
                                 result[typeName] = list = new List<(MonoBehaviour, string)>();
                             list.Add((behaviour, field.Name));
                         }
-                    }
                 }
-            }
 
             return result;
-        }
-
-        private struct PoolField
-        {
-            public string FieldTypeName;
-            public string FieldTypeNamespace;
         }
     }
 }
