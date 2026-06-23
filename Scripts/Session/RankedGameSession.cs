@@ -1,9 +1,10 @@
 using Tsvrc.Core;
 using Tsvrc.Network;
+using Tsvrc.Process;
 using UdonSharp;
 using UnityEngine;
 
-namespace Tsvrc.Process
+namespace Tsvrc.Session
 {
     public static class RankedGameSessionState
     {
