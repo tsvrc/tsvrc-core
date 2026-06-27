@@ -28,6 +28,12 @@ namespace Tsvrc.Editor
         private readonly List<GameObject> _colliderOnlySources = new List<GameObject>();
         private readonly HashSet<GameObject> _seenColliderSet = new HashSet<GameObject>();
 
+        // GameObjects that have a ParticleSystem but no MeshFilter, collected by LoadFromSelection.
+        // They are reparented as children of the combined output to preserve their settings.
+        private bool _combineParticleSystems = true;
+        private readonly List<ParticleSystem> _particleSystemSources = new List<ParticleSystem>();
+        private readonly HashSet<GameObject> _seenParticleSet = new HashSet<GameObject>();
+
         // ValidateSavePath result cached per-frame to avoid redundant string checks.
         private string _cachedPathError;
         private bool _pathErrorDirty = true;
@@ -87,6 +93,8 @@ namespace Tsvrc.Editor
                 _sources.Clear();
                 _colliderOnlySources.Clear();
                 _seenColliderSet.Clear();
+                _particleSystemSources.Clear();
+                _seenParticleSet.Clear();
                 InvalidateCache();
                 _statusMessage = null;
             }
@@ -121,7 +129,8 @@ namespace Tsvrc.Editor
 
             var valid = GetValid();
             var colliderOnlyText = _colliderOnlySources.Count > 0 ? $" + {_colliderOnlySources.Count} collider-only" : "";
-            EditorGUILayout.LabelField($"{valid.Count} valid source(s){colliderOnlyText} of {_sources.Count} slot(s)", EditorStyles.miniLabel);
+            var psText = _particleSystemSources.Count > 0 ? $" + {_particleSystemSources.Count} particle system(s)" : "";
+            EditorGUILayout.LabelField($"{valid.Count} valid source(s){colliderOnlyText}{psText} of {_sources.Count} slot(s)", EditorStyles.miniLabel);
         }
 
         private void DrawSettings()
@@ -173,6 +182,13 @@ namespace Tsvrc.Editor
                     "GameObjects with colliders but no MeshFilter are included automatically when loading from selection. " +
                     "Disabled colliders and colliders on objects with UdonSharpBehaviour are excluded."),
                 _combineColliders);
+
+            _combineParticleSystems = EditorGUILayout.Toggle(
+                new GUIContent("Reparent Particle Systems",
+                    "Move GameObjects with a ParticleSystem (and no MeshFilter) to be children of the combined output. " +
+                    "Particle systems are not merged — they are reparented to preserve their settings and simulation state. " +
+                    "GameObjects with UdonSharpBehaviour are excluded."),
+                _combineParticleSystems);
         }
 
         private void DrawCombineButton()
@@ -208,11 +224,19 @@ namespace Tsvrc.Editor
                         _sources.Add(mf);
                 }
 
-            // Second pass: collect GameObjects that have a Collider but no MeshFilter.
             foreach (var go in Selection.gameObjects)
                 foreach (var col in go.GetComponentsInChildren<Collider>(true))
                     if (!meshFilterGOs.Contains(col.gameObject) && _seenColliderSet.Add(col.gameObject))
                         _colliderOnlySources.Add(col.gameObject);
+
+            _particleSystemSources.Clear();
+            _seenParticleSet.Clear();
+            foreach (var go in Selection.gameObjects)
+                foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+                    if (!meshFilterGOs.Contains(ps.gameObject)
+                        && ps.GetComponent<UdonSharpBehaviour>() == null
+                        && _seenParticleSet.Add(ps.gameObject))
+                        _particleSystemSources.Add(ps);
 
             InvalidateCache();
             _statusMessage = null;
@@ -292,6 +316,33 @@ namespace Tsvrc.Editor
                     CopyCollider(col, child);
                 }
 
+                // Unity blocks SetParent on transforms inside a prefab instance, so unpack the enclosing
+                // hierarchy layer by layer until the GO is free to reparent.
+                int psCount = 0;
+                if (_combineParticleSystems)
+                {
+                    foreach (var ps in _particleSystemSources)
+                    {
+                        if (ps == null) continue;
+                        var prefabRoot = PrefabUtility.GetOutermostPrefabInstanceRoot(ps.gameObject);
+                        while (prefabRoot != null)
+                        {
+                            PrefabUtility.UnpackPrefabInstance(prefabRoot, PrefabUnpackMode.OutermostRoot, InteractionMode.AutomatedAction);
+                            prefabRoot = PrefabUtility.GetOutermostPrefabInstanceRoot(ps.gameObject);
+                        }
+                        Undo.RecordObject(ps.transform, "Combine Meshes");
+                        ps.transform.SetParent(go.transform, worldPositionStays: true);
+                        psCount++;
+                    }
+                }
+
+                // Build a set of reparented GOs so the collider-only deactivation pass does not
+                // deactivate GOs that were just moved under the combined output.
+                var reparentedGOs = new HashSet<GameObject>();
+                if (_combineParticleSystems)
+                    foreach (var ps in _particleSystemSources)
+                        if (ps != null) reparentedGOs.Add(ps.gameObject);
+
                 int skippedUdon = 0;
                 if (_deactivateSources)
                 {
@@ -320,6 +371,8 @@ namespace Tsvrc.Editor
                         // Only deactivate collider-only GOs when their colliders were actually combined.
                         // Deactivating them without combining their colliders would remove physics with no replacement.
                         if (!_combineColliders) continue;
+                        // Skip GOs that were reparented for particle systems — they were moved, not left in place.
+                        if (reparentedGOs.Contains(colGO)) continue;
                         if (colGO.GetComponent<UdonSharpBehaviour>() != null) { skippedUdon++; continue; }
                         Undo.RecordObject(colGO, "Combine Meshes");
                         colGO.SetActive(false);
@@ -332,9 +385,11 @@ namespace Tsvrc.Editor
                 Selection.activeGameObject = go;
 
                 _statusMessage = $"Done: {visualMesh.vertexCount:N0} vertices, {result.Materials.Length} material(s) saved to {_savePath}"
+                    + (psCount > 0 ? $"\n{psCount} particle system(s) reparented." : "")
                     + (skippedUdon > 0 ? $"\n{skippedUdon} source(s) with UdonSharpBehaviour kept active." : "");
                 _statusType = MessageType.Info;
                 Debug.Log($"[Tsvrc] Mesh combined to {_savePath} ({result.Materials.Length} material(s), {visualMesh.vertexCount} vertices)"
+                    + (psCount > 0 ? $" {psCount} particle system(s) reparented." : "")
                     + (skippedUdon > 0 ? $" {skippedUdon} Udon source(s) kept active." : ""));
             }
             catch (System.Exception ex)
