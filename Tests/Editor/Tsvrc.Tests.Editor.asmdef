@@ -1,0 +1,32 @@
+{
+    "name": "Tsvrc.Tests.Editor",
+    "rootNamespace": "Tsvrc.Tests.Editor",
+    "references": [
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Tsvrc.Utils.Pure",
+        "UdonSharp.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompileReferences": [
+        "nunit.framework.dll",
+        "NSubstitute.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [
+        {
+            "name": "NSubstitute.dll",
+            "expression": "",
+            "define": "NSUBSTITUTE"
+        }
+    ],
+    "noEngineReferences": false
+}

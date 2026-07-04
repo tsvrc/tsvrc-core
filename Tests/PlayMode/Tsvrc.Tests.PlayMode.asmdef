@@ -1,0 +1,30 @@
+{
+    "name": "Tsvrc.Tests.PlayMode",
+    "rootNamespace": "Tsvrc.Tests.PlayMode",
+    "references": [
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Tsvrc.Utils.Pure",
+        "UdonSharp.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompileReferences": [
+        "nunit.framework.dll",
+        "NSubstitute.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [
+        {
+            "name": "NSubstitute.dll",
+            "expression": "",
+            "define": "NSUBSTITUTE"
+        }
+    ],
+    "noEngineReferences": false
+}
