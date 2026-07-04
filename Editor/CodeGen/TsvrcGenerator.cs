@@ -2,14 +2,19 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Text;
 using Tsvrc.Config;
+using Tsvrc.Core;
 using UnityEditor;
 using UnityEngine;
 
 namespace Tsvrc.Editor
 {
     // Orchestrates all generator modules. A single Run() pass:
+    //   0. Automatic triggers only proceed if HasBootstrapSignal() finds a reason this project
+    //      actually uses Tsvrc; otherwise nothing is written or created (see Run()).
     //   1. Calls LoadConfig() on every module (reads scene and asset state).
     //   2. Resolves cross-module field name conflicts via ExposedFieldNames/ExcludeFieldNames.
     //   3. Writes generated .cs files via WriteModules(); if any file changed, triggers
@@ -38,18 +43,32 @@ namespace Tsvrc.Editor
         [MenuItem("Tsvrc/Force Regenerate")]
         public static void ManualGenerate()
         {
-            Run();
+            Run(allowBootstrap: true);
             Debug.Log("[Tsvrc] Regenerated.");
         }
 
         internal static void AfterDomainReload(bool skipRefresh = false) => Run(skipRefresh);
 
-        internal static void Run(bool skipRefresh = false)
+        // allowBootstrap: false (the default, used by every automatic trigger - domain reload,
+        // asset watcher, hierarchy/undo watcher) means Run() will not create the scaffold from
+        // nothing. It only proceeds if HasBootstrapSignal() finds a reason to believe this
+        // project actually uses Tsvrc; otherwise it waits for one via WaitForBootstrapSignal.
+        // ManualGenerate() (the "Force Regenerate" menu item) passes true, since a deliberate
+        // click is itself the bootstrap signal.
+        internal static void Run(bool skipRefresh = false, bool allowBootstrap = false)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             EditorApplication.hierarchyChanged -= OnHierarchyChanged;
             Undo.postprocessModifications -= OnPostprocessModifications;
             _activeModules = null;
+
+            if (!allowBootstrap && !HasBootstrapSignal())
+            {
+                EditorApplication.hierarchyChanged -= WaitForBootstrapSignal;
+                EditorApplication.hierarchyChanged += WaitForBootstrapSignal;
+                return;
+            }
+            EditorApplication.hierarchyChanged -= WaitForBootstrapSignal;
 
             var modules = CreateModules();
 
@@ -114,6 +133,40 @@ namespace Tsvrc.Editor
             _activeModules = modules;
             EditorApplication.hierarchyChanged += OnHierarchyChanged;
             Undo.postprocessModifications += OnPostprocessModifications;
+        }
+
+        // Checked once per hierarchyChanged event while gated (see Run()). Stops watching and
+        // runs for real the moment a reason to bootstrap appears.
+        private static void WaitForBootstrapSignal()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            if (!HasBootstrapSignal()) return;
+            EditorApplication.hierarchyChanged -= WaitForBootstrapSignal;
+            Run(allowBootstrap: true);
+        }
+
+        // True if there's a concrete reason to believe this project uses Tsvrc: an existing
+        // TsvrcConfig, an existing scaffold instance in the scene (already bootstrapped, this
+        // is just maintenance), or a user-authored TsvrcInstance subclass anywhere in the
+        // project (declared before ever placing it in a scene).
+        private static bool HasBootstrapSignal()
+        {
+            if (UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true) != null) return true;
+
+            var compiledType = ScaffoldModule.FindCompiledType();
+            if (compiledType != null && UnityEngine.Object.FindObjectOfType(compiledType, true) != null) return true;
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[] types;
+                try { types = assembly.GetTypes(); }
+                catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
+
+                foreach (var type in types)
+                    if (type != typeof(TsvrcInstance) && !type.IsAbstract && typeof(TsvrcInstance).IsAssignableFrom(type))
+                        return true;
+            }
+            return false;
         }
 
         internal static void ScheduleRerun()
