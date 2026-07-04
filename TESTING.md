@@ -1,65 +1,50 @@
 # Testing Strategy for Tsvrc (UdonSharp / VRChat SDK3)
 
-Research date: 2026-07-03. Sources at the bottom.
+Research date: 2026-07-03. Updated 2026-07-04 for the package restructure into
+`Runtime/` (single `Tsvrc.Runtime.asmdef`) and `Editor/` (single `Tsvrc.Editor.asmdef`,
+with generator code under `Editor/CodeGen`). Sources at the bottom.
 
 ## Current status
 
 Base structure implemented:
-- `Assets/Tsvrc/Tests/Editor/Tsvrc.Tests.Editor.asmdef` — Edit Mode test assembly (Editor-only platform).
-- `Assets/Tsvrc/Tests/PlayMode/Tsvrc.Tests.PlayMode.asmdef` — Play Mode test assembly.
+- `Tests/Editor/Tsvrc.Tests.Editor.asmdef` — Edit Mode test assembly (Editor-only platform).
+- `Tests/PlayMode/Tsvrc.Tests.PlayMode.asmdef` — Play Mode test assembly.
 - `com.unity.test-framework` is already a project dependency (`Packages/manifest.json`) — no package install needed.
 - NSubstitute installed via NuGetForUnity (`Assets/Packages/NSubstitute.5.3.0/`). Both test
   asmdefs reference `NSubstitute.dll` via `precompileReferences` and gate a `NSUBSTITUTE`
   compilation symbol via `versionDefines` (auto-defined only in assemblies where the DLL is
   present — no global Scripting Define Symbol needed). Guard usage with `#if NSUBSTITUTE`.
 
-**Broader gap, still deliberately left open:** almost every other class in
-`Assets/Tsvrc/Scripts` (including "utility"-sounding ones like `DataChunker`) extends
-`UdonSharpBehaviour` and is already placed on GameObjects in committed scenes/prefabs.
-Converting the rest of `Scripts` to asmdefs is a project-wide change with real risk
-(serialized component references by assembly-qualified name) and was intentionally
-deferred. `TsArray` was a safe first case specifically because it's a plain class,
-never a scene component.
+All of `Runtime/` now compiles as a single `Tsvrc.Runtime.asmdef`, referenced by both
+test asmdefs. This supersedes the earlier `TsArray`-only
+`Tsvrc.Utils.Pure.asmdef` proof of concept described in prior revisions of this doc — that
+asmdef has been deleted and `TsArray.cs` folded back into `Runtime/Utils/`, since every class
+under `Runtime/` is now referenceable from tests through the one `Tsvrc.Runtime` assembly.
 
-`TsArray.cs` moved to its own assembly as a proof of concept:
-- Relocated (via `git mv`, history preserved) from `Scripts/Utils/TsArray.cs` to
-  `Scripts/Utils/Pure/TsArray.cs`. Namespace (`Tsvrc.Utils`) is unchanged, so none of
-  its 6 existing callers needed code changes.
-- Added `Scripts/Utils/Pure/Tsvrc.Utils.Pure.asmdef`, referencing `UdonSharp.Runtime`
-  (the only external type it uses is `UdonSharpBehaviour`), with `autoReferenced: true`
-  so `Assembly-CSharp` (i.e. the rest of Tsvrc) keeps seeing it automatically — no
-  reference changes needed in existing callers.
-- Added `"Tsvrc.Utils.Pure"` to the `references` list in both
-  `Tsvrc.Tests.Editor.asmdef` and `Tsvrc.Tests.PlayMode.asmdef`, so tests can now
-  actually do `using Tsvrc.Utils;` and call `TsArray.Add(...)` etc.
-
-**One step I could not safely automate:** UdonSharp requires a companion **"U#
-Assembly Definition"** asset alongside any plain `.asmdef` that contains code called
-from Udon (which `TsArray` is — it's used inside `UdonSharpBehaviour` methods). That
-companion asset is a ScriptableObject created and wired up through Unity's own menu,
-not a plain text file, so hand-authoring it risks a corrupt/incorrect asset. **You
-need to do this once in the Editor:**
-1. Right-click the `Scripts/Utils/Pure` folder > **Create > U# Assembly Definition**.
-2. Name it identically to the existing one: `Tsvrc.Utils.Pure`.
-3. In the Inspector, set its **Source Assembly** field to
-   `Tsvrc.Utils.Pure.asmdef`.
+**One step that still can't be automated:** UdonSharp requires a companion **"U#
+Assembly Definition"** asset alongside any `.asmdef` that contains code called from Udon,
+which is now true of `Tsvrc.Runtime.asmdef` as a whole (it contains every
+`UdonSharpBehaviour` in the library). That companion asset is a ScriptableObject created
+and wired up through Unity's own menu, not a plain text file. **Do this once in the
+Editor:**
+1. Right-click the `Runtime/` folder > **Create > U# Assembly Definition**.
+2. Name it identically to the existing one: `Tsvrc.Runtime`.
+3. In the Inspector, set its **Source Assembly** field to `Tsvrc.Runtime.asmdef`.
 4. If UdonSharp still complains scripts aren't part of a U# assembly, reimport the
-   `Scripts/Utils/Pure` folder (right-click > Reimport).
+   `Runtime/` folder (right-click > Reimport).
 
 ### Manual steps still needed from you
 
 1. **Open the project in Unity** and do the U# Assembly Definition step above.
-   Confirm the project still compiles and any UdonSharpBehaviour calling `TsArray`
-   still compiles to Udon without errors.
-2. **Decide when to migrate more of `Scripts`** to asmdefs the same way, one
-   plain/unused module at a time, following the `TsArray` pattern above.
-3. **Install ClientSim** (`com.vrchat.clientsim`) via VRChat Creator Companion (VCC) —
+   Confirm the project compiles and every `UdonSharpBehaviour` in `Runtime/` still
+   compiles to Udon without errors.
+2. **Install ClientSim** (`com.vrchat.clientsim`) via VRChat Creator Companion (VCC) —
    not installed in this project yet (checked `Packages/vpm-manifest.json`). This is a
    GUI action in VCC, not something to hand-edit into the manifest.
-4. **Disable Domain Reload** for faster/more reliable Play Mode test runs later:
+3. **Disable Domain Reload** for faster/more reliable Play Mode test runs later:
    Edit > Project Settings > Editor > Enter Play Mode Settings > uncheck "Reload
    Domain". Optional, but recommended once Play Mode tests exist.
-5. ~~NSubstitute / NuGetForUnity~~ — done. Installed and wired into both test asmdefs.
+4. ~~NSubstitute / NuGetForUnity~~ — done. Installed and wired into both test asmdefs.
 
 ## TL;DR
 
@@ -95,9 +80,9 @@ project and needs no VRChat-specific setup.
 
 - **Edit Mode tests**: run in-editor without entering Play Mode. Fast, no scene
   needed. Best for anything you can factor out as plain C# (no `MonoBehaviour`
-  lifecycle, no scene refs). Great fit for things like `Assets/Tsvrc/Scripts/Utils`
+  lifecycle, no scene refs). Great fit for things like `Runtime/Utils`
   (`TsArray.cs`, `TsJson.cs`, `TsMemory.cs`), `DataChunker.cs`, `TsvrcTranslationConfig.cs`,
-  and the `Editor/UdonGenerator` modules — all of these are logic-heavy and don't need
+  and the `Editor/CodeGen` modules — all of these are logic-heavy and don't need
   a running scene.
 - **Play Mode tests**: run inside Play Mode, can use `[UnityTest]` + `IEnumerator` to
   wait frames. Since UdonSharpBehaviours run as their C# proxy in-editor, you can:
@@ -114,16 +99,16 @@ project and needs no VRChat-specific setup.
 
 ### Suggested folder layout
 ```
-Assets/Tsvrc/Tests/
+Tests/
   Editor/
     Tsvrc.Tests.Editor.asmdef   (references nunit.framework.dll, platform=Editor)
     Utils/TsArrayTests.cs
     Utils/TsJsonTests.cs
-    Network/DataChunkerTests.cs
+    DataTransfer/DataChunkerTests.cs
   PlayMode/
     Tsvrc.Tests.PlayMode.asmdef (Test Assemblies checked, no platform restriction)
     Core/TsvrcInstanceTests.cs
-    State/StateManagerTests.cs
+    StateMachine/StateManagerTests.cs
 ```
 
 ## Layer 3: ClientSim (`com.vrchat.clientsim`)
@@ -157,7 +142,7 @@ processes), but:
 - The SDK exposes a public build-pipeline API (`VRCSdkControlPanel.TryGetBuilder<T>`,
   `OnSdkBuildStart`, `OnSdkBuildEnd`, `OnSdkPanelEnable`) that tooling can hook for
   custom pre-build validation — useful for **scripted sanity checks** (e.g. verifying
-  Tsvrc's `UdonGenerator`/`TsvrcBuildCompile.cs` output is consistent) even though it's
+  Tsvrc's `CodeGen`/`TsvrcBuildCompile.cs` output is consistent) even though it's
   not a "unit test" mechanism per se.
 - Treat this layer as your **manual/scripted smoke-test gate before publishing**, not
   as part of a fast feedback loop.
@@ -181,12 +166,12 @@ pattern to copy (not necessarily to depend on):
 ## Recommended adoption plan for Tsvrc
 
 1. **Add the Unity Test Framework package** (usually already present) and create the
-   `Assets/Tsvrc/Tests/Editor` + `Tests/PlayMode` asmdefs described above.
+   `Tests/Editor` + `Tests/PlayMode` asmdefs described above.
 2. **Extract pure logic** out of long `UdonSharpBehaviour` classes into plain C#
    helper classes/structs (no scene/component dependency) wherever feasible — these
    become trivially Edit-Mode-testable and are the highest ROI given the "classes are
    too long" pain point. Good first candidates: `TsvrcInstance.cs`, `StateManager.cs`,
-   `DataTransferer/*`, `TsvrcTimer.cs`.
+   `Runtime/DataTransfer/*`, `TsvrcTimer.cs`.
 3. **Write Play Mode tests** for the remaining `UdonSharpBehaviour` glue, driving it
    through its public API/Unity events, relying on the proxy-runs-as-C# behavior.
 4. **Introduce ClientSim** for player/networking-adjacent scripts once (1)-(3) are in
