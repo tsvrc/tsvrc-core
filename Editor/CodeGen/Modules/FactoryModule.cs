@@ -1,0 +1,365 @@
+#if UNITY_EDITOR
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using Tsvrc.Core;
+using Tsvrc.Config;
+using UnityEditor;
+using UnityEngine;
+
+namespace Tsvrc.Editor
+{
+    // Generates a Create{Name}(Transform parent) factory method per configured prefab.
+    // At wire time, instantiates each prefab under a "Factories" child (inactive by
+    // default) so TsvrcGenerated can hand out instances on demand without a Resources
+    // load. Builtin and user factory groups are merged; group names become a name prefix.
+    internal class FactoryModule : TsvrcModule
+    {
+        private List<FactoryEntry> _entries = new List<FactoryEntry>();
+
+        // Tab-only UI state, keyed by array index (not group name) so the key is stable while
+        // the user is typing and the foldout never collapses mid-edit.
+        private readonly Dictionary<int, bool> _foldouts = new Dictionary<int, bool>();
+        private static readonly GUIContent LabelGroupName = new GUIContent("Group Name");
+        private static readonly GUIContent LabelPrefabs = new GUIContent("Prefabs");
+
+        internal override string FileName => "TsvrcGeneratedFactory.cs";
+
+        internal override string TabLabel => "Factories";
+        internal override string TabDescription =>
+            "Register prefabs organized into named groups. Generates a Create{Group}{Name}(Transform parent) method for each entry. WARNING: instantiated objects do not receive a VRChat network ID and cannot send or receive network events. Use Pool for networked objects.";
+
+        internal override void DrawTab(SerializedObject so)
+        {
+            var factoriesProp = so.FindProperty("Factories");
+
+            int toDelete = -1;
+            for (int i = 0; i < factoriesProp.arraySize; i++)
+            {
+                var groupProp = factoriesProp.GetArrayElementAtIndex(i);
+                var groupNameProp = groupProp.FindPropertyRelative("GroupName");
+                var prefabsProp = groupProp.FindPropertyRelative("Prefabs");
+
+                string groupName = groupNameProp.stringValue;
+                int prefabCount = prefabsProp.arraySize;
+
+                if (!_foldouts.TryGetValue(i, out bool expanded))
+                    expanded = false;
+
+                string foldoutLabel = string.IsNullOrEmpty(groupName)
+                    ? $"(unnamed)   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})"
+                    : $"{groupName}   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})";
+
+                EditorGUILayout.BeginHorizontal();
+                // Foldout is UI-only state, save/restore GUI.changed so toggling it does not
+                // bubble up to TsvrcWindow's EndChangeCheck and mark the config as dirty.
+                bool prevChanged = GUI.changed;
+                GUI.changed = false;
+                expanded = EditorGUILayout.Foldout(expanded, foldoutLabel, true);
+                _foldouts[i] = expanded;
+                GUI.changed = prevChanged;
+                if (ObjectListGUI.DeleteButton())
+                    toDelete = i;
+                EditorGUILayout.EndHorizontal();
+
+                if (expanded)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(groupNameProp, LabelGroupName);
+                    // Read groupName after PropertyField so the prefix preview reflects the current value.
+                    string currentName = groupNameProp.stringValue;
+                    string preview = string.IsNullOrWhiteSpace(currentName)
+                        ? "Create…"
+                        : $"Create{Sanitize(currentName)}…";
+                    EditorGUILayout.LabelField($"Prefix:  {preview}", EditorStyles.miniLabel);
+                    EditorGUILayout.PropertyField(prefabsProp, LabelPrefabs, true);
+                    EditorGUI.indentLevel--;
+                }
+
+                EditorGUILayout.Space(2);
+            }
+
+            // Deletion deferred outside the draw loop to avoid index invalidation.
+            if (toDelete >= 0)
+            {
+                factoriesProp.DeleteArrayElementAtIndex(toDelete);
+                ShiftFoldoutsAfterDelete(toDelete);
+            }
+
+            EditorGUILayout.Space(4);
+            if (GUILayout.Button("+ Add Factory Group"))
+            {
+                int newIndex = factoriesProp.arraySize;
+                factoriesProp.InsertArrayElementAtIndex(newIndex);
+                var newGroup = factoriesProp.GetArrayElementAtIndex(newIndex);
+                newGroup.FindPropertyRelative("GroupName").stringValue = string.Empty;
+                newGroup.FindPropertyRelative("Prefabs").ClearArray();
+                // Auto-expand the new group so the user can immediately name it.
+                _foldouts[newIndex] = true;
+            }
+        }
+
+        private void ShiftFoldoutsAfterDelete(int deletedIndex)
+        {
+            _foldouts.Remove(deletedIndex);
+            // Shift all entries above the deleted index down by one.
+            var keys = new List<int>(_foldouts.Keys);
+            keys.Sort();
+            foreach (int key in keys)
+            {
+                if (key > deletedIndex)
+                {
+                    bool val = _foldouts[key];
+                    _foldouts.Remove(key);
+                    _foldouts[key - 1] = val;
+                }
+            }
+        }
+
+        internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
+
+        internal override void LoadConfig()
+        {
+            var userConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
+            var builtinConfig = AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(BuiltinConfigPath);
+            _entries = BuildEntries(userConfig, builtinConfig);
+        }
+
+        internal override string GenerateCode()
+        {
+            if (_entries.Count == 0)
+                return BuildStub();
+
+            var usings = new List<string> { "UdonSharp", "UnityEngine" };
+            foreach (var entry in _entries)
+                if (!string.IsNullOrEmpty(entry.TypeNamespace) && !usings.Contains(entry.TypeNamespace))
+                    usings.Add(entry.TypeNamespace);
+
+            var w = new UdonWriter();
+            w.AutoGenHeader();
+            w.BlankLine();
+            w.Usings(usings);
+
+            using (w.Namespace(ScaffoldModule.CompiledNamespace))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
+            {
+                foreach (var entry in _entries)
+                    w.Line($"[HideInInspector] [SerializeField] private GameObject {FieldName(entry.Name)};");
+
+                foreach (var entry in _entries)
+                {
+                    using (w.Method($"public {entry.TypeName} Create{entry.Name}(Transform parent)"))
+                    {
+                        w.Line($"var go = (GameObject)Instantiate({FieldName(entry.Name)}, parent);");
+                        w.Line("if (go == null) return null;");
+                        w.Line("go.SetActive(true);");
+                        if (entry.TypeName == "GameObject")
+                        {
+                            w.Line("return go;");
+                        }
+                        else if (entry.IsTsvrcBehaviour)
+                        {
+                            w.Line($"var instance = go.GetComponent<{entry.TypeName}>();");
+                            w.Line("if (instance != null) instance.TsConstruct(this);");
+                            w.Line("return instance;");
+                        }
+                        else
+                        {
+                            w.Line($"return go.GetComponent<{entry.TypeName}>();");
+                        }
+                    }
+                }
+            }
+
+            return w.ToString();
+        }
+
+        private static string BuildStub()
+        {
+            var w = new UdonWriter();
+            w.AutoGenHeader();
+            w.BlankLine();
+            w.Usings(new[] { "UdonSharp", "UnityEngine" });
+            using (w.Namespace(ScaffoldModule.CompiledNamespace))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
+            { }
+            return w.ToString();
+        }
+
+        internal override bool OnSceneHierarchyChanged()
+        {
+            if (_entries.Count == 0) return false;
+            var root = FindRoot();
+            if (root == null) return false;
+            return root.transform.Find("Factories") == null;
+        }
+
+        internal override void Wire()
+        {
+            var root = FindRoot();
+            if (root == null) return;
+
+            var existing = root.transform.Find("Factories");
+
+            if (_entries.Count == 0)
+            {
+                if (existing != null)
+                    Undo.DestroyObjectImmediate(existing.gameObject);
+                return;
+            }
+
+            if (IsFactoriesAlreadyWired(root, existing)) return;
+
+            if (existing != null)
+                Undo.DestroyObjectImmediate(existing.gameObject);
+
+            var so = new SerializedObject(root);
+            GameObject factoriesContainer = null;
+
+            foreach (var entry in _entries)
+            {
+                var prop = so.FindProperty(FieldName(entry.Name));
+                if (prop == null)
+                {
+                    Debug.LogWarning($"[FactoryModule] Field '{FieldName(entry.Name)}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
+                    continue;
+                }
+
+                if (factoriesContainer == null)
+                {
+                    factoriesContainer = new GameObject("Factories");
+                    Undo.RegisterCreatedObjectUndo(factoriesContainer, "Create Factories Container");
+                    factoriesContainer.transform.SetParent(root.transform, false);
+                }
+
+                var instance = (GameObject)PrefabUtility.InstantiatePrefab(entry.PrefabAsset, factoriesContainer.transform);
+                if (instance == null)
+                {
+                    Debug.LogWarning($"[FactoryModule] Failed to instantiate factory prefab '{entry.Name}'. The prefab asset may be missing.");
+                    continue;
+                }
+
+                instance.name = entry.Name;
+                instance.SetActive(false);
+                Undo.RegisterCreatedObjectUndo(instance, $"Create {entry.Name} factory instance");
+
+                prop.objectReferenceValue = instance;
+            }
+
+            ApplyAndMarkDirty(so, root);
+        }
+
+        private static List<FactoryEntry> BuildEntries(TsvrcConfig config, TsvrcBuiltinConfig builtinConfig)
+        {
+            var usedNames = new HashSet<string>(StringComparer.Ordinal);
+            var entries = new List<FactoryEntry>();
+
+            var allGroups = (builtinConfig?.Factories ?? Array.Empty<TsvrcFactoryGroup>())
+                .Concat(config?.Factories ?? Array.Empty<TsvrcFactoryGroup>());
+
+            foreach (var group in allGroups)
+            {
+                if (group?.Prefabs == null) continue;
+                string prefix = string.IsNullOrEmpty(group.GroupName) ? string.Empty : Sanitize(group.GroupName);
+
+                foreach (var obj in group.Prefabs)
+                {
+                    if (obj == null) continue;
+
+                    var prefab = obj is Component c ? c.gameObject : obj as GameObject;
+                    if (prefab == null) continue;
+
+                    if (!EditorUtility.IsPersistent(prefab))
+                    {
+                        Debug.LogWarning($"[FactoryModule] '{prefab.name}' is a scene object, not a prefab asset. Drag a prefab asset from the Project window instead. Skipping.");
+                        continue;
+                    }
+
+                    string name = Deduplicate(prefix + Sanitize(prefab.name), usedNames);
+                    usedNames.Add(name);
+
+                    var behaviour = prefab.GetComponent<TsvrcBehaviour>();
+                    string typeName = behaviour != null ? behaviour.GetType().Name : "GameObject";
+                    string typeNamespace = behaviour != null ? (behaviour.GetType().Namespace ?? string.Empty) : string.Empty;
+
+                    entries.Add(new FactoryEntry
+                    {
+                        Name = name,
+                        TypeName = typeName,
+                        TypeNamespace = typeNamespace,
+                        IsTsvrcBehaviour = behaviour != null,
+                        PrefabAsset = prefab,
+                    });
+                }
+            }
+
+            return entries;
+        }
+
+        private bool IsFactoriesAlreadyWired(Component root, Transform existing)
+        {
+            if (existing == null || existing.childCount != _entries.Count) return false;
+
+            SerializedObject so = null;
+
+            foreach (var entry in _entries)
+            {
+                var childTransform = existing.Find(entry.Name);
+                if (childTransform == null) return false;
+
+                if (PrefabUtility.GetCorrespondingObjectFromSource(childTransform.gameObject) != entry.PrefabAsset)
+                    return false;
+
+                if (childTransform.gameObject.activeSelf) return false;
+
+                if (so == null) so = new SerializedObject(root);
+                var prop = so.FindProperty(FieldName(entry.Name));
+                if (prop == null || prop.objectReferenceValue != (UnityEngine.Object)childTransform.gameObject) return false;
+            }
+
+            return true;
+        }
+
+        private static string FieldName(string name) => $"_factory{name}";
+
+        // Strips __Alias__ markers, splits on non-alphanumeric separators, PascalCases each word,
+        // and prepends '_' if the result starts with a digit.
+        private static string Sanitize(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return string.Empty;
+
+            if (raw.StartsWith("__") && raw.EndsWith("__") && raw.Length > 4)
+                raw = raw.Substring(2, raw.Length - 4);
+
+            var sb = new StringBuilder();
+            bool capitalizeNext = true;
+            foreach (char ch in raw)
+            {
+                if (char.IsLetterOrDigit(ch))
+                {
+                    sb.Append(capitalizeNext ? char.ToUpper(ch) : ch);
+                    capitalizeNext = false;
+                }
+                else
+                {
+                    capitalizeNext = true;
+                }
+            }
+
+            if (sb.Length == 0) return string.Empty;
+            if (char.IsDigit(sb[0])) sb.Insert(0, '_');
+            return sb.ToString();
+        }
+
+        private struct FactoryEntry
+        {
+            public string Name;
+            public string TypeName;
+            public string TypeNamespace;
+            public bool IsTsvrcBehaviour;
+            public GameObject PrefabAsset;
+        }
+    }
+}
+#endif

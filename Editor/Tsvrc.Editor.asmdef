@@ -1,0 +1,27 @@
+{
+    "name": "Tsvrc.Editor",
+    "rootNamespace": "",
+    "references": [
+        "Tsvrc.Runtime",
+        "UdonSharp.Runtime",
+        "UdonSharp.Editor",
+        "VRC.SDKBase",
+        "VRC.SDKBase.Editor",
+        "VRC.SDKBase.Editor.BuildPipeline",
+        "VRC.SDK3",
+        "VRC.SDK3.Editor",
+        "VRC.Udon",
+        "VRC.Udon.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompileReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,14 @@
+{
+  "name": "com.tsvrc.core",
+  "displayName": "Tsvrc Core",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "description": "Structured init, dependency wiring, pooling, tracking, timing, session/state-machine helpers, and editor codegen tooling for VRChat UdonSharp worlds.",
+  "author": {
+    "name": "Tsvrc",
+    "url": "https://tsvrc.com"
+  },
+  "vpmDependencies": {
+    "com.vrchat.worlds": "3.5.x"
+  }
+}
