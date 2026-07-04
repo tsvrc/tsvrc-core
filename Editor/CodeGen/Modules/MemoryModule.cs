@@ -32,7 +32,7 @@ namespace Tsvrc.Editor
             {
                 w.Line("[ReadOnly] [SerializeField] private TsMemory _memory;");
                 w.BlankLine();
-                w.Line("public TsMemory Memory => _memory;");
+                w.Line("public override TsMemory Memory => _memory;");
                 w.BlankLine();
                 using (w.Method("public void _TsMemoryStart()"))
                     w.Line("_memory.TsConstruct(this);");

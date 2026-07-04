@@ -10,23 +10,23 @@ namespace Tsvrc.Core
     /// </summary>
     public class TsvrcBehaviour : UdonSharpBehaviour
     {
-        protected TsvrcGenerated _ts;
+        protected TsvrcRoot _ts;
 
         private UdonSharpBehaviour[] _subListeners = new UdonSharpBehaviour[0];
         private string[] _subKeys = new string[0];
         private string[] _subCallbacks = new string[0];
 
         /// <summary>
-        /// Assigns the <see cref="TsvrcGenerated"/> reference and calls <see cref="TsStart"/>.
+        /// Assigns the <see cref="TsvrcRoot"/> reference and calls <see cref="TsStart"/>.
         /// </summary>
-        public void TsConstruct(TsvrcGenerated tsvrc)
+        public void TsConstruct(TsvrcRoot tsvrc)
         {
             _ts = tsvrc;
             TsStart();
         }
 
         /// <summary>
-        /// Propagates the <see cref="TsvrcGenerated"/> reference from an existing
+        /// Propagates the <see cref="TsvrcRoot"/> reference from an existing
         /// <see cref="TsvrcBehaviour"/> and fully constructs this behaviour.
         /// </summary>
         public void TsConstruct(TsvrcBehaviour parent)

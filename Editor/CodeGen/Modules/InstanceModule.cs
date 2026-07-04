@@ -47,7 +47,7 @@ namespace Tsvrc.Editor
             {
                 w.Line("[ReadOnly] [SerializeField] private TsvrcInstance _instance;");
                 w.BlankLine();
-                w.Line("public TsvrcInstance Instance => _instance;");
+                w.Line("public override TsvrcInstance Instance => _instance;");
                 w.BlankLine();
                 using (w.Method("public void _TsInstanceStart()"))
                 {

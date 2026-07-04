@@ -45,7 +45,7 @@ namespace {CompiledNamespace}
 {{
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     [AddComponentMenu("""")]
-    public partial class {CompiledClassName} : UdonSharpBehaviour
+    public partial class {CompiledClassName} : TsvrcRoot
     {{
         void Start()
         {{
