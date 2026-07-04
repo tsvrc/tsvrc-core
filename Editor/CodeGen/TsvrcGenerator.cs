@@ -12,17 +12,10 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Orchestrates all generator modules. A single Run() pass:
-    //   0. Automatic triggers only proceed if HasBootstrapSignal() finds a reason this project
-    //      actually uses Tsvrc; otherwise nothing is written or created (see Run()).
-    //   1. Calls LoadConfig() on every module (reads scene and asset state).
-    //   2. Resolves cross-module field name conflicts via ExposedFieldNames/ExcludeFieldNames.
-    //   3. Writes generated .cs files via WriteModules(); if any file changed, triggers
-    //      AssetDatabase.Refresh() and returns — Unity must recompile before wiring.
-    //   4. Calls AfterFilesStable() (creates scene objects that depend on compiled types).
-    //      If that triggers another write, refreshes again.
-    //   5. Calls Wire() on every module to assign scene references into serialized fields.
-    //   6. Subscribes to hierarchy/undo events to detect incremental changes and rerun.
+    // Orchestrates all generator modules: loads their config, writes generated files,
+    // refreshes/recompiles as needed, wires scene references, then watches for changes to
+    // rerun. Automatic triggers only proceed once HasBootstrapSignal() finds a reason this
+    // project actually uses Tsvrc.
     internal static class TsvrcGenerator
     {
         private const string GeneratedFolder = "Assets/TsvrcGenerated";
