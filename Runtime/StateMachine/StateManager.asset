@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: StateManager
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: e97d995adaabb69469ad92b6f10bd035,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: b1d567ea12ac54641a571c0a7ea650e4,
     type: 2}
   udonAssembly: 
   assemblyError: 
@@ -21,7 +21,7 @@ MonoBehaviour:
   compiledVersion: 2
   behaviourSyncMode: 1
   hasInteractEvent: 0
-  scriptID: 4347887179554795125
+  scriptID: -6587902925019913246
   serializationData:
     SerializedFormat: 2
     SerializedBytes: 
@@ -62,7 +62,7 @@ MonoBehaviour:
       Data: 3|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.Core.Generated.TsvrcGenerated, Assembly-CSharp
+      Data: Tsvrc.Core.Generated.TsvrcRoot, Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 

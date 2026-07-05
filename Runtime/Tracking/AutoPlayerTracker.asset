@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: AutoPlayerTracker
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: 32728d21cbbda7d4b848af252fdb2853,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: b504d72699628e14489768ad48c64bea,
     type: 2}
   udonAssembly: 
   assemblyError: 
@@ -21,7 +21,7 @@ MonoBehaviour:
   compiledVersion: 2
   behaviourSyncMode: 4
   hasInteractEvent: 0
-  scriptID: -5042387965746985757
+  scriptID: -1513217620750053338
   serializationData:
     SerializedFormat: 2
     SerializedBytes: 
@@ -62,7 +62,7 @@ MonoBehaviour:
       Data: 3|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.Core.Generated.TsvrcGenerated, Assembly-CSharp
+      Data: Tsvrc.Core.Generated.TsvrcRoot, Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 

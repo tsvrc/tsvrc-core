@@ -5,15 +5,20 @@
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "Tsvrc.Runtime",
-        "UdonSharp.Runtime"
+        "UdonSharp.Runtime",
+        "VRC.SDKBase",
+        "VRC.SDK3",
+        "VRC.ClientSim"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,
-    "precompileReferences": [
+    "precompiledReferences": [
         "nunit.framework.dll",
-        "NSubstitute.dll"
+        "NSubstitute.dll",
+        "VRCSDKBase.dll",
+        "VRCSDK3.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [

@@ -5,6 +5,7 @@
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "Tsvrc.Runtime",
+        "Tsvrc.Editor",
         "UdonSharp.Runtime"
     ],
     "includePlatforms": [
@@ -13,7 +14,7 @@
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,
-    "precompileReferences": [
+    "precompiledReferences": [
         "nunit.framework.dll",
         "NSubstitute.dll"
     ],

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: TsMemory
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: 5682ef3300323ee4bbbe49e363f57321,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: cb46f84b1c5f3d2479198ca6beb4f102,
     type: 2}
   udonAssembly: 
   assemblyError: 
@@ -62,7 +62,7 @@ MonoBehaviour:
       Data: 3|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.Core.Generated.TsvrcGenerated, Assembly-CSharp
+      Data: Tsvrc.Core.Generated.TsvrcRoot, Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 

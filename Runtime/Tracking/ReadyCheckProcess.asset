@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: ReadyCheckProcess
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: b2214ac3439b20049a89cf5607816c0b,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: 166dceac76c408d429642b1e7a61248b,
     type: 2}
   udonAssembly: 
   assemblyError: 
@@ -21,7 +21,7 @@ MonoBehaviour:
   compiledVersion: 2
   behaviourSyncMode: 4
   hasInteractEvent: 0
-  scriptID: -4424675861911507431
+  scriptID: -7080648901504412455
   serializationData:
     SerializedFormat: 2
     SerializedBytes: 
@@ -62,7 +62,7 @@ MonoBehaviour:
       Data: 3|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.Core.Generated.TsvrcGenerated, Assembly-CSharp
+      Data: Tsvrc.Core.Generated.TsvrcRoot, Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: TsList
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: b2e4bcdfae2614549988a947d8a66b56,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: 2fb9336b2e5b7c446a6f20aa85372924,
     type: 2}
   udonAssembly: 
   assemblyError: 
@@ -62,7 +62,7 @@ MonoBehaviour:
       Data: 3|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.Core.Generated.TsvrcGenerated, Assembly-CSharp
+      Data: Tsvrc.Core.Generated.TsvrcRoot, Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 
@@ -365,7 +365,7 @@ MonoBehaviour:
       Data: 22|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.UI.TsListItem, Assembly-CSharp
+      Data: Tsvrc.UI.TsListItem, Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 
@@ -708,7 +708,7 @@ MonoBehaviour:
       Data: 46|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.UI.TsListItem[], Assembly-CSharp
+      Data: Tsvrc.UI.TsListItem[], Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 

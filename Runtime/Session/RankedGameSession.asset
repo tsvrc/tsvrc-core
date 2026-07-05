@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: RankedGameSession
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: 66df062868ccb274b85279d64f41b2d6,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: 17d086f21b284c242b19f748ced53d80,
     type: 2}
   udonAssembly: 
   assemblyError: 
@@ -62,7 +62,7 @@ MonoBehaviour:
       Data: 3|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.Core.Generated.TsvrcGenerated, Assembly-CSharp
+      Data: Tsvrc.Core.Generated.TsvrcRoot, Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 
@@ -284,7 +284,7 @@ MonoBehaviour:
       Data: 16|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.Network.PlayerTracker, Assembly-CSharp
+      Data: Tsvrc.Tracking.PlayerTracker, Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 
@@ -344,7 +344,7 @@ MonoBehaviour:
       Data: 20|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.Process.ReadyCheckProcess, Assembly-CSharp
+      Data: Tsvrc.Tracking.ReadyCheckProcess, Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 
@@ -512,7 +512,7 @@ MonoBehaviour:
       Data: 30|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.Process.TsvrcTimer, Assembly-CSharp
+      Data: Tsvrc.Timing.TsvrcTimer, Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 
