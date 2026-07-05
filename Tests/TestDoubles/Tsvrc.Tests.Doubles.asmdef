@@ -1,0 +1,17 @@
+{
+    "name": "Tsvrc.Tests.Doubles",
+    "rootNamespace": "Tsvrc.Tests.Editor",
+    "references": [
+        "Tsvrc.Runtime",
+        "UdonSharp.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

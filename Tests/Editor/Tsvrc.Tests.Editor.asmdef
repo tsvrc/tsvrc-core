@@ -6,7 +6,15 @@
         "UnityEditor.TestRunner",
         "Tsvrc.Runtime",
         "Tsvrc.Editor",
-        "UdonSharp.Runtime"
+        "Tsvrc.Tests.Doubles",
+        "UdonSharp.Runtime",
+        "UdonSharp.Editor",
+        "Unity.TextMeshPro",
+        "VRC.SDKBase",
+        "VRC.SDKBase.Editor",
+        "VRC.Udon",
+        "VRC.Udon.Editor",
+        "GUID:21332e1f0d937794d916d2402ba1943a"
     ],
     "includePlatforms": [
         "Editor"
@@ -16,7 +24,8 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "nunit.framework.dll",
-        "NSubstitute.dll"
+        "NSubstitute.dll",
+        "VRCSDKBase-Editor.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [

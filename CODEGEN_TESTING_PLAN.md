@@ -301,6 +301,24 @@ actual `TsvrcBuiltinConfig` contents.
 Checkbox items. `[x]` = already implemented (cross-referenced against
 `Tests/Editor/CodeGen/*`); `[ ]` = to write.
 
+**Implementation status (2026-07-05):** Phases G0, G1, G2, and G3 are fully implemented
+(249 tests, all passing in real Unity batch-mode `-runTests -testPlatform EditMode` runs).
+Phases G4 and G5 are implemented for every module *except* the "field found → value
+assigned" happy path on `SingletonModule`/`ConstructModule`/`FactoryModule`/`PoolModule`
+(and `PoolModule`'s slot-field specifically) — see Part 4.5 for exactly why, and what
+would unblock it. `PoolModule.Wire()`'s scene-mutation and external-`[WirePool]`-target
+assignment (the part that doesn't depend on the missing bootstrap) is fully covered,
+including the `CollectWireTargetsByType` finding in Part 4 item 5. Phase G6 covers
+`CreateModules()` and (indirectly, via `TsvrcBuildCompileTests`) a real bootstrap-gated
+`Run()` pass; the deeper orchestration items (G6.3 synthetic-module collision, G6.6
+`_isWiring` timing, G6.7 `skipRefresh` fallthrough) remain unwritten — driving the real
+`TsvrcGenerator.Run()` repeatedly across a test suite has a real, now-documented risk (see
+`TsvrcBuildCompileTests`' own header comment) of leaving process-lifetime
+`EditorApplication` hooks active for the rest of the batch, so each additional test that
+exercises `Run()` needs the same care. Phase G7's `TsvrcAssetWatcher` short-circuit
+branches are covered; `TsvrcDomainReloadHandler` remains an intentional low-value skip per
+its own entry below. Phase 8 (manual) is unchanged - still manual.
+
 ### Phase G0 — Harness
 
 - [ ] G0.1 `TempSceneScope` + `CompiledRootFixture` + `PrivateFieldAccess` helpers
@@ -764,8 +782,63 @@ Revisit this list once the corresponding phase is implemented.
    the set's own comparer) or whether a fresh `HashSet` gets rebuilt somewhere with
    a different comparer. Likely fine, but cheap to pin with a test given the
    case-sensitivity of filesystem paths varying by OS.
+5. **`PoolModule.CollectWireTargetsByType` doesn't apply the same serialization filter as
+   `ScanExternalRefs`/`ScanInternalDeps`** (confirmed while implementing `PoolModuleWireTests`,
+   2026-07-05) — `IsWirePoolField` (used by the two `Scan*` methods that compute slot counts)
+   requires a `[WirePool]` field to be `public` or carry `[SerializeField]`; a private field
+   with neither is correctly excluded from slot-count math. `CollectWireTargetsByType` (used by
+   `Wire()`'s actual field-assignment pass) has its own separate, looser inline filter that only
+   excludes array/generic fields — it does **not** check public/`[SerializeField]` at all. The
+   practical effect: a non-serialized private `[WirePool]` field contributes zero to the slot
+   count (so no extra pool instance gets created for it) but *is* counted in the target-count
+   mismatch warnings and gets its own separate `"has [WirePool] but is not serialized"` warning
+   at assignment time, inflating the apparent target/slot mismatch by one for every such field in
+   the scene. Confirmed via `PoolModuleWireTests.Wire_NonSerializedWirePoolField_...` and the
+   corrected expected count in `Wire_MoreExternalTargetsThanSlots_...`. Not fixed — flagged for a
+   maintainer decision on whether `CollectWireTargetsByType` should reuse `IsWirePoolField`
+   directly (it would need to become non-private, or the check inlined identically) so the two
+   scans agree on what counts as a wireable field.
 
 ---
+
+## Part 4.5 — Constraint discovered while implementing Phase G4 (2026-07-05)
+
+While implementing Wire() tests against the real compiled root (§2.2, Obstacle A), a second,
+more consequential environment constraint surfaced: **this project has never been bootstrapped
+with a real, non-empty `TsvrcConfig`.** There is no committed `TsvrcInstance` subclass and no
+configured Singletons/Constructs/Factories/PooledObjects anywhere in the repo yet - the
+committed `Assets/TsvrcGenerated/*.cs` files are all in their empty "stub" form, and (until
+this session) `Assets/TsvrcGenerated/TsvrcGenerated.asset` (the program asset) didn't exist at
+all, only `.cs` sources. `CompiledRootFixture` now self-heals that specific missing-asset case
+the same way `ScaffoldModule.AfterFilesStable()` would (see its comment) - but it cannot
+conjure fields that were never generated.
+
+This matters because `SingletonModule`/`ConstructModule`/`FactoryModule`/`PoolModule` each
+generate their serialized fields under **config-derived names** (`GameManager`,
+`_constructHudManager`, `_factoryBullet`, `_pool_StateManager_0`, ...) - those fields only
+exist on the compiled `TsvrcGenerated` type once a real `GenerateCode()` pass ran against real
+config *and* a domain reload compiled the result. A single Edit Mode `[Test]` cannot trigger
+and wait out a real domain reload mid-test, so **the "field found → value actually assigned"
+happy path for these four modules' `Wire()` cannot be exercised against this project's real
+compiled root today** - only the "field not found → warns, doesn't throw, other entries still
+processed" branch is reachable.
+
+Two fields were still fully testable end-to-end because they are unconditional (always
+generated regardless of config): `MemoryModule`'s `_memory` and `InstanceModule`'s `_instance`.
+`SingletonModuleWireTests` exploits this directly - it targets `_memory` as a stand-in "real
+field" to validate the exact same mechanical assignment path a true Singleton field would use,
+since `SingletonModule.Wire()` has no idea which module owns a field name, only that
+`SerializedObject.FindProperty(name)` resolves and the source object's type matches.
+
+**What would unblock full Phase G4 coverage for Factory/Pool/Translation's happy paths:**
+either (a) a one-time real bootstrap - add a `TsvrcConfig` with real entries to the actual
+project scene, run `Tsvrc > Force Regenerate`, let it settle through however many domain
+reloads it takes, and commit the resulting non-stub generated files, so future test runs have
+real fields to target; or (b) accept the current scope (missing-field/idempotency/scan-logic
+paths only) as the practical ceiling for solo Edit-Mode-test coverage of these four modules and
+rely on Phase 8's manual Build & Test gate to catch anything the happy path would have caught.
+Recorded here rather than silently worked around, since it changes what "100% covered" can
+mean for this specific slice of the module.
 
 ## Part 5 — Cross-reference to `TESTING_PLAN.md`
 

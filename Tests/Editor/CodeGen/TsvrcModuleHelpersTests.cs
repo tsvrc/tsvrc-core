@@ -16,6 +16,9 @@ namespace Tsvrc.Tests.Editor
 
         internal static string CallDeduplicate(string baseName, HashSet<string> usedNames)
             => Deduplicate(baseName, usedNames);
+
+        internal static bool CallIsTsvrcBehaviourType(string shortName, string ns)
+            => IsTsvrcBehaviourType(shortName, ns);
     }
 
     public class TsvrcModuleHelpersTests
@@ -87,6 +90,36 @@ namespace Tsvrc.Tests.Editor
             var used = new HashSet<string> { "Foo", "Foo2", "Foo3" };
 
             Assert.AreEqual("Foo4", TsvrcModuleTestHarness.CallDeduplicate("Foo", used));
+        }
+
+        [Test]
+        public void IsTsvrcBehaviourType_RealTsvrcBehaviourSubclass_ReturnsTrue()
+        {
+            // Tsvrc.StateMachine.StateManager : TsvrcBehaviour - a real production type,
+            // not a test double, so this exercises the actual inheritance chain in this project.
+            Assert.IsTrue(TsvrcModuleTestHarness.CallIsTsvrcBehaviourType("StateManager", "Tsvrc.StateMachine"));
+        }
+
+        [Test]
+        public void IsTsvrcBehaviourType_UdonSharpBehaviourNotExtendingTsvrcBehaviour_ReturnsFalse()
+        {
+            // TsvrcRoot : UdonSharpBehaviour directly - never TsvrcBehaviour.
+            Assert.IsFalse(TsvrcModuleTestHarness.CallIsTsvrcBehaviourType("TsvrcRoot", "Tsvrc.Core.Generated"));
+        }
+
+        [Test]
+        public void IsTsvrcBehaviourType_TypeNotFoundInAnyAssembly_ReturnsFalse()
+        {
+            Assert.IsFalse(TsvrcModuleTestHarness.CallIsTsvrcBehaviourType("NoSuchTypeAnywhere_XyzZy", "No.Such.Namespace"));
+        }
+
+        [Test]
+        public void IsTsvrcBehaviourType_NullOrEmptyNamespace_StillResolvesFullName()
+        {
+            // ns null/empty both fall back to the bare short name in the full-name lookup.
+            Assert.IsTrue(TsvrcModuleTestHarness.CallIsTsvrcBehaviourType("StateManager", "Tsvrc.StateMachine"));
+            Assert.IsFalse(TsvrcModuleTestHarness.CallIsTsvrcBehaviourType("StateManager", null));
+            Assert.IsFalse(TsvrcModuleTestHarness.CallIsTsvrcBehaviourType("StateManager", ""));
         }
     }
 }

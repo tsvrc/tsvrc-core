@@ -136,5 +136,40 @@ namespace Tsvrc.Tests.Editor
 
             Assert.AreEqual(4, result["A"]);
         }
+
+        [Test]
+        public void ComputeTotalSlots_ThreeLevelChain_ResolvesDepthGreaterThanTwo()
+        {
+            // C (the only externally-referenced type, 5 scene instances) contains 1
+            // [WirePool] field of B; each B in turn contains 2 [WirePool] fields of A.
+            // Slots flow from the external anchor down through the chain: B = 1*C.Total,
+            // A = 2*B.Total. Confirms the topological DFS isn't accidentally limited to a
+            // single hop (a bug here would resolve B correctly but leave A at 0).
+            var result = ComputeSlots(
+                new PoolNode { Name = "C", ExternalCount = 5, Deps = new (string, int)[] { ("B", 1) } },
+                new PoolNode { Name = "B", ExternalCount = 0, Deps = new (string, int)[] { ("A", 2) } },
+                new PoolNode { Name = "A", ExternalCount = 0, Deps = Array.Empty<(string, int)>() });
+
+            Assert.AreEqual(5, result["C"]);
+            Assert.AreEqual(5, result["B"], "B = 1 field-in-C * C.TotalSlots (1*5).");
+            Assert.AreEqual(10, result["A"], "A = 2 fields-in-B * B.TotalSlots (2*5).");
+        }
+
+        [Test]
+        public void ComputeTotalSlots_DisconnectedForest_DoesNotCrossContaminate()
+        {
+            // Two entirely unrelated graphs computed within the same _poolTypeInfos
+            // dictionary/single ComputeTotalSlots() pass must not affect each other's totals.
+            var result = ComputeSlots(
+                new PoolNode { Name = "X", ExternalCount = 3, Deps = new (string, int)[] { ("Y", 2) } },
+                new PoolNode { Name = "Y", ExternalCount = 0, Deps = Array.Empty<(string, int)>() },
+                new PoolNode { Name = "M", ExternalCount = 7, Deps = Array.Empty<(string, int)>() },
+                new PoolNode { Name = "N", ExternalCount = 0, Deps = new (string, int)[] { ("M", 4) } });
+
+            Assert.AreEqual(3, result["X"]);
+            Assert.AreEqual(6, result["Y"], "Y = 2 * X.TotalSlots (2*3).");
+            Assert.AreEqual(7, result["M"]);
+            Assert.AreEqual(0, result["N"], "N has no external refs and nothing points at N.");
+        }
     }
 }
