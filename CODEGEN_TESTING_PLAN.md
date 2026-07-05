@@ -828,6 +828,36 @@ Also fixed as part of building this: `GeneratedFileBackup` originally used
 (`WriteAllText` without an explicit `Encoding.UTF8` writes no-BOM UTF-8) - switched to
 `File.ReadAllBytes`/`WriteAllBytes` for true byte-for-byte fidelity.
 
+**Extended 2026-07-05 (same day) to close remaining gaps:** `CodeGenSandbox.Bootstrap()`
+now also creates a real language file + `TsvrcTranslationConfig` asset, so
+`TranslationModule`'s own "field found → `_translationTargets` assigned" happy path
+(`TranslationModuleWireTests.Wire_RealTranslationTargetsField_...`) runs for real too -
+previously the sandbox only covered Singleton/Construct/Factory/Pool. Also added:
+`TsvrcGeneratorSkipRefreshFallthroughTests` (G6.7), and two more `IsPoolAlreadyWired`
+tests exercising the "true" branch's inner per-slot `[WirePool]`-target-field match with
+genuine data (previously only tested with an always-empty targets dict, which could never
+prove that specific check actually works). Verified end-to-end again: 269 tests, 260
+passed / 9 ignored unbootstrapped, 267 passed / 1 failed / 1 (intentionally
+self-skipping) ignored when bootstrapped - the 1 failure was a bug in my own
+`TsvrcGeneratorWiringSuppressionTests` (its `_rerunPending` assertion didn't account for
+its *own* `Run()` call legitimately changing file content the first time when run against
+an already-bootstrapped baseline, vs. the normal empty-repo baseline where content never
+changes) - fixed by settling `GenerateCode()` output with one `Run()` pass before the
+real assertion. Assessed and explicitly **not implemented**: forcing
+`PrefabUtility.InstantiatePrefab` to return null (the "corrupted prefab reference" branch
+in `FactoryModule`/`PoolModule`) - no reliable, deterministic way to construct that
+condition was found without either passing a literal null (which throws, not returns
+null) or a genuinely broken asset reference (environment-dependent, risks flakiness).
+
+**One more thing found and fixed while finishing this pass:** the git *index* (staged
+snapshot, separate from the working tree) for `TsvrcGeneratedTranslation.cs`,
+`TsvrcTranslationConfig.asset`, and `TsvrcGenerated.asset` had drifted to contain stale
+sandbox-bootstrap content (accumulated field definitions from earlier bootstrap/restore
+cycles) even though the working tree was correctly back to stub - not a working-tree bug,
+but worth knowing the staging area can drift independently of the file contents during
+this kind of repeated bootstrap/restore/recompile cycling. Re-staged to match the
+verified-correct working tree.
+
 ---
 
 ## Part 4 — Candidate bugs / design gaps found during this analysis
@@ -894,6 +924,23 @@ Revisit this list once the corresponding phase is implemented.
    maintainer decision on whether `CollectWireTargetsByType` should reuse `IsWirePoolField`
    directly (it would need to become non-private, or the check inlined identically) so the two
    scans agree on what counts as a wireable field.
+6. **`TranslationModule.GenerateCode()`'s "language not available" error message never shows
+   the actual invalid index** (confirmed empirically 2026-07-05 via real Unity output, not
+   hand-derived, in `TranslationModuleGenerateCodeTests`) — the generator source
+   (`TranslationModule.cs`, the `SetLanguage` body) builds this line via nested
+   interpolated-string escaping:
+   `w.Line($"else {{ Debug.LogError($\"[TsvrcGenerated] Language index {{{{_tsIdx}}}} is not available.\"); return; }}");`.
+   The quadruple braces around `_tsIdx` are two *escaped literal brace pairs* in the outer
+   generator string, which produce the literal text `{{_tsIdx}}` in the generated `.cs` file.
+   When *that* generated file is itself compiled, `{{`/`}}` inside its own `$"..."` string are
+   *also* escape sequences (for a literal `{`/`}`), not an interpolation hole - so the actual
+   runtime log message reads literally `Language index {_tsIdx} is not available.`, never
+   substituting the real (invalid) index value a world author would need to debug the problem.
+   Almost certainly unintentional (one interpolation layer too many was escaped when this line
+   was written) - the likely intended output was `Language index 3 is not available.` with the
+   real number. Not fixed - flagged for a maintainer decision; the exact current (probably
+   buggy) text is pinned by a regression test in `TranslationModuleGenerateCodeTests` so
+   fixing it will visibly require updating that test.
 
 ---
 
