@@ -302,12 +302,14 @@ Checkbox items. `[x]` = already implemented (cross-referenced against
 `Tests/Editor/CodeGen/*`); `[ ]` = to write.
 
 **Implementation status (2026-07-05, updated):** Phases G0, G1, G2, and G3 are fully
-implemented. Phases G4 and G5 are implemented for every module *except* the "field found →
-value assigned" happy path on `SingletonModule`/`ConstructModule`/`FactoryModule`/
-`PoolModule` (and `PoolModule`'s slot-field specifically) — see Part 4.5 for exactly why,
-and what would unblock it. `PoolModule.Wire()`'s scene-mutation and external-`[WirePool]`-
-target assignment (the part that doesn't depend on the missing bootstrap) is fully
-covered, including the `CollectWireTargetsByType` finding in Part 4 item 5.
+implemented. Phases G4 and G5 are implemented for every module, **including** the "field
+found → value assigned" happy path on `SingletonModule`/`ConstructModule`/`FactoryModule`/
+`PoolModule` — the Part 4.5 blocker on that is now lifted permanently via the CodeGen
+sandbox (Part 3.5): those specific tests `Assert.Ignore()` in this repo's normal
+(unbootstrapped) state and execute their real assertion whenever
+`CodeGenSandbox.Bootstrap()` has been run. `PoolModule.Wire()`'s scene-mutation and
+external-`[WirePool]`-target assignment (which never depended on the bootstrap) is fully
+covered too, including the `CollectWireTargetsByType` finding in Part 4 item 5.
 `InstanceModule.Wire()` is covered (ambiguous no-op, null-type removal, creation,
 idempotent re-wire, program-asset-deleted recreate) using a real existing UdonSharpBehaviour
 type as a structural stand-in — deliberately *not* a real `TsvrcInstance` subclass, to avoid
@@ -328,13 +330,15 @@ environment constraint" section). Phase G7's `TsvrcAssetWatcher` short-circuit b
 covered; `TsvrcDomainReloadHandler` remains an intentional low-value skip per its own entry
 below. Phase 8 (manual) is unchanged - still manual.
 
-**Test count: 259, all passing** in real Unity batch-mode `-runTests -testPlatform EditMode`
-runs (`Tsvrc.Tests.Editor.asmdef` needed new references along the way: `UdonSharp.Editor`,
-`Unity.TextMeshPro`, `VRC.SDKBase.Editor`, `VRC.Udon`, `VRC.Udon.Editor`, and the
-precompiled `VRCSDKBase-Editor.dll` — the last one specifically because
-`VRCSDKRequestedBuildType`/`IVRCSDKBuildRequestedCallback` live in that DLL, not in the
-same-named `VRC.SDKBase.Editor.BuildPipeline` asmdef, which turned out to only contain a
-Samples subfolder).
+**Test count: 265** (259 always-on + 6 sandbox-gated), all passing in real Unity
+batch-mode `-runTests -testPlatform EditMode` runs, in both states: 259 passed / 6
+Assert.Ignore()'d in this repo's normal state, 265 passed / 0 skipped when run against a
+`CodeGenSandbox.Bootstrap()`-ed state (`Tsvrc.Tests.Editor.asmdef` needed new references
+along the way: `UdonSharp.Editor`, `Unity.TextMeshPro`, `VRC.SDKBase.Editor`, `VRC.Udon`,
+`VRC.Udon.Editor`, and the precompiled `VRCSDKBase-Editor.dll` — the last one specifically
+because `VRCSDKRequestedBuildType`/`IVRCSDKBuildRequestedCallback` live in that DLL, not in
+the same-named `VRC.SDKBase.Editor.BuildPipeline` asmdef, which turned out to only contain
+a Samples subfolder). See Part 3.5 for the sandbox mechanism.
 
 ### Phase G0 — Harness
 
@@ -748,6 +752,81 @@ where avoidable, but don't rule out reflection where it's the only way to observ
       single Edit Mode test run; treat as effectively covered by G6's `Run()`-level
       tests plus a code-reading confirmation that the constructor body is a single
       `delayCall +=` line with no loop/conditional that could double-subscribe).
+
+---
+
+## Part 3.5 — The CodeGen sandbox: unblocking Part 4.5's happy paths permanently, no manual steps
+
+Part 4.5 originally documented a hard limit: `SingletonModule`/`ConstructModule`/
+`FactoryModule`/`PoolModule`'s "field found → value assigned" happy path can't be tested
+against this project's real compiled `TsvrcGenerated` type because it's never been
+bootstrapped with real config. That limit is now lifted, permanently and automatically,
+by `Tests/Editor/CodeGen/TestUtil/CodeGenSandbox.cs` — entirely in C#/Unity, no external
+shell/PowerShell scripts, and it never touches `Assets/Scenes/VRCDefaultWorldScene.unity`
+or any other committed scene.
+
+**How it works:** `CodeGenSandbox.Bootstrap()` adds a real `TsvrcConfig` (one entry per
+config-driven module) to a throwaway, unsaved scene, runs the real generator once so
+`Assets/TsvrcGenerated/*.cs` get real, non-stub fields, backs up the original file bytes
+to the OS temp folder, then discards the scratch scene (replacing it with a fresh empty
+one) so nothing is left "dirty." `CodeGenSandbox.Restore()` reverts those files from the
+backup and deletes the two scratch prefab assets it created.
+
+**Why three separate `Unity.exe` invocations, not one:** writing new fields only takes
+effect once Unity recompiles from the new source - a fresh process. An earlier version
+of this tool tried to do the whole cycle (bootstrap → wait out the recompile via
+`SessionState` + `[InitializeOnLoad]` → drive `TestRunnerApi` programmatically → restore)
+in one continuous batch process. That hit the exact Test-Runner-never-terminates
+fragility already documented in this file's Play Mode section, just triggered via
+`TestRunnerApi` in Edit Mode instead - confirmed by reproducing the hang twice. Three
+separate, ordinary invocations sidestep it entirely, at the cost of needing three command
+lines instead of one:
+
+```
+1. Unity.exe -batchmode -projectPath <repo> -quit -executeMethod Tsvrc.Tests.Editor.CodeGenSandbox.Bootstrap
+2. Unity.exe -batchmode -projectPath <repo> -runTests -testPlatform EditMode -testResults results.xml
+3. Unity.exe -batchmode -projectPath <repo> -quit -executeMethod Tsvrc.Tests.Editor.CodeGenSandbox.Restore
+```
+
+Step 2 is the exact same `-runTests` CLI invocation used for every other run in this
+project - nothing test-specific to the sandbox is needed there.
+
+**How the gated tests work:** `SandboxGate.RequireField(root, fieldName)` checks whether
+a given field exists on the compiled root via `SerializedObject.FindProperty`. If it
+doesn't (the normal, unbootstrapped state of this repo), the test `Assert.Ignore()`s with
+a message pointing back here. If it does (step 2, after step 1's bootstrap), the test
+runs its real assertion. This is used by:
+`SingletonModuleWireTests.Wire_RealSingletonField_...`,
+`ConstructModuleWireTests.Wire_RealConstructField_...`,
+`FactoryModuleWireTests.Wire_RealFactoryField_...` (×2, including an idempotency check),
+`PoolModuleWireTests.Wire_RealSlotField_...` and `IsPoolAlreadyWired_RealSlotFieldMatchesExistingChild_...`.
+Verified end-to-end 2026-07-05: step 2 against a bootstrapped project ran all six for
+real (0 skipped instead of 6), all passing.
+
+**A second real interaction was found and is worth knowing about, not silently
+worked around:** `TsvrcBuildCompileTests` and `TsvrcGeneratorWiringSuppressionTests` each
+drive the real `TsvrcGenerator.Run()` with their own minimal (empty) `TsvrcConfig`, which
+legitimately produces stub content and writes it via `WriteIfChanged`. Their own
+`GeneratedFileBackup` correctly restores the pre-test content afterward *for that test* -
+but `TsvrcGenerator.WatchedPaths` (populated by any real `Run()` call and never cleared,
+by design) stays pointed at the real file paths for the rest of the process. When run in
+the *same* batch as a bootstrapped sandbox, this occasionally left the sandbox's real
+fields reverted to stub by the time the whole suite finished, even though every individual
+test's own before/after state was internally correct - `TsvrcAssetWatcher` reacting to a
+later raw file write (from an unrelated test's restore) and scheduling a rerun against
+whatever config existed by then. `CodeGenSandbox.Restore()` is unaffected (it restores
+from its own out-of-band backup regardless of what happened mid-run), but this means: **a
+single sandboxed test run may or may not show all six happy-path tests executing,
+depending on NUnit's test execution order relative to those two orchestration tests.** Not
+fixed - documented here as a known, low-severity quirk of running Run()-driving
+orchestration tests and a sandbox bootstrap in the same process. A clean single-purpose
+verification run (`-testFilter` scoped to just the `*WireTests` happy-path methods) avoids
+it entirely.
+
+Also fixed as part of building this: `GeneratedFileBackup` originally used
+`File.ReadAllText`/`WriteAllText`, which silently drops the UTF-8 BOM on restore
+(`WriteAllText` without an explicit `Encoding.UTF8` writes no-BOM UTF-8) - switched to
+`File.ReadAllBytes`/`WriteAllBytes` for true byte-for-byte fidelity.
 
 ---
 

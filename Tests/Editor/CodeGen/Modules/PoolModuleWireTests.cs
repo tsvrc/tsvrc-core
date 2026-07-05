@@ -15,9 +15,10 @@ namespace Tsvrc.Tests.Editor
     // Singleton/Construct/Factory, PoolModule's slot-field-not-found path only skips the
     // *field assignment* (Debug.LogWarning, no `continue`) - it still creates the "Pool"
     // container and instantiates every prefab regardless. That makes the scene-mutation
-    // half of Wire() fully testable here even though this project has no real bootstrapped
-    // pool config yet (see CODEGEN_TESTING_PLAN.md Part 4.5) - only the slot-field
-    // assignment itself can't be verified. Phase G4.10.
+    // half of Wire() fully testable here always; the slot-field assignment itself
+    // additionally runs for real whenever CodeGenSandbox.Bootstrap() has been applied (see
+    // run-codegen-sandbox-tests.ps1 and CODEGEN_TESTING_PLAN.md Part 4.5), and is
+    // Assert.Ignore()'d otherwise. Phase G4.10.
     public class PoolModuleWireTests
     {
         private const string ScratchPrefabPath = ScratchAssets.Folder + "/PoolWirePrefab.prefab";
@@ -50,18 +51,27 @@ namespace Tsvrc.Tests.Editor
         }
 
         private static PoolModule BuildModule(StateManager prefab, int totalSlots)
+            => BuildModule(prefab, totalSlots, "StateManager");
+
+        // typeName drives both the generated slot field name (_pool_{typeName}_{i}) and the
+        // child GameObject name - it does NOT need to match prefab's actual component type
+        // (Wire() separately uses prefabComponent.GetType() for the real GetComponent() call),
+        // so tests that specifically need a slot field guaranteed to never exist on the real
+        // compiled type (e.g. when this project's CodeGenSandbox bootstrap is active and has
+        // created real "StateManager" pool fields) can pass a type name the sandbox never uses.
+        private static PoolModule BuildModule(StateManager prefab, int totalSlots, string typeName)
         {
             var info = PrivateFieldAccess.BuildEntry(InfoType,
-                ("Prefab", prefab), ("TypeName", "StateManager"), ("TypeNamespace", "Tsvrc.StateMachine"),
+                ("Prefab", prefab), ("TypeName", typeName), ("TypeNamespace", "Tsvrc.StateMachine"),
                 ("ExternalCount", 0), ("InternalDeps", new Dictionary<string, int>(StringComparer.Ordinal)),
                 ("TotalSlots", totalSlots));
             var dictType = typeof(Dictionary<,>).MakeGenericType(typeof(string), InfoType);
             var dict = (IDictionary)Activator.CreateInstance(dictType, StringComparer.Ordinal);
-            dict["StateManager"] = info;
+            dict[typeName] = info;
 
             var module = new PoolModule();
             PrivateFieldAccess.SetField(module, "_hasAnyConfigured", true);
-            PrivateFieldAccess.SetField(module, "_poolEntries", new List<(Component, string)> { (prefab, "StateManager") });
+            PrivateFieldAccess.SetField(module, "_poolEntries", new List<(Component, string)> { (prefab, typeName) });
             PrivateFieldAccess.SetField(module, "_poolTypeInfos", dict);
             return module;
         }
@@ -125,14 +135,22 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void Wire_SlotFieldNotFoundOnRoot_StillCreatesInstanceAndWarns()
         {
+            // Uses a type name guaranteed to have no real compiled field (unlike
+            // "StateManager", which CodeGenSandbox's bootstrap - see
+            // run-codegen-sandbox-tests recipe in CodeGenSandbox.cs - legitimately creates
+            // real "_pool_StateManager_0"/"_1" fields for), so this always exercises the
+            // genuinely-missing-field path regardless of whether the sandbox is active.
+            const string fakeTypeName = "PoolModuleWireTestsNeverRealType";
             var prefab = CreateScratchPrefab("Widget2");
-            var module = BuildModule(prefab, totalSlots: 1);
+            var module = BuildModule(prefab, totalSlots: 1, fakeTypeName);
 
-            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*Field '_pool_StateManager_0' not found.*"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex($".*Field '_pool_{fakeTypeName}_0' not found.*"));
 
             module.Wire();
 
-            Assert.IsNotNull(_root.transform.Find("Pool")?.Find("StateManager_0"), "Instance must still be created even when the slot field is missing.");
+            var container = _root.transform.Find("Pool");
+            Assert.IsNotNull(container);
+            Assert.IsNotNull(container.Find($"{fakeTypeName}_0"), "Instance must still be created even when the slot field is missing.");
         }
 
         [Test]
@@ -236,6 +254,37 @@ namespace Tsvrc.Tests.Editor
             wrongInstance.name = "StateManager_0";
 
             Assert.IsFalse(IsAlreadyWired(module, _root, container.transform));
+        }
+
+        [Test]
+        public void Wire_RealSlotField_IsAssignedToTheNewInstance()
+        {
+            // Runs for real once CodeGenSandbox.Bootstrap() has produced real
+            // "_pool_StateManager_N" fields on TsvrcGenerated; Assert.Ignore()s otherwise.
+            // See run-codegen-sandbox-tests.ps1.
+            SandboxGate.RequireField(_root, "_pool_" + CodeGenSandbox.PoolTypeName + "_0");
+
+            var prefab = CreateScratchPrefab("Widget8");
+            var module = BuildModule(prefab, totalSlots: 1);
+
+            module.Wire();
+
+            var instance = _root.transform.Find("Pool").Find("StateManager_0").GetComponent<StateManager>();
+            var fieldValue = new SerializedObject(_root).FindProperty("_pool_StateManager_0").objectReferenceValue;
+            Assert.AreEqual(instance, fieldValue);
+        }
+
+        [Test]
+        public void IsPoolAlreadyWired_RealSlotFieldMatchesExistingChild_ReturnsTrue()
+        {
+            SandboxGate.RequireField(_root, "_pool_" + CodeGenSandbox.PoolTypeName + "_0");
+
+            var prefab = CreateScratchPrefab("Widget9");
+            var module = BuildModule(prefab, totalSlots: 1);
+            module.Wire(); // establishes real wiring, including the slot field
+
+            var container = _root.transform.Find("Pool");
+            Assert.IsTrue(IsAlreadyWired(module, _root, container), "An unchanged, correctly-wired container/field must be recognized as already wired.");
         }
     }
 }

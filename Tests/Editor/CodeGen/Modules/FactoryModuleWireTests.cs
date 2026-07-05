@@ -9,9 +9,12 @@ namespace Tsvrc.Tests.Editor
 {
     // FactoryModule.Wire() against a real compiled root. Unlike PoolModule, Factory's
     // slot-field-not-found path `continue`s BEFORE creating the "Factories" container or
-    // instantiating anything - so (per CODEGEN_TESTING_PLAN.md Part 4.5) only the
-    // empty-entries branches and the "field missing -> zero mutation" regression are
-    // testable against this project's real (unbootstrapped) compiled root. Phase G4.9.
+    // instantiating anything - so the empty-entries branches and the "field missing -> zero
+    // mutation" regression are always testable against this project's real (unbootstrapped)
+    // compiled root; the "field found -> instantiated and assigned" happy path additionally
+    // runs for real whenever CodeGenSandbox.Bootstrap() has been applied (see
+    // run-codegen-sandbox-tests.ps1 and CODEGEN_TESTING_PLAN.md Part 4.5), and is
+    // Assert.Ignore()'d otherwise. Phase G4.9.
     public class FactoryModuleWireTests
     {
         private const string ScratchPrefabPath = ScratchAssets.Folder + "/FactoryWirePrefab.prefab";
@@ -145,6 +148,46 @@ namespace Tsvrc.Tests.Editor
             instance.SetActive(false);
 
             Assert.IsFalse(IsAlreadyWired(module, _root, container.transform));
+        }
+
+        [Test]
+        public void Wire_RealFactoryField_CreatesContainerInstantiatesInactiveAndAssignsField()
+        {
+            // Runs for real once CodeGenSandbox.Bootstrap() has produced a real
+            // "_factorySampleFactoryPrefab" field on TsvrcGenerated; Assert.Ignore()s
+            // otherwise. See run-codegen-sandbox-tests.ps1.
+            SandboxGate.RequireField(_root, CodeGenSandbox.FactoryFieldName);
+
+            var prefab = CreateScratchPrefab(CodeGenSandbox.FactoryEntryName);
+            var module = ModuleWithOneEntry(CodeGenSandbox.FactoryEntryName, prefab);
+
+            module.Wire();
+
+            var container = _root.transform.Find("Factories");
+            Assert.IsNotNull(container);
+            var instance = container.Find(CodeGenSandbox.FactoryEntryName);
+            Assert.IsNotNull(instance);
+            Assert.IsFalse(instance.gameObject.activeSelf, "Factory instances must be created inactive.");
+            var fieldValue = new SerializedObject(_root).FindProperty(CodeGenSandbox.FactoryFieldName).objectReferenceValue;
+            Assert.AreEqual(instance.gameObject, fieldValue);
+        }
+
+        [Test]
+        public void Wire_RealFactoryField_SecondWireWithUnchangedConfigIsIdempotent()
+        {
+            SandboxGate.RequireField(_root, CodeGenSandbox.FactoryFieldName);
+
+            var prefab = CreateScratchPrefab(CodeGenSandbox.FactoryEntryName);
+            var module = ModuleWithOneEntry(CodeGenSandbox.FactoryEntryName, prefab);
+            module.Wire();
+            var firstInstance = _root.transform.Find("Factories").Find(CodeGenSandbox.FactoryEntryName).gameObject;
+
+            var secondModule = ModuleWithOneEntry(CodeGenSandbox.FactoryEntryName, prefab);
+            secondModule.Wire();
+
+            var container = _root.transform.Find("Factories");
+            Assert.AreEqual(1, container.childCount, "Re-wiring identical config must not recreate the instance.");
+            Assert.AreEqual(firstInstance, container.Find(CodeGenSandbox.FactoryEntryName).gameObject);
         }
     }
 }
