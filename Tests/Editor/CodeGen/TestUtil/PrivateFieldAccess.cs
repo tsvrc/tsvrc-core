@@ -31,6 +31,13 @@ namespace Tsvrc.Tests.Editor
             return (T)field.GetValue(target);
         }
 
+        internal static T GetField<T>(Type staticType, string fieldName)
+        {
+            var field = staticType.GetField(fieldName, StaticFlags);
+            Assert.IsNotNull(field, $"Static field '{fieldName}' not found on {staticType.Name}. Signature changed?");
+            return (T)field.GetValue(null);
+        }
+
         internal static object InvokeStatic(Type type, string methodName, params object[] args)
         {
             var method = type.GetMethod(methodName, StaticFlags);

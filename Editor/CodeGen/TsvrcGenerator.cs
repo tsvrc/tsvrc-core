@@ -68,15 +68,7 @@ namespace Tsvrc.Editor
             foreach (var module in modules)
                 module.LoadConfig();
 
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            var duplicates = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var module in modules)
-                foreach (var name in module.ExposedFieldNames())
-                    if (!seen.Add(name))
-                        duplicates.Add(name);
-            if (duplicates.Count > 0)
-                foreach (var module in modules)
-                    module.ExcludeFieldNames(duplicates);
+            DetectAndExcludeFieldNameCollisions(modules);
 
             var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var module in modules)
@@ -220,6 +212,26 @@ namespace Tsvrc.Editor
             new FactoryModule(),
             new ScaffoldModule(),
         };
+
+        // Any field name exposed (via ExposedFieldNames()) by more than one module is
+        // stripped from every module that declared it (via ExcludeFieldNames()), so a name
+        // collision never silently produces two same-named fields on TsvrcGenerated.
+        // Extracted from Run() as its own method purely for testability (see
+        // CODEGEN_TESTING_PLAN.md Phase G6.3) - only SingletonModule currently overrides
+        // ExposedFieldNames()/ExcludeFieldNames() among the real modules, so this path is
+        // otherwise only exercisable with synthetic test modules.
+        internal static void DetectAndExcludeFieldNameCollisions(List<TsvrcModule> modules)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var duplicates = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var module in modules)
+                foreach (var name in module.ExposedFieldNames())
+                    if (!seen.Add(name))
+                        duplicates.Add(name);
+            if (duplicates.Count > 0)
+                foreach (var module in modules)
+                    module.ExcludeFieldNames(duplicates);
+        }
 
         private static bool WriteModules(List<TsvrcModule> modules)
         {

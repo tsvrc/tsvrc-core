@@ -301,23 +301,40 @@ actual `TsvrcBuiltinConfig` contents.
 Checkbox items. `[x]` = already implemented (cross-referenced against
 `Tests/Editor/CodeGen/*`); `[ ]` = to write.
 
-**Implementation status (2026-07-05):** Phases G0, G1, G2, and G3 are fully implemented
-(249 tests, all passing in real Unity batch-mode `-runTests -testPlatform EditMode` runs).
-Phases G4 and G5 are implemented for every module *except* the "field found → value
-assigned" happy path on `SingletonModule`/`ConstructModule`/`FactoryModule`/`PoolModule`
-(and `PoolModule`'s slot-field specifically) — see Part 4.5 for exactly why, and what
-would unblock it. `PoolModule.Wire()`'s scene-mutation and external-`[WirePool]`-target
-assignment (the part that doesn't depend on the missing bootstrap) is fully covered,
-including the `CollectWireTargetsByType` finding in Part 4 item 5. Phase G6 covers
-`CreateModules()` and (indirectly, via `TsvrcBuildCompileTests`) a real bootstrap-gated
-`Run()` pass; the deeper orchestration items (G6.3 synthetic-module collision, G6.6
-`_isWiring` timing, G6.7 `skipRefresh` fallthrough) remain unwritten — driving the real
-`TsvrcGenerator.Run()` repeatedly across a test suite has a real, now-documented risk (see
-`TsvrcBuildCompileTests`' own header comment) of leaving process-lifetime
-`EditorApplication` hooks active for the rest of the batch, so each additional test that
-exercises `Run()` needs the same care. Phase G7's `TsvrcAssetWatcher` short-circuit
-branches are covered; `TsvrcDomainReloadHandler` remains an intentional low-value skip per
-its own entry below. Phase 8 (manual) is unchanged - still manual.
+**Implementation status (2026-07-05, updated):** Phases G0, G1, G2, and G3 are fully
+implemented. Phases G4 and G5 are implemented for every module *except* the "field found →
+value assigned" happy path on `SingletonModule`/`ConstructModule`/`FactoryModule`/
+`PoolModule` (and `PoolModule`'s slot-field specifically) — see Part 4.5 for exactly why,
+and what would unblock it. `PoolModule.Wire()`'s scene-mutation and external-`[WirePool]`-
+target assignment (the part that doesn't depend on the missing bootstrap) is fully
+covered, including the `CollectWireTargetsByType` finding in Part 4 item 5.
+`InstanceModule.Wire()` is covered (ambiguous no-op, null-type removal, creation,
+idempotent re-wire, program-asset-deleted recreate) using a real existing UdonSharpBehaviour
+type as a structural stand-in — deliberately *not* a real `TsvrcInstance` subclass, to avoid
+permanently changing this project's `HasBootstrapSignal()` outcome; this means the
+`_instance` field-*value* assignment itself isn't asserted in those tests (type-incompatible
+stand-in → Unity silently nulls `objectReferenceValue`), only the scene-structure half.
+
+Phase G6 now also covers: `CreateModules()`'s fixed order/freshness, the cross-module
+field-name-collision mechanism (`TsvrcGenerator.DetectAndExcludeFieldNameCollisions` —
+extracted out of `Run()` as a small, behavior-preserving refactor purely for testability,
+per the plan's own suggestion at G6.3), and the `_isWiring`/`_justFinishedWiring`/
+`_rerunPending` timing guarantee (G6.6, via a real bootstrap-gated `Run()` pass with a real
+compiled root, backed by `GeneratedFileBackup` for file safety and a hook-reset in
+`TearDown`). Still open: G6.7 (`skipRefresh` fallthrough pin) and G6.8 (Play Mode
+suppression — deliberately not attempted; it would require a real Play Mode entry, which
+carries the same Test-Runner-never-terminates risk documented in `TESTING_PLAN.md`'s "Known
+environment constraint" section). Phase G7's `TsvrcAssetWatcher` short-circuit branches are
+covered; `TsvrcDomainReloadHandler` remains an intentional low-value skip per its own entry
+below. Phase 8 (manual) is unchanged - still manual.
+
+**Test count: 259, all passing** in real Unity batch-mode `-runTests -testPlatform EditMode`
+runs (`Tsvrc.Tests.Editor.asmdef` needed new references along the way: `UdonSharp.Editor`,
+`Unity.TextMeshPro`, `VRC.SDKBase.Editor`, `VRC.Udon`, `VRC.Udon.Editor`, and the
+precompiled `VRCSDKBase-Editor.dll` — the last one specifically because
+`VRCSDKRequestedBuildType`/`IVRCSDKBuildRequestedCallback` live in that DLL, not in the
+same-named `VRC.SDKBase.Editor.BuildPipeline` asmdef, which turned out to only contain a
+Samples subfolder).
 
 ### Phase G0 — Harness
 

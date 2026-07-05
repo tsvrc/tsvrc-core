@@ -1,9 +1,6 @@
-using System.Collections.Generic;
-using System.IO;
 using NUnit.Framework;
 using Tsvrc.Config;
 using Tsvrc.Editor;
-using UnityEngine;
 using VRC.SDKBase.Editor.BuildPipeline;
 
 namespace Tsvrc.Tests.Editor
@@ -18,36 +15,18 @@ namespace Tsvrc.Tests.Editor
     // temp scene first to guarantee a deterministic, real bootstrap signal.
     //
     // TsvrcGenerator is a static, project-wide singleton - Run() really does write
-    // Assets/TsvrcGenerated/*.cs to disk for real (WriteIfChanged is a genuine file write,
-    // not scratch). Driving it from an empty synthetic scene/config could silently
-    // overwrite a developer's actual configured output with "stub" content. Back up and
-    // byte-for-byte restore those files around the test so this test is destructive-safe
-    // regardless of what real content happens to be configured when it runs.
+    // Assets/TsvrcGenerated/*.cs to disk for real. GeneratedFileBackup makes that
+    // destructive-safe; the TearDown's extra AfterDomainReload() call resets the
+    // process-lifetime EditorApplication hooks Run() leaves subscribed.
     public class TsvrcBuildCompileTests
     {
-        private const string GeneratedFolder = "Assets/TsvrcGenerated";
-
-        private static readonly string[] GeneratedFileNames =
-        {
-            "TsvrcGenerated.cs", "TsvrcGeneratedConstruct.cs", "TsvrcGeneratedFactory.cs",
-            "TsvrcGeneratedInstance.cs", "TsvrcGeneratedMemory.cs", "TsvrcGeneratedPool.cs",
-            "TsvrcGeneratedSingleton.cs", "TsvrcGeneratedTranslation.cs",
-        };
-
         private TempSceneScope _scope;
-        private readonly Dictionary<string, string> _backup = new Dictionary<string, string>();
+        private GeneratedFileBackup _backup;
 
         [SetUp]
         public void SetUp()
         {
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            _backup.Clear();
-            foreach (var fileName in GeneratedFileNames)
-            {
-                string path = Path.Combine(projectRoot, GeneratedFolder.Replace('/', Path.DirectorySeparatorChar), fileName);
-                if (File.Exists(path)) _backup[path] = File.ReadAllText(path);
-            }
-
+            _backup = new GeneratedFileBackup();
             _scope = new TempSceneScope();
             _scope.CreateGameObject("TsvrcConfig").AddComponent<TsvrcConfig>();
         }
@@ -56,8 +35,7 @@ namespace Tsvrc.Tests.Editor
         public void TearDown()
         {
             _scope.Dispose();
-            foreach (var (path, content) in _backup)
-                File.WriteAllText(path, content);
+            _backup.Dispose();
 
             // Run() leaves EditorApplication.hierarchyChanged/Undo.postprocessModifications
             // subscribed for the rest of the process once it completes past the bootstrap
