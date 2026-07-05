@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using Tsvrc.Editor;
 using TMPro;
+using UnityEditor;
 using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.Editor
@@ -41,14 +42,41 @@ namespace Tsvrc.Tests.Editor
         {
             // Unlike every other config-driven module, TranslationModule.Wire() returns
             // silently (no Debug.LogWarning) when `_translationTargets` isn't found on the
-            // compiled root - this project has no real language files configured yet, so
-            // the field genuinely doesn't exist (see CODEGEN_TESTING_PLAN.md Part 4.5).
-            CompiledRootFixture.AddTo(_scope);
+            // compiled root - this project has no real language files configured by default
+            // (see CODEGEN_TESTING_PLAN.md Part 4.5), so the field genuinely doesn't exist
+            // unless CodeGenSandbox.Bootstrap() has run; when it has, this same missing-field
+            // scenario can't be constructed this way anymore, so this test is skipped (not
+            // failed) in that state - see Wire_RealTranslationTargetsField_... below for the
+            // bootstrapped-state coverage instead.
+            var root = CompiledRootFixture.AddTo(_scope);
+            if (new SerializedObject(root).FindProperty("_translationTargets") != null)
+                Assert.Ignore("_translationTargets already exists on the compiled root (CodeGenSandbox is active) - this scenario is covered by Wire_RealTranslationTargetsField_... instead.");
+
             var module = new TranslationModule();
             PrivateFieldAccess.SetField(module, "_languages", PrivateFieldAccess.BuildList(EntryType, new[] { OneLanguage() }));
 
             LogAssert.NoUnexpectedReceived();
             Assert.DoesNotThrow(() => module.Wire());
+        }
+
+        [Test]
+        public void Wire_RealTranslationTargetsField_IsAssignedToMatchingSceneTmpObjects()
+        {
+            // Runs for real once CodeGenSandbox.Bootstrap() has produced a real
+            // "_translationTargets" field on TsvrcGenerated; Assert.Ignore()s otherwise.
+            var root = CompiledRootFixture.AddTo(_scope);
+            SandboxGate.RequireField(root, "_translationTargets");
+
+            var target = _scope.CreateGameObject(CodeGenSandbox.TranslationKey).AddComponent<TextMeshProUGUI>();
+            var module = new TranslationModule();
+            PrivateFieldAccess.SetField(module, "_languages", PrivateFieldAccess.BuildList(EntryType, new[] { OneLanguage() }));
+            PrivateFieldAccess.SetField(module, "_cachedTmpTargets", new List<TextMeshProUGUI> { target });
+
+            module.Wire();
+
+            var prop = new SerializedObject(root).FindProperty("_translationTargets");
+            Assert.AreEqual(1, prop.arraySize);
+            Assert.AreEqual(target, prop.GetArrayElementAtIndex(0).objectReferenceValue);
         }
 
         [Test]

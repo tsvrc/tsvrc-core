@@ -220,6 +220,15 @@ namespace Tsvrc.Tests.Editor
             return (bool)PrivateFieldAccess.InvokeInstance(module, "IsPoolAlreadyWired", root, existingContainer, emptyTargets);
         }
 
+        // Real [WirePool] target collection (CollectWireTargetsByType is `private static`) -
+        // used to exercise IsPoolAlreadyWired's inner per-slot target-field-match check with
+        // genuine data, rather than an always-absent empty dict.
+        private static bool IsAlreadyWiredWithRealTargets(PoolModule module, Component root, Transform existingContainer)
+        {
+            var realTargets = PrivateFieldAccess.InvokeStatic(typeof(PoolModule), "CollectWireTargetsByType", root.gameObject.scene);
+            return (bool)PrivateFieldAccess.InvokeInstance(module, "IsPoolAlreadyWired", root, existingContainer, realTargets);
+        }
+
         [Test]
         public void IsPoolAlreadyWired_NoExistingContainer_ReturnsFalse()
         {
@@ -285,6 +294,48 @@ namespace Tsvrc.Tests.Editor
 
             var container = _root.transform.Find("Pool");
             Assert.IsTrue(IsAlreadyWired(module, _root, container), "An unchanged, correctly-wired container/field must be recognized as already wired.");
+        }
+
+        [Test]
+        public void IsPoolAlreadyWired_RealWirePoolTargetFieldMatches_ReturnsTrue()
+        {
+            // Exercises IsPoolAlreadyWired's inner per-slot check
+            // (`targetProp.objectReferenceValue == childComp`) with a genuine [WirePool]
+            // target, rather than the always-empty targets dict IsAlreadyWired() passes.
+            SandboxGate.RequireField(_root, "_pool_" + CodeGenSandbox.PoolTypeName + "_0");
+
+            var prefab = CreateScratchPrefab("Widget10");
+            var target = _scope.CreateGameObject("RealTarget").AddComponent<PoolWireTargetDouble>();
+            var module = BuildModule(prefab, totalSlots: 1);
+            module.Wire(); // Phase 2 assigns target.PublicField/_serializedField to the new instance for real
+
+            Assert.IsNotNull(target.PublicField, "Sanity check: Wire() must have actually assigned the target field.");
+
+            var container = _root.transform.Find("Pool");
+            Assert.IsTrue(IsAlreadyWiredWithRealTargets(module, _root, container),
+                "An unchanged container, slot field, AND matching real [WirePool] target field must all be recognized as already wired.");
+        }
+
+        [Test]
+        public void IsPoolAlreadyWired_RealWirePoolTargetFieldManuallyCleared_ReturnsFalse()
+        {
+            // The mirror image of the test above: once Wire() has run, if a user (or another
+            // system) clears the target's field back to null by hand, the next Wire() pass
+            // must detect the mismatch and re-wire rather than treating it as already wired.
+            SandboxGate.RequireField(_root, "_pool_" + CodeGenSandbox.PoolTypeName + "_0");
+
+            var prefab = CreateScratchPrefab("Widget11");
+            var target = _scope.CreateGameObject("RealTarget").AddComponent<PoolWireTargetDouble>();
+            var module = BuildModule(prefab, totalSlots: 1);
+            module.Wire();
+
+            // Only PublicField needs clearing: CollectWireTargetsByType enumerates fields in
+            // declaration order, so PublicField is targets[0] for this double's single slot.
+            target.PublicField = null;
+
+            var container = _root.transform.Find("Pool");
+            Assert.IsFalse(IsAlreadyWiredWithRealTargets(module, _root, container),
+                "A manually-cleared [WirePool] target field must invalidate the already-wired check.");
         }
     }
 }

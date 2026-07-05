@@ -40,15 +40,25 @@ namespace Tsvrc.Tests.Editor
     // that Bootstrap() itself discards (replaces with another fresh, unmodified empty
     // scene) before returning, so nothing is left "dirty" going into step 2. The only real,
     // persistent side effects between steps 1 and 3 are (a) the rewritten
-    // Assets/TsvrcGenerated/*.cs content (backed up to ScratchFolder/_backup/ by
-    // Bootstrap(), restored by Restore()) and (b) two scratch prefab assets under
-    // ScratchFolder (deleted by Restore()) - nothing is left in the working tree once step
-    // 3 finishes.
+    // Assets/TsvrcGenerated/*.cs content (backed up to the OS temp folder by Bootstrap(),
+    // restored by Restore()), (b) two scratch prefab assets plus a scratch language JSON
+    // file under ScratchFolder, and (c) TranslationModule's own fixed-path config asset
+    // (Assets/TsvrcGenerated/TsvrcTranslationConfig.asset, which doesn't exist in this
+    // project otherwise) - (b) and (c) are both deleted by Restore(). Nothing is left in
+    // the working tree once step 3 finishes.
     internal static class CodeGenSandbox
     {
         internal const string ScratchFolder = "Assets/Tsvrc/__TestBootstrapScratch__";
         internal const string FactoryPrefabPath = ScratchFolder + "/SampleFactoryPrefab.prefab";
         internal const string PoolPrefabPath = ScratchFolder + "/SamplePoolPrefab.prefab";
+        internal const string LanguageFilePath = ScratchFolder + "/SampleLanguage.json";
+
+        // Matches TranslationModule.ConfigAssetPath (private) - a fixed path the module
+        // itself owns entirely; this project has no real translation config yet (confirmed:
+        // no such asset exists in a fresh clone), so the sandbox exclusively creates and
+        // later deletes it rather than needing to back it up/restore like the shared
+        // Assets/TsvrcGenerated/*.cs files.
+        internal const string TranslationConfigAssetPath = "Assets/TsvrcGenerated/TsvrcTranslationConfig.asset";
 
         private const string GeneratedFolder = "Assets/TsvrcGenerated";
         private static readonly string[] GeneratedFileNames =
@@ -75,6 +85,8 @@ namespace Tsvrc.Tests.Editor
         internal const string FactoryFieldName = "_factorySampleFactoryPrefab";
         internal const string FactoryMethodName = "CreateSampleFactoryPrefab";
         internal const string PoolTypeName = "StateManager";
+        internal const string TranslationKey = "_sampleTranslationKey_";
+        internal const string TranslationEnumMemberName = "English";
 
         [MenuItem("Tsvrc/CodeGen Sandbox/1) Bootstrap (writes real fields to TsvrcGenerated)")]
         public static void Bootstrap()
@@ -102,6 +114,18 @@ namespace Tsvrc.Tests.Editor
             // non-zero slot count for StateManager (TotalSlots==0 would otherwise exclude it
             // from generation entirely).
             new GameObject("SamplePoolConsumer").AddComponent<PoolWireTargetDouble>();
+
+            // TranslationModule reads from its own fixed asset path, not from TsvrcConfig -
+            // write the language file directly and create the config asset there.
+            string languageJson = "{\"key\":\"en\",\"label\":\"" + TranslationEnumMemberName + "\"," +
+                "\"entries\":{\"" + TranslationKey + "\":\"Hello\"}}";
+            File.WriteAllText(ToFullPath(LanguageFilePath), languageJson);
+            AssetDatabase.ImportAsset(LanguageFilePath);
+            var languageAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(LanguageFilePath);
+
+            var translationConfig = ScriptableObject.CreateInstance<TsvrcTranslationConfig>();
+            translationConfig.LanguageFiles = new[] { languageAsset };
+            AssetDatabase.CreateAsset(translationConfig, TranslationConfigAssetPath);
 
             var configGo = new GameObject("__TestBootstrapConfig__");
             var config = configGo.AddComponent<TsvrcConfig>();
@@ -138,8 +162,17 @@ namespace Tsvrc.Tests.Editor
             if (AssetDatabase.IsValidFolder(ScratchFolder))
                 AssetDatabase.DeleteAsset(ScratchFolder);
 
+            if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(TranslationConfigAssetPath) != null)
+                AssetDatabase.DeleteAsset(TranslationConfigAssetPath);
+
             AssetDatabase.Refresh();
             Debug.Log("[CodeGenSandbox] Restore complete - Assets/TsvrcGenerated and scratch assets are back to their original state.");
+        }
+
+        private static string ToFullPath(string assetPath)
+        {
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            return Path.Combine(projectRoot, assetPath.Replace('/', Path.DirectorySeparatorChar));
         }
 
         private static void BackupGeneratedFiles()

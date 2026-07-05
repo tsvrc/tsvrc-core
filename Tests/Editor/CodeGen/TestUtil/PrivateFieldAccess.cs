@@ -24,6 +24,13 @@ namespace Tsvrc.Tests.Editor
             field.SetValue(target, value);
         }
 
+        internal static void SetField(Type staticType, string fieldName, object value)
+        {
+            var field = staticType.GetField(fieldName, StaticFlags);
+            Assert.IsNotNull(field, $"Static field '{fieldName}' not found on {staticType.Name}. Signature changed?");
+            field.SetValue(null, value);
+        }
+
         internal static T GetField<T>(object target, string fieldName)
         {
             var field = FindField(target.GetType(), fieldName);

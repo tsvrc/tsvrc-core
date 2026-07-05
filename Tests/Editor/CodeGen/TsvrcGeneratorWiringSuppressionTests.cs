@@ -36,13 +36,25 @@ namespace Tsvrc.Tests.Editor
         {
             CompiledRootFixture.AddTo(_scope);
 
+            // Run() once first to let GenerateCode() output settle to whatever this test's
+            // (empty) config produces. If the project happened to be in a *different* state
+            // beforehand (e.g. CodeGenSandbox.Bootstrap() has been run - see
+            // CODEGEN_TESTING_PLAN.md Part 3.5), this first pass's own file-content change is
+            // a legitimate, *external-looking* reason for TsvrcAssetWatcher to schedule a
+            // rerun - that's not what this test is about. Reset _rerunPending afterward so the
+            // real assertion below is only about the second pass, where content is already
+            // stable and nothing external changes.
+            TsvrcGenerator.AfterDomainReload(skipRefresh: true);
+            PrivateFieldAccess.SetField(typeof(TsvrcGenerator), "_rerunPending", false);
+
             TsvrcGenerator.AfterDomainReload(skipRefresh: true);
 
-            // Immediately after Run() returns (before any EditorApplication.delayCall has had
-            // a chance to fire): _isWiring must already be cleared (the finally block ran),
-            // _justFinishedWiring must still be true (its own delayCall hasn't fired yet), and
-            // _rerunPending must be false - proving Wire()'s own scene/SerializedObject writes
-            // did not get treated as an external modification that needs a rerun.
+            // Immediately after this second Run() returns (before any EditorApplication.
+            // delayCall has had a chance to fire): _isWiring must already be cleared (the
+            // finally block ran), _justFinishedWiring must still be true (its own delayCall
+            // hasn't fired yet), and _rerunPending must be false - proving Wire()'s own
+            // scene/SerializedObject writes did not get treated as an external modification
+            // that needs a rerun.
             Assert.IsFalse(PrivateFieldAccess.GetField<bool>(typeof(TsvrcGenerator), "_isWiring"));
             Assert.IsTrue(PrivateFieldAccess.GetField<bool>(typeof(TsvrcGenerator), "_justFinishedWiring"));
             Assert.IsFalse(PrivateFieldAccess.GetField<bool>(typeof(TsvrcGenerator), "_rerunPending"));
