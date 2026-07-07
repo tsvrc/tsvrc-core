@@ -6,8 +6,8 @@ using UnityEngine;
 namespace Tsvrc.Tests.Editor
 {
     // Proves the shared harness (TempSceneScope + CompiledRootFixture + PrivateFieldAccess
-    // + ScratchAssets) actually works end to end, per CODEGEN_TESTING_PLAN.md Phase G0.
-    // Every later Wire()-level test builds on these same pieces.
+    // + ScratchAssets) actually works end to end. Every later Wire()-level test builds on
+    // these same pieces.
     public class HarnessProofTests
     {
         [Test]

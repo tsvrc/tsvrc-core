@@ -5,7 +5,7 @@ using Tsvrc.Editor;
 namespace Tsvrc.Tests.Editor
 {
     // TsvrcAssetWatcher.OnPostprocessAllAssets - reflected and called directly with
-    // synthetic path arrays. Phase G7.1.
+    // synthetic path arrays.
     //
     // Only the two branches that are provably side-effect-free are exercised directly here:
     // `didDomainReload: true` (short-circuits immediately) and an empty `WatchedPaths` (also

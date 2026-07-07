@@ -9,7 +9,6 @@ namespace Tsvrc.Tests.Editor
     // PoolModule.ScanExternalRefs()/ScanInternalDeps(), driven against a real temp scene
     // (TempSceneScope makes it the active scene, which is what SceneManager.GetActiveScene()
     // inside these methods reads) containing the PoolWireTargetDouble test doubles.
-    // Phase G3.5.
     public class PoolModuleScanRefsTests
     {
         private static readonly Type InfoType = PrivateFieldAccess.NestedType(typeof(PoolModule), "PoolTypeInfo");

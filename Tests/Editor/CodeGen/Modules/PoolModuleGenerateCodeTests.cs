@@ -6,9 +6,9 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.Editor
 {
-    // PoolModule.GenerateCode(), fed a synthetic _poolTypeInfos dictionary via reflection
-    // (bypassing ScanExternalRefs/ScanInternalDeps/ComputeTotalSlots entirely - those are
-    // covered separately by PoolModuleSlotMathTests). Phase G2.5.
+    // Tests feed PoolModule.GenerateCode() a synthetic _poolTypeInfos dictionary via
+    // reflection, bypassing ScanExternalRefs/ScanInternalDeps/ComputeTotalSlots entirely -
+    // those are covered separately by PoolModuleSlotMathTests.
     public class PoolModuleGenerateCodeTests
     {
         private static readonly Type InfoType = PrivateFieldAccess.NestedType(typeof(PoolModule), "PoolTypeInfo");

@@ -8,8 +8,7 @@ using VRC.SDKBase;
 
 namespace Tsvrc.Tests.PlayMode
 {
-    // Proof-of-concept for Plan step 0.2.6: confirms the ClientSim harness itself
-    // works in this project before anything in Phase 5 is built on top of it.
+    // Confirms the ClientSim harness itself works in this project.
     // VRC.ClientSim ships no public test-base class (the `VRC.ClientSim.Tests`
     // assembly referenced by its own Samples~ is not present in this SDK version),
     // so this drives ClientSimRuntimeLoader directly instead.

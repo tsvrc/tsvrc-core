@@ -6,10 +6,9 @@ using UnityEngine;
 namespace Tsvrc.Tests.Editor
 {
     // Adds a real, compiled TsvrcGenerated instance (there is only ever one such type in
-    // the AppDomain - see CODEGEN_TESTING_PLAN.md Part 2.2, Obstacle A) to a fresh
-    // GameObject inside a TempSceneScope. Module Wire()/GenerateCode() tests then call
-    // through real production code against this synthetic root, never the developer's
-    // actual scaffolded scene object.
+    // the AppDomain) to a fresh GameObject inside a TempSceneScope. Module Wire()/
+    // GenerateCode() tests then call through real production code against this synthetic
+    // root, never the developer's actual scaffolded scene object.
     internal static class CompiledRootFixture
     {
         // Mirrors ScaffoldModule's own (private) GeneratedFolder/ScaffoldFilePath/

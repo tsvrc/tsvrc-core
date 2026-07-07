@@ -4,7 +4,7 @@ using Tsvrc.Utils;
 
 namespace Tsvrc.Tests.Editor
 {
-    // MemoryModule.OnSceneHierarchyChanged(). Phase G5.2.
+    // MemoryModule.OnSceneHierarchyChanged().
     public class MemoryModuleHierarchyChangedTests
     {
         private TempSceneScope _scope;

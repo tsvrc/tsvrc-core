@@ -6,10 +6,10 @@ namespace Tsvrc.Tests.Editor
 {
     // TsvrcGenerator's _isWiring/_justFinishedWiring suppression - the mechanism that
     // stops Wire()'s own SerializedObject writes from recursively triggering another
-    // ScheduleRerun() via OnPostprocessModifications. Phase G6.6, the highest-value
-    // orchestration test in the plan. Drives the real, static, project-wide Run() (via
-    // GeneratedFileBackup + the same TsvrcConfig-in-a-temp-scene bootstrap pattern as
-    // TsvrcBuildCompileTests), with a real compiled root present so Wire() actually runs.
+    // ScheduleRerun() via OnPostprocessModifications. Drives the real, static,
+    // project-wide Run() (via GeneratedFileBackup + the same TsvrcConfig-in-a-temp-scene
+    // bootstrap pattern as TsvrcBuildCompileTests), with a real compiled root present so
+    // Wire() actually runs.
     public class TsvrcGeneratorWiringSuppressionTests
     {
         private TempSceneScope _scope;
@@ -38,12 +38,11 @@ namespace Tsvrc.Tests.Editor
 
             // Run() once first to let GenerateCode() output settle to whatever this test's
             // (empty) config produces. If the project happened to be in a *different* state
-            // beforehand (e.g. CodeGenSandbox.Bootstrap() has been run - see
-            // CODEGEN_TESTING_PLAN.md Part 3.5), this first pass's own file-content change is
-            // a legitimate, *external-looking* reason for TsvrcAssetWatcher to schedule a
-            // rerun - that's not what this test is about. Reset _rerunPending afterward so the
-            // real assertion below is only about the second pass, where content is already
-            // stable and nothing external changes.
+            // beforehand (e.g. CodeGenSandbox.Bootstrap() has been run), this first pass's
+            // own file-content change is a legitimate, *external-looking* reason for
+            // TsvrcAssetWatcher to schedule a rerun - that's not what this test is about.
+            // Reset _rerunPending afterward so the real assertion below is only about the
+            // second pass, where content is already stable and nothing external changes.
             TsvrcGenerator.AfterDomainReload(skipRefresh: true);
             PrivateFieldAccess.SetField(typeof(TsvrcGenerator), "_rerunPending", false);
 

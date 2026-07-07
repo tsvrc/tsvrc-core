@@ -9,7 +9,6 @@ using UnityEngine.TestTools;
 namespace Tsvrc.Tests.Editor
 {
     // TranslationModule.Wire()/OnSceneHierarchyChanged() against a real compiled root.
-    // Phase G4.11/G4.12/G5.6.
     public class TranslationModuleWireTests
     {
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(TranslationModule), "LanguageEntry");
@@ -42,12 +41,12 @@ namespace Tsvrc.Tests.Editor
         {
             // Unlike every other config-driven module, TranslationModule.Wire() returns
             // silently (no Debug.LogWarning) when `_translationTargets` isn't found on the
-            // compiled root - this project has no real language files configured by default
-            // (see CODEGEN_TESTING_PLAN.md Part 4.5), so the field genuinely doesn't exist
-            // unless CodeGenSandbox.Bootstrap() has run; when it has, this same missing-field
-            // scenario can't be constructed this way anymore, so this test is skipped (not
-            // failed) in that state - see Wire_RealTranslationTargetsField_... below for the
-            // bootstrapped-state coverage instead.
+            // compiled root - this project has no real language files configured by default,
+            // so the field genuinely doesn't exist unless CodeGenSandbox.Bootstrap() has run;
+            // when it has, this same missing-field scenario can't be constructed this way
+            // anymore, so this test is skipped (not failed) in that state - see
+            // Wire_RealTranslationTargetsField_... below for the bootstrapped-state coverage
+            // instead.
             var root = CompiledRootFixture.AddTo(_scope);
             if (new SerializedObject(root).FindProperty("_translationTargets") != null)
                 Assert.Ignore("_translationTargets already exists on the compiled root (CodeGenSandbox is active) - this scenario is covered by Wire_RealTranslationTargetsField_... instead.");
@@ -113,7 +112,7 @@ namespace Tsvrc.Tests.Editor
         {
             var module = new TranslationModule();
             PrivateFieldAccess.SetField(module, "_translationKeys", new HashSet<string>(new[] { "_a_" }, StringComparer.Ordinal));
-            // Scene now has nothing matching - previously had "_a_".
+            // Scene has nothing matching the tracked key "_a_".
             PrivateFieldAccess.SetField(module, "_cachedTmpTargets", new List<TextMeshProUGUI>());
             PrivateFieldAccess.SetField(module, "_effectiveKeys", new HashSet<string>(new[] { "_a_" }, StringComparer.Ordinal));
 

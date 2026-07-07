@@ -15,9 +15,8 @@ namespace Tsvrc.Tests.Editor
     // *field assignment* (Debug.LogWarning, no `continue`) - it still creates the "Pool"
     // container and instantiates every prefab regardless. That makes the scene-mutation
     // half of Wire() fully testable here always; the slot-field assignment itself
-    // additionally runs for real whenever CodeGenSandbox.Bootstrap() has been applied (see
-    // CODEGEN_TESTING_PLAN.md Part 3.5 and Part 4.5), and is
-    // Assert.Ignore()'d otherwise. Phase G4.10.
+    // additionally runs for real whenever CodeGenSandbox.Bootstrap() has been applied, and is
+    // Assert.Ignore()'d otherwise.
     public class PoolModuleWireTests
     {
         private const string ScratchPrefabPath = ScratchAssets.Folder + "/PoolWirePrefab.prefab";
@@ -77,11 +76,9 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void Wire_NoEntries_ExistingPoolContainerDestroyed()
         {
-            // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 1: this used to only clean up the
-            // stale "Pool" container when no pool config had ever existed at all. Now the
-            // (removed) _hasAnyConfigured distinction is gone entirely - an empty
-            // _poolEntries always triggers cleanup, whether nothing was ever configured or
-            // everything configured became invalid (e.g. all prefabs deleted).
+            // An empty _poolEntries always triggers cleanup of a stale "Pool" container,
+            // whether nothing was ever configured or everything configured became invalid
+            // (e.g. all prefabs deleted).
             var stray = _scope.CreateGameObject("Pool");
             stray.transform.SetParent(_root.transform, false);
 
@@ -116,8 +113,7 @@ namespace Tsvrc.Tests.Editor
         public void Wire_SlotFieldNotFoundOnRoot_StillCreatesInstanceAndWarns()
         {
             // Uses a type name guaranteed to have no real compiled field (unlike
-            // "StateManager", which CodeGenSandbox.Bootstrap() - see
-            // CODEGEN_TESTING_PLAN.md Part 3.5 - legitimately creates real
+            // "StateManager", which CodeGenSandbox.Bootstrap() legitimately creates real
             // "_pool_StateManager_0"/"_1" fields for), so this always exercises the
             // genuinely-missing-field path regardless of whether the sandbox is active.
             const string fakeTypeName = "PoolModuleWireTestsNeverRealType";
@@ -153,11 +149,10 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void Wire_MoreExternalTargetsThanSlots_LogsStaleReferenceWarning()
         {
-            // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 5: CollectWireTargetsByType now
-            // reuses IsWirePoolField, the same public/[SerializeField] filter
-            // ScanExternalRefs uses for slot-count math - so PoolWireTargetDouble's
-            // _nonSerializedField no longer counts as a target here either. Only
-            // PublicField and _serializedField count - 2 total, against 1 slot.
+            // CollectWireTargetsByType reuses IsWirePoolField, the same public/[SerializeField]
+            // filter ScanExternalRefs uses for slot-count math - so PoolWireTargetDouble's
+            // _nonSerializedField does not count as a target here either. Only PublicField
+            // and _serializedField count - 2 total, against 1 slot.
             var prefab = CreateScratchPrefab("Widget4");
             _scope.CreateGameObject("Target").AddComponent<PoolWireTargetDouble>();
             var module = BuildModule(prefab, totalSlots: 1);
@@ -170,13 +165,12 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void Wire_NonSerializedWirePoolField_SilentlyExcludedFromTargetsLikeItIsFromSlotCounts()
         {
-            // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 5: CollectWireTargetsByType and
-            // ScanExternalRefs now agree on what counts as a wireable [WirePool] field, so a
-            // non-serialized private field is silently excluded from both - no "not
-            // serialized" warning fires anymore, since the field is never treated as a
-            // target for assignment in the first place. As a direct consequence, the slot now
-            // has zero targets, so it logs the ordinary "unassigned" mismatch warning instead
-            // (same as any other under-targeted slot). The unrelated "slot field not found on
+            // CollectWireTargetsByType and ScanExternalRefs agree on what counts as a wireable
+            // [WirePool] field, so a non-serialized private field is silently excluded from
+            // both - no "not serialized" warning fires, since the field is never treated as a
+            // target for assignment in the first place. As a consequence the slot has zero
+            // targets, so it logs the ordinary "unassigned" mismatch warning instead (same as
+            // any other under-targeted slot). The unrelated "slot field not found on
             // TsvrcGenerated" warning is expected too - this project's compiled type has no
             // real "_pool_StateManager_0" field outside CodeGenSandbox.Bootstrap(), same as
             // every other non-bootstrapped test in this fixture.
@@ -255,7 +249,6 @@ namespace Tsvrc.Tests.Editor
         {
             // Runs for real once CodeGenSandbox.Bootstrap() has produced real
             // "_pool_StateManager_N" fields on TsvrcGenerated; Assert.Ignore()s otherwise.
-            // See CODEGEN_TESTING_PLAN.md Part 3.5.
             SandboxGate.RequireField(_root, "_pool_" + CodeGenSandbox.PoolTypeName + "_0");
 
             var prefab = CreateScratchPrefab("Widget8");

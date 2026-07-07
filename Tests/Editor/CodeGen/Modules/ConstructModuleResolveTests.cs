@@ -10,7 +10,7 @@ namespace Tsvrc.Tests.Editor
 {
     // ConstructModule.Resolve() via reflection with real (but scene-only, throwaway)
     // TsvrcBehaviour components. No builtin source exists for Constructs - scene-only,
-    // unlike Singleton/Pool/Factory. Phase G3.2.
+    // unlike Singleton/Pool/Factory.
     public class ConstructModuleResolveTests
     {
         private TempSceneScope _scope;

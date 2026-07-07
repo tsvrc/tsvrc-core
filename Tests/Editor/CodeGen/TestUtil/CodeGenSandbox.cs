@@ -14,28 +14,25 @@ namespace Tsvrc.Tests.Editor
 {
     // Permanent sandbox tooling for exercising the CodeGen happy paths that need real,
     // config-derived fields on the compiled TsvrcGenerated type (Singleton/Construct/
-    // Factory/Pool - see CODEGEN_TESTING_PLAN.md Part 4.5). Entirely C#/Unity-native: no
-    // external shell/PowerShell scripts, just three ordinary `Unity.exe -batchmode`
-    // invocations (the middle one is the same plain `-runTests` CLI already used
-    // throughout this project's test suite - proven reliable all session):
+    // Factory/Pool). Entirely C#/Unity-native: no external shell/PowerShell scripts, just
+    // three ordinary `Unity.exe -batchmode` invocations (the middle one is the same plain
+    // `-runTests` CLI already used throughout this project's test suite):
     //
     //   1. Unity.exe -batchmode -projectPath <repo> -quit
     //        -executeMethod Tsvrc.Tests.Editor.CodeGenSandbox.Bootstrap
     //   2. Unity.exe -batchmode -projectPath <repo>
     //        -runTests -testPlatform EditMode -testResults results.xml
-    //        (SandboxGate-gated happy-path tests now execute for real instead of
+    //        (SandboxGate-gated happy-path tests execute for real instead of
     //        Assert.Ignore()'ing)
     //   3. Unity.exe -batchmode -projectPath <repo> -quit
     //        -executeMethod Tsvrc.Tests.Editor.CodeGenSandbox.Restore
     //
-    // Why three separate process launches rather than one continuous run: writing new
-    // fields to Assets/TsvrcGenerated/*.cs only takes effect once Unity recompiles from
-    // that new source, which means a fresh process. An earlier version of this tool tried
-    // to do steps 1-2 in a single long-lived batch process (triggering the recompile and
-    // waiting it out via SessionState + [InitializeOnLoad], then driving TestRunnerApi
-    // programmatically) - that hit the same Test-Runner-never-terminates fragility already
-    // documented in TESTING_PLAN.md's "Known environment constraint" section. Three
-    // separate, ordinary invocations sidestep that fragility entirely.
+    // Three separate process launches are required rather than one continuous run:
+    // writing new fields to Assets/TsvrcGenerated/*.cs only takes effect once Unity
+    // recompiles from that new source, which means a fresh process. Driving the recompile
+    // and the test run from within a single long-lived batch process (via SessionState +
+    // [InitializeOnLoad] plus TestRunnerApi) risks the Test Runner never terminating;
+    // three separate, ordinary invocations sidestep that fragility entirely.
     //
     // Bootstrap()/Restore() never edit Assets/Scenes/VRCDefaultWorldScene.unity (or any
     // committed scene) - the config lives on a throwaway GameObject in a brand-new scene

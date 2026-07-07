@@ -9,13 +9,13 @@ using UnityEngine.TestTools;
 namespace Tsvrc.Tests.Editor
 {
     // ConstructModule.Wire() against a real compiled root in an isolated temp scene.
-    // Phase G4.4. Unlike Memory/Instance, Construct's fields are all `_construct{Name}` -
-    // there is no fixed field name that exists on the compiled type without a prior real
-    // config-driven generation pass (this project has none by default - see
-    // CODEGEN_TESTING_PLAN.md Part 4.5), so the missing-field/null-source/root-absent
-    // branches are always testable, while Wire_RealConstructField_... additionally runs the
-    // real "field found -> assigned" path whenever CodeGenSandbox.Bootstrap() has been
-    // applied (see CODEGEN_TESTING_PLAN.md Part 3.5), and is Assert.Ignore()'d otherwise.
+    // Unlike Memory/Instance, Construct's fields are all `_construct{Name}` - there is no
+    // fixed field name that exists on the compiled type without a prior real config-driven
+    // generation pass (this project has none by default), so the
+    // missing-field/null-source/root-absent branches are always testable, while
+    // Wire_RealConstructField_... additionally runs the real "field found -> assigned" path
+    // whenever CodeGenSandbox.Bootstrap() has been applied, and is Assert.Ignore()'d
+    // otherwise.
     public class ConstructModuleWireTests
     {
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(ConstructModule), "ConstructEntry");
@@ -79,7 +79,7 @@ namespace Tsvrc.Tests.Editor
         {
             // Runs for real once CodeGenSandbox.Bootstrap() has produced a real
             // "_constructSampleConstruct" field on TsvrcGenerated; Assert.Ignore()s
-            // otherwise. See CODEGEN_TESTING_PLAN.md Part 3.5.
+            // otherwise.
             SandboxGate.RequireField(_root, CodeGenSandbox.ConstructFieldName);
 
             var behaviour = _scope.CreateGameObject("SomeConstructTarget").AddComponent<StateManager>();

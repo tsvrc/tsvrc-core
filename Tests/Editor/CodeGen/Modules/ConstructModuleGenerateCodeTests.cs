@@ -4,7 +4,7 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.Editor
 {
-    // ConstructModule.GenerateCode(), fed synthetic entries via reflection. Phase G2.3.
+    // Tests feed ConstructModule.GenerateCode() synthetic entries via reflection.
     public class ConstructModuleGenerateCodeTests
     {
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(ConstructModule), "ConstructEntry");

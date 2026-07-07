@@ -6,9 +6,9 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.Editor
 {
-    // PoolModule.OnSceneHierarchyChanged(). Phase G5.5. Note: this only checks child
-    // *count*, not per-slot identity - a same-count-but-corrupted-slot scenario would NOT
-    // be caught here (it relies on IsPoolAlreadyWired inside the next Wire() call instead).
+    // PoolModule.OnSceneHierarchyChanged(). Note: this only checks child *count*, not
+    // per-slot identity - a same-count-but-corrupted-slot scenario would NOT be caught here
+    // (it relies on IsPoolAlreadyWired inside the next Wire() call instead).
     public class PoolModuleHierarchyChangedTests
     {
         private static readonly Type InfoType = PrivateFieldAccess.NestedType(typeof(PoolModule), "PoolTypeInfo");

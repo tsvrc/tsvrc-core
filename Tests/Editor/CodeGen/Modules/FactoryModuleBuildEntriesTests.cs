@@ -10,7 +10,7 @@ namespace Tsvrc.Tests.Editor
 {
     // FactoryModule.BuildEntries() via reflection with synthetic TsvrcConfig/
     // TsvrcBuiltinConfig instances (ScriptableObject.CreateInstance - never touching the
-    // real AssetDatabase-backed builtin config). Phase G3.3.
+    // real AssetDatabase-backed builtin config).
     public class FactoryModuleBuildEntriesTests
     {
         private const string ScratchPrefabPath = ScratchAssets.Folder + "/FactoryBuildEntriesPrefab.prefab";

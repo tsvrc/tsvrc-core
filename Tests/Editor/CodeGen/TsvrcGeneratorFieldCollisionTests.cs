@@ -4,13 +4,12 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.Editor
 {
-    // TsvrcGenerator.DetectAndExcludeFieldNameCollisions() - extracted out of Run() purely
-    // for testability (CODEGEN_TESTING_PLAN.md Phase G6.3). Among the real 8 modules, only
-    // SingletonModule currently overrides ExposedFieldNames()/ExcludeFieldNames(), and its
-    // own Resolve()/Deduplicate() step already prevents same-module collisions before this
-    // ever runs - so the cross-module path is only reachable through synthetic modules like
-    // these, confirming the mechanism itself still works even though no real module
-    // combination currently trips it.
+    // Tests TsvrcGenerator.DetectAndExcludeFieldNameCollisions() in isolation from Run().
+    // Among the real 8 modules, only SingletonModule currently overrides
+    // ExposedFieldNames()/ExcludeFieldNames(), and its own Resolve()/Deduplicate() step
+    // already prevents same-module collisions before this ever runs - so the cross-module
+    // path is only reachable through synthetic modules like these, confirming the
+    // mechanism itself still works even though no real module combination currently trips it.
     public class TsvrcGeneratorFieldCollisionTests
     {
         private class RecordingModule : TsvrcModule

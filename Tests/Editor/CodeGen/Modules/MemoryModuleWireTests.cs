@@ -7,7 +7,7 @@ using UnityEngine;
 namespace Tsvrc.Tests.Editor
 {
     // MemoryModule.Wire()/AfterFilesStable() against a real compiled root in an isolated
-    // temp scene. Phase G4.1/G4.2.
+    // temp scene.
     public class MemoryModuleWireTests
     {
         private TempSceneScope _scope;

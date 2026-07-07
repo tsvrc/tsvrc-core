@@ -11,16 +11,16 @@ namespace Tsvrc.Tests.Editor
     // InstanceModule.Wire() against a real compiled root. Creating a real child+component
     // (CreateComponent) needs `_detectedType` to be a genuine, already-compiled
     // UdonSharpBehaviour with a real script asset - using an actual production
-    // TsvrcInstance subclass would work, but this project intentionally has none yet (see
-    // CODEGEN_TESTING_PLAN.md Part 4.5), and adding one as a permanent test double would
-    // change TsvrcGenerator.HasBootstrapSignal() for the whole project, not just tests
-    // (InstanceModule doesn't care whether the "detected" type is actually a TsvrcInstance
-    // subclass for the plumbing exercised here, only DetectInstanceType() does - which
-    // isn't under test in this file). So `StateManager` stands in as a real, already-
-    // compiled UdonSharpBehaviour: CreateComponent()'s mechanics (script lookup, program
-    // asset creation, component add) don't care that it isn't a TsvrcInstance. Its
-    // transient "Assets/TsvrcGenerated/StateManager.asset" program asset is backed up/
-    // restored like every other real-file side effect in this suite. Phase G4.8.
+    // TsvrcInstance subclass would work, but this project intentionally has none yet, and
+    // adding one as a permanent test double would change TsvrcGenerator.HasBootstrapSignal()
+    // for the whole project, not just tests (InstanceModule doesn't care whether the
+    // "detected" type is actually a TsvrcInstance subclass for the plumbing exercised here,
+    // only DetectInstanceType() does - which isn't under test in this file). So
+    // `StateManager` stands in as a real, already-compiled UdonSharpBehaviour:
+    // CreateComponent()'s mechanics (script lookup, program asset creation, component add)
+    // don't care that it isn't a TsvrcInstance. Its transient
+    // "Assets/TsvrcGenerated/StateManager.asset" program asset is backed up/restored like
+    // every other real-file side effect in this suite.
     public class InstanceModuleWireTests
     {
         private const string StateManagerAssetPath = "Assets/TsvrcGenerated/StateManager.asset";

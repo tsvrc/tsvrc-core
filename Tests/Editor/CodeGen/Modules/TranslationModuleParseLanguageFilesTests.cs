@@ -8,8 +8,8 @@ namespace Tsvrc.Tests.Editor
 {
     // TranslationModule.ParseLanguageFiles() - the multi-file orchestration layer one level
     // above the already-tested single-file ParseLanguageJson(). Confirms one malformed file
-    // doesn't take down the whole run. Phase G3.6. Uses in-memory TextAsset instances
-    // (new TextAsset(text) with no backing project file) - no AssetDatabase involvement.
+    // doesn't take down the whole run. Uses in-memory TextAsset instances (new
+    // TextAsset(text) with no backing project file) - no AssetDatabase involvement.
     public class TranslationModuleParseLanguageFilesTests
     {
         private const string GoodJson = @"{ ""key"": ""en"", ""label"": ""English"", ""entries"": { ""_hi_"": ""Hi"" } }";

@@ -4,8 +4,8 @@ using Tsvrc.Player;
 namespace Tsvrc.Tests.Editor
 {
     // TsPlayer.ToArray is the only member of TsPlayer with zero VRCPlayerApi dependency —
-    // everything else needs a live player list (see Tests/PlayMode/Player/TsPlayerTests.cs,
-    // Phase 5.6 in TESTING_PLAN.md) and can't run in Edit Mode.
+    // everything else needs a live player list (see Tests/PlayMode/Player/TsPlayerTests.cs)
+    // and can't run in Edit Mode.
     public class TsPlayerToArrayTests
     {
         [Test]

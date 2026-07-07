@@ -11,7 +11,7 @@ namespace Tsvrc.Tests.Editor
     // instance methods directly. Every CodeGen module keeps its resolved config in a
     // private field never exposed publicly, so tests that want to exercise Wire()/
     // GenerateCode() without going through the real (project-coupled) LoadConfig()
-    // pipeline need this - see CODEGEN_TESTING_PLAN.md Part 2.2, Obstacle B.
+    // pipeline need this.
     internal static class PrivateFieldAccess
     {
         private const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;

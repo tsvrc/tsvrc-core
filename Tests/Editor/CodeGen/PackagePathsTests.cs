@@ -5,9 +5,8 @@ namespace Tsvrc.Tests.Editor
 {
     // PackagePaths.Root is fixed at compile time via [CallerFilePath] to wherever
     // PackagePaths.cs physically lives on disk - it cannot be parameterized for a fully
-    // isolated test (see CODEGEN_TESTING_PLAN.md Part 1.4 / G1.8). This pins the current,
-    // real value for this project's actual layout (an Assets-folder install, not an
-    // embedded/registry package) as a regression guard.
+    // isolated test. This pins the current, real value for this project's actual layout
+    // (an Assets-folder install, not an embedded/registry package) as a regression guard.
     public class PackagePathsTests
     {
         [Test]

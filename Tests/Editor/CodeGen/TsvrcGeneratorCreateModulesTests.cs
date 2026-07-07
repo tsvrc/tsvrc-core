@@ -4,8 +4,7 @@ using Tsvrc.Editor;
 namespace Tsvrc.Tests.Editor
 {
     // TsvrcGenerator.CreateModules() - the fixed module list/order used both by Run() and
-    // by TsvrcWindow to build its tab list. Phase G6 (orchestration, safe subset - no real
-    // Run() needed).
+    // by TsvrcWindow to build its tab list.
     public class TsvrcGeneratorCreateModulesTests
     {
         [Test]

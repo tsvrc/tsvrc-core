@@ -8,7 +8,7 @@ namespace Tsvrc.Tests.Editor
 {
     // TranslationModule.FindTmpTargets() against real scene TextMeshProUGUI objects.
     // Confirms BOTH the name-shape regex AND translation-key presence gate every match -
-    // a correctly-shaped name with no matching key is excluded, and vice versa. Phase G3.7.
+    // a correctly-shaped name with no matching key is excluded, and vice versa.
     public class TranslationModuleFindTmpTargetsTests
     {
         private TempSceneScope _scope;

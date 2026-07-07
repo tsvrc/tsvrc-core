@@ -4,9 +4,8 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.Editor
 {
-    // SingletonModule.GenerateCode(), fed synthetic entries via reflection (bypassing the
-    // real LoadConfig()/AssetDatabase-coupled pipeline entirely - see
-    // CODEGEN_TESTING_PLAN.md Part 2.2, Obstacle B). Phase G2.2.
+    // Tests feed SingletonModule.GenerateCode() synthetic entries via reflection, bypassing
+    // the real LoadConfig()/AssetDatabase-coupled pipeline entirely.
     public class SingletonModuleGenerateCodeTests
     {
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(SingletonModule), "SingletonEntry");

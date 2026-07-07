@@ -4,8 +4,8 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.Editor
 {
-    // FactoryModule.GenerateCode(), fed synthetic entries via reflection. Covers the three
-    // Create{Name}(Transform parent) code-shape branches. Phase G2.4.
+    // Tests feed FactoryModule.GenerateCode() synthetic entries via reflection, covering the
+    // three Create{Name}(Transform parent) code-shape branches.
     public class FactoryModuleGenerateCodeTests
     {
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(FactoryModule), "FactoryEntry");

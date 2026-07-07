@@ -3,7 +3,7 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.Editor
 {
-    // InstanceModule.OnSceneHierarchyChanged(). Phase G5.3.
+    // InstanceModule.OnSceneHierarchyChanged().
     public class InstanceModuleHierarchyChangedTests
     {
         private TempSceneScope _scope;

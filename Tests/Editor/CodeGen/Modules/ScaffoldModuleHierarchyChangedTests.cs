@@ -5,7 +5,7 @@ using Tsvrc.Editor;
 namespace Tsvrc.Tests.Editor
 {
     // ScaffoldModule.OnSceneHierarchyChanged() - the self-healing signal that decides
-    // whether a rerun should be scheduled after any hierarchy edit. Phase G5.1.
+    // whether a rerun should be scheduled after any hierarchy edit.
     public class ScaffoldModuleHierarchyChangedTests
     {
         private TempSceneScope _scope;
@@ -23,7 +23,7 @@ namespace Tsvrc.Tests.Editor
             // class is always compiled and loaded), so the `compiledType == null` branch
             // cannot be reached from an Edit Mode test here - it would only apply to a
             // project where the generator has never produced its first .cs file at all.
-            Assert.Pass("Documented as untestable in this project; see CODEGEN_TESTING_PLAN.md Part 2.2/G6.1 for the same root constraint.");
+            Assert.Pass("Unreachable in this project: FindCompiledType() never returns null here.");
         }
 
         [Test]

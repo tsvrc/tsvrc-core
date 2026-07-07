@@ -4,7 +4,7 @@ using Tsvrc.Editor;
 namespace Tsvrc.Tests.Editor
 {
     // ScaffoldModule.GenerateCode() is the one truly parameter-free golden file in the
-    // whole generator - it never varies with config. CODEGEN_TESTING_PLAN.md Phase G2.1.
+    // whole generator - it never varies with config.
     public class ScaffoldModuleGenerateCodeTests
     {
         [Test]

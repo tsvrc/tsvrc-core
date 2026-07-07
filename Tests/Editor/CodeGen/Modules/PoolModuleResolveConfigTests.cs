@@ -10,10 +10,10 @@ using UnityEngine.TestTools;
 namespace Tsvrc.Tests.Editor
 {
     // PoolModule.ResolveConfig() + the builtin/user dedup-by-type-name step from
-    // LoadConfig(), via reflection with synthetic prefab assets. Phase G3.4. The tuple
-    // element types (Component, string) are both public, so the reflection Invoke result
-    // can be cast directly to List<(Component, string)> without needing to reach into a
-    // private nested type.
+    // LoadConfig(), via reflection with synthetic prefab assets. The tuple element types
+    // (Component, string) are both public, so the reflection Invoke result can be cast
+    // directly to List<(Component, string)> without needing to reach into a private nested
+    // type.
     public class PoolModuleResolveConfigTests
     {
         private const string ScratchPrefabPath = ScratchAssets.Folder + "/PoolResolveConfigPrefab.prefab";

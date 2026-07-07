@@ -5,8 +5,7 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.Editor
 {
-    // TranslationModule.GenerateCode(), fed a synthetic _languages list via reflection.
-    // Phase G2.8.
+    // Tests feed TranslationModule.GenerateCode() a synthetic _languages list via reflection.
     public class TranslationModuleGenerateCodeTests
     {
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(TranslationModule), "LanguageEntry");
@@ -90,11 +89,8 @@ namespace {ScaffoldModule.CompiledNamespace}
             StringAssert.Contains("Debug.LogError", code);
             StringAssert.Contains("is not available.", code);
 
-            // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 6: the generated line's interpolated
-            // string used to escape `_tsIdx` as a *literal* brace pair, not an interpolation
-            // hole - at runtime this logged the literal text "{_tsIdx}", never the actual
-            // invalid index value. Now it's a real interpolation hole, so the runtime message
-            // substitutes the real (invalid) index.
+            // `_tsIdx` must be a real interpolation hole (not an escaped literal brace pair),
+            // so the runtime error message substitutes the actual invalid index value.
             StringAssert.Contains(
                 "else { Debug.LogError($\"[TsvrcGenerated] Language index {_tsIdx} is not available.\"); return; }",
                 code);

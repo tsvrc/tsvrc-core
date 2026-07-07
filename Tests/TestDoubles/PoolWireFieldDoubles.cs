@@ -10,8 +10,7 @@ namespace Tsvrc.Tests.Editor
     // serialized-private, non-serialized-private (excluded), array (excluded), and generic
     // (excluded). Live in their own Tsvrc.Tests.Doubles asmdef (not Tsvrc.Tests.Editor,
     // which is Editor-platform-restricted) because AddComponent() refuses to attach an
-    // Editor-only script to a real scene GameObject - both G3 (scan logic) and G4 (Wire())
-    // tests use them.
+    // Editor-only script to a real scene GameObject.
     public class PoolWireTargetDouble : MonoBehaviour
     {
         [WirePool] public StateManager PublicField;

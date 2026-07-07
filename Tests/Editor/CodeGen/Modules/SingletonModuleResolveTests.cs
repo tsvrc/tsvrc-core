@@ -9,7 +9,7 @@ namespace Tsvrc.Tests.Editor
 {
     // SingletonModule.Resolve() called directly via reflection with fully synthetic
     // UnityEngine.Object instances - no AssetDatabase, no TsvrcConfig/TsvrcBuiltinConfig
-    // asset touched at all (CODEGEN_TESTING_PLAN.md Part 2.2, Obstacle B / Phase G3.1).
+    // asset touched at all.
     public class SingletonModuleResolveTests
     {
         private TempSceneScope _scope;

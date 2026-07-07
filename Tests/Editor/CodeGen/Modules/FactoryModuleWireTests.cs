@@ -10,11 +10,10 @@ namespace Tsvrc.Tests.Editor
     // FactoryModule.Wire() against a real compiled root. Unlike PoolModule, Factory's
     // slot-field-not-found path `continue`s BEFORE creating the "Factories" container or
     // instantiating anything - so the empty-entries branches and the "field missing -> zero
-    // mutation" regression are always testable against this project's real (unbootstrapped)
+    // mutation" case are always testable against this project's real (unbootstrapped)
     // compiled root; the "field found -> instantiated and assigned" happy path additionally
-    // runs for real whenever CodeGenSandbox.Bootstrap() has been applied (see
-    // CODEGEN_TESTING_PLAN.md Part 3.5 and Part 4.5), and is
-    // Assert.Ignore()'d otherwise. Phase G4.9.
+    // runs for real whenever CodeGenSandbox.Bootstrap() has been applied, and is
+    // Assert.Ignore()'d otherwise.
     public class FactoryModuleWireTests
     {
         private const string ScratchPrefabPath = ScratchAssets.Folder + "/FactoryWirePrefab.prefab";
@@ -82,7 +81,7 @@ namespace Tsvrc.Tests.Editor
         // IsFactoriesAlreadyWired() is `private` (instance) - reachable via reflection. Only
         // its "not wired" (false) outcomes are verifiable without a bootstrap, since the
         // "wired" (true) branch requires a real `_factory{Name}` field reference match on
-        // the compiled root (see class-level comment / Part 4.5).
+        // the compiled root.
         private static bool IsAlreadyWired(FactoryModule module, Component root, Transform existing)
             => (bool)PrivateFieldAccess.InvokeInstance(module, "IsFactoriesAlreadyWired", root, existing);
 
@@ -155,7 +154,7 @@ namespace Tsvrc.Tests.Editor
         {
             // Runs for real once CodeGenSandbox.Bootstrap() has produced a real
             // "_factorySampleFactoryPrefab" field on TsvrcGenerated; Assert.Ignore()s
-            // otherwise. See CODEGEN_TESTING_PLAN.md Part 3.5.
+            // otherwise.
             SandboxGate.RequireField(_root, CodeGenSandbox.FactoryFieldName);
 
             var prefab = CreateScratchPrefab(CodeGenSandbox.FactoryEntryName);

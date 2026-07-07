@@ -7,7 +7,7 @@ namespace Tsvrc.Tests.Editor
 {
     // TsvrcBuildCompile ensures generated files/wiring are current before every VRChat
     // world build. No real build is needed to exercise it - just call OnBuildRequested
-    // directly, per CODEGEN_TESTING_PLAN.md Phase G1.9.
+    // directly.
     //
     // TsvrcGenerator.Run() is bootstrap-gated (HasBootstrapSignal()) and this project has
     // no TsvrcInstance subclass of its own yet, so a bare call would silently no-op via

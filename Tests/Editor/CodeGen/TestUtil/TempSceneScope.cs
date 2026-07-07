@@ -9,8 +9,7 @@ namespace Tsvrc.Tests.Editor
     // Creates a brand-new, unsaved Editor scene so CodeGen module tests never read or
     // mutate the developer's actual open scene/config. Unity has no invisible sandbox
     // scene for Edit Mode tests, so this replaces the active scene outright - save your
-    // work before running the CodeGen suite interactively. See CODEGEN_TESTING_PLAN.md
-    // Part 2.2 for why this (not a mock root) is the isolation strategy.
+    // work before running the CodeGen suite interactively.
     internal sealed class TempSceneScope : IDisposable
     {
         private readonly List<GameObject> _tracked = new List<GameObject>();

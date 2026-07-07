@@ -10,7 +10,7 @@ namespace Tsvrc.Tests.Editor
 {
     // ScaffoldModule.AfterFilesStable() - the internal entry point that owns
     // EnsureRootSceneObject()/EnsureChildSceneObject()/NormalizeProgramAsset(), none of
-    // which are individually public. Phase G4.5/G4.6/G4.7.
+    // which are individually public.
     public class ScaffoldModuleWireTests
     {
         private TempSceneScope _scope;

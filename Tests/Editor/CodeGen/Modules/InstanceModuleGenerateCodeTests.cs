@@ -6,8 +6,7 @@ namespace Tsvrc.Tests.Editor
     // Unlike every other module, InstanceModule.GenerateCode() does not vary with the
     // resolved _detectedType/_ambiguous state at all - it always emits the same fixed
     // field/property/method shape (the *scene wiring* is what varies, not the generated
-    // source). CODEGEN_TESTING_PLAN.md Phase G2.6 - confirming this asymmetry explicitly
-    // since it's easy to wrongly assume this file's content depends on config like the rest.
+    // source). This is easy to wrongly assume depends on config like the rest.
     public class InstanceModuleGenerateCodeTests
     {
         private static string Expected =>

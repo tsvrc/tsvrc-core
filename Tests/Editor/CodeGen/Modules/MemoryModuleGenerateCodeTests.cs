@@ -4,7 +4,7 @@ using Tsvrc.Editor;
 namespace Tsvrc.Tests.Editor
 {
     // MemoryModule.GenerateCode() has no config-driven variation at all (LoadConfig() is
-    // a no-op). CODEGEN_TESTING_PLAN.md Phase G2.7.
+    // a no-op).
     public class MemoryModuleGenerateCodeTests
     {
         [Test]

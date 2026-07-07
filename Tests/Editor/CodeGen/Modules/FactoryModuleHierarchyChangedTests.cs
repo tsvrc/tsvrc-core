@@ -4,7 +4,7 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.Editor
 {
-    // FactoryModule.OnSceneHierarchyChanged(). Phase G5.4.
+    // FactoryModule.OnSceneHierarchyChanged().
     public class FactoryModuleHierarchyChangedTests
     {
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(FactoryModule), "FactoryEntry");
