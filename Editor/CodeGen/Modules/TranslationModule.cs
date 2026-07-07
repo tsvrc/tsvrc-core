@@ -96,7 +96,11 @@ namespace Tsvrc.Editor
                             string prefix = i == 0 ? "if" : "else if";
                             w.Line($"{prefix} (_tsIdx == {i}) {{ _tsCurrentKeys = _tsKeys_{id}; _tsCurrentVals = _tsVals_{id}; }}");
                         }
-                        w.Line($"else {{ Debug.LogError($\"[TsvrcGenerated] Language index {{{{_tsIdx}}}} is not available.\"); return; }}");
+                        // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 6: this used to escape
+                        // `_tsIdx` one interpolation layer too deep ({{{{_tsIdx}}}}), producing
+                        // a literal, non-interpolating "{_tsIdx}" in the generated code's own
+                        // interpolated string instead of substituting the real invalid index.
+                        w.Line($"else {{ Debug.LogError($\"[TsvrcGenerated] Language index {{_tsIdx}} is not available.\"); return; }}");
                         w.Line("_tsCurrentLang = _tsIdx;");
                         w.Line("_tsBatchIndex = 0;");
                         w.Line("_tsBatchRunning = true;");

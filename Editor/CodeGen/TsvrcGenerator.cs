@@ -80,7 +80,18 @@ namespace Tsvrc.Editor
                     paths.Add($"{GeneratedFolder}/{module.FileName}");
             WatchedPaths = paths;
 
-            if (WriteModules(modules) && !skipRefresh) { AssetDatabase.Refresh(); return; }
+            if (WriteModules(modules))
+            {
+                // Even with skipRefresh (build-time — see TsvrcBuildCompile), stop here rather
+                // than falling through to Wire() below: the compiled type on disk is now stale
+                // relative to what was just written, so wiring against it would operate on the
+                // wrong field set. The real recompile that follows (e.g. UdonSharp's own
+                // build-time pass) triggers a fresh domain reload, which calls AfterDomainReload()
+                // again with the now-current compiled type (see TsvrcDomainReloadHandler) — that
+                // pass is what actually wires. Fixed CODEGEN_TESTING_PLAN.md Part 4 item 3.
+                if (!skipRefresh) AssetDatabase.Refresh();
+                return;
+            }
 
             bool stableChanged = false;
             foreach (var module in modules)
@@ -90,7 +101,11 @@ namespace Tsvrc.Editor
             // Refresh even if no .cs file changed — UdonSharp won't re-link the backing
             // UdonBehaviour until it processes the new asset.
             bool filesWritten = WriteModules(modules);
-            if ((filesWritten || stableChanged) && !skipRefresh) { AssetDatabase.Refresh(); return; }
+            if (filesWritten || stableChanged)
+            {
+                if (!skipRefresh) AssetDatabase.Refresh();
+                return;
+            }
 
             var compiledType = ScaffoldModule.FindCompiledType();
             if (compiledType != null && UnityEngine.Object.FindObjectOfType(compiledType, true) != null)

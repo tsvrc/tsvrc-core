@@ -90,14 +90,13 @@ namespace {ScaffoldModule.CompiledNamespace}
             StringAssert.Contains("Debug.LogError", code);
             StringAssert.Contains("is not available.", code);
 
-            // Candidate bug (CODEGEN_TESTING_PLAN.md Part 4 item 6): the generated line's
-            // interpolated string escapes `_tsIdx` as a *literal* brace pair, not an
-            // interpolation hole - at runtime this logs the literal text "{_tsIdx}", never
-            // the actual invalid index value. Pinning the exact text here (verified against
-            // real Unity output, not hand-derived) so this either gets fixed deliberately or
-            // this test visibly needs updating if the escaping ever changes.
+            // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 6: the generated line's interpolated
+            // string used to escape `_tsIdx` as a *literal* brace pair, not an interpolation
+            // hole - at runtime this logged the literal text "{_tsIdx}", never the actual
+            // invalid index value. Now it's a real interpolation hole, so the runtime message
+            // substitutes the real (invalid) index.
             StringAssert.Contains(
-                "else { Debug.LogError($\"[TsvrcGenerated] Language index {{_tsIdx}} is not available.\"); return; }",
+                "else { Debug.LogError($\"[TsvrcGenerated] Language index {_tsIdx} is not available.\"); return; }",
                 code);
         }
 

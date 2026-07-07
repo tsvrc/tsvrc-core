@@ -19,7 +19,6 @@ namespace Tsvrc.Editor
     // instances) and assign [WirePool] fields on all of them.
     internal class PoolModule : TsvrcModule
     {
-        private bool _hasAnyConfigured;
         private List<(Component prefab, string typeName)> _poolEntries = new List<(Component, string)>();
         private Dictionary<string, PoolTypeInfo> _poolTypeInfos = new Dictionary<string, PoolTypeInfo>(StringComparer.Ordinal);
         private HashSet<string> _watchedTypeNames = new HashSet<string>(StringComparer.Ordinal);
@@ -51,8 +50,6 @@ namespace Tsvrc.Editor
         {
             var userConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
             var builtinConfig = AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(BuiltinConfigPath);
-            _hasAnyConfigured = (userConfig?.PooledObjects?.Length > 0)
-                             || (builtinConfig?.PoolPrefabs?.Length > 0);
 
             _poolEntries = ResolveConfig(userConfig, builtinConfig);
 
@@ -230,8 +227,6 @@ namespace Tsvrc.Editor
         {
             var root = FindRoot();
             if (root == null) return;
-
-            if (_hasAnyConfigured && _poolEntries.Count == 0) return;
 
             var existingContainer = root.transform.Find("Pool");
 
@@ -441,7 +436,13 @@ namespace Tsvrc.Editor
                     for (var t = behaviour.GetType(); t != null && t != typeof(MonoBehaviour) && t != typeof(UdonSharpBehaviour); t = t.BaseType)
                         foreach (var field in t.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
                         {
-                            if (!field.GetCustomAttributes(false).Any(a => a.GetType().Name == "WirePoolAttribute")) continue;
+                            // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 5: this used to check only
+                            // for the [WirePool] attribute, without the public/[SerializeField]
+                            // requirement that ScanExternalRefs/ScanInternalDeps apply via
+                            // IsWirePoolField - so a non-serialized private [WirePool] field
+                            // contributed nothing to slot counts but still inflated the
+                            // target/slot mismatch warnings by one. Now both scans agree.
+                            if (!IsWirePoolField(field)) continue;
                             if (field.FieldType.IsArray || field.FieldType.IsGenericType) continue;
 
                             string typeName = field.FieldType.Name;

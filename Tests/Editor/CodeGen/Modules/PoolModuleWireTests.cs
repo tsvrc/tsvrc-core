@@ -70,7 +70,6 @@ namespace Tsvrc.Tests.Editor
             dict[typeName] = info;
 
             var module = new PoolModule();
-            PrivateFieldAccess.SetField(module, "_hasAnyConfigured", true);
             PrivateFieldAccess.SetField(module, "_poolEntries", new List<(Component, string)> { (prefab, typeName) });
             PrivateFieldAccess.SetField(module, "_poolTypeInfos", dict);
             return module;
@@ -79,39 +78,21 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void Wire_NoEntries_ExistingPoolContainerDestroyed()
         {
+            // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 1: this used to only clean up the
+            // stale "Pool" container when no pool config had ever existed at all. Now the
+            // (removed) _hasAnyConfigured distinction is gone entirely - an empty
+            // _poolEntries always triggers cleanup, whether nothing was ever configured or
+            // everything configured became invalid (e.g. all prefabs deleted).
             var stray = _scope.CreateGameObject("Pool");
             stray.transform.SetParent(_root.transform, false);
 
             var module = new PoolModule();
-            PrivateFieldAccess.SetField(module, "_hasAnyConfigured", false);
             PrivateFieldAccess.SetField(module, "_poolEntries", new List<(Component, string)>());
             PrivateFieldAccess.SetField(module, "_poolTypeInfos", Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(typeof(string), InfoType), StringComparer.Ordinal));
 
             module.Wire();
 
             Assert.IsNull(_root.transform.Find("Pool"));
-        }
-
-        [Test]
-        public void Wire_HasAnyConfiguredButEntriesEmpty_LeavesStaleContainerUntouched()
-        {
-            // Pins the candidate-bug behavior documented in CODEGEN_TESTING_PLAN.md Part 4
-            // item 1: when _hasAnyConfigured is true but _poolEntries resolved to empty
-            // (e.g. every configured prefab became invalid), Wire() returns before ever
-            // reaching the "destroy stale container" branch - the stray "Pool" GameObject
-            // from a previous valid run is left behind. This test documents *current*
-            // behavior, not necessarily desired behavior.
-            var stray = _scope.CreateGameObject("Pool");
-            stray.transform.SetParent(_root.transform, false);
-
-            var module = new PoolModule();
-            PrivateFieldAccess.SetField(module, "_hasAnyConfigured", true);
-            PrivateFieldAccess.SetField(module, "_poolEntries", new List<(Component, string)>());
-            PrivateFieldAccess.SetField(module, "_poolTypeInfos", Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(typeof(string), InfoType), StringComparer.Ordinal));
-
-            module.Wire();
-
-            Assert.IsNotNull(_root.transform.Find("Pool"), "Documents the current (arguably buggy) behavior: the stale container survives.");
         }
 
         [Test]
@@ -173,38 +154,43 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void Wire_MoreExternalTargetsThanSlots_LogsStaleReferenceWarning()
         {
-            // PoolWireTargetDouble's [WirePool] StateManager targets, per
-            // CollectWireTargetsByType's *own* filtering (see the dedicated regression test
-            // below for why this differs from ScanExternalRefs's count): PublicField,
-            // _serializedField, AND _nonSerializedField all count as "targets" here (only
-            // array/generic fields are excluded in this method) - 3 total, against 1 slot.
+            // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 5: CollectWireTargetsByType now
+            // reuses IsWirePoolField, the same public/[SerializeField] filter
+            // ScanExternalRefs uses for slot-count math - so PoolWireTargetDouble's
+            // _nonSerializedField no longer counts as a target here either. Only
+            // PublicField and _serializedField count - 2 total, against 1 slot.
             var prefab = CreateScratchPrefab("Widget4");
             _scope.CreateGameObject("Target").AddComponent<PoolWireTargetDouble>();
             var module = BuildModule(prefab, totalSlots: 1);
 
-            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*3 \\[WirePool\\] target\\(s\\), 1 slot\\(s\\) — 2 component\\(s\\) will keep stale references.*"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*2 \\[WirePool\\] target\\(s\\), 1 slot\\(s\\) — 1 component\\(s\\) will keep stale references.*"));
 
             module.Wire();
         }
 
         [Test]
-        public void Wire_NonSerializedWirePoolField_CountsAsTargetButLogsItsOwnNotSerializedWarning()
+        public void Wire_NonSerializedWirePoolField_SilentlyExcludedFromTargetsLikeItIsFromSlotCounts()
         {
-            // Candidate finding: ScanExternalRefs (slot-count computation) uses
-            // IsWirePoolField, which excludes a private [WirePool] field lacking
-            // [SerializeField]. CollectWireTargetsByType (Wire()'s actual assignment scan)
-            // does NOT apply that same filter - it only excludes array/generic fields - so a
-            // non-serialized [WirePool] field is silently absent from the slot-count math
-            // but still counted as a "target" here, and separately fails at assignment time
-            // with its own distinct warning. Isolate that second warning specifically using
-            // a double with only the non-serialized field (no Public/_serializedField noise).
+            // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 5: CollectWireTargetsByType and
+            // ScanExternalRefs now agree on what counts as a wireable [WirePool] field, so a
+            // non-serialized private field is silently excluded from both - no "not
+            // serialized" warning fires anymore, since the field is never treated as a
+            // target for assignment in the first place. As a direct consequence, the slot now
+            // has zero targets, so it logs the ordinary "unassigned" mismatch warning instead
+            // (same as any other under-targeted slot). The unrelated "slot field not found on
+            // TsvrcGenerated" warning is expected too - this project's compiled type has no
+            // real "_pool_StateManager_0" field outside CodeGenSandbox.Bootstrap(), same as
+            // every other non-bootstrapped test in this fixture.
             var prefab = CreateScratchPrefab("Widget5b");
             _scope.CreateGameObject("Target").AddComponent<PoolWireOnlyNonSerializedFieldDouble>();
             var module = BuildModule(prefab, totalSlots: 1);
 
-            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*_nonSerializedField.*has \\[WirePool\\] but is not serialized.*"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*Field '_pool_StateManager_0' not found.*"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*1 slot\\(s\\), 0 \\[WirePool\\] target\\(s\\) — 1 slot\\(s\\) unassigned.*"));
 
             module.Wire();
+
+            LogAssert.NoUnexpectedReceived();
         }
 
         // IsPoolAlreadyWired() is `private` (instance) - only its "not wired" (false)

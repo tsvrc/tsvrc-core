@@ -41,8 +41,9 @@ namespace Tsvrc.Tests.Editor
         public void PrivateFieldAccess_SetAndGetField_RoundTrips()
         {
             var pool = new PoolModule();
-            PrivateFieldAccess.SetField(pool, "_hasAnyConfigured", true);
-            Assert.IsTrue(PrivateFieldAccess.GetField<bool>(pool, "_hasAnyConfigured"));
+            var entries = new System.Collections.Generic.List<(UnityEngine.Component, string)>();
+            PrivateFieldAccess.SetField(pool, "_poolEntries", entries);
+            Assert.AreSame(entries, PrivateFieldAccess.GetField<object>(pool, "_poolEntries"));
         }
     }
 }

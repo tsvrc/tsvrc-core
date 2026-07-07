@@ -863,84 +863,104 @@ verified-correct working tree.
 ## Part 4 — Candidate bugs / design gaps found during this analysis
 
 These surfaced from reading the generator source closely while planning the tests
-above, **not** from running anything yet. Per the stated priority (cover what's
-implemented first; let real test-writing surface bugs), don't fix these yet — but
-each has a specific test already called out above that will confirm or refute it.
-Revisit this list once the corresponding phase is implemented.
+above. Items 1, 3, 5, and 6 were confirmed real and **fixed on 2026-07-07** (see
+each entry for what changed and which tests were updated); the full CodeGen suite
+was rerun via real Unity batch mode after all fixes (`-runTests -testPlatform
+EditMode`) and is green: 259 passed, 9 skipped (documented environment-gated
+cases), 0 failed. Items 2 and 4 were investigated and confirmed **not bugs** — no
+code change was needed for either.
 
-1. **PoolModule stale-container leak** (G4.10(d)) — `Wire()`'s guard
-   `if (_hasAnyConfigured && _poolEntries.Count == 0) return;` executes *before* the
-   very next block that would destroy a stale "Pool" container
-   (`if (_poolEntries.Count == 0) { destroy existing; return; }`), meaning that
-   second block is dead code whenever `_hasAnyConfigured` is true. Concretely: if a
-   project has a valid pool config, runs `Wire()` once (creating real pool
-   instances), and then every pool entry becomes invalid (e.g. all configured
-   prefabs deleted, while `_hasAnyConfigured` remains true because the *config
-   array itself* still has non-null-but-now-invalid-persistence entries), the old
-   "Pool" GameObject and its instantiated children are never cleaned up. Worth
-   confirming with a test and then a decision on whether this is the intended
-   "leave broken things alone" philosophy (matching `InstanceModule`'s deliberate
-   ambiguous-no-op) or an oversight.
-2. **Cross-module `ExposedFieldNames` is effectively single-module today**
-   (§1.1, G6.3) — the collision-detection mechanism in `TsvrcGenerator.Run()` is
-   general (any module can override `ExposedFieldNames`/`ExcludeFieldNames`), but
-   only `SingletonModule` does. `ConstructModule`/`FactoryModule`/`PoolModule` all
-   use prefixed field names (`_construct`/`_factory`/`_pool_`) which happen to make
-   cross-module collisions structurally impossible today — but that means the
-   general mechanism is currently only ever tripped by two Singleton entries
-   deriving the same name, which `SingletonModule.Resolve()`'s own `Deduplicate`
-   call already prevents before `ExposedFieldNames()` is even consulted. In its
-   current form the cross-module path may be unreachable through any real module
-   combination; only the synthetic-module test in G6.3 can currently exercise it.
-   Not necessarily a bug — just worth the maintainers knowing the safety net has
-   never actually fired in practice.
-3. **`Run()`'s `skipRefresh` control flow** (§1.2.a, G6.7) — when called with
-   `skipRefresh: true` (build-time) and pending `.cs` changes exist, execution falls
-   through to `Wire()` against the *previous* compiled type rather than stopping.
-   Whether this is safe depends on UdonSharp's own build-time compile happening
-   later in the same build pass and re-wiring correctly — outside this module's
-   control to verify directly. Flag for a human decision once G6.7's pinning test
-   exists and its actual current behavior is visible in a real run.
-4. **`TsvrcAssetWatcher.AnyMatch` comparer** (G1.7) — confirm whether the
+1. **FIXED — PoolModule stale-container leak** (G4.10(d)) — `Wire()` had a guard
+   `if (_hasAnyConfigured && _poolEntries.Count == 0) return;` that executed
+   *before* the very next block that destroys a stale "Pool" container
+   (`if (_poolEntries.Count == 0) { destroy existing; return; }`), making that
+   second block dead code whenever `_hasAnyConfigured` was true. Concretely: if a
+   project had a valid pool config, ran `Wire()` once (creating real pool
+   instances), and then every pool entry became invalid (e.g. all configured
+   prefabs deleted), the old "Pool" GameObject and its instantiated children were
+   never cleaned up. **Fix:** removed the dead early-return guard entirely (and the
+   now-unused `_hasAnyConfigured` field along with it, since nothing else read it)
+   — an empty `_poolEntries` now always triggers cleanup, matching the
+   never-configured case. See `PoolModuleWireTests.Wire_NoEntries_
+   ExistingPoolContainerDestroyed` (updated to cover both scenarios; the redundant
+   dedicated test for the `_hasAnyConfigured`-true case was removed since the
+   distinction no longer exists in the code).
+2. **NOT A BUG — Cross-module `ExposedFieldNames` is effectively single-module
+   today** (§1.1, G6.3) — the collision-detection mechanism in
+   `TsvrcGenerator.Run()` is general (any module can override
+   `ExposedFieldNames`/`ExcludeFieldNames`), but only `SingletonModule` does.
+   `ConstructModule`/`FactoryModule`/`PoolModule` all use prefixed field names
+   (`_construct`/`_factory`/`_pool_`) which happen to make cross-module collisions
+   structurally impossible today — the general mechanism is currently only ever
+   tripped by two Singleton entries deriving the same name, which
+   `SingletonModule.Resolve()`'s own `Deduplicate` call already prevents before
+   `ExposedFieldNames()` is even consulted. Confirmed this is intentional headroom
+   for future modules, not a defect — the safety net working correctly whenever
+   it's exercised (by the synthetic-module test in G6.3) is exactly what a general,
+   currently-underused mechanism should look like. No code change made.
+3. **FIXED — `Run()`'s `skipRefresh` control flow** (§1.2.a, G6.7) — when called
+   with `skipRefresh: true` (build-time, via `TsvrcBuildCompile`) and pending `.cs`
+   changes existed, execution fell through to `Wire()` against the *previous*
+   (stale, pre-recompile) compiled type instead of stopping. **Fix:** both
+   write-check branches in `Run()` now return immediately whenever files were
+   written or became stable, regardless of `skipRefresh` — only the
+   `AssetDatabase.Refresh()` call itself is skipped when `skipRefresh` is true.
+   Wiring is deferred to the next domain-reload-triggered `Run()` (see
+   `TsvrcDomainReloadHandler`), which runs against the now-current compiled type
+   after the real recompile (e.g. UdonSharp's own build-time pass) completes. See
+   `TsvrcGeneratorSkipRefreshFallthroughTests.Run_SkipRefreshTrueWithPendingFileChanges_
+   StopsAfterWritingWithoutWiringOrThrowing` (renamed and rewritten to assert Wire()
+   does NOT run this pass, proven by the absence of the stale-field warning it used
+   to log).
+4. **NOT A BUG — `TsvrcAssetWatcher.AnyMatch` comparer** (G1.7) — confirmed the
    case-insensitive construction of `WatchedPaths` in `TsvrcGenerator` (`new
-   HashSet<string>(StringComparer.OrdinalIgnoreCase)`) is actually honored by
-   `AnyMatch`'s lookup (`watched.Contains(path)` — correct, since `Contains` uses
-   the set's own comparer) or whether a fresh `HashSet` gets rebuilt somewhere with
-   a different comparer. Likely fine, but cheap to pin with a test given the
-   case-sensitivity of filesystem paths varying by OS.
-5. **`PoolModule.CollectWireTargetsByType` doesn't apply the same serialization filter as
-   `ScanExternalRefs`/`ScanInternalDeps`** (confirmed while implementing `PoolModuleWireTests`,
-   2026-07-05) — `IsWirePoolField` (used by the two `Scan*` methods that compute slot counts)
-   requires a `[WirePool]` field to be `public` or carry `[SerializeField]`; a private field
-   with neither is correctly excluded from slot-count math. `CollectWireTargetsByType` (used by
-   `Wire()`'s actual field-assignment pass) has its own separate, looser inline filter that only
-   excludes array/generic fields — it does **not** check public/`[SerializeField]` at all. The
-   practical effect: a non-serialized private `[WirePool]` field contributes zero to the slot
-   count (so no extra pool instance gets created for it) but *is* counted in the target-count
-   mismatch warnings and gets its own separate `"has [WirePool] but is not serialized"` warning
-   at assignment time, inflating the apparent target/slot mismatch by one for every such field in
-   the scene. Confirmed via `PoolModuleWireTests.Wire_NonSerializedWirePoolField_...` and the
-   corrected expected count in `Wire_MoreExternalTargetsThanSlots_...`. Not fixed — flagged for a
-   maintainer decision on whether `CollectWireTargetsByType` should reuse `IsWirePoolField`
-   directly (it would need to become non-private, or the check inlined identically) so the two
-   scans agree on what counts as a wireable field.
-6. **`TranslationModule.GenerateCode()`'s "language not available" error message never shows
-   the actual invalid index** (confirmed empirically 2026-07-05 via real Unity output, not
-   hand-derived, in `TranslationModuleGenerateCodeTests`) — the generator source
-   (`TranslationModule.cs`, the `SetLanguage` body) builds this line via nested
-   interpolated-string escaping:
+   HashSet<string>(StringComparer.OrdinalIgnoreCase)`) is correctly honored by
+   `AnyMatch`'s lookup (`watched.Contains(path)` uses the set's own comparer). No
+   code change needed; already pinned by a passing test.
+5. **FIXED — `PoolModule.CollectWireTargetsByType` didn't apply the same
+   serialization filter as `ScanExternalRefs`/`ScanInternalDeps`** (confirmed while
+   implementing `PoolModuleWireTests`, 2026-07-05) — `IsWirePoolField` (used by the
+   two `Scan*` methods that compute slot counts) requires a `[WirePool]` field to
+   be `public` or carry `[SerializeField]`; a private field with neither is
+   correctly excluded from slot-count math. `CollectWireTargetsByType` (used by
+   `Wire()`'s actual field-assignment pass) had its own separate, looser inline
+   filter that only excluded array/generic fields — it did **not** check
+   public/`[SerializeField]` at all. The practical effect: a non-serialized private
+   `[WirePool]` field contributed zero to the slot count (so no extra pool instance
+   was created for it) but *was* counted in the target-count mismatch warnings and
+   got its own separate `"has [WirePool] but is not serialized"` warning at
+   assignment time, inflating the apparent target/slot mismatch by one for every
+   such field in the scene. **Fix (2026-07-07):** `CollectWireTargetsByType` now
+   calls the shared `IsWirePoolField` directly instead of its own looser inline
+   check, so both scans agree on what counts as a wireable field. As a direct
+   consequence, the "has [WirePool] but is not serialized" assignment-time warning
+   became unreachable for non-serialized fields (they're no longer collected as
+   targets at all, so a non-serialized field is now silently excluded end-to-end,
+   consistent with how the slot-count side already treated it) — the
+   `Wire_MoreExternalTargetsThanSlots_...` test's expected counts were corrected
+   (3→2 targets, 2→1 stale references) and
+   `Wire_NonSerializedWirePoolField_...` was rewritten (and renamed to
+   `..._SilentlyExcludedFromTargetsLikeItIsFromSlotCounts`) to assert the field is
+   now excluded from both, rather than pinning the old inconsistent behavior.
+6. **FIXED — `TranslationModule.GenerateCode()`'s "language not available" error
+   message never showed the actual invalid index** (confirmed empirically
+   2026-07-05 via real Unity output, in `TranslationModuleGenerateCodeTests`) — the
+   generator source (`TranslationModule.cs`, the `SetLanguage` body) built this
+   line via nested interpolated-string escaping:
    `w.Line($"else {{ Debug.LogError($\"[TsvrcGenerated] Language index {{{{_tsIdx}}}} is not available.\"); return; }}");`.
-   The quadruple braces around `_tsIdx` are two *escaped literal brace pairs* in the outer
-   generator string, which produce the literal text `{{_tsIdx}}` in the generated `.cs` file.
-   When *that* generated file is itself compiled, `{{`/`}}` inside its own `$"..."` string are
-   *also* escape sequences (for a literal `{`/`}`), not an interpolation hole - so the actual
-   runtime log message reads literally `Language index {_tsIdx} is not available.`, never
-   substituting the real (invalid) index value a world author would need to debug the problem.
-   Almost certainly unintentional (one interpolation layer too many was escaped when this line
-   was written) - the likely intended output was `Language index 3 is not available.` with the
-   real number. Not fixed - flagged for a maintainer decision; the exact current (probably
-   buggy) text is pinned by a regression test in `TranslationModuleGenerateCodeTests` so
-   fixing it will visibly require updating that test.
+   The quadruple braces around `_tsIdx` were two *escaped literal brace pairs* in
+   the outer generator string, producing the literal text `{{_tsIdx}}` in the
+   generated `.cs` file — and since `{{`/`}}` inside *that* file's own `$"..."`
+   string are themselves escape sequences (for a literal `{`/`}`), not an
+   interpolation hole, the actual runtime log message read literally
+   `Language index {_tsIdx} is not available.`, never substituting the real
+   (invalid) index value a world author would need to debug the problem. **Fix:**
+   reduced the quadruple braces to a real double-brace interpolation hole
+   (`{{_tsIdx}}` in the generator source, which escapes to a single `{_tsIdx}` in
+   the generated file — a genuine interpolation hole once that file is compiled).
+   The runtime message now correctly substitutes the real invalid index. The
+   pinning test in `TranslationModuleGenerateCodeTests` was updated to expect the
+   corrected (interpolating) text.
 
 ---
 
