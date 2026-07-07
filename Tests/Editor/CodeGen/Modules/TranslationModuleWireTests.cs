@@ -4,6 +4,7 @@ using NUnit.Framework;
 using Tsvrc.Editor;
 using TMPro;
 using UnityEditor;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.Editor
@@ -12,6 +13,15 @@ namespace Tsvrc.Tests.Editor
     public class TranslationModuleWireTests
     {
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(TranslationModule), "LanguageEntry");
+
+        // A stand-in for the compiled root exposing only the one literal field name
+        // AssignTargets is fed via SerializedProperty - not the real compiled type, since
+        // this project has no real language config and thus no real "_translationTargets"
+        // field outside a full config-driven generation pass.
+        private class TranslationTargetsFieldDouble : MonoBehaviour
+        {
+            public TMPro.TextMeshProUGUI[] _translationTargets;
+        }
 
         private TempSceneScope _scope;
 
@@ -41,15 +51,9 @@ namespace Tsvrc.Tests.Editor
         {
             // Unlike every other config-driven module, TranslationModule.Wire() returns
             // silently (no Debug.LogWarning) when `_translationTargets` isn't found on the
-            // compiled root - this project has no real language files configured by default,
-            // so the field genuinely doesn't exist unless CodeGenSandbox.Bootstrap() has run;
-            // when it has, this same missing-field scenario can't be constructed this way
-            // anymore, so this test is skipped (not failed) in that state - see
-            // Wire_RealTranslationTargetsField_... below for the bootstrapped-state coverage
-            // instead.
-            var root = CompiledRootFixture.AddTo(_scope);
-            if (new SerializedObject(root).FindProperty("_translationTargets") != null)
-                Assert.Ignore("_translationTargets already exists on the compiled root (CodeGenSandbox is active) - this scenario is covered by Wire_RealTranslationTargetsField_... instead.");
+            // compiled root - this project has no real language files configured, so the
+            // field genuinely never exists on the compiled type.
+            CompiledRootFixture.AddTo(_scope);
 
             var module = new TranslationModule();
             PrivateFieldAccess.SetField(module, "_languages", PrivateFieldAccess.BuildList(EntryType, new[] { OneLanguage() }));
@@ -59,21 +63,18 @@ namespace Tsvrc.Tests.Editor
         }
 
         [Test]
-        public void Wire_RealTranslationTargetsField_IsAssignedToMatchingSceneTmpObjects()
+        public void AssignTargets_ResizesArrayAndAssignsEachElement()
         {
-            // Runs for real once CodeGenSandbox.Bootstrap() has produced a real
-            // "_translationTargets" field on TsvrcGenerated; Assert.Ignore()s otherwise.
-            var root = CompiledRootFixture.AddTo(_scope);
-            SandboxGate.RequireField(root, "_translationTargets");
+            // AssignTargets is testable against any array-typed SerializedProperty, not only
+            // the real compiled root's "_translationTargets" (which this project never has
+            // without a real language config driving a full generation pass).
+            var fakeRoot = _scope.CreateGameObject("FakeRoot").AddComponent<TranslationTargetsFieldDouble>();
+            var target = _scope.CreateGameObject("Target").AddComponent<TextMeshProUGUI>();
+            var prop = new SerializedObject(fakeRoot).FindProperty(nameof(TranslationTargetsFieldDouble._translationTargets));
 
-            var target = _scope.CreateGameObject(CodeGenSandbox.TranslationKey).AddComponent<TextMeshProUGUI>();
-            var module = new TranslationModule();
-            PrivateFieldAccess.SetField(module, "_languages", PrivateFieldAccess.BuildList(EntryType, new[] { OneLanguage() }));
-            PrivateFieldAccess.SetField(module, "_cachedTmpTargets", new List<TextMeshProUGUI> { target });
+            PrivateFieldAccess.InvokeStatic(typeof(TranslationModule), "AssignTargets", prop, new List<TextMeshProUGUI> { target });
+            prop.serializedObject.ApplyModifiedPropertiesWithoutUndo();
 
-            module.Wire();
-
-            var prop = new SerializedObject(root).FindProperty("_translationTargets");
             Assert.AreEqual(1, prop.arraySize);
             Assert.AreEqual(target, prop.GetArrayElementAtIndex(0).objectReferenceValue);
         }

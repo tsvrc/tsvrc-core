@@ -205,10 +205,17 @@ namespace Tsvrc.Editor
             var so = new SerializedObject(root);
             var prop = so.FindProperty("_translationTargets");
             if (prop == null) return;
-            prop.arraySize = _cachedTmpTargets.Count;
-            for (int i = 0; i < _cachedTmpTargets.Count; i++)
-                prop.GetArrayElementAtIndex(i).objectReferenceValue = _cachedTmpTargets[i];
+            AssignTargets(prop, _cachedTmpTargets);
             ApplyAndMarkDirty(so, root);
+        }
+
+        // Testable in isolation via reflection against any array-typed SerializedProperty -
+        // not tied to the real compiled root's "_translationTargets".
+        private static void AssignTargets(SerializedProperty prop, List<TMPro.TextMeshProUGUI> targets)
+        {
+            prop.arraySize = targets.Count;
+            for (int i = 0; i < targets.Count; i++)
+                prop.GetArrayElementAtIndex(i).objectReferenceValue = targets[i];
         }
 
         private List<TMPro.TextMeshProUGUI> FindTmpTargets()

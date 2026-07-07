@@ -226,25 +226,10 @@ namespace Tsvrc.Editor
                     continue;
                 }
 
-                if (factoriesContainer == null)
-                {
-                    factoriesContainer = new GameObject("Factories");
-                    Undo.RegisterCreatedObjectUndo(factoriesContainer, "Create Factories Container");
-                    factoriesContainer.transform.SetParent(root.transform, false);
-                }
-
-                var instance = (GameObject)PrefabUtility.InstantiatePrefab(entry.PrefabAsset, factoriesContainer.transform);
+                var (container, instance) = CreateAndAssignInstance(prop, entry.PrefabAsset, entry.Name, factoriesContainer, root.transform);
+                factoriesContainer = container;
                 if (instance == null)
-                {
                     Debug.LogWarning($"[FactoryModule] Failed to instantiate factory prefab '{entry.Name}'. The prefab asset may be missing.");
-                    continue;
-                }
-
-                instance.name = entry.Name;
-                instance.SetActive(false);
-                Undo.RegisterCreatedObjectUndo(instance, $"Create {entry.Name} factory instance");
-
-                prop.objectReferenceValue = instance;
             }
 
             ApplyAndMarkDirty(so, root);
@@ -295,6 +280,30 @@ namespace Tsvrc.Editor
             }
 
             return entries;
+        }
+
+        // Testable in isolation via reflection against any SerializedProperty/parent
+        // Transform - not tied to the real compiled root.
+        private static (GameObject container, GameObject instance) CreateAndAssignInstance(
+            SerializedProperty prop, UnityEngine.Object prefabAsset, string entryName, GameObject existingContainer, Transform rootTransform)
+        {
+            var container = existingContainer;
+            if (container == null)
+            {
+                container = new GameObject("Factories");
+                Undo.RegisterCreatedObjectUndo(container, "Create Factories Container");
+                container.transform.SetParent(rootTransform, false);
+            }
+
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefabAsset, container.transform);
+            if (instance == null) return (container, null);
+
+            instance.name = entryName;
+            instance.SetActive(false);
+            Undo.RegisterCreatedObjectUndo(instance, $"Create {entryName} factory instance");
+
+            prop.objectReferenceValue = instance;
+            return (container, instance);
         }
 
         private bool IsFactoriesAlreadyWired(Component root, Transform existing)

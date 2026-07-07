@@ -37,12 +37,12 @@ namespace Tsvrc.Tests.Editor
             CompiledRootFixture.AddTo(_scope);
 
             // Run() once first to let GenerateCode() output settle to whatever this test's
-            // (empty) config produces. If the project happened to be in a *different* state
-            // beforehand (e.g. CodeGenSandbox.Bootstrap() has been run), this first pass's
-            // own file-content change is a legitimate, *external-looking* reason for
-            // TsvrcAssetWatcher to schedule a rerun - that's not what this test is about.
-            // Reset _rerunPending afterward so the real assertion below is only about the
-            // second pass, where content is already stable and nothing external changes.
+            // (empty) config produces. If the project's generated files happened to already
+            // differ from that, this first pass's own file-content change is a legitimate,
+            // *external-looking* reason for TsvrcAssetWatcher to schedule a rerun - that's not
+            // what this test is about. Reset _rerunPending afterward so the real assertion
+            // below is only about the second pass, where content is already stable and
+            // nothing external changes.
             TsvrcGenerator.AfterDomainReload(skipRefresh: true);
             PrivateFieldAccess.SetField(typeof(TsvrcGenerator), "_rerunPending", false);
 

@@ -11,13 +11,23 @@ namespace Tsvrc.Tests.Editor
     // slot-field-not-found path `continue`s BEFORE creating the "Factories" container or
     // instantiating anything - so the empty-entries branches and the "field missing -> zero
     // mutation" case are always testable against this project's real (unbootstrapped)
-    // compiled root; the "field found -> instantiated and assigned" happy path additionally
-    // runs for real whenever CodeGenSandbox.Bootstrap() has been applied, and is
-    // Assert.Ignore()'d otherwise.
+    // compiled root. The "field found -> instantiated and assigned" sequence lives in
+    // FactoryModule.CreateAndAssignInstance(), a private static method reachable via
+    // reflection, tested directly against a plain test double instead of needing a real
+    // bootstrapped field on the compiled type.
     public class FactoryModuleWireTests
     {
         private const string ScratchPrefabPath = ScratchAssets.Folder + "/FactoryWirePrefab.prefab";
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(FactoryModule), "FactoryEntry");
+
+        // A stand-in for the compiled root exposing only the one literal field name
+        // CreateAndAssignInstance/IsFactoriesAlreadyWired need to find a match against - both
+        // take their target as an explicit parameter rather than looking up the real compiled
+        // type themselves, so any Component with the right field works.
+        private class FactoryFieldDouble : MonoBehaviour
+        {
+            public GameObject _factoryWidget;
+        }
 
         private TempSceneScope _scope;
         private Component _root;
@@ -78,10 +88,8 @@ namespace Tsvrc.Tests.Editor
             Assert.IsNull(_root.transform.Find("Factories"), "Unlike PoolModule, Factory must not create the container at all when the field is missing.");
         }
 
-        // IsFactoriesAlreadyWired() is `private` (instance) - reachable via reflection. Only
-        // its "not wired" (false) outcomes are verifiable without a bootstrap, since the
-        // "wired" (true) branch requires a real `_factory{Name}` field reference match on
-        // the compiled root.
+        // IsFactoriesAlreadyWired() is `private` (instance) - reachable via reflection,
+        // passing whatever root/existing container the test constructs.
         private static bool IsAlreadyWired(FactoryModule module, Component root, Transform existing)
             => (bool)PrivateFieldAccess.InvokeInstance(module, "IsFactoriesAlreadyWired", root, existing);
 
@@ -150,43 +158,54 @@ namespace Tsvrc.Tests.Editor
         }
 
         [Test]
-        public void Wire_RealFactoryField_CreatesContainerInstantiatesInactiveAndAssignsField()
+        public void CreateAndAssignInstance_FieldFound_CreatesContainerInstantiatesInactiveAndAssignsField()
         {
-            // Runs for real once CodeGenSandbox.Bootstrap() has produced a real
-            // "_factorySampleFactoryPrefab" field on TsvrcGenerated; Assert.Ignore()s
-            // otherwise.
-            SandboxGate.RequireField(_root, CodeGenSandbox.FactoryFieldName);
+            var prefab = CreateScratchPrefab("Widget");
+            var fakeRoot = _scope.CreateGameObject("FakeRoot").AddComponent<FactoryFieldDouble>();
+            var prop = new SerializedObject(fakeRoot).FindProperty(nameof(FactoryFieldDouble._factoryWidget));
 
-            var prefab = CreateScratchPrefab(CodeGenSandbox.FactoryEntryName);
-            var module = ModuleWithOneEntry(CodeGenSandbox.FactoryEntryName, prefab);
+            var (container, instance) = ((GameObject container, GameObject instance))PrivateFieldAccess.InvokeStatic(
+                typeof(FactoryModule), "CreateAndAssignInstance", prop, prefab, "Widget", null, fakeRoot.transform);
+            prop.serializedObject.ApplyModifiedPropertiesWithoutUndo();
 
-            module.Wire();
-
-            var container = _root.transform.Find("Factories");
             Assert.IsNotNull(container);
-            var instance = container.Find(CodeGenSandbox.FactoryEntryName);
+            Assert.AreEqual("Factories", container.name);
+            Assert.AreEqual(fakeRoot.transform, container.transform.parent);
             Assert.IsNotNull(instance);
-            Assert.IsFalse(instance.gameObject.activeSelf, "Factory instances must be created inactive.");
-            var fieldValue = new SerializedObject(_root).FindProperty(CodeGenSandbox.FactoryFieldName).objectReferenceValue;
-            Assert.AreEqual(instance.gameObject, fieldValue);
+            Assert.IsFalse(instance.activeSelf, "Factory instances must be created inactive.");
+            Assert.AreEqual(instance, fakeRoot._factoryWidget);
         }
 
         [Test]
-        public void Wire_RealFactoryField_SecondWireWithUnchangedConfigIsIdempotent()
+        public void CreateAndAssignInstance_ExistingContainerPassedIn_ReusedRatherThanRecreated()
         {
-            SandboxGate.RequireField(_root, CodeGenSandbox.FactoryFieldName);
+            var prefab = CreateScratchPrefab("Widget");
+            var fakeRoot = _scope.CreateGameObject("FakeRoot").AddComponent<FactoryFieldDouble>();
+            var existingContainer = _scope.CreateGameObject("Factories");
+            existingContainer.transform.SetParent(fakeRoot.transform, false);
+            var prop = new SerializedObject(fakeRoot).FindProperty(nameof(FactoryFieldDouble._factoryWidget));
 
-            var prefab = CreateScratchPrefab(CodeGenSandbox.FactoryEntryName);
-            var module = ModuleWithOneEntry(CodeGenSandbox.FactoryEntryName, prefab);
-            module.Wire();
-            var firstInstance = _root.transform.Find("Factories").Find(CodeGenSandbox.FactoryEntryName).gameObject;
+            var (container, _) = ((GameObject container, GameObject instance))PrivateFieldAccess.InvokeStatic(
+                typeof(FactoryModule), "CreateAndAssignInstance", prop, prefab, "Widget", existingContainer, fakeRoot.transform);
 
-            var secondModule = ModuleWithOneEntry(CodeGenSandbox.FactoryEntryName, prefab);
-            secondModule.Wire();
+            Assert.AreEqual(existingContainer, container, "An existing container must be reused, not recreated.");
+        }
 
-            var container = _root.transform.Find("Factories");
-            Assert.AreEqual(1, container.childCount, "Re-wiring identical config must not recreate the instance.");
-            Assert.AreEqual(firstInstance, container.Find(CodeGenSandbox.FactoryEntryName).gameObject);
+        [Test]
+        public void IsFactoriesAlreadyWired_FieldMatchesExistingChild_ReturnsTrue()
+        {
+            var prefab = CreateScratchPrefab("Widget");
+            var module = ModuleWithOneEntry("Widget", prefab);
+
+            var fakeRoot = _scope.CreateGameObject("FakeRoot").AddComponent<FactoryFieldDouble>();
+            var container = _scope.CreateGameObject("Factories");
+            container.transform.SetParent(fakeRoot.transform, false);
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, container.transform);
+            instance.name = "Widget";
+            instance.SetActive(false);
+            fakeRoot._factoryWidget = instance;
+
+            Assert.IsTrue(IsAlreadyWired(module, fakeRoot, container.transform));
         }
     }
 }

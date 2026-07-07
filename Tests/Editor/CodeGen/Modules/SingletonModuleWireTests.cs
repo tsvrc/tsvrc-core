@@ -11,15 +11,13 @@ namespace Tsvrc.Tests.Editor
     // SingletonModule.Wire() against a real compiled root in an isolated temp scene, fed
     // synthetic entries via reflection (bypassing LoadConfig()).
     //
-    // This project ships with no real configured Singleton entries, so most of the mechanism
-    // here is exercised against "_memory" - a field that unconditionally exists on the
-    // compiled type regardless of config (MemoryModule's own field). SingletonModule.Wire()
-    // only cares that FindProperty(entry.Name) resolves and that the source object's type
-    // matches the field's declared type - it has no idea which module "owns" the field name,
-    // so this is a faithful, if borrowed, test of the exact same mechanical assignment path a
-    // real Singleton field goes through. Wire_RealSingletonField_... below additionally runs
-    // the literal, non-borrowed path for real whenever CodeGenSandbox.Bootstrap() has been
-    // applied, and is Assert.Ignore()'d otherwise.
+    // This project ships with no real configured Singleton entries, so the mechanism here is
+    // exercised against "_memory" - a field that unconditionally exists on the compiled type
+    // regardless of config (MemoryModule's own field). SingletonModule.Wire() only cares that
+    // FindProperty(entry.Name) resolves and that the source object's type matches the field's
+    // declared type - it has no idea which module "owns" the field name, so this is a
+    // faithful, if borrowed, test of the exact same mechanical assignment path a real
+    // Singleton field goes through.
     public class SingletonModuleWireTests
     {
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(SingletonModule), "SingletonEntry");
@@ -96,22 +94,6 @@ namespace Tsvrc.Tests.Editor
             var module = ModuleWith(Entry("Anything", null));
 
             Assert.DoesNotThrow(() => module.Wire());
-        }
-
-        [Test]
-        public void Wire_RealSingletonField_DirectReferenceIsAssigned()
-        {
-            // Runs for real once CodeGenSandbox.Bootstrap() has produced a real
-            // "SampleSingleton" GameObject field on TsvrcGenerated; Assert.Ignore()s
-            // otherwise.
-            SandboxGate.RequireField(_root, CodeGenSandbox.SingletonFieldName);
-
-            var target = _scope.CreateGameObject("SomeSingletonTarget");
-            var module = ModuleWith(Entry(CodeGenSandbox.SingletonFieldName, target));
-
-            module.Wire();
-
-            Assert.AreEqual(target, FieldValue(CodeGenSandbox.SingletonFieldName));
         }
     }
 }
