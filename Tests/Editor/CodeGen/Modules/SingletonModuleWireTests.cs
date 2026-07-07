@@ -20,7 +20,7 @@ namespace Tsvrc.Tests.Editor
     // a faithful, if borrowed, test of the exact same mechanical assignment path a real
     // Singleton field goes through. Wire_RealSingletonField_... below additionally runs the
     // literal, non-borrowed path for real whenever CodeGenSandbox.Bootstrap() has been
-    // applied (see run-codegen-sandbox-tests.ps1), and is Assert.Ignore()'d otherwise.
+    // applied (see CODEGEN_TESTING_PLAN.md Part 3.5), and is Assert.Ignore()'d otherwise.
     public class SingletonModuleWireTests
     {
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(SingletonModule), "SingletonEntry");
@@ -104,7 +104,7 @@ namespace Tsvrc.Tests.Editor
         {
             // Runs for real once CodeGenSandbox.Bootstrap() has produced a real
             // "SampleSingleton" GameObject field on TsvrcGenerated; Assert.Ignore()s
-            // otherwise. See run-codegen-sandbox-tests.ps1.
+            // otherwise. See CODEGEN_TESTING_PLAN.md Part 3.5.
             SandboxGate.RequireField(_root, CodeGenSandbox.SingletonFieldName);
 
             var target = _scope.CreateGameObject("SomeSingletonTarget");

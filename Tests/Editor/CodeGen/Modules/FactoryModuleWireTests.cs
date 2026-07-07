@@ -13,7 +13,7 @@ namespace Tsvrc.Tests.Editor
     // mutation" regression are always testable against this project's real (unbootstrapped)
     // compiled root; the "field found -> instantiated and assigned" happy path additionally
     // runs for real whenever CodeGenSandbox.Bootstrap() has been applied (see
-    // run-codegen-sandbox-tests.ps1 and CODEGEN_TESTING_PLAN.md Part 4.5), and is
+    // CODEGEN_TESTING_PLAN.md Part 3.5 and Part 4.5), and is
     // Assert.Ignore()'d otherwise. Phase G4.9.
     public class FactoryModuleWireTests
     {
@@ -155,7 +155,7 @@ namespace Tsvrc.Tests.Editor
         {
             // Runs for real once CodeGenSandbox.Bootstrap() has produced a real
             // "_factorySampleFactoryPrefab" field on TsvrcGenerated; Assert.Ignore()s
-            // otherwise. See run-codegen-sandbox-tests.ps1.
+            // otherwise. See CODEGEN_TESTING_PLAN.md Part 3.5.
             SandboxGate.RequireField(_root, CodeGenSandbox.FactoryFieldName);
 
             var prefab = CreateScratchPrefab(CodeGenSandbox.FactoryEntryName);

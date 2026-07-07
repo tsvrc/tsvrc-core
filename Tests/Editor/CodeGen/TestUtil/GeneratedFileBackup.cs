@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using Tsvrc.Editor;
 using UnityEngine;
 
 namespace Tsvrc.Tests.Editor
@@ -18,14 +20,13 @@ namespace Tsvrc.Tests.Editor
     {
         private const string GeneratedFolder = "Assets/TsvrcGenerated";
 
-        private static readonly string[] GeneratedFileNames =
-        {
-            "TsvrcGenerated.cs", "TsvrcGeneratedConstruct.cs", "TsvrcGeneratedFactory.cs",
-            "TsvrcGeneratedInstance.cs", "TsvrcGeneratedMemory.cs", "TsvrcGeneratedPool.cs",
-            "TsvrcGeneratedSingleton.cs", "TsvrcGeneratedTranslation.cs",
-        };
+        // Derived from the real module list (TsvrcGenerator.CreateModules()) rather than a
+        // second hardcoded copy of the filenames, so a new/renamed module's generated file
+        // can never silently fall outside backup/restore coverage.
+        private static IEnumerable<string> GeneratedFileNames =>
+            TsvrcGenerator.CreateModules().Select(m => m.FileName).Where(n => n != null);
 
-        private readonly Dictionary<string, byte[]> _backup = new Dictionary<string, byte[]>();
+        private readonly Dictionary<string, byte[]> _backup = new();
 
         internal GeneratedFileBackup()
         {

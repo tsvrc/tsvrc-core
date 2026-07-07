@@ -30,11 +30,6 @@ namespace Tsvrc.Tests.Editor
             return go;
         }
 
-        internal void Track(GameObject go)
-        {
-            if (go != null) _tracked.Add(go);
-        }
-
         public void Dispose()
         {
             foreach (var go in _tracked)

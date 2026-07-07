@@ -1,7 +1,6 @@
 using NUnit.Framework;
 using Tsvrc.Config;
 using Tsvrc.Editor;
-using Tsvrc.StateMachine;
 using UnityEngine;
 using UnityEngine.TestTools;
 

@@ -15,7 +15,7 @@ namespace Tsvrc.Tests.Editor
     // CODEGEN_TESTING_PLAN.md Part 4.5), so the missing-field/null-source/root-absent
     // branches are always testable, while Wire_RealConstructField_... additionally runs the
     // real "field found -> assigned" path whenever CodeGenSandbox.Bootstrap() has been
-    // applied (see run-codegen-sandbox-tests.ps1), and is Assert.Ignore()'d otherwise.
+    // applied (see CODEGEN_TESTING_PLAN.md Part 3.5), and is Assert.Ignore()'d otherwise.
     public class ConstructModuleWireTests
     {
         private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(ConstructModule), "ConstructEntry");
@@ -79,7 +79,7 @@ namespace Tsvrc.Tests.Editor
         {
             // Runs for real once CodeGenSandbox.Bootstrap() has produced a real
             // "_constructSampleConstruct" field on TsvrcGenerated; Assert.Ignore()s
-            // otherwise. See run-codegen-sandbox-tests.ps1.
+            // otherwise. See CODEGEN_TESTING_PLAN.md Part 3.5.
             SandboxGate.RequireField(_root, CodeGenSandbox.ConstructFieldName);
 
             var behaviour = _scope.CreateGameObject("SomeConstructTarget").AddComponent<StateManager>();

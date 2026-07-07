@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Tsvrc.Config;
 using Tsvrc.Core;
 using Tsvrc.Editor;
@@ -61,12 +63,13 @@ namespace Tsvrc.Tests.Editor
         internal const string TranslationConfigAssetPath = "Assets/TsvrcGenerated/TsvrcTranslationConfig.asset";
 
         private const string GeneratedFolder = "Assets/TsvrcGenerated";
-        private static readonly string[] GeneratedFileNames =
-        {
-            "TsvrcGenerated.cs", "TsvrcGeneratedConstruct.cs", "TsvrcGeneratedFactory.cs",
-            "TsvrcGeneratedInstance.cs", "TsvrcGeneratedMemory.cs", "TsvrcGeneratedPool.cs",
-            "TsvrcGeneratedSingleton.cs", "TsvrcGeneratedTranslation.cs",
-        };
+
+        // Derived from the real module list (TsvrcGenerator.CreateModules()) rather than a
+        // hardcoded copy of the filenames - see the identical reasoning in
+        // GeneratedFileBackup, which independently needs the same list for a different
+        // (in-memory, single-process) backup mechanism.
+        private static IEnumerable<string> GeneratedFileNames =>
+            TsvrcGenerator.CreateModules().Select(m => m.FileName).Where(n => n != null);
 
         // Written outside Assets/ (a plain OS temp folder, not an imported asset) so backing
         // up/restoring never itself triggers an import or shows up in the working tree.
@@ -83,10 +86,8 @@ namespace Tsvrc.Tests.Editor
         internal const string ConstructFieldName = "_constructSampleConstruct";
         internal const string FactoryEntryName = "SampleFactoryPrefab";
         internal const string FactoryFieldName = "_factorySampleFactoryPrefab";
-        internal const string FactoryMethodName = "CreateSampleFactoryPrefab";
         internal const string PoolTypeName = "StateManager";
         internal const string TranslationKey = "_sampleTranslationKey_";
-        internal const string TranslationEnumMemberName = "English";
 
         [MenuItem("Tsvrc/CodeGen Sandbox/1) Bootstrap (writes real fields to TsvrcGenerated)")]
         public static void Bootstrap()
@@ -117,7 +118,7 @@ namespace Tsvrc.Tests.Editor
 
             // TranslationModule reads from its own fixed asset path, not from TsvrcConfig -
             // write the language file directly and create the config asset there.
-            string languageJson = "{\"key\":\"en\",\"label\":\"" + TranslationEnumMemberName + "\"," +
+            string languageJson = "{\"key\":\"en\",\"label\":\"English\"," +
                 "\"entries\":{\"" + TranslationKey + "\":\"Hello\"}}";
             File.WriteAllText(ToFullPath(LanguageFilePath), languageJson);
             AssetDatabase.ImportAsset(LanguageFilePath);

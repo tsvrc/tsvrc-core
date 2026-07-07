@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using NUnit.Framework;
 using Tsvrc.Editor;
 using Tsvrc.StateMachine;
@@ -17,7 +16,7 @@ namespace Tsvrc.Tests.Editor
     // container and instantiates every prefab regardless. That makes the scene-mutation
     // half of Wire() fully testable here always; the slot-field assignment itself
     // additionally runs for real whenever CodeGenSandbox.Bootstrap() has been applied (see
-    // run-codegen-sandbox-tests.ps1 and CODEGEN_TESTING_PLAN.md Part 4.5), and is
+    // CODEGEN_TESTING_PLAN.md Part 3.5 and Part 4.5), and is
     // Assert.Ignore()'d otherwise. Phase G4.10.
     public class PoolModuleWireTests
     {
@@ -117,9 +116,9 @@ namespace Tsvrc.Tests.Editor
         public void Wire_SlotFieldNotFoundOnRoot_StillCreatesInstanceAndWarns()
         {
             // Uses a type name guaranteed to have no real compiled field (unlike
-            // "StateManager", which CodeGenSandbox's bootstrap - see
-            // run-codegen-sandbox-tests recipe in CodeGenSandbox.cs - legitimately creates
-            // real "_pool_StateManager_0"/"_1" fields for), so this always exercises the
+            // "StateManager", which CodeGenSandbox.Bootstrap() - see
+            // CODEGEN_TESTING_PLAN.md Part 3.5 - legitimately creates real
+            // "_pool_StateManager_0"/"_1" fields for), so this always exercises the
             // genuinely-missing-field path regardless of whether the sandbox is active.
             const string fakeTypeName = "PoolModuleWireTestsNeverRealType";
             var prefab = CreateScratchPrefab("Widget2");
@@ -256,7 +255,7 @@ namespace Tsvrc.Tests.Editor
         {
             // Runs for real once CodeGenSandbox.Bootstrap() has produced real
             // "_pool_StateManager_N" fields on TsvrcGenerated; Assert.Ignore()s otherwise.
-            // See run-codegen-sandbox-tests.ps1.
+            // See CODEGEN_TESTING_PLAN.md Part 3.5.
             SandboxGate.RequireField(_root, "_pool_" + CodeGenSandbox.PoolTypeName + "_0");
 
             var prefab = CreateScratchPrefab("Widget8");
