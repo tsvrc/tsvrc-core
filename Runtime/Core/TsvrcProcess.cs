@@ -22,7 +22,6 @@ namespace Tsvrc.Core
         [UdonSynced] private string _ownerId = "";
         // The numeric player ID of the current process owner, synced alongside _ownerId.
         // Lets every client check ownership without building the "DisplayName#playerId" string.
-        // VRChat player IDs start at 1 and are unique per session, so 0 is a safe no-owner sentinel.
         // Always updated together with _ownerId inside SetProcessOwner.
         [UdonSynced] private int _ownerPlayerIdInt = 0;
         [UdonSynced] private bool _useProcessUpdate = false;
@@ -31,6 +30,9 @@ namespace Tsvrc.Core
 
         // Tracks whether the update loop is currently scheduled to prevent scheduling it twice.
         private bool _updateLoopActive = false;
+        // Real-time (Time.realtimeSinceStartup) deadline the next legitimate tick is due at.
+        // See _TickProcessUpdate for how this is used to discard stale scheduled calls.
+        private float _nextTickDueAtRealTime = 0f;
 
         // Set to true just before and cleared just after every SendCustomNetworkEvent(All, ...) call.
         // On the sending client VRChat fires the event inline before returning, so the broadcast
@@ -56,6 +58,8 @@ namespace Tsvrc.Core
 
         public override void OnPlayerLeft(VRCPlayerApi player)
         {
+            base.OnPlayerLeft(player);
+
             if (!IsProcessRunning()) return;
 
             // Skip if this player is not the current process owner. Comparing ints instead of
@@ -90,6 +94,8 @@ namespace Tsvrc.Core
 
         public override void OnPlayerSuspendChanged(VRCPlayerApi player)
         {
+            base.OnPlayerSuspendChanged(player);
+
             // A suspended process owner cannot run Udon code or receive network events, so the
             // tick loop would stall permanently. We need to transfer ownership away from them.
             //
@@ -111,6 +117,8 @@ namespace Tsvrc.Core
 
         public override void OnDeserialization()
         {
+            base.OnDeserialization();
+
             // In Manual sync mode, a reliable packet queued by a departed or suspended owner
             // can arrive after TakeOverAbandonedProcess has already run, overwriting _ownerId
             // with the old owner's ID. Two problems follow from that:
@@ -142,12 +150,12 @@ namespace Tsvrc.Core
 
             // Restart the update loop if we are the owner and it is not currently running.
             // This covers stale-packet recovery and any other situation where the loop went
-            // silent unexpectedly. This block never runs on the sender of RequestSerialization
-            // (VRChat guarantee), so TakeOverAbandonedProcess restarts the loop explicitly
-            // to cover that path.
+            // silent unexpectedly. See TakeOverAbandonedProcess for the one case this block
+            // can't reach on its own.
             if (IsProcessOwner() && IsProcessRunning() && _useProcessUpdate && !_updateLoopActive)
             {
                 _updateLoopActive = true;
+                _nextTickDueAtRealTime = Time.realtimeSinceStartup;
                 SendCustomEventDelayedSeconds(nameof(_TickProcessUpdate), 0f);
             }
         }
@@ -188,13 +196,18 @@ namespace Tsvrc.Core
 
             OnProcessStarted();
 
-            if (_useProcessUpdate)
+            // !_updateLoopActive matters when OnProcessStarted() reentrantly stops and restarts
+            // the process (e.g. calling StopProcess() then StartProcess() again from its own
+            // hook): the inner StartProcess call already schedules a tick and sets this flag, so
+            // without the guard this outer call would schedule a redundant second one.
+            if (_useProcessUpdate && !_updateLoopActive)
             {
                 // A 0-second delay defers the first tick to the next frame so that StartProcess
                 // returns to the caller before OnProcessUpdate fires. This prevents re-entrancy
                 // and lets callers set up additional state after this call.
                 // SendCustomEventDelayedSeconds is local-only and never routed over the network.
                 _updateLoopActive = true;
+                _nextTickDueAtRealTime = Time.realtimeSinceStartup;
                 SendCustomEventDelayedSeconds(nameof(_TickProcessUpdate), 0f);
             }
         }
@@ -282,8 +295,8 @@ namespace Tsvrc.Core
         /// </remarks>
         protected bool IsProcessOwner()
         {
-            // Comparing ints avoids string allocation. 0 means no owner since valid player IDs
-            // are 1 or higher. Equivalent to: _ownerId != "" && _ownerId == _localPlayerId.
+            // Equivalent to: _ownerId != "" && _ownerId == _localPlayerId, without the
+            // string allocation.
             return _ownerPlayerIdInt != 0 && _ownerPlayerIdInt == _localPlayerIdInt;
         }
 
@@ -336,20 +349,27 @@ namespace Tsvrc.Core
             // Clearing _ownerId would make IsProcessOwner() return false, causing subclass
             // broadcast handlers to reject all incoming acks. Clearing _updateLoopActive would
             // kill the new process tick loop on the next invocation.
+            //
+            // OnProcessCleanup is skipped in that same case, for the same reason: it
+            // belongs to the process that just stopped/completed, and subclasses are
+            // documented to clear their own synced state inside it. Running it here
+            // would clobber the new process's just-set state one line after its own
+            // OnProcessStarted() already fired.
             if (!_isRunning)
             {
                 _ownerId = "";
                 _ownerPlayerIdInt = 0;
                 _useProcessUpdate = false;
                 _updateLoopActive = false;
-            }
 
-            // Call OnProcessCleanup before RequestSerialization so that any synced variables
-            // a subclass clears in that hook are already zeroed when the packet goes out.
-            // If we serialized first, remote clients would receive _isRunning=false alongside
-            // stale subclass array values, and unless the subclass calls RequestSerialization
-            // itself in OnProcessCleanup, no corrective packet would ever follow.
-            OnProcessCleanup(isCompleted);
+                // Call OnProcessCleanup before RequestSerialization so that any synced
+                // variables a subclass clears in that hook are already zeroed when the
+                // packet goes out. If we serialized first, remote clients would receive
+                // _isRunning=false alongside stale subclass array values, and unless the
+                // subclass calls RequestSerialization itself in OnProcessCleanup, no
+                // corrective packet would ever follow.
+                OnProcessCleanup(isCompleted);
+            }
 
             // Serialize the final state so remote clients see the cleared owner and running flag.
             // If a subclass already called RequestSerialization inside OnProcessCleanup, this
@@ -366,14 +386,32 @@ namespace Tsvrc.Core
 
         // Public only because SendCustomEventDelayedSeconds requires a public method target.
         // Do not call this directly.
+        //
+        // Deliberately still SendCustomEventDelayedSeconds-based, not Update()-based: this loop
+        // must keep ticking while its GameObject is inactive (e.g. a hidden UI representation of
+        // a still-running process), and Unity's automatic Update() message is never delivered to
+        // an inactive GameObject or disabled component — a hard engine constraint, not something
+        // any C#/UdonSharp-level design can opt out of. SendCustomEventDelayedSeconds is tracked
+        // by Udon's own scheduler instead of Unity's native per-frame component dispatch, so it
+        // keeps firing regardless of GameObject activity.
         public void _TickProcessUpdate()
         {
-            // If InternalCleanup set _updateLoopActive to false after enqueueing this tick,
-            // discard it here without touching the flag so a subsequent StartProcess can safely
-            // schedule a new loop. Note: calling StopProcess and StartProcess in the same frame
-            // can cause a stale tick from the old loop to arrive when _updateLoopActive is already
-            // true again. That race cannot be resolved in UdonSharp without closure support.
+            // If InternalCleanup set _updateLoopActive to false, this call belongs to a loop that
+            // was fully stopped with no restart — discard it here without touching the flag so a
+            // subsequent StartProcess can safely schedule a new loop.
             if (!_updateLoopActive) return;
+
+            // SendCustomEventDelayedSeconds cannot be canceled once scheduled, so calling
+            // StopProcess() then StartProcess() in the same frame can leave this exact stopped
+            // loop's already-in-flight scheduled call pending even after a brand new loop has set
+            // _updateLoopActive back to true (the check above alone can't tell the two loops
+            // apart, since both are "active" as far as that single boolean is concerned).
+            // _nextTickDueAtRealTime is advanced on every legitimate tick and on every activation
+            // to reflect the CURRENT generation's expected cadence; a call that fires before that
+            // real-time deadline belongs to an earlier, already-superseded generation and is
+            // discarded here — deliberately without rescheduling, so a stale chain dies on its own
+            // instead of retrying indefinitely.
+            if (Time.realtimeSinceStartup < _nextTickDueAtRealTime) return;
 
             // Stop the loop if the process ended or ownership was transferred away.
             if (!IsProcessRunning() || !IsProcessOwner())
@@ -393,26 +431,30 @@ namespace Tsvrc.Core
                 return;
             }
 
+            _nextTickDueAtRealTime = Time.realtimeSinceStartup + _processUpdateInterval;
             SendCustomEventDelayedSeconds(nameof(_TickProcessUpdate), _processUpdateInterval);
         }
 
         /// <summary>
         /// Received by the owner when a non-owner calls <see cref="StopProcess"/>.
         /// Guard checks discard the event if ownership disagreement caused misrouting,
-        /// or if the process already stopped before the packet arrived.
+        /// or if no process is running at all by the time the packet arrives.
         /// </summary>
         /// <remarks>
         /// Rate-limited to 1 call per second. Any player in the instance can invoke this directly
         /// as a network event because VRChat cannot restrict callers of <c>[NetworkCallable]</c>
         /// methods. Authorization beyond the owner guard below is the responsibility of subclasses.
+        /// Calls beyond the rate limit are queued, not dropped, and can arrive up to roughly a
+        /// second late. There is no per-run generation token, so a stale call arriving after the
+        /// same owner has already stopped and restarted the process (a new, unrelated run) is
+        /// indistinguishable from a legitimate call for the current run, and incorrectly stops it.
+        /// Callers that stop and restart in quick succession need to coordinate that at a higher
+        /// level, the same way <see cref="StartProcess"/>'s own remarks require for its race.
         /// </remarks>
         [NetworkCallable(maxEventsPerSecond: 1)]
         public void RequestStopProcess()
         {
-            // We accept authority if either the process owner ID matches us, or we hold Unity
-            // ownership. The Unity owner fallback handles the timing window where the previous
-            // owner just left, VRChat already routed the event to us as the new owner, but the
-            // deserialization packet updating _ownerId has not arrived yet.
+            // Same dual-authority fallback as StopProcess, for the same timing window.
             if ((!IsProcessOwner() && !Networking.IsOwner(gameObject)) || !_isRunning) return;
             ExecuteStop();
         }
@@ -420,10 +462,11 @@ namespace Tsvrc.Core
         /// <summary>
         /// Received by the owner when a non-owner calls <see cref="CompleteProcess"/>.
         /// Guard checks discard the event if ownership disagreement caused misrouting,
-        /// or if the process already completed before the packet arrived.
+        /// or if no process is running at all by the time the packet arrives.
         /// </summary>
         /// <remarks>
-        /// Rate-limited to 1 call per second. Same caller-authorization note as <see cref="RequestStopProcess"/>.
+        /// Rate-limited to 1 call per second. Same caller-authorization note and the same
+        /// stale-call-targets-a-new-run limitation as <see cref="RequestStopProcess"/>.
         /// </remarks>
         [NetworkCallable(maxEventsPerSecond: 1)]
         public void RequestCompleteProcess()
@@ -449,6 +492,7 @@ namespace Tsvrc.Core
             if (_useProcessUpdate && !_updateLoopActive)
             {
                 _updateLoopActive = true;
+                _nextTickDueAtRealTime = Time.realtimeSinceStartup;
                 SendCustomEventDelayedSeconds(nameof(_TickProcessUpdate), 0f);
             }
         }
