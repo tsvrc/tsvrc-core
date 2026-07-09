@@ -24,7 +24,7 @@ namespace Tsvrc.Tests.Editor
     public class PoolModuleWireTests
     {
         private const string ScratchPrefabPath = ScratchAssets.Folder + "/PoolWirePrefab.prefab";
-        private static readonly Type InfoType = PrivateFieldAccess.NestedType(typeof(PoolModule), "PoolTypeInfo");
+        private static readonly Type InfoType = CodeGenModuleReflection.NestedType(typeof(PoolModule), "PoolTypeInfo");
 
         // A stand-in for the compiled root exposing only the one literal field name
         // IsPoolAlreadyWired needs to find a match against - IsPoolAlreadyWired takes `root`
@@ -71,7 +71,7 @@ namespace Tsvrc.Tests.Editor
         // compiled type can pass an arbitrary type name.
         private static PoolModule BuildModule(StateManager prefab, int totalSlots, string typeName)
         {
-            var info = PrivateFieldAccess.BuildEntry(InfoType,
+            var info = CodeGenModuleReflection.BuildEntry(InfoType,
                 ("Prefab", prefab), ("TypeName", typeName), ("TypeNamespace", "Tsvrc.StateMachine"),
                 ("ExternalCount", 0), ("InternalDeps", new Dictionary<string, int>(StringComparer.Ordinal)),
                 ("TotalSlots", totalSlots));

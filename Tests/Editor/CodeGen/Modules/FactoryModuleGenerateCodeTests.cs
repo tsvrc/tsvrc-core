@@ -8,17 +8,17 @@ namespace Tsvrc.Tests.Editor
     // three Create{Name}(Transform parent) code-shape branches.
     public class FactoryModuleGenerateCodeTests
     {
-        private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(FactoryModule), "FactoryEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(FactoryModule), "FactoryEntry");
 
         private static FactoryModule BuildModule(params object[] entries)
         {
             var module = new FactoryModule();
-            PrivateFieldAccess.SetField(module, "_entries", PrivateFieldAccess.BuildList(EntryType, entries));
+            PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, entries));
             return module;
         }
 
         private static object Entry(string name, string typeName, string ns, bool isTsvrcBehaviour)
-            => PrivateFieldAccess.BuildEntry(EntryType,
+            => CodeGenModuleReflection.BuildEntry(EntryType,
                 ("Name", name), ("TypeName", typeName), ("TypeNamespace", ns),
                 ("IsTsvrcBehaviour", isTsvrcBehaviour), ("PrefabAsset", null));
 

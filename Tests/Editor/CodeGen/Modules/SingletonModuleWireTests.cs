@@ -20,7 +20,7 @@ namespace Tsvrc.Tests.Editor
     // Singleton field goes through.
     public class SingletonModuleWireTests
     {
-        private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(SingletonModule), "SingletonEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(SingletonModule), "SingletonEntry");
         private const string RealFieldName = "_memory";
 
         private TempSceneScope _scope;
@@ -37,12 +37,12 @@ namespace Tsvrc.Tests.Editor
         public void TearDown() => _scope.Dispose();
 
         private static object Entry(string name, UnityEngine.Object source)
-            => PrivateFieldAccess.BuildEntry(EntryType, ("Name", name), ("TypeName", ""), ("Namespace", ""), ("SourceObject", source));
+            => CodeGenModuleReflection.BuildEntry(EntryType, ("Name", name), ("TypeName", ""), ("Namespace", ""), ("SourceObject", source));
 
         private static SingletonModule ModuleWith(params object[] entries)
         {
             var module = new SingletonModule();
-            PrivateFieldAccess.SetField(module, "_entries", PrivateFieldAccess.BuildList(EntryType, entries));
+            PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, entries));
             return module;
         }
 

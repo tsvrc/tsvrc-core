@@ -5,6 +5,8 @@
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "Tsvrc.Runtime",
+        "Tsvrc.Tests.Doubles",
+        "Tsvrc.Tests.TestUtil",
         "UdonSharp.Runtime",
         "VRC.SDKBase",
         "VRC.SDK3",

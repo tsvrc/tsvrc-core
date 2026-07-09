@@ -8,19 +8,19 @@ namespace Tsvrc.Tests.Editor
     // Tests feed TranslationModule.GenerateCode() a synthetic _languages list via reflection.
     public class TranslationModuleGenerateCodeTests
     {
-        private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(TranslationModule), "LanguageEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(TranslationModule), "LanguageEntry");
 
         private static object Language(string key, string label, params (string k, string v)[] entries)
         {
             var dict = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var (k, v) in entries) dict[k] = v;
-            return PrivateFieldAccess.BuildEntry(EntryType, ("Key", key), ("Label", label), ("Entries", dict));
+            return CodeGenModuleReflection.BuildEntry(EntryType, ("Key", key), ("Label", label), ("Entries", dict));
         }
 
         private static TranslationModule BuildModule(params object[] languages)
         {
             var module = new TranslationModule();
-            PrivateFieldAccess.SetField(module, "_languages", PrivateFieldAccess.BuildList(EntryType, languages));
+            PrivateFieldAccess.SetField(module, "_languages", CodeGenModuleReflection.BuildList(EntryType, languages));
             return module;
         }
 

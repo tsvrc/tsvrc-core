@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Reflection;
 using NUnit.Framework;
 using Tsvrc.Core;
 using Tsvrc.Core.Generated;
@@ -35,36 +34,6 @@ namespace Tsvrc.Tests.PlayMode
     public class TsvrcProcessOwnershipHandoverTests
     {
         private GameObject _descriptorObject;
-
-        private const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-
-        // PrivateFieldAccess (Tests/Editor/CodeGen/TestUtil/) lives in the Editor-only
-        // Tsvrc.Tests.Editor assembly and can't be referenced from this (all-platform)
-        // Play Mode assembly, so this is a small local equivalent. Same base-type walk
-        // as PrivateFieldAccess.FindField.
-        private static void SetField(object target, string name, object value)
-        {
-            FieldInfo field = FindField(target.GetType(), name);
-            Assert.IsNotNull(field, "Field '" + name + "' not found on " + target.GetType().Name + ".");
-            field.SetValue(target, value);
-        }
-
-        private static T GetField<T>(object target, string name)
-        {
-            FieldInfo field = FindField(target.GetType(), name);
-            Assert.IsNotNull(field, "Field '" + name + "' not found on " + target.GetType().Name + ".");
-            return (T)field.GetValue(target);
-        }
-
-        private static FieldInfo FindField(System.Type type, string name)
-        {
-            for (System.Type t = type; t != null; t = t.BaseType)
-            {
-                FieldInfo field = t.GetField(name, InstanceFlags);
-                if (field != null) return field;
-            }
-            return null;
-        }
 
         [UnityTearDown]
         public IEnumerator TearDown()
@@ -171,8 +140,8 @@ namespace Tsvrc.Tests.PlayMode
 
             string expectedId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             int expectedIntId = Networking.LocalPlayer.playerId;
-            string cachedId = GetField<string>(process, "_localPlayerId");
-            int cachedIntId = GetField<int>(process, "_localPlayerIdInt");
+            string cachedId = PrivateFieldAccess.GetField<string>(process, "_localPlayerId");
+            int cachedIntId = PrivateFieldAccess.GetField<int>(process, "_localPlayerIdInt");
 
             UnityEngine.Object.DestroyImmediate(go);
 
@@ -191,15 +160,15 @@ namespace Tsvrc.Tests.PlayMode
             GameObject go = new GameObject("Process_StartProcess");
             TsvrcProcessTestSubclass process = go.AddComponent<TsvrcProcessTestSubclass>();
             process.TsConstruct((TsvrcRoot)null);
-            int ownerIntIdBefore = GetField<int>(process, "_ownerPlayerIdInt");
+            int ownerIntIdBefore = PrivateFieldAccess.GetField<int>(process, "_ownerPlayerIdInt");
 
             process.StartProcess();
             yield return null;
 
             string expectedOwnerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             int expectedOwnerIntId = Networking.LocalPlayer.playerId;
-            string ownerId = GetField<string>(process, "_ownerId");
-            int ownerIntId = GetField<int>(process, "_ownerPlayerIdInt");
+            string ownerId = PrivateFieldAccess.GetField<string>(process, "_ownerId");
+            int ownerIntId = PrivateFieldAccess.GetField<int>(process, "_ownerPlayerIdInt");
             bool isUnityOwner = Networking.IsOwner(go);
             int startedCount = process.OnProcessStartedCount;
 
@@ -231,9 +200,9 @@ namespace Tsvrc.Tests.PlayMode
             VRCPlayerApi remote = FindPlayerByName(remoteName);
             Assert.IsNotNull(remote, "Remote player was not spawned.");
 
-            SetField(process, "_isRunning", true);
-            SetField(process, "_ownerId", TsPlayer.GetPlayerID(remote));
-            SetField(process, "_ownerPlayerIdInt", remote.playerId);
+            PrivateFieldAccess.SetField(process, "_isRunning", true);
+            PrivateFieldAccess.SetField(process, "_ownerId", TsPlayer.GetPlayerID(remote));
+            PrivateFieldAccess.SetField(process, "_ownerPlayerIdInt", remote.playerId);
 
             // ClientSim's OnPlayerLeft broadcast only reaches compiled UdonBehaviour VM
             // instances registered with UdonManager. This test's process is a plain,
@@ -249,7 +218,7 @@ namespace Tsvrc.Tests.PlayMode
             process.OnPlayerLeft(remote);
 
             int localId = Networking.LocalPlayer.playerId;
-            int ownerIntIdAfter = GetField<int>(process, "_ownerPlayerIdInt");
+            int ownerIntIdAfter = PrivateFieldAccess.GetField<int>(process, "_ownerPlayerIdInt");
             int abandonedCount = process.OnOwnerAbandonedProcessCount;
             bool wasUnityOwnerAtLeaveTime = Networking.IsOwner(go);
 
@@ -289,14 +258,14 @@ namespace Tsvrc.Tests.PlayMode
             yield return null;
             yield return null;
 
-            SetField(process, "_isRunning", true);
-            SetField(process, "_ownerId", remotePlayerId);
-            SetField(process, "_ownerPlayerIdInt", remoteIntId);
+            PrivateFieldAccess.SetField(process, "_isRunning", true);
+            PrivateFieldAccess.SetField(process, "_ownerId", remotePlayerId);
+            PrivateFieldAccess.SetField(process, "_ownerPlayerIdInt", remoteIntId);
 
             process.OnOwnershipTransferred(remote);
 
             int localId = Networking.LocalPlayer.playerId;
-            int ownerIntIdAfter = GetField<int>(process, "_ownerPlayerIdInt");
+            int ownerIntIdAfter = PrivateFieldAccess.GetField<int>(process, "_ownerPlayerIdInt");
             int abandonedCount = process.OnOwnerAbandonedProcessCount;
 
             UnityEngine.Object.DestroyImmediate(go);
@@ -327,9 +296,9 @@ namespace Tsvrc.Tests.PlayMode
             VRCPlayerApi remote = FindPlayerByName(remoteName);
             Assert.IsNotNull(remote, "Remote player was not spawned.");
 
-            SetField(process, "_isRunning", true);
-            SetField(process, "_ownerId", TsPlayer.GetPlayerID(remote));
-            SetField(process, "_ownerPlayerIdInt", remote.playerId);
+            PrivateFieldAccess.SetField(process, "_isRunning", true);
+            PrivateFieldAccess.SetField(process, "_ownerId", TsPlayer.GetPlayerID(remote));
+            PrivateFieldAccess.SetField(process, "_ownerPlayerIdInt", remote.playerId);
 
             // Mark suspended WITHOUT removing — still present/findable via
             // TsPlayer.FindPlayerByID, unlike the "gone" test above.
@@ -343,7 +312,7 @@ namespace Tsvrc.Tests.PlayMode
             process.OnOwnershipTransferred(remote);
 
             int localId = Networking.LocalPlayer.playerId;
-            int ownerIntIdAfter = GetField<int>(process, "_ownerPlayerIdInt");
+            int ownerIntIdAfter = PrivateFieldAccess.GetField<int>(process, "_ownerPlayerIdInt");
             int abandonedCount = process.OnOwnerAbandonedProcessCount;
             bool remoteReportsSuspended = remote.isSuspended;
 
@@ -381,9 +350,9 @@ namespace Tsvrc.Tests.PlayMode
             yield return null;
             yield return null;
 
-            SetField(process, "_isRunning", true);
-            SetField(process, "_ownerId", remotePlayerId);
-            SetField(process, "_ownerPlayerIdInt", remoteIntId);
+            PrivateFieldAccess.SetField(process, "_isRunning", true);
+            PrivateFieldAccess.SetField(process, "_ownerId", remotePlayerId);
+            PrivateFieldAccess.SetField(process, "_ownerPlayerIdInt", remoteIntId);
 
             // Networking.IsOwner(gameObject) is always true locally, so
             // OnDeserialization's recovery block — which requires exactly that — is
@@ -391,7 +360,7 @@ namespace Tsvrc.Tests.PlayMode
             process.OnDeserialization();
 
             int localId = Networking.LocalPlayer.playerId;
-            int ownerIntIdAfter = GetField<int>(process, "_ownerPlayerIdInt");
+            int ownerIntIdAfter = PrivateFieldAccess.GetField<int>(process, "_ownerPlayerIdInt");
 
             UnityEngine.Object.DestroyImmediate(go);
 
@@ -417,9 +386,9 @@ namespace Tsvrc.Tests.PlayMode
             VRCPlayerApi remote = FindPlayerByName(remoteName);
             Assert.IsNotNull(remote, "Remote player was not spawned.");
 
-            SetField(process, "_isRunning", true);
-            SetField(process, "_ownerId", TsPlayer.GetPlayerID(remote));
-            SetField(process, "_ownerPlayerIdInt", remote.playerId);
+            PrivateFieldAccess.SetField(process, "_isRunning", true);
+            PrivateFieldAccess.SetField(process, "_ownerId", TsPlayer.GetPlayerID(remote));
+            PrivateFieldAccess.SetField(process, "_ownerPlayerIdInt", remote.playerId);
 
             // player.isSuspended is false by default here, so the method's first guard
             // (`if (!player.isSuspended || ...) return;`) must reject this immediately.
@@ -432,7 +401,7 @@ namespace Tsvrc.Tests.PlayMode
             // & Test.
             process.OnPlayerSuspendChanged(remote);
 
-            int ownerIntIdAfter = GetField<int>(process, "_ownerPlayerIdInt");
+            int ownerIntIdAfter = PrivateFieldAccess.GetField<int>(process, "_ownerPlayerIdInt");
             int expectedUnchanged = remote.playerId;
 
             UnityEngine.Object.DestroyImmediate(go);

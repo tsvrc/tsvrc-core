@@ -12,7 +12,7 @@ namespace Tsvrc.Tests.Editor
     // TranslationModule.Wire()/OnSceneHierarchyChanged() against a real compiled root.
     public class TranslationModuleWireTests
     {
-        private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(TranslationModule), "LanguageEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(TranslationModule), "LanguageEntry");
 
         // A stand-in for the compiled root exposing only the one literal field name
         // AssignTargets is fed via SerializedProperty - not the real compiled type, since
@@ -34,14 +34,14 @@ namespace Tsvrc.Tests.Editor
         private static object OneLanguage()
         {
             var dict = new Dictionary<string, string>(StringComparer.Ordinal) { ["_a_"] = "A" };
-            return PrivateFieldAccess.BuildEntry(EntryType, ("Key", "en"), ("Label", "English"), ("Entries", dict));
+            return CodeGenModuleReflection.BuildEntry(EntryType, ("Key", "en"), ("Label", "English"), ("Entries", dict));
         }
 
         [Test]
         public void Wire_EmptyLanguages_IsANoOpEvenWithoutARoot()
         {
             var module = new TranslationModule();
-            PrivateFieldAccess.SetField(module, "_languages", PrivateFieldAccess.BuildList(EntryType, Array.Empty<object>()));
+            PrivateFieldAccess.SetField(module, "_languages", CodeGenModuleReflection.BuildList(EntryType, Array.Empty<object>()));
 
             Assert.DoesNotThrow(() => module.Wire());
         }
@@ -56,7 +56,7 @@ namespace Tsvrc.Tests.Editor
             CompiledRootFixture.AddTo(_scope);
 
             var module = new TranslationModule();
-            PrivateFieldAccess.SetField(module, "_languages", PrivateFieldAccess.BuildList(EntryType, new[] { OneLanguage() }));
+            PrivateFieldAccess.SetField(module, "_languages", CodeGenModuleReflection.BuildList(EntryType, new[] { OneLanguage() }));
 
             LogAssert.NoUnexpectedReceived();
             Assert.DoesNotThrow(() => module.Wire());

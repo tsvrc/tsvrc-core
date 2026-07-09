@@ -7,17 +7,17 @@ namespace Tsvrc.Tests.Editor
     // Tests feed ConstructModule.GenerateCode() synthetic entries via reflection.
     public class ConstructModuleGenerateCodeTests
     {
-        private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(ConstructModule), "ConstructEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(ConstructModule), "ConstructEntry");
 
         private static ConstructModule BuildModule(params object[] entries)
         {
             var module = new ConstructModule();
-            PrivateFieldAccess.SetField(module, "_entries", PrivateFieldAccess.BuildList(EntryType, entries));
+            PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, entries));
             return module;
         }
 
         private static object Entry(string name, string typeName, string ns)
-            => PrivateFieldAccess.BuildEntry(EntryType,
+            => CodeGenModuleReflection.BuildEntry(EntryType,
                 ("Name", name), ("TypeName", typeName), ("Namespace", ns), ("SourceObject", null));
 
         [Test]

@@ -11,7 +11,7 @@ namespace Tsvrc.Tests.Editor
     // inside these methods reads) containing the PoolWireTargetDouble test doubles.
     public class PoolModuleScanRefsTests
     {
-        private static readonly Type InfoType = PrivateFieldAccess.NestedType(typeof(PoolModule), "PoolTypeInfo");
+        private static readonly Type InfoType = CodeGenModuleReflection.NestedType(typeof(PoolModule), "PoolTypeInfo");
 
         private TempSceneScope _scope;
 
@@ -23,7 +23,7 @@ namespace Tsvrc.Tests.Editor
 
         private static PoolModule BuildModuleWithStateManagerPoolType()
         {
-            var info = PrivateFieldAccess.BuildEntry(InfoType,
+            var info = CodeGenModuleReflection.BuildEntry(InfoType,
                 ("Prefab", null), ("TypeName", "StateManager"), ("TypeNamespace", "Tsvrc.StateMachine"),
                 ("ExternalCount", 0), ("InternalDeps", new Dictionary<string, int>(StringComparer.Ordinal)),
                 ("TotalSlots", 0));
@@ -87,11 +87,11 @@ namespace Tsvrc.Tests.Editor
         {
             // A [WirePool] field whose declaring behaviour is itself a configured pool type
             // must be handled by ScanInternalDeps, never counted again by ScanExternalRefs.
-            var info = PrivateFieldAccess.BuildEntry(InfoType,
+            var info = CodeGenModuleReflection.BuildEntry(InfoType,
                 ("Prefab", null), ("TypeName", nameof(PoolWireTargetDouble)), ("TypeNamespace", "Tsvrc.Tests.Editor"),
                 ("ExternalCount", 0), ("InternalDeps", new Dictionary<string, int>(StringComparer.Ordinal)),
                 ("TotalSlots", 0));
-            var stateManagerInfo = PrivateFieldAccess.BuildEntry(InfoType,
+            var stateManagerInfo = CodeGenModuleReflection.BuildEntry(InfoType,
                 ("Prefab", null), ("TypeName", "StateManager"), ("TypeNamespace", "Tsvrc.StateMachine"),
                 ("ExternalCount", 0), ("InternalDeps", new Dictionary<string, int>(StringComparer.Ordinal)),
                 ("TotalSlots", 0));

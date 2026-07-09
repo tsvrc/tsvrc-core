@@ -11,7 +11,7 @@ namespace Tsvrc.Tests.Editor
     // (it relies on IsPoolAlreadyWired inside the next Wire() call instead).
     public class PoolModuleHierarchyChangedTests
     {
-        private static readonly Type InfoType = PrivateFieldAccess.NestedType(typeof(PoolModule), "PoolTypeInfo");
+        private static readonly Type InfoType = CodeGenModuleReflection.NestedType(typeof(PoolModule), "PoolTypeInfo");
 
         private TempSceneScope _scope;
 
@@ -27,7 +27,7 @@ namespace Tsvrc.Tests.Editor
             var dict = (IDictionary)Activator.CreateInstance(dictType, StringComparer.Ordinal);
             if (expectedTotalSlots > 0)
             {
-                var info = PrivateFieldAccess.BuildEntry(InfoType,
+                var info = CodeGenModuleReflection.BuildEntry(InfoType,
                     ("Prefab", null), ("TypeName", "X"), ("TypeNamespace", ""),
                     ("ExternalCount", 0), ("InternalDeps", new Dictionary<string, int>(StringComparer.Ordinal)),
                     ("TotalSlots", expectedTotalSlots));

@@ -17,7 +17,7 @@ namespace Tsvrc.Tests.Editor
     // SingletonModuleWireTests.Wire_FieldFound_DirectReferenceIsAssigned.
     public class ConstructModuleWireTests
     {
-        private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(ConstructModule), "ConstructEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(ConstructModule), "ConstructEntry");
 
         private TempSceneScope _scope;
 
@@ -32,12 +32,12 @@ namespace Tsvrc.Tests.Editor
         public void TearDown() => _scope.Dispose();
 
         private static object Entry(string name, UnityEngine.Object source)
-            => PrivateFieldAccess.BuildEntry(EntryType, ("Name", name), ("TypeName", ""), ("Namespace", ""), ("SourceObject", source));
+            => CodeGenModuleReflection.BuildEntry(EntryType, ("Name", name), ("TypeName", ""), ("Namespace", ""), ("SourceObject", source));
 
         private static ConstructModule ModuleWith(params object[] entries)
         {
             var module = new ConstructModule();
-            PrivateFieldAccess.SetField(module, "_entries", PrivateFieldAccess.BuildList(EntryType, entries));
+            PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, entries));
             return module;
         }
 

@@ -7,7 +7,7 @@ namespace Tsvrc.Tests.Editor
     // FactoryModule.OnSceneHierarchyChanged().
     public class FactoryModuleHierarchyChangedTests
     {
-        private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(FactoryModule), "FactoryEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(FactoryModule), "FactoryEntry");
 
         private TempSceneScope _scope;
 
@@ -21,12 +21,12 @@ namespace Tsvrc.Tests.Editor
         {
             var entries = new object[count];
             for (int i = 0; i < count; i++)
-                entries[i] = PrivateFieldAccess.BuildEntry(EntryType,
+                entries[i] = CodeGenModuleReflection.BuildEntry(EntryType,
                     ("Name", "E" + i), ("TypeName", "GameObject"), ("TypeNamespace", ""),
                     ("IsTsvrcBehaviour", false), ("PrefabAsset", null));
 
             var module = new FactoryModule();
-            PrivateFieldAccess.SetField(module, "_entries", PrivateFieldAccess.BuildList(EntryType, entries));
+            PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, entries));
             return module;
         }
 

@@ -11,10 +11,10 @@ namespace Tsvrc.Tests.Editor
     // those are covered separately by PoolModuleSlotMathTests.
     public class PoolModuleGenerateCodeTests
     {
-        private static readonly Type InfoType = PrivateFieldAccess.NestedType(typeof(PoolModule), "PoolTypeInfo");
+        private static readonly Type InfoType = CodeGenModuleReflection.NestedType(typeof(PoolModule), "PoolTypeInfo");
 
         private static object Info(string typeName, string ns, int totalSlots)
-            => PrivateFieldAccess.BuildEntry(InfoType,
+            => CodeGenModuleReflection.BuildEntry(InfoType,
                 ("Prefab", null), ("TypeName", typeName), ("TypeNamespace", ns),
                 ("ExternalCount", 0), ("InternalDeps", new Dictionary<string, int>(StringComparer.Ordinal)),
                 ("TotalSlots", totalSlots));

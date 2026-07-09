@@ -18,7 +18,7 @@ namespace Tsvrc.Tests.Editor
     public class FactoryModuleWireTests
     {
         private const string ScratchPrefabPath = ScratchAssets.Folder + "/FactoryWirePrefab.prefab";
-        private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(FactoryModule), "FactoryEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(FactoryModule), "FactoryEntry");
 
         // A stand-in for the compiled root exposing only the one literal field name
         // CreateAndAssignInstance/IsFactoriesAlreadyWired need to find a match against - both
@@ -75,11 +75,11 @@ namespace Tsvrc.Tests.Editor
         public void Wire_FieldNotFoundOnRoot_NoContainerOrInstanceCreated()
         {
             var prefab = CreateScratchPrefab("Widget");
-            var entry = PrivateFieldAccess.BuildEntry(EntryType,
+            var entry = CodeGenModuleReflection.BuildEntry(EntryType,
                 ("Name", "DefinitelyNotReal"), ("TypeName", "GameObject"), ("TypeNamespace", ""),
                 ("IsTsvrcBehaviour", false), ("PrefabAsset", prefab));
             var module = new FactoryModule();
-            PrivateFieldAccess.SetField(module, "_entries", PrivateFieldAccess.BuildList(EntryType, new object[] { entry }));
+            PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, new object[] { entry }));
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*Field '_factoryDefinitelyNotReal' not found.*"));
 
@@ -95,11 +95,11 @@ namespace Tsvrc.Tests.Editor
 
         private static FactoryModule ModuleWithOneEntry(string name, GameObject prefab)
         {
-            var entry = PrivateFieldAccess.BuildEntry(EntryType,
+            var entry = CodeGenModuleReflection.BuildEntry(EntryType,
                 ("Name", name), ("TypeName", "GameObject"), ("TypeNamespace", ""),
                 ("IsTsvrcBehaviour", false), ("PrefabAsset", prefab));
             var module = new FactoryModule();
-            PrivateFieldAccess.SetField(module, "_entries", PrivateFieldAccess.BuildList(EntryType, new object[] { entry }));
+            PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, new object[] { entry }));
             return module;
         }
 

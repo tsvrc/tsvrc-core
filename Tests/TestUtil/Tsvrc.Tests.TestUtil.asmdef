@@ -1,0 +1,16 @@
+{
+    "name": "Tsvrc.Tests.TestUtil",
+    "rootNamespace": "Tsvrc.Tests.Editor",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

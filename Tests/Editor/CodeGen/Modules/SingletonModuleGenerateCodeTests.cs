@@ -8,17 +8,17 @@ namespace Tsvrc.Tests.Editor
     // the real LoadConfig()/AssetDatabase-coupled pipeline entirely.
     public class SingletonModuleGenerateCodeTests
     {
-        private static readonly Type EntryType = PrivateFieldAccess.NestedType(typeof(SingletonModule), "SingletonEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(SingletonModule), "SingletonEntry");
 
         private static SingletonModule BuildModule(params object[] entries)
         {
             var module = new SingletonModule();
-            PrivateFieldAccess.SetField(module, "_entries", PrivateFieldAccess.BuildList(EntryType, entries));
+            PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, entries));
             return module;
         }
 
         private static object Entry(string name, string typeName, string ns)
-            => PrivateFieldAccess.BuildEntry(EntryType,
+            => CodeGenModuleReflection.BuildEntry(EntryType,
                 ("Name", name), ("TypeName", typeName), ("Namespace", ns), ("SourceObject", null));
 
         [Test]
