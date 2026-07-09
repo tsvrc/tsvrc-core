@@ -3,7 +3,6 @@
     "rootNamespace": "Tsvrc.Tests.Editor",
     "references": [
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner",
         "Tsvrc.Runtime",
         "Tsvrc.Editor",
         "Tsvrc.Tests.Doubles",
@@ -12,7 +11,6 @@
         "UdonSharp.Editor",
         "Unity.TextMeshPro",
         "VRC.SDKBase",
-        "VRC.SDKBase.Editor",
         "VRC.Udon",
         "VRC.Udon.Editor",
         "GUID:21332e1f0d937794d916d2402ba1943a"
@@ -25,19 +23,12 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "nunit.framework.dll",
-        "NSubstitute.dll",
         "VRCSDKBase-Editor.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [
         "UNITY_INCLUDE_TESTS"
     ],
-    "versionDefines": [
-        {
-            "name": "NSubstitute.dll",
-            "expression": "",
-            "define": "NSUBSTITUTE"
-        }
-    ],
+    "versionDefines": [],
     "noEngineReferences": false
 }

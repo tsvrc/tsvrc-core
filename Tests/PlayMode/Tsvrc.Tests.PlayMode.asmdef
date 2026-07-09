@@ -3,7 +3,6 @@
     "rootNamespace": "Tsvrc.Tests.PlayMode",
     "references": [
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner",
         "Tsvrc.Runtime",
         "Tsvrc.Tests.Doubles",
         "Tsvrc.Tests.TestUtil",
@@ -18,7 +17,6 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "nunit.framework.dll",
-        "NSubstitute.dll",
         "VRCSDKBase.dll",
         "VRCSDK3.dll"
     ],
@@ -26,12 +24,6 @@
     "defineConstraints": [
         "UNITY_INCLUDE_TESTS"
     ],
-    "versionDefines": [
-        {
-            "name": "NSubstitute.dll",
-            "expression": "",
-            "define": "NSUBSTITUTE"
-        }
-    ],
+    "versionDefines": [],
     "noEngineReferences": false
 }
