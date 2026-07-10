@@ -85,6 +85,44 @@ namespace Tsvrc.Tests.Editor
         }
 
         [Test]
+        public void Dedupe_PreservesFirstOccurrenceOrder()
+        {
+            string[] result = TsArray.Dedupe(new[] { "a", "b", "a", "c", "b" });
+
+            Assert.AreEqual(new[] { "a", "b", "c" }, result);
+        }
+
+        [Test]
+        public void Dedupe_NoDuplicates_ReturnsEquivalentArray()
+        {
+            string[] original = { "a", "b", "c" };
+
+            string[] result = TsArray.Dedupe(original);
+
+            Assert.AreEqual(original, result);
+        }
+
+        [Test]
+        public void Dedupe_EmptyArray_ReturnsSameEmptyArray()
+        {
+            string[] original = new string[0];
+
+            string[] result = TsArray.Dedupe(original);
+
+            Assert.AreSame(original, result);
+        }
+
+        [Test]
+        public void Dedupe_SingleElement_ReturnsSameArray()
+        {
+            string[] original = { "a" };
+
+            string[] result = TsArray.Dedupe(original);
+
+            Assert.AreSame(original, result);
+        }
+
+        [Test]
         public void Add_Behaviours_ConcatenatesInOrder()
         {
             UdonSharpBehaviour[] original = CreateBehaviours(2);

@@ -66,6 +66,35 @@ namespace Tsvrc.Utils
         }
 
         /// <summary>
+        /// Returns a new array with repeated values collapsed to their first occurrence.
+        /// Order is preserved.
+        /// </summary>
+        public static string[] Dedupe(string[] original)
+        {
+            int originalLen = original.Length;
+            if (originalLen < 2) return original;
+
+            string[] deduped = new string[originalLen];
+            int dedupedCount = 0;
+            for (int i = 0; i < originalLen; i++)
+            {
+                bool isDuplicate = false;
+                for (int j = 0; j < dedupedCount; j++)
+                {
+                    if (deduped[j] == original[i]) { isDuplicate = true; break; }
+                }
+                if (!isDuplicate)
+                    deduped[dedupedCount++] = original[i];
+            }
+
+            if (dedupedCount == originalLen) return deduped;
+
+            string[] trimmed = new string[dedupedCount];
+            System.Array.Copy(deduped, trimmed, dedupedCount);
+            return trimmed;
+        }
+
+        /// <summary>
         /// Returns a new array containing all elements of <paramref name="original"/>
         /// followed by all elements of <paramref name="items"/>.
         /// </summary>

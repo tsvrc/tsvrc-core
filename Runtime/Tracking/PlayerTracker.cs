@@ -221,34 +221,35 @@ namespace Tsvrc.Tracking
         /// <param name="useProcessUpdate">When <c>true</c>, <see cref="OnProcessUpdate"/> fires every 0.5 s while the process runs.</param>
         public virtual void StartPlayerTracking(string[] playerIds, bool useProcessUpdate = false)
         {
+            // If a process is already running, base.StartProcess will just log a warning
+            // and no-op; skip the dedup work and, critically, don't touch
+            // _initialTrackerPlayerIds at all in that case. Writing it here unconditionally
+            // would leave a stale, never-consumed value behind (OnProcessStarted is the only
+            // consumer, and it only runs on an actual fresh start) that could silently corrupt
+            // the *next* legitimate start's initial tracked set, since OnProcessCleanup's own
+            // reset of this field is skipped entirely on a reentrant restart.
+            if (IsProcessRunning())
+            {
+                base.StartProcess(useProcessUpdate);
+                return;
+            }
+
             if (playerIds == null) playerIds = new string[0];
+
+            // Strip null entries: an unfiltered null would otherwise be treated as "not already
+            // tracked" everywhere else in this class (TsArray.Contains/IsTrackedPlayer are
+            // null-safe but not null-*rejecting*) and silently become a permanently-tracked
+            // "null player", corrupting any consumer of LastPlayerIds/LastAddedPlayerIds that
+            // assumes non-null entries. Mirrors the equivalent filter in BroadcastAddTrackedPlayers,
+            // the other entry point into _trackedPlayerIds.
+            playerIds = TsArray.Remove(playerIds, new string[] { null });
 
             // Deduplicate the initial list to match the invariant that BroadcastAddTrackedPlayers
             // enforces at runtime: no ID appears more than once. Without this, a caller passing
             // repeated IDs would produce duplicates in _trackedPlayerIds, which corrupts
             // LastPlayerIds on all clients and causes OnOwnerAbandonedProcess to broadcast
             // spurious duplicate entries in the removed list.
-            if (playerIds.Length > 1)
-            {
-                string[] deduped = new string[playerIds.Length];
-                int dedupedCount = 0;
-                for (int i = 0; i < playerIds.Length; i++)
-                {
-                    bool isDuplicate = false;
-                    for (int j = 0; j < dedupedCount; j++)
-                    {
-                        if (deduped[j] == playerIds[i]) { isDuplicate = true; break; }
-                    }
-                    if (!isDuplicate)
-                        deduped[dedupedCount++] = playerIds[i];
-                }
-                if (dedupedCount < playerIds.Length)
-                {
-                    string[] trimmed = new string[dedupedCount];
-                    System.Array.Copy(deduped, trimmed, dedupedCount);
-                    playerIds = trimmed;
-                }
-            }
+            playerIds = TsArray.Dedupe(playerIds);
 
             _initialTrackerPlayerIds = playerIds;
 
@@ -380,6 +381,14 @@ namespace Tsvrc.Tracking
                 var owner = Networking.GetOwner(gameObject);
                 if (caller == null || owner == null || caller.playerId != owner.playerId) return;
             }
+            // Sanitize independently of the sender, same rationale/pattern as
+            // NotifyTrackedPlayersAdded/Removed: this method is itself public and
+            // [NetworkCallable], so a direct call can carry nulls/duplicates the normal
+            // OnProcessStarted->_trackedPlayerIds path would never produce. Unlike
+            // Added/Removed, an empty (but non-null) result is a legitimate value here (a
+            // tracker started with zero players) so there is no emptiness re-check/early-return.
+            playerIds = TsArray.Remove(playerIds, new string[] { null });
+            playerIds = TsArray.Dedupe(playerIds);
             LastPlayerIds = playerIds;
             OnTrackingStarted(playerIds);
             TsEmit(OnTrackingStartedEvent);
@@ -404,6 +413,10 @@ namespace Tsvrc.Tracking
                 var owner = Networking.GetOwner(gameObject);
                 if (caller == null || owner == null || caller.playerId != owner.playerId) return;
             }
+            // Sanitize independently of the sender: same rationale as
+            // NotifyTrackedPlayersProcessStarted above.
+            playerIds = TsArray.Remove(playerIds, new string[] { null });
+            playerIds = TsArray.Dedupe(playerIds);
             LastPlayerIds = playerIds;
             OnTrackingStopped(playerIds);
             TsEmit(OnTrackingStoppedEvent);
@@ -426,6 +439,10 @@ namespace Tsvrc.Tracking
                 var owner = Networking.GetOwner(gameObject);
                 if (caller == null || owner == null || caller.playerId != owner.playerId) return;
             }
+            // Sanitize independently of the sender: same rationale as
+            // NotifyTrackedPlayersProcessStarted above.
+            playerIds = TsArray.Remove(playerIds, new string[] { null });
+            playerIds = TsArray.Dedupe(playerIds);
             LastPlayerIds = playerIds;
             OnTrackingCompleted(playerIds);
             TsEmit(OnTrackingCompletedEvent);
@@ -442,14 +459,31 @@ namespace Tsvrc.Tracking
         [NetworkCallable(maxEventsPerSecond: 100)]
         public void NotifyTrackedPlayersAdded(string[] addedPlayerIds)
         {
-            if (addedPlayerIds == null) return;
-            // Owner-only guard: same rationale as NotifyTrackedPlayersProcessStarted.
+            // A non-null but empty array represents no actual change; every sender already
+            // guards against this before broadcasting (BroadcastAddTrackedPlayers returns early
+            // when its filtered validCount is 0), but this method is public and network-callable,
+            // so a direct call could otherwise still fire a spurious "players added" notification
+            // for zero players.
+            if (addedPlayerIds == null || addedPlayerIds.Length == 0) return;
+            // Owner-only guard: same rationale as NotifyTrackedPlayersProcessStarted. Checked
+            // before sanitizing below so a rejected call doesn't pay for the dedup/null-strip
+            // work at all.
             if (!_isBroadcasting)
             {
                 var caller = NetworkCalling.CallingPlayer;
                 var owner = Networking.GetOwner(gameObject);
                 if (caller == null || owner == null || caller.playerId != owner.playerId) return;
             }
+            // Sanitize independently of the sender: BroadcastAddTrackedPlayers already dedupes
+            // and null-filters before broadcasting, but this method is itself public and
+            // [NetworkCallable], so a direct call from the real owner (passing the guard above)
+            // could still bypass that. Strip nulls first, then dedupe (order matters: dedupe
+            // alone would keep one null; null-strip alone wouldn't catch duplicate real ids).
+            // Re-check emptiness afterward - stripping nulls out of e.g. [null] leaves nothing,
+            // and per the guard above an empty payload must never fire the lifecycle hook/event.
+            addedPlayerIds = TsArray.Remove(addedPlayerIds, new string[] { null });
+            addedPlayerIds = TsArray.Dedupe(addedPlayerIds);
+            if (addedPlayerIds.Length == 0) return;
             LastAddedPlayerIds = addedPlayerIds;
             // Apply the delta so LastPlayerIds is current when the callback fires.
             // Serialization packets and network events have no relative ordering guarantee
@@ -485,14 +519,26 @@ namespace Tsvrc.Tracking
         public void NotifyTrackedPlayersRemoved(string[] removedPlayerIds)
         {
             // Any [NetworkCallable] can receive null parameters; TsArray.Remove crashes on null input.
-            if (removedPlayerIds == null) return;
-            // Owner-only guard: same rationale as NotifyTrackedPlayersProcessStarted.
+            // A non-null but empty array represents no actual change; see NotifyTrackedPlayersAdded's
+            // comment for why this is guarded here too, not just at the sender.
+            if (removedPlayerIds == null || removedPlayerIds.Length == 0) return;
+            // Owner-only guard: same rationale as NotifyTrackedPlayersProcessStarted. Checked
+            // before sanitizing below so a rejected call doesn't pay for the dedup/null-strip
+            // work at all.
             if (!_isBroadcasting)
             {
                 var caller = NetworkCalling.CallingPlayer;
                 var owner = Networking.GetOwner(gameObject);
                 if (caller == null || owner == null || caller.playerId != owner.playerId) return;
             }
+            // Sanitize independently of the sender: same rationale as NotifyTrackedPlayersAdded.
+            // TsArray.Remove already tolerates duplicate/null entries in removedPlayerIds without
+            // corrupting LastPlayerIds itself, but without this LastRemovedPlayerIds - a direct,
+            // unfiltered assignment below - would still misreport a null or a duplicated id as
+            // having been removed.
+            removedPlayerIds = TsArray.Remove(removedPlayerIds, new string[] { null });
+            removedPlayerIds = TsArray.Dedupe(removedPlayerIds);
+            if (removedPlayerIds.Length == 0) return;
             LastRemovedPlayerIds = removedPlayerIds;
             // Apply the delta so LastPlayerIds is current when the callback runs.
             LastPlayerIds = TsArray.Remove(LastPlayerIds, removedPlayerIds);
@@ -520,7 +566,10 @@ namespace Tsvrc.Tracking
 
             for (int i = 0; i < playerIds.Length; i++)
             {
-                if (!IsTrackedPlayer(playerIds[i]))
+                // Reject null entries here too: IsTrackedPlayer(null) is false (nothing tracked
+                // is ever null once this guard exists), so an unfiltered null would otherwise
+                // pass as "not already tracked" and become a permanently-tracked null player id.
+                if (playerIds[i] != null && !IsTrackedPlayer(playerIds[i]))
                 {
                     validPlayerIds[validCount++] = playerIds[i];
                 }
@@ -534,6 +583,13 @@ namespace Tsvrc.Tracking
                 System.Array.Copy(validPlayerIds, trimmed, validCount);
                 validPlayerIds = trimmed;
             }
+
+            // The filter above only excludes IDs already present in _trackedPlayerIds; it does
+            // not catch repeats within playerIds itself. Without this, a caller passing the same
+            // new ID twice in one call would add it to _trackedPlayerIds twice, breaking the
+            // "no ID appears more than once" invariant StartPlayerTracking establishes and
+            // documents, and the broadcast payload would carry the duplicate to every client.
+            validPlayerIds = TsArray.Dedupe(validPlayerIds);
 
             _trackedPlayerIds = TsArray.Add(_trackedPlayerIds, validPlayerIds);
             RequestSerialization();
@@ -573,6 +629,14 @@ namespace Tsvrc.Tracking
                 System.Array.Copy(validPlayerIds, trimmed, validCount);
                 validPlayerIds = trimmed;
             }
+
+            // Same reasoning as BroadcastAddTrackedPlayers: the filter above only checks against
+            // the current tracked set, not repeats within playerIds itself. TsArray.Remove already
+            // tolerates duplicate entries in its "items" argument without corrupting
+            // _trackedPlayerIds, but without this the broadcast payload (and thus
+            // LastRemovedPlayerIds on every client) would misreport the same ID as removed more
+            // than once.
+            validPlayerIds = TsArray.Dedupe(validPlayerIds);
 
             var remainingPlayerIds = TsArray.Remove(_trackedPlayerIds, validPlayerIds);
 
