@@ -24,7 +24,7 @@ namespace Tsvrc.Config
     // ScaffoldModule) is what strips it from the VRChat build, not the script's location.
     public class TsvrcConfig : MonoBehaviour
     {
-        [Tooltip("Scene objects exposed as named fields on _ts.Singleton. Drag a GameObject or Component here.")]
+        [Tooltip("Scene objects exposed as named fields directly on the generated TsvrcGenerated root. Drag a GameObject or Component here.")]
         public Object[] Singletons;
         [Tooltip("UdonSharpBehaviour prefabs to pool. Must be prefab assets, not scene objects.")]
         public UdonSharpBehaviour[] PooledObjects;
