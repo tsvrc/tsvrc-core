@@ -356,6 +356,19 @@ namespace Tsvrc.Tracking
         protected virtual void OnTrackingPlayersRemoved(string[] removedPlayerIds) { }
 
         /// <summary>
+        /// Called by <see cref="BroadcastAddTrackedPlayers"/> on the owner, after the running/owner
+        /// guards but before any state mutation. Return <c>false</c> to reject the addition.
+        /// </summary>
+        /// <remarks>
+        /// This runs for BOTH call paths that reach <see cref="BroadcastAddTrackedPlayers"/>: the
+        /// owner's own local fast-path call from <see cref="AddTrackedPlayers"/>, and a non-owner's
+        /// remote <c>[NetworkCallable]</c> call. <see cref="BroadcastAddTrackedPlayers"/> cannot be
+        /// <c>virtual</c>/<c>override</c> itself (VRChat forbids that on <c>[NetworkCallable]</c>
+        /// methods), so this hook is the only point that can intercept both paths at once.
+        /// </remarks>
+        protected virtual bool CanAcceptTrackedPlayerAdditions() { return true; }
+
+        /// <summary>
         /// Broadcast target: fires on all instance players when the process starts.
         /// Read <c>LastPlayerIds</c> to check if the local player is tracked.
         /// </summary>
@@ -560,6 +573,7 @@ namespace Tsvrc.Tracking
             // _trackedPlayerIds and fire a spurious NotifyTrackedPlayersAdded event to all clients.
             if (!IsProcessRunning() || !IsProcessOwner()) return;
             if (playerIds == null || playerIds.Length == 0) return;
+            if (!CanAcceptTrackedPlayerAdditions()) return;
 
             string[] validPlayerIds = new string[playerIds.Length];
             int validCount = 0;

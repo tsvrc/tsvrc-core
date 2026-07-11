@@ -94,6 +94,24 @@ namespace Tsvrc.Tracking
             CheckAllPlayersReady();
         }
 
+        protected override void OnOwnerAbandonedProcess()
+        {
+            base.OnOwnerAbandonedProcess();
+
+            // TakeOverAbandonedProcess (TsvrcProcess) has no knowledge of this class's
+            // _readyCheckActive flag and never corrects it. Before taking over, this client
+            // was a non-owner whose _readyCheckActive is only ever corrected by
+            // OnTrackingDeserialization, on receipt of a sync packet or the started network
+            // event; if the takeover happens before either arrived, _readyCheckActive is
+            // still stuck at its stale default (false), and stays that way forever once this
+            // client becomes the owner: OnDeserialization never fires for the client whose
+            // own RequestSerialization produced the packet. SetReady()'s own top-level gate
+            // checks _readyCheckActive first, so the new owner would otherwise be unable to
+            // ever mark themselves ready. Deriving it from IsProcessRunning() here applies
+            // the same correction OnTrackingDeserialization already applies for late joiners.
+            _readyCheckActive = IsProcessRunning();
+        }
+
         // Completes the ready check if every tracked player is ready.
         // Called immediately after each player marks ready and also on every 0.5s poll tick.
         private void CheckAllPlayersReady()
@@ -254,6 +272,10 @@ namespace Tsvrc.Tracking
 
         /// <summary>
         /// Returns true if the player with the given ID is currently marked as ready.
+        /// On non-owner clients this reflects the last deserialized state, which is never
+        /// otherwise updated for this client (unlike <c>_trackedPlayerIds</c>, there is no
+        /// <c>Notify*</c> broadcast for ready/unready changes) - see
+        /// <see cref="PlayerTracker.IsTrackedPlayer"/> for the same caveat applied there.
         /// </summary>
         protected bool IsPlayerReady(string playerId)
         {

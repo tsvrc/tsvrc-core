@@ -87,10 +87,30 @@ namespace Tsvrc.DataTransfer
         protected override void OnTransferCompleted()
         {
             base.OnTransferCompleted();
-            string assembled = ReassembleMessage(_receivedChunks);
+            // NotifyTrackedPlayersDataTransferCompleted targets NetworkEventTarget.All, so this
+            // fires on every player physically in the instance, not just currently-tracked ones.
+            // A player tracked for only a prefix of the transfer (removed mid-transfer via
+            // RemoveTrackedPlayers, or filtered out by ChunkedTransferSession's inter-chunk-gap
+            // departure handling while still present in the instance) has _receivedChunks sized
+            // for the full chunk count from their earlier accepted chunks, but with null gaps
+            // past the point they stopped receiving - BroadcastDataChunkReceived's own playerIds
+            // check silently drops every chunk sent after their removal. HasAllChunks rejects
+            // reassembling that array (ReassembleMessage requires every element non-null), so
+            // this reports an empty result instead - the same result a never-tracked bystander's
+            // empty _receivedChunks already produces.
+            string assembled = HasAllChunks(_receivedChunks) ? ReassembleMessage(_receivedChunks) : "";
             _receivedChunks = new string[0];
             _transferActive = false;
             OnChunksAssembled(assembled);
+        }
+
+        // An untracked bystander's never-allocated empty array trivially satisfies this (the
+        // loop never runs), preserving its existing "" result.
+        private static bool HasAllChunks(string[] receivedChunks)
+        {
+            for (int i = 0; i < receivedChunks.Length; i++)
+                if (receivedChunks[i] == null) return false;
+            return true;
         }
 
         protected override void OnDataChunkSendRequested(string dataChunk, int chunkIndex, int totalChunks, string[] playerIds)
@@ -137,11 +157,8 @@ namespace Tsvrc.DataTransfer
             // reallocations. The default StringBuilder capacity is 16 chars; without
             // pre-allocation a 500,000-char message (200 chunks × 2,500 chars) would
             // resize the buffer ~15 times, each doubling it and copying all prior data.
-            // Chunks are guaranteed non-null at this call site: ReassembleMessage is only
-            // called from OnTransferCompleted, which is only reached after all N chunks have
-            // been accepted (each ready check completes only when all tracked players ACK
-            // the current chunk, and chunks arrive in strict order due to the sequential
-            // ready-check protocol).
+            // OnTransferCompleted, the only call site, checks HasAllChunks(receivedChunks)
+            // before calling this; a null element here throws on receivedChunks[i].Length.
             int totalLength = 0;
             for (int i = 0; i < receivedChunks.Length; i++)
                 totalLength += receivedChunks[i].Length;

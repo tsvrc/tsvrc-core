@@ -282,6 +282,29 @@ namespace Tsvrc.DataTransfer
         }
 
         /// <summary>
+        /// Adding tracked players while a transfer is active is not supported. Rejected with a
+        /// warning instead of allowed.
+        /// </summary>
+        // A player added mid-transfer was never sent the chunks already broadcast before their
+        // addition, so BroadcastDataChunkReceived's own playerIds check rejects every one of
+        // those chunks for them and they can never call SetReady(), stalling the ready check
+        // forever. _currentChunkIndex > 0 for the whole duration of a transfer, from the first
+        // chunk's OnProcessStarted until ResetInternalTransferData clears it, covering both the
+        // actively-in-flight and inter-chunk-gap windows. RemoveTrackedPlayers has no equivalent
+        // guard: removing a tracked player mid-transfer is the normal departure path, already
+        // handled by OnPlayerLeft/OnOwnerAbandonedProcess/_StartNextReadyCheck's own filtering.
+        protected override bool CanAcceptTrackedPlayerAdditions()
+        {
+            if (_currentChunkIndex > 0)
+            {
+                Debug.LogWarning("[TsvrcDataSender] Cannot add tracked players while a transfer is in progress.");
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Cancels the current data transfer. Safe to call at any point during a transfer,
         /// including while the process is between chunks. Has no effect if no transfer is active.
         /// </summary>
