@@ -1,6 +1,7 @@
 using Tsvrc.Core;
 using Tsvrc.Tracking;
 using Tsvrc.Timing;
+using Tsvrc.Utils;
 using UdonSharp;
 using UnityEngine;
 
@@ -129,6 +130,15 @@ namespace Tsvrc.Session
                 Debug.LogError("[TsVRC] RankedGameSession.StartSession: session is already running.", this);
                 return;
             }
+            // ReadyCheckProcess.CheckAllPlayersReady returns early (never auto-completes)
+            // when zero players are tracked, so starting with an empty lobby would leave
+            // the session stuck in Loading forever with no player able to ever complete
+            // the check - only StopSession could recover it.
+            if (LobbyPlayerIds.Length == 0)
+            {
+                Debug.LogError("[TsVRC] RankedGameSession.StartSession: lobby is empty.", this);
+                return;
+            }
             _readyCheck.StartReadyCheck(LobbyPlayerIds);
         }
 
@@ -192,6 +202,15 @@ namespace Tsvrc.Session
             if (CurrentState != RankedGameSessionState.InGame)
             {
                 Debug.LogError("[TsVRC] RankedGameSession.AddCompletedPlayer: session is not in game state.", this);
+                return;
+            }
+            // Without this check, a caller passing an arbitrary/spoofed playerId not in
+            // GamePlayerIds would still inflate _completedTracker's count, letting
+            // _OnPlayersCompleted's completed->=game comparison end the session before
+            // every real game player has actually completed.
+            if (!TsArray.Contains(GamePlayerIds, playerId))
+            {
+                Debug.LogError("[TsVRC] RankedGameSession.AddCompletedPlayer: playerId is not an active game player.", this);
                 return;
             }
             _completedTracker.AddTrackedPlayers(new[] { playerId });
