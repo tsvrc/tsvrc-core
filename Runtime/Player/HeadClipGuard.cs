@@ -6,9 +6,11 @@ using VRC.SDKBase;
 namespace Tsvrc.Player
 {
     /// <summary>
-    /// Prevents VR head clipping through geometry by applying the minimum world-space push needed
-    /// to move the head out of any violated solid OBB. Runs in PostLateUpdate after all IK and
-    /// tracking have settled. Collider data is baked once on Begin().
+    /// Prevents VR head clipping through geometry by pushing the head out of any violated solid
+    /// OBB, along the axis the body most likely entered through. Falls back to the head's own
+    /// true nearest-face, minimum-penetration push only when the body is also inside the OBB
+    /// (see ComputePushLocal). Runs in PostLateUpdate after all IK and tracking have settled.
+    /// Collider data is baked once on Begin().
     ///
     /// PostLateUpdate stages:
     ///   0. Movement gate, skip all work when head movement per axis is below _movSkip and no
@@ -45,7 +47,6 @@ namespace Tsvrc.Player
         [SerializeField, Tooltip("Per-axis head movement threshold (metres). PostLateUpdate is skipped when all axes are below this and no violation was active. VR tracking jitter is ~1-3 mm; 5 mm skips most standing-still frames.")]
         private float _movSkip = 0.005f;
 
-        // ── Baked OBB data ───────────────────────────────────────────────────────
         // _invRotations[i]      world-to-local rotation for OBB i.
         // _marginHalfExtents[i] OBB half-extents plus _margin.
         // _aabbMin/Max[i]       tight world-space AABB of OBB i, expanded by _margin.
@@ -58,18 +59,15 @@ namespace Tsvrc.Player
         private Vector3[] _aabbMax;
         private int _count;
 
-        // ── Candidate tracking ───────────────────────────────────────────────────
         // _candidatePos[i]  index of OBB i inside _candidateIndices, or -1 if not a candidate.
         // _candidateIndices compact list: [0, _candidateCount) holds the current nearby OBB indices.
         private int[] _candidatePos;
         private int[] _candidateIndices;
         private int _candidateCount;
 
-        // ── Batch state ──────────────────────────────────────────────────────────
         private int _batchStart;
         private int _batchSize; // ceil(_count / _batchFrames)
 
-        // ── Runtime state ────────────────────────────────────────────────────────
         private bool _active;
         private bool _playerReady;  // set after first IsValid() confirmation; skips that call thereafter
         private bool _lastViolated; // whether last processed frame had a violation; bypasses movement gate
@@ -77,16 +75,10 @@ namespace Tsvrc.Player
         private Vector3 _lastHeadPos; // head position from the last processed frame; movement gate delta source
         private Vector3 _lastSafePlayerPos; // capsule position from the last non-violated frame; fallback for symmetric-push edge case
 
-        #region TsvrcBehaviour Callbacks
-
         protected override void TsStart()
         {
             _localPlayer = Networking.LocalPlayer;
         }
-
-        #endregion
-
-        #region VRChat Callbacks
 
         public override void PostLateUpdate()
         {
@@ -97,11 +89,14 @@ namespace Tsvrc.Player
             {
                 if (_localPlayer == null || !_localPlayer.IsValid()) return;
                 _playerReady = true;
+                // Seeds the symmetric-push-cancellation fallback before this frame's own
+                // push logic can run, so it's never still the zero-vector from a Begin()
+                // call made while the player was transiently invalid.
+                _lastSafePlayerPos = _localPlayer.GetPosition();
             }
 
             Vector3 headPos = _localPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
 
-            // ── Movement gate ────────────────────────────────────────────────────
             // Skip all work while standing still. Per-axis float deltas avoid any
             // vector allocation or multiply. _lastViolated bypasses the gate so active
             // violations are always corrected every frame.
@@ -119,7 +114,6 @@ namespace Tsvrc.Player
             }
             _lastHeadPos = headPos;
 
-            // ── Batch phase ──────────────────────────────────────────────────────
             // AdvanceBatch returns the current candidate count, avoiding two extra field reads
             // (the zero-check and the cCount assignment) on every processed frame.
             int cCount = AdvanceBatch(headPos);
@@ -130,7 +124,6 @@ namespace Tsvrc.Player
                 return;
             }
 
-            // ── Test phase ───────────────────────────────────────────────────────
             Vector3 capsulePos = _localPlayer.GetPosition();
             Vector3 totalPush = Vector3.zero;
             bool violated = false;
@@ -169,7 +162,6 @@ namespace Tsvrc.Player
                     (headLocal.z > mHalf.z || headLocal.z < -mHalf.z))
                     continue;
 
-                // ── Push phase ───────────────────────────────────────────────────
                 violated = true;
                 Vector3 capsuleLocal = invRot * (capsulePos - center);
                 // Forward rotation = conjugate of invRot: Quaternion(-ix, -iy, -iz, iw).
@@ -194,10 +186,6 @@ namespace Tsvrc.Player
                 VRC.SDKBase.VRC_SceneDescriptor.SpawnOrientation.Default,
                 false);
         }
-
-        #endregion
-
-        #region Public Methods
 
         /// <summary>
         /// Bakes collider data and starts guarding. Null elements in the array are skipped.
@@ -258,10 +246,6 @@ namespace Tsvrc.Player
             _candidatePos = null;
             _candidateIndices = null;
         }
-
-        #endregion
-
-        #region Private Methods
 
         private void AllocateArrays(int n)
         {
@@ -479,7 +463,5 @@ namespace Tsvrc.Player
 
             return push;
         }
-
-        #endregion
     }
 }
