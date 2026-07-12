@@ -20,8 +20,12 @@ namespace Tsvrc.Player
         /// </summary>
         public static VRCPlayerApi FindPlayerByID(string playerID)
         {
-            VRCPlayerApi[] allPlayers = GetAllPlayers();
-            foreach (var player in allPlayers)
+            return FindPlayerByIDIn(GetAllPlayers(), playerID);
+        }
+
+        private static VRCPlayerApi FindPlayerByIDIn(VRCPlayerApi[] players, string playerID)
+        {
+            foreach (var player in players)
             {
                 if (GetPlayerID(player) == playerID)
                 {
@@ -51,11 +55,19 @@ namespace Tsvrc.Player
         public static VRCPlayerApi[] ToPlayerApis(string[] playerIds)
         {
             VRCPlayerApi[] players = new VRCPlayerApi[playerIds.Length];
+            if (playerIds.Length == 0)
+            {
+                return players;
+            }
+
+            // Fetched once and reused below so an N-id lookup costs one player-list
+            // fetch instead of N.
+            VRCPlayerApi[] allPlayers = GetAllPlayers();
             int foundCount = 0;
 
             for (int i = 0; i < playerIds.Length; i++)
             {
-                VRCPlayerApi player = FindPlayerByID(playerIds[i]);
+                VRCPlayerApi player = FindPlayerByIDIn(allPlayers, playerIds[i]);
                 if (player != null)
                 {
                     players[foundCount++] = player;
