@@ -42,6 +42,16 @@ namespace Tsvrc.Timing
         // Reset to false in OnProcessStarted at the beginning of each new run.
         [UdonSynced] private bool _wasCompleted = false;
         [UdonSynced] private bool _isPaused = false;
+        // Incremented in OnProcessStarted every time a new run begins. VRChat coalesces
+        // multiple RequestSerialization calls made in the same frame into one outbound
+        // packet, so a subscriber that reacts to OnTimerStopped/OnTimerCompleted by
+        // restarting the timer synchronously can produce a single packet where, from a
+        // remote client's perspective, IsProcessRunning() was true before AND after -
+        // the running-state diff in OnDeserialization below would otherwise see no
+        // transition at all and silently drop the entire stop-then-restart. Comparing
+        // this counter against the last observed value lets OnDeserialization detect
+        // that case even though the diff on _isRunning alone cannot.
+        [UdonSynced] private int _runId = 0;
 
         private const float _localUpdateInterval = 0.25f;
         private bool _localUpdateLoopActive = false;
@@ -49,6 +59,7 @@ namespace Tsvrc.Timing
         private int _lastObservedElapsedMs = 0;
         private bool _lastObservedIsRunning = false;
         private bool _lastObservedIsPaused = false;
+        private int _lastObservedRunId = 0;
 
         /// <summary>
         /// The last locally evaluated elapsed time in milliseconds.
@@ -87,6 +98,9 @@ namespace Tsvrc.Timing
             bool wasRunning = _lastObservedIsRunning;
             bool wasPaused = _lastObservedIsPaused;
             bool hadObserved = _hasObservedState;
+            int runId = _runId;
+            int lastObservedRunId = _lastObservedRunId;
+            _lastObservedRunId = runId;
 
             UpdateElapsedSnapshot();
 
@@ -122,6 +136,24 @@ namespace Tsvrc.Timing
                     TsEmit(OnTimerStoppedEvent);
                 }
             }
+            else if (hadObserved && wasRunning && isRunning && runId != lastObservedRunId)
+            {
+                // The old run's stop-then-restart coalesced into this single packet (see
+                // _runId's own comment). The old run's actual stopped-vs-completed outcome
+                // was already overwritten by the new run's own OnProcessStarted resetting
+                // _wasCompleted before this packet was even sent, so it cannot be recovered
+                // here - but the new run's start (and already-paused state, if any) must
+                // still be surfaced, exactly like the late-joiner-mid-run branch above,
+                // otherwise a remote client's UI would keep counting from the OLD run's
+                // anchor forever with no indication a new run ever began.
+                OnTimerStarted();
+                TsEmit(OnTimerStartedEvent);
+                if (isPaused)
+                {
+                    OnTimerPaused();
+                    TsEmit(OnTimerPausedEvent);
+                }
+            }
             else if (hadObserved && wasRunning && isRunning)
             {
                 // Detect pause/resume within a running timer.
@@ -147,6 +179,7 @@ namespace Tsvrc.Timing
             _elapsedOffsetMs = 0;
             _wasCompleted = false;
             _isPaused = false;
+            _runId++;
             LastElapsedMilliseconds = 0;
 
             StartLocalUpdateLoop();
