@@ -65,7 +65,7 @@ namespace Tsvrc.Tracking
         /// </remarks>
         public void StartAutoTracking()
         {
-            base.StartPlayerTracking(TsPlayer.GetAllPlayerIDs(), false);
+            StartAutoTrackingSnapshot();
         }
 
         /// <summary>
@@ -91,6 +91,20 @@ namespace Tsvrc.Tracking
         /// </summary>
         public override void StartPlayerTracking(string[] playerIds, bool useProcessUpdate = false)
         {
+            StartAutoTrackingSnapshot();
+        }
+
+        // PlayerTracker.StartPlayerTracking discards its playerIds argument unread
+        // whenever the process is already running, so the real player-list snapshot is
+        // only computed when a fresh start is actually possible.
+        private void StartAutoTrackingSnapshot()
+        {
+            if (IsProcessRunning())
+            {
+                base.StartPlayerTracking(null, false);
+                return;
+            }
+
             base.StartPlayerTracking(TsPlayer.GetAllPlayerIDs(), false);
         }
 
