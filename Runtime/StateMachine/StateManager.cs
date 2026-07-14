@@ -27,6 +27,15 @@ namespace Tsvrc.StateMachine
         // Maps state int -> DataDictionary { "enter": methodName, "exit": methodName, "target": UdonSharpBehaviour }
         private DataDictionary _stateData = new DataDictionary();
 
+        // A SetState call made while _isTransitioning is true (from OnStateChanged, an
+        // external OnStateChanged subscriber, or a dispatched enter/exit method) is
+        // queued into these fields instead of running immediately. Only the most
+        // recently queued state survives if several arrive before the active
+        // transition finishes.
+        private bool _isTransitioning;
+        private bool _hasQueuedState;
+        private int _queuedState;
+
         /// <summary>
         /// Register a state with optional enter/exit method names and an optional target behaviour to
         /// dispatch them on. If target is null, dispatches on this StateManager (for subclass overrides).
@@ -51,47 +60,70 @@ namespace Tsvrc.StateMachine
         /// Calls the registered exit method on the current state, notifies the subclass via OnStateChanged,
         /// then calls the registered enter method on the new state.
         /// SendCustomEvent dispatches to the concrete subclass.
+        /// A SetState call made reentrantly (from OnStateChanged, an OnStateChanged
+        /// subscriber, or an enter/exit method) is queued and runs only after the
+        /// in-progress transition fully completes, rather than interleaving with it.
         /// </summary>
         public void SetState(int newState)
+        {
+            if (_isTransitioning)
+            {
+                _hasQueuedState = true;
+                _queuedState = newState;
+                return;
+            }
+
+            _isTransitioning = true;
+            RunTransition(newState);
+            _isTransitioning = false;
+
+            while (_hasQueuedState)
+            {
+                _hasQueuedState = false;
+                int queuedState = _queuedState;
+                _isTransitioning = true;
+                RunTransition(queuedState);
+                _isTransitioning = false;
+            }
+        }
+
+        private void RunTransition(int newState)
         {
             if (_currentState == newState)
                 return;
 
-            // --- Exit current state ---
-            // Only call exit if a state was previously set and it has a registered handler.
-            // currentState == -1 means no state has been entered yet (initial value).
-            if (_currentState != -1 && _stateData.ContainsKey(_currentState))
-            {
-                var exitEntry = _stateData[_currentState].DataDictionary;
-                string exitMethod = exitEntry["exit"].String;
-                if (!string.IsNullOrEmpty(exitMethod))
-                {
-                    var exitTarget = (UdonSharpBehaviour)exitEntry["target"].Reference;
-                    exitTarget.SendCustomEvent(exitMethod);
-                }
-            }
+            // currentState == -1 means no state has been entered yet, so there is
+            // nothing registered to exit from.
+            if (_currentState != -1 && _stateData.TryGetValue(_currentState, out DataToken exitEntry))
+                Dispatch(exitEntry.DataDictionary, "exit");
 
             int oldState = _currentState;
             _previousState = _currentState;
             _currentState = newState;
 
-            // Notify subclass that the state has changed before entering the new state
             OnStateChanged(oldState, newState);
-
-            // Notify any external subscribers (compose-based users)
             TsEmit("OnStateChanged");
 
-            // --- Enter new state ---
-            if (_stateData.ContainsKey(newState))
-            {
-                var enterEntry = _stateData[newState].DataDictionary;
-                string enterMethod = enterEntry["enter"].String;
-                if (!string.IsNullOrEmpty(enterMethod))
-                {
-                    var enterTarget = (UdonSharpBehaviour)enterEntry["target"].Reference;
-                    enterTarget.SendCustomEvent(enterMethod);
-                }
-            }
+            if (_stateData.TryGetValue(newState, out DataToken enterEntry))
+                Dispatch(enterEntry.DataDictionary, "enter");
+        }
+
+        // Skips silently if no method name was registered, or if the registered
+        // target's GameObject was destroyed since RegisterState (the target itself is
+        // never truly C#-null - RegisterState always defaults it to `this` - so the
+        // cast-then-compare below is specifically checking Unity's overridden equality
+        // for a destroyed object, not a real null reference).
+        private void Dispatch(DataDictionary entry, string methodKey)
+        {
+            string method = entry[methodKey].String;
+            if (string.IsNullOrEmpty(method))
+                return;
+
+            var target = (UdonSharpBehaviour)entry["target"].Reference;
+            if ((object)target != null && target == null)
+                return;
+
+            target.SendCustomEvent(method);
         }
 
         public int GetCurrentState()
