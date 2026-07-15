@@ -11,6 +11,7 @@
         "UdonSharp.Editor",
         "Unity.TextMeshPro",
         "VRC.SDKBase",
+        "VRC.SDK3",
         "VRC.Udon",
         "VRC.Udon.Editor",
         "GUID:21332e1f0d937794d916d2402ba1943a"
@@ -23,7 +24,8 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "nunit.framework.dll",
-        "VRCSDKBase-Editor.dll"
+        "VRCSDKBase-Editor.dll",
+        "VRCSDK3.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [

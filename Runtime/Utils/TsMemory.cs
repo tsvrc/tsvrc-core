@@ -197,7 +197,7 @@ namespace Tsvrc.Utils
                     Networking.SetOwner(Networking.LocalPlayer, gameObject);
             }
 
-            if (_IsPersist(flags))
+            if (_IsPersist(flags) && _persistStore.ContainsKey(key))
                 Debug.LogWarning($"[TsMemory] '{key}' is persistent. PlayerData cannot be deleted; local cache cleared.");
 
             _Store(flags).Remove(key);
