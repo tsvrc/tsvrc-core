@@ -112,8 +112,8 @@ namespace Tsvrc.UI
         // _playerBuffer    : tracked players resolved from LastPlayerIds (output of _ResolveTrackedPlayers).
         // _allPlayersBuffer: all instance players from VRCPlayerApi.GetPlayers() (input, no-alloc).
         private Color32[] _pixelBuffer;
-        private VRCPlayerApi[] _playerBuffer;     // max 82 (VRChat instance cap)
-        private VRCPlayerApi[] _allPlayersBuffer; // max 82
+        private VRCPlayerApi[] _playerBuffer;
+        private VRCPlayerApi[] _allPlayersBuffer;
 
         // Recached at the start of each remote tick so inspector edits take effect
         // without requiring a new Setup() call. Blink tick uses the latest cached values.
@@ -132,9 +132,9 @@ namespace Tsvrc.UI
         // CPU buffer AND uploading the blank image to the GPU.
         private bool _bufferIsClean = true;
 
-        // Per-frame position cache populated by the remote tick and consumed by the local tick.
-        // Stores the last-known pixel position of each tracked player so the local tick can
-        // rebuild the full buffer without calling VRCPlayerApi.GetPlayers() again.
+        // Per-frame position cache populated by the remote tick and consumed by the blink tick.
+        // Stores the last-known pixel position of each tracked player so the blink tick can
+        // draw remote markers without calling VRCPlayerApi.GetPlayers() again.
         private int[] _cachedPxArr;
         private int[] _cachedPyArr;
         private float[] _cachedHeadings;   // only used when MarkerShape == Triangle
@@ -150,6 +150,9 @@ namespace Tsvrc.UI
 
         private bool _isSetup;
         private bool _isOverlayUpdating;
+
+        // VRChat's current per-instance player cap. Sizes every fixed-capacity buffer below.
+        private const int MaxTrackedPlayers = 82;
 
         // Double-tick guard: each schedule call increments the counter; each fired event
         // decrements it. If the counter is still > 0 when a tick fires a newer tick is already
@@ -193,14 +196,7 @@ namespace Tsvrc.UI
             _worldOrigin = worldOrigin;
             _pixelsPerUnitX = pixelsPerUnitX;
             _pixelsPerUnitZ = pixelsPerUnitZ;
-            _localMarkerRadius = Mathf.Max(1, Mathf.RoundToInt(Mathf.Min(LocalMarkerWidth, LocalMarkerHeight) / 2f));
-            _remoteMarkerRadius = Mathf.Max(1, Mathf.RoundToInt(Mathf.Min(RemoteMarkerWidth, RemoteMarkerHeight) / 2f));
-            _localHalfW = Mathf.Max(1, Mathf.RoundToInt(LocalMarkerWidth / 2f));
-            _localHalfH = Mathf.Max(1, Mathf.RoundToInt(LocalMarkerHeight / 2f));
-            _remoteHalfW = Mathf.Max(1, Mathf.RoundToInt(RemoteMarkerWidth / 2f));
-            _remoteHalfH = Mathf.Max(1, Mathf.RoundToInt(RemoteMarkerHeight / 2f));
-            _localColor32 = LocalPlayerColor;
-            _remoteColor32 = RemotePlayerColor;
+            _RecacheFields();
 
             if (_overlayTexture != null)
                 Destroy(_overlayTexture);
@@ -217,18 +213,16 @@ namespace Tsvrc.UI
             OverlayImage.color = Color.white;
 
             if (_playerBuffer == null)
-                _playerBuffer = new VRCPlayerApi[82];
-            // Separate buffer for the no-alloc VRCPlayerApi.GetPlayers() call.
+                _playerBuffer = new VRCPlayerApi[MaxTrackedPlayers];
             if (_allPlayersBuffer == null)
-                _allPlayersBuffer = new VRCPlayerApi[82];
+                _allPlayersBuffer = new VRCPlayerApi[MaxTrackedPlayers];
 
-            // Position cache for the local-tick full-rebuild (allocated once, reused every tick).
             if (_cachedPxArr == null)
             {
-                _cachedPxArr = new int[82];
-                _cachedPyArr = new int[82];
-                _cachedHeadings = new float[82];
-                _cachedIsLocalArr = new bool[82];
+                _cachedPxArr = new int[MaxTrackedPlayers];
+                _cachedPyArr = new int[MaxTrackedPlayers];
+                _cachedHeadings = new float[MaxTrackedPlayers];
+                _cachedIsLocalArr = new bool[MaxTrackedPlayers];
             }
             _cachedPlayerCount = 0;
 
@@ -307,11 +301,6 @@ namespace Tsvrc.UI
 
             _markersVisible = !_markersVisible;
 
-            // Track whether _pixelBuffer actually changed this tick.
-            // Only upload to the GPU when something changed. Source: Unity docs,
-            // "Apply is an expensive operation because it copies all the pixels in the
-            // texture even if you've only changed some." Uploading an unchanged texture
-            // wastes a full CPU to GPU copy every tick.
             bool bufferModified = false;
 
             if (_markersVisible)
@@ -366,8 +355,7 @@ namespace Tsvrc.UI
                 }
             }
 
-            // Only pay the CPU to GPU upload cost when the buffer actually changed.
-            // Always emit the event so subscribers are notified on every cycle.
+            // Always emit the event, even on a skipped flush, so subscribers are notified every cycle.
             if (bufferModified)
                 _FlushTexture();
             else
@@ -388,10 +376,7 @@ namespace Tsvrc.UI
             _scheduledRemoteTickCount--;
             if (_scheduledRemoteTickCount > 0 || !_isOverlayUpdating) return;
 
-            // Recache inspector-editable fields so runtime changes take effect without Setup().
             _RecacheFields();
-
-            // Resolve tracked IDs to live VRCPlayerApi references (one GetPlayers call, no alloc).
             int count = _ResolveTrackedPlayers();
 
             // Populate the blink-tick position cache. No draw, no flush.
@@ -442,7 +427,7 @@ namespace Tsvrc.UI
         }
 
         // Thin wrapper: computes pixel position from world position then delegates to _DrawPlayerAtPixel.
-        // Called by the local tick for the fresh local-player draw (only place a VRCPlayerApi is
+        // Called by the blink tick for the fresh local-player draw (only place a VRCPlayerApi is
         // needed at draw time).
         private void _DrawPlayer(VRCPlayerApi player)
         {
@@ -530,15 +515,12 @@ namespace Tsvrc.UI
         /// then for each tracked ID parses the trailing <c>playerId</c> integer from the
         /// <c>"displayName#playerId"</c> string (zero alloc, character arithmetic) and matches
         /// it against <c>VRCPlayerApi.playerId</c> (an <c>int</c> field, no allocation).
-        /// Avoids the previous O(N×M) pattern of calling <c>TsPlayer.GetPlayerID</c> inside the
-        /// inner loop, which allocated a new heap string for every (tracked × instance) player pair.
         /// </summary>
         private int _ResolveTrackedPlayers()
         {
             string[] ids = LastPlayerIds;
             if (ids.Length == 0) return 0;
 
-            // Fill the pre-allocated buffer with all current instance players. No allocation.
             // VRCPlayerApi.GetPlayers() writes in-place and pads with null beyond player count.
             int totalCount = VRCPlayerApi.GetPlayerCount();
             VRCPlayerApi.GetPlayers(_allPlayersBuffer);
@@ -546,9 +528,6 @@ namespace Tsvrc.UI
             int count = 0;
             for (int i = 0; i < ids.Length && count < _playerBuffer.Length; i++)
             {
-                // Parse the int suffix of "displayName#playerId" once. Zero allocation.
-                // Comparing against playerId (an int) avoids building GetPlayerID strings
-                // in the inner loop, which would create O(N×M) heap allocations per tick.
                 int targetIntId = _ParsePlayerIntId(ids[i]);
                 if (targetIntId < 0) continue; // malformed ID, skip
                 for (int j = 0; j < totalCount; j++)
