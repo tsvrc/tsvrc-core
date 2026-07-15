@@ -89,8 +89,10 @@ namespace Tsvrc.UI.Utils
             {
                 for (int t = 0; t < thickness; t++)
                 {
-                    if (x + i < texture.width && y + t < texture.height)
-                        texture.SetPixel(x + i, y + t, color);
+                    int px = x + i;
+                    int py = y + t;
+                    if (px >= 0 && px < texture.width && py >= 0 && py < texture.height)
+                        texture.SetPixel(px, py, color);
                 }
             }
         }
@@ -106,8 +108,10 @@ namespace Tsvrc.UI.Utils
             {
                 for (int t = 0; t < thickness; t++)
                 {
-                    if (x + t < texture.width && y + i < texture.height)
-                        texture.SetPixel(x + t, y + i, color);
+                    int px = x + t;
+                    int py = y + i;
+                    if (px >= 0 && px < texture.width && py >= 0 && py < texture.height)
+                        texture.SetPixel(px, py, color);
                 }
             }
         }
@@ -159,7 +163,7 @@ namespace Tsvrc.UI.Utils
 
             for (int py = pyMin; py <= pyMax; py++)
             {
-                int dy        = py - cy;
+                int dy = py - cy;
                 int rowOffset = py * bufferWidth;
 
                 for (int px = pxMin; px <= pxMax; px++)
@@ -182,7 +186,7 @@ namespace Tsvrc.UI.Utils
         public static void DrawTriangleToBuffer(Color32[] buffer, int bufferWidth, int bufferHeight,
             int cx, int cy, int halfWidth, int halfHeight, float headingDegrees, Color32 color)
         {
-            float rad  = headingDegrees * Mathf.Deg2Rad;
+            float rad = headingDegrees * Mathf.Deg2Rad;
             float cosA = Mathf.Cos(rad);
             float sinA = Mathf.Sin(rad);
 
@@ -191,16 +195,16 @@ namespace Tsvrc.UI.Utils
             //   left  = (-halfWidth, -halfHeight)
             //   right = (+halfWidth, -halfHeight)
             // CW rotation by headingDegrees: x' = x*cos + y*sin,  y' = -x*sin + y*cos
-            float tipX   = cx + halfHeight * sinA;
-            float tipY   = cy + halfHeight * cosA;
-            float leftX  = cx + (-halfWidth * cosA - halfHeight * sinA);
-            float leftY  = cy + ( halfWidth * sinA - halfHeight * cosA);
-            float rightX = cx + ( halfWidth * cosA - halfHeight * sinA);
+            float tipX = cx + halfHeight * sinA;
+            float tipY = cy + halfHeight * cosA;
+            float leftX = cx + (-halfWidth * cosA - halfHeight * sinA);
+            float leftY = cy + (halfWidth * sinA - halfHeight * cosA);
+            float rightX = cx + (halfWidth * cosA - halfHeight * sinA);
             float rightY = cy + (-halfWidth * sinA - halfHeight * cosA);
 
-            int minX = Mathf.Max(0,             Mathf.FloorToInt(Mathf.Min(tipX, Mathf.Min(leftX, rightX))));
-            int maxX = Mathf.Min(bufferWidth  - 1, Mathf.CeilToInt(Mathf.Max(tipX, Mathf.Max(leftX, rightX))));
-            int minY = Mathf.Max(0,             Mathf.FloorToInt(Mathf.Min(tipY, Mathf.Min(leftY, rightY))));
+            int minX = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(tipX, Mathf.Min(leftX, rightX))));
+            int maxX = Mathf.Min(bufferWidth - 1, Mathf.CeilToInt(Mathf.Max(tipX, Mathf.Max(leftX, rightX))));
+            int minY = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(tipY, Mathf.Min(leftY, rightY))));
             int maxY = Mathf.Min(bufferHeight - 1, Mathf.CeilToInt(Mathf.Max(tipY, Mathf.Max(leftY, rightY))));
 
             for (int py = minY; py <= maxY; py++)
@@ -213,9 +217,9 @@ namespace Tsvrc.UI.Utils
                     float fpx = px;
                     // Edge functions (cross products). Point is inside when all three
                     // have the same sign (or zero), i.e., no mix of positive and negative.
-                    float d1 = (leftX  - tipX)   * (fpy - tipY)   - (leftY  - tipY)   * (fpx - tipX);
-                    float d2 = (rightX - leftX)  * (fpy - leftY)  - (rightY - leftY)  * (fpx - leftX);
-                    float d3 = (tipX   - rightX) * (fpy - rightY) - (tipY   - rightY) * (fpx - rightX);
+                    float d1 = (leftX - tipX) * (fpy - tipY) - (leftY - tipY) * (fpx - tipX);
+                    float d2 = (rightX - leftX) * (fpy - leftY) - (rightY - leftY) * (fpx - leftX);
+                    float d3 = (tipX - rightX) * (fpy - rightY) - (tipY - rightY) * (fpx - rightX);
 
                     bool hasNeg = d1 < 0f || d2 < 0f || d3 < 0f;
                     bool hasPos = d1 > 0f || d2 > 0f || d3 > 0f;
@@ -264,9 +268,9 @@ namespace Tsvrc.UI.Utils
             int x, int y, int length, int thickness, Color32 color)
         {
             int xStart = Mathf.Max(x, 0);
-            int xEnd   = Mathf.Min(x + length,    bufferWidth);
+            int xEnd = Mathf.Min(x + length, bufferWidth);
             int yStart = Mathf.Max(y, 0);
-            int yEnd   = Mathf.Min(y + thickness,  bufferHeight);
+            int yEnd = Mathf.Min(y + thickness, bufferHeight);
             for (int py = yStart; py < yEnd; py++)
             {
                 int rowOffset = py * bufferWidth;
@@ -283,9 +287,9 @@ namespace Tsvrc.UI.Utils
             int x, int y, int length, int thickness, Color32 color)
         {
             int xStart = Mathf.Max(x, 0);
-            int xEnd   = Mathf.Min(x + thickness,  bufferWidth);
+            int xEnd = Mathf.Min(x + thickness, bufferWidth);
             int yStart = Mathf.Max(y, 0);
-            int yEnd   = Mathf.Min(y + length,      bufferHeight);
+            int yEnd = Mathf.Min(y + length, bufferHeight);
             for (int py = yStart; py < yEnd; py++)
             {
                 int rowOffset = py * bufferWidth;
@@ -301,16 +305,16 @@ namespace Tsvrc.UI.Utils
         public static void DrawLineToBuffer(Color32[] buffer, int bufferWidth, int bufferHeight,
             int x0, int y0, int x1, int y1, int thickness, Color32 color)
         {
-            int dx   = Mathf.Abs(x1 - x0);
-            int dy   = Mathf.Abs(y1 - y0);
-            int sx   = x0 < x1 ? 1 : -1;
-            int sy   = y0 < y1 ? 1 : -1;
-            int err  = dx - dy;
+            int dx = Mathf.Abs(x1 - x0);
+            int dy = Mathf.Abs(y1 - y0);
+            int sx = x0 < x1 ? 1 : -1;
+            int sy = y0 < y1 ? 1 : -1;
+            int err = dx - dy;
             int half = thickness / 2;
             while (true)
             {
                 int txMin = Mathf.Max(x0 - half, 0);
-                int txMax = Mathf.Min(x0 + half, bufferWidth  - 1);
+                int txMax = Mathf.Min(x0 + half, bufferWidth - 1);
                 int tyMin = Mathf.Max(y0 - half, 0);
                 int tyMax = Mathf.Min(y0 + half, bufferHeight - 1);
                 for (int ty = tyMin; ty <= tyMax; ty++)
@@ -322,7 +326,7 @@ namespace Tsvrc.UI.Utils
                 if (x0 == x1 && y0 == y1) break;
                 int e2 = 2 * err;
                 if (e2 > -dy) { err -= dy; x0 += sx; }
-                if (e2 <  dx) { err += dx; y0 += sy; }
+                if (e2 < dx) { err += dx; y0 += sy; }
             }
         }
     }
