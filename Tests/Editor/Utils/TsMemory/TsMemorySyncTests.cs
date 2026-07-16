@@ -26,11 +26,11 @@ namespace Tsvrc.Tests.Editor
             return go.AddComponent<TsMemory>();
         }
 
-        private TsvrcListenerDouble CreateListener()
+        private TsListenerDouble CreateListener()
         {
-            var go = new GameObject(nameof(TsvrcListenerDouble));
+            var go = new GameObject(nameof(TsListenerDouble));
             _spawned.Add(go);
-            return go.AddComponent<TsvrcListenerDouble>();
+            return go.AddComponent<TsListenerDouble>();
         }
 
         private static void SetSyncedJson(TsMemory memory, string json) =>
@@ -54,8 +54,8 @@ namespace Tsvrc.Tests.Editor
         public void OnDeserialization_ValidDictJson_EmitsSyncedChangedEvent()
         {
             TsMemory memory = CreateMemory();
-            TsvrcListenerDouble listener = CreateListener();
-            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            TsListenerDouble listener = CreateListener();
+            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsListenerDouble.CallbackA));
             SetSyncedJson(memory, "{\"k\":\"v\"}");
 
             memory.OnDeserialization();
@@ -67,8 +67,8 @@ namespace Tsvrc.Tests.Editor
         public void OnDeserialization_EmptyDictJson_UpdatesToEmptyStoreAndEmits()
         {
             TsMemory memory = CreateMemory();
-            TsvrcListenerDouble listener = CreateListener();
-            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            TsListenerDouble listener = CreateListener();
+            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsListenerDouble.CallbackA));
             SetSyncedJson(memory, "{}");
 
             memory.OnDeserialization();
@@ -81,8 +81,8 @@ namespace Tsvrc.Tests.Editor
         public void OnDeserialization_MalformedJson_ReturnsEarlyWithoutEmitting()
         {
             TsMemory memory = CreateMemory();
-            TsvrcListenerDouble listener = CreateListener();
-            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            TsListenerDouble listener = CreateListener();
+            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsListenerDouble.CallbackA));
             DataDictionary storeBefore = GetSyncedStore(memory);
             SetSyncedJson(memory, "{not valid json");
 
@@ -97,8 +97,8 @@ namespace Tsvrc.Tests.Editor
         public void OnDeserialization_ArrayJson_ReturnsEarlyWithoutEmitting()
         {
             TsMemory memory = CreateMemory();
-            TsvrcListenerDouble listener = CreateListener();
-            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            TsListenerDouble listener = CreateListener();
+            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsListenerDouble.CallbackA));
             SetSyncedJson(memory, "[1,2,3]");
 
             Assert.DoesNotThrow(() => memory.OnDeserialization());
@@ -110,8 +110,8 @@ namespace Tsvrc.Tests.Editor
         public void OnDeserialization_PrimitiveStringJson_ReturnsEarlyWithoutEmitting()
         {
             TsMemory memory = CreateMemory();
-            TsvrcListenerDouble listener = CreateListener();
-            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            TsListenerDouble listener = CreateListener();
+            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsListenerDouble.CallbackA));
             SetSyncedJson(memory, "\"just a string\"");
 
             // VRCJson's underlying parser rejects a bare JSON scalar at the top level (only
@@ -127,8 +127,8 @@ namespace Tsvrc.Tests.Editor
         public void OnDeserialization_EmptyStringJson_ReturnsEarlyWithoutEmitting()
         {
             TsMemory memory = CreateMemory();
-            TsvrcListenerDouble listener = CreateListener();
-            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            TsListenerDouble listener = CreateListener();
+            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsListenerDouble.CallbackA));
             SetSyncedJson(memory, "");
 
             UnityEngine.TestTools.LogAssert.Expect(LogType.Error, "[TsJson] Cannot deserialize null or empty JSON string.");
@@ -144,8 +144,8 @@ namespace Tsvrc.Tests.Editor
             // OnDeserialization fires before any real network write ever arrives) must
             // handle it identically to any other valid empty dict.
             TsMemory memory = CreateMemory();
-            TsvrcListenerDouble listener = CreateListener();
-            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            TsListenerDouble listener = CreateListener();
+            memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsListenerDouble.CallbackA));
 
             memory.OnDeserialization();
 

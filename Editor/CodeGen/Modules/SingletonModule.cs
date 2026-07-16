@@ -8,24 +8,24 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Generates one public field on TsvrcGenerated per configured singleton, wired by
+    // Generates one public field on TsGenerated per configured singleton, wired by
     // direct reference. Generates _TsSingletonStart() which calls TsConstruct(this) on
-    // any singleton that is a TsvrcBehaviour.
+    // any singleton that is a TsBehaviour.
     //
-    // Singletons are scene objects by nature, so they're read from TsvrcConfig - a scene
-    // component ScaffoldModule auto-creates/heals under TsvrcGenerated, not an asset (an asset
+    // Singletons are scene objects by nature, so they're read from TsConfig - a scene
+    // component ScaffoldModule auto-creates/heals under TsGenerated, not an asset (an asset
     // cannot hold a reference to a scene object: no stable cross-file address for it). Builtin/
     // library-internal singletons are expected to be asset-type objects, so those still come
-    // from TsvrcBuiltinConfig (which is a genuine asset).
-    internal class SingletonModule : TsvrcModule
+    // from TsBuiltinConfig (which is a genuine asset).
+    internal class SingletonModule : TsModule
     {
         private List<SingletonEntry> _entries = new List<SingletonEntry>();
 
-        internal override string FileName => "TsvrcGeneratedSingleton.cs";
+        internal override string FileName => "TsGeneratedSingleton.cs";
 
         internal override string TabLabel => "Singletons";
         internal override string TabDescription =>
-            "Register any scene object or component as a named field on _ts. After compiling, access it from any TsvrcBehaviour via _ts.FieldName. Example: drag your GameManager here, then use _ts.GameManager from any behaviour.";
+            "Register any scene object or component as a named field on _ts. After compiling, access it from any TsBehaviour via _ts.FieldName. Example: drag your GameManager here, then use _ts.GameManager from any behaviour.";
         internal override void DrawTab(SerializedObject so) => ObjectListGUI.DrawObjectList(so, "Singletons");
 
         internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
@@ -45,8 +45,8 @@ namespace Tsvrc.Editor
 
         internal override void LoadConfig()
         {
-            var sceneConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
-            var builtinConfig = AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(BuiltinConfigPath);
+            var sceneConfig = UnityEngine.Object.FindObjectOfType<TsConfig>(true);
+            var builtinConfig = AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(BuiltinConfigPath);
 
             var sceneSingletons = Array.Empty<UnityEngine.Object>();
             if (sceneConfig != null)
@@ -92,7 +92,7 @@ namespace Tsvrc.Editor
                 {
                     foreach (var entry in _entries.OrderBy(e => e.Name))
                     {
-                        if (!IsTsvrcBehaviourType(entry.TypeName, entry.Namespace)) continue;
+                        if (!IsTsBehaviourType(entry.TypeName, entry.Namespace)) continue;
                         w.Line($"{entry.Name}.TsConstruct(this);");
                     }
                 }

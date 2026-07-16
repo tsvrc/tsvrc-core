@@ -19,15 +19,15 @@ namespace Tsvrc.Tests.Editor
         private const string ScratchPrefabPath = ScratchAssets.Folder + "/PoolResolveConfigPrefab.prefab";
 
         private TempSceneScope _scope;
-        private TsvrcConfig _userConfig;
-        private TsvrcBuiltinConfig _builtinConfig;
+        private TsConfig _userConfig;
+        private TsBuiltinConfig _builtinConfig;
 
         [SetUp]
         public void SetUp()
         {
             _scope = new TempSceneScope();
-            _userConfig = _scope.CreateGameObject("Config").AddComponent<TsvrcConfig>();
-            _builtinConfig = ScriptableObject.CreateInstance<TsvrcBuiltinConfig>();
+            _userConfig = _scope.CreateGameObject("Config").AddComponent<TsConfig>();
+            _builtinConfig = ScriptableObject.CreateInstance<TsBuiltinConfig>();
             ScratchAssets.EnsureFolder();
         }
 
@@ -39,7 +39,7 @@ namespace Tsvrc.Tests.Editor
             ScratchAssets.DeleteAll();
         }
 
-        private static List<(Component prefab, string typeName)> ResolveConfig(TsvrcConfig userConfig, TsvrcBuiltinConfig builtinConfig)
+        private static List<(Component prefab, string typeName)> ResolveConfig(TsConfig userConfig, TsBuiltinConfig builtinConfig)
             => (List<(Component, string)>)PrivateFieldAccess.InvokeStatic(typeof(PoolModule), "ResolveConfig", userConfig, builtinConfig);
 
         private StateManager CreateScratchPrefab(string name)

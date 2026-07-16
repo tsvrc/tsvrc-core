@@ -16,7 +16,7 @@ namespace Tsvrc.Tests.PlayMode
     // OnOwnerAbandonedProcess) - these can't be reached in Edit Mode: VRCPlayerApi doesn't
     // resolve in that assembly, and neither method has a real player list to scan without
     // ClientSim. Follows the exact harness/verification pattern established by
-    // Tests/PlayMode/Core/TsvrcProcess/TsvrcProcessOwnershipHandoverTests.cs: NUnit Assert
+    // Tests/PlayMode/Core/TsProcess/TsProcessOwnershipHandoverTests.cs: NUnit Assert
     // failures are silent in this project's Play Mode environment (no exception, no results
     // XML), so every test computes its own bool and logs exactly one
     // PLAYMODE_TEST_RESULT marker with PASS/FAIL plus observed values, and ClientSim never
@@ -91,7 +91,7 @@ namespace Tsvrc.Tests.PlayMode
 
         // Seeds the tracker as its own process owner using the local ClientSim player's real
         // identity, bypassing SetProcessOwner/Networking.SetOwner entirely - same rationale as
-        // TsvrcProcessTestBase.SeedAsOwner, just against a real local player id instead of a
+        // TsProcessTestBase.SeedAsOwner, just against a real local player id instead of a
         // synthetic one, since PlayerTracker's own OnPlayerLeft/OnPlayerSuspendChanged/
         // OnOwnerAbandonedProcess guards only ever read _ownerPlayerIdInt/IsProcessOwner(), never
         // Networking.IsOwner directly.
@@ -116,7 +116,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_OnPlayerLeft");
             PlayerTrackerTestSubclass tracker = go.AddComponent<PlayerTrackerTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             const string remoteName = "TrackedThenLeaves";
             ClientSimMain.SpawnRemotePlayer(remoteName);
@@ -146,7 +146,7 @@ namespace Tsvrc.Tests.PlayMode
         [UnityTest]
         public IEnumerator OnPlayerLeft_ProcessNotRunning_IsNoOpEvenForATrackedPlayer()
         {
-            // TsvrcProcess.OnPlayerLeft's own `if (!IsProcessRunning()) return;` runs before it
+            // TsProcess.OnPlayerLeft's own `if (!IsProcessRunning()) return;` runs before it
             // ever dereferences player.playerId - Tests/Editor can't compile a VRCPlayerApi
             // parameter at all (see the Edit Mode PlayerTrackerAbandonmentTests.cs header
             // comment), so this branch is covered here instead, with a real player rather than
@@ -157,7 +157,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_OnPlayerLeft_NotRunning");
             PlayerTrackerTestSubclass tracker = go.AddComponent<PlayerTrackerTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             const string remoteName = "LeavesWhileNotRunning";
             ClientSimMain.SpawnRemotePlayer(remoteName);
@@ -203,7 +203,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_OnPlayerSuspendChanged");
             PlayerTrackerTestSubclass tracker = go.AddComponent<PlayerTrackerTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             const string remoteName = "TrackedThenSuspends";
             ClientSimMain.SpawnRemotePlayer(remoteName);
@@ -237,7 +237,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_OnPlayerSuspendChanged_WakeUp");
             PlayerTrackerTestSubclass tracker = go.AddComponent<PlayerTrackerTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             const string remoteName = "WakesUp";
             ClientSimMain.SpawnRemotePlayer(remoteName);
@@ -270,7 +270,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_OnOwnerAbandonedProcess");
             PlayerTrackerTestSubclass tracker = go.AddComponent<PlayerTrackerTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             ClientSimMain.SpawnRemotePlayer("WillDepart");
             ClientSimMain.SpawnRemotePlayer("WillSuspend");
@@ -331,7 +331,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_CallingPlayerDiagnostic");
             PlayerTrackerTestSubclass tracker = go.AddComponent<PlayerTrackerTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             VRCPlayerApi caller = VRC.SDK3.UdonNetworkCalling.NetworkCalling.CallingPlayer;
             bool callingPlayerIsNull = caller == null;

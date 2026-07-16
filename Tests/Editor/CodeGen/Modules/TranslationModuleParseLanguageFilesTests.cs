@@ -15,7 +15,7 @@ namespace Tsvrc.Tests.Editor
         private const string GoodJson = @"{ ""key"": ""en"", ""label"": ""English"", ""entries"": { ""_hi_"": ""Hi"" } }";
         private const string MalformedJson = @"{ this is not valid json";
 
-        private static IList ParseLanguageFiles(TsvrcTranslationConfig config)
+        private static IList ParseLanguageFiles(TsTranslationConfig config)
             => (IList)PrivateFieldAccess.InvokeStatic(typeof(TranslationModule), "ParseLanguageFiles", config);
 
         private static string KeyOf(object entry) => PrivateFieldAccess.GetField<string>(entry, "Key");
@@ -23,7 +23,7 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void ParseLanguageFiles_OneGoodOneMalformed_MalformedSkippedGoodSurvives()
         {
-            var config = ScriptableObject.CreateInstance<TsvrcTranslationConfig>();
+            var config = ScriptableObject.CreateInstance<TsTranslationConfig>();
             var good = new TextAsset(GoodJson) { name = "en" };
             var bad = new TextAsset(MalformedJson) { name = "broken" };
             config.LanguageFiles = new[] { bad, good };
@@ -43,7 +43,7 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void ParseLanguageFiles_NullEntryInLanguageFilesArray_Skipped()
         {
-            var config = ScriptableObject.CreateInstance<TsvrcTranslationConfig>();
+            var config = ScriptableObject.CreateInstance<TsTranslationConfig>();
             config.LanguageFiles = new TextAsset[] { null };
 
             var result = ParseLanguageFiles(config);
@@ -56,7 +56,7 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void ParseLanguageFiles_NullLanguageFilesArray_ReturnsEmptyListWithoutThrowing()
         {
-            var config = ScriptableObject.CreateInstance<TsvrcTranslationConfig>();
+            var config = ScriptableObject.CreateInstance<TsTranslationConfig>();
             config.LanguageFiles = null;
 
             IList result = null;

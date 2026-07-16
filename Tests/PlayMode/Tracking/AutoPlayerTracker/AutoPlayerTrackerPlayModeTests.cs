@@ -104,7 +104,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_Solo");
             AutoPlayerTracker tracker = go.AddComponent<AutoPlayerTracker>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             tracker.StartAutoTracking();
 
@@ -139,7 +139,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_MultiPresent");
             AutoPlayerTracker tracker = go.AddComponent<AutoPlayerTracker>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             tracker.StartAutoTracking();
 
@@ -161,7 +161,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_IgnoredParams");
             AutoPlayerTracker tracker = go.AddComponent<AutoPlayerTracker>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             tracker.StartPlayerTracking(new[] { "NotARealPlayer" }, true);
 
@@ -184,7 +184,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_OnPlayerJoined_Owner");
             AutoPlayerTracker tracker = go.AddComponent<AutoPlayerTracker>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
             tracker.StartAutoTracking();
 
             ClientSimMain.SpawnRemotePlayer("JoinsAfterStart");
@@ -216,7 +216,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_OnPlayerJoined_NonOwner");
             AutoPlayerTracker tracker = go.AddComponent<AutoPlayerTracker>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             // Running, but owned by someone else - the local client is not the owner.
             PrivateFieldAccess.SetField(tracker, "_isRunning", true);
@@ -257,7 +257,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("Tracker_OnPlayerJoined_NotRunning");
             AutoPlayerTracker tracker = go.AddComponent<AutoPlayerTracker>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
             // _isRunning left at its default false.
 
             ClientSimMain.SpawnRemotePlayer("JoinsWhileNotRunning");

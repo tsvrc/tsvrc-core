@@ -104,7 +104,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("DataTransferer_RealOwnerSingleChunk");
             DataTransfererTestSubclass transferer = go.AddComponent<DataTransfererTestSubclass>();
-            transferer.TsConstruct((TsvrcRoot)null);
+            transferer.TsConstruct((TsRoot)null);
             transferer.SubscribeToAllTransferEvents();
 
             string localId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
@@ -132,7 +132,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("DataTransferer_RealOwnerMultiChunk");
             DataTransfererTestSubclass transferer = go.AddComponent<DataTransfererTestSubclass>();
-            transferer.TsConstruct((TsvrcRoot)null);
+            transferer.TsConstruct((TsRoot)null);
             transferer.SubscribeToAllTransferEvents();
 
             string localId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
@@ -166,7 +166,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("DataTransferer_RealMultiPlayer");
             DataTransfererTestSubclass transferer = go.AddComponent<DataTransfererTestSubclass>();
-            transferer.TsConstruct((TsvrcRoot)null);
+            transferer.TsConstruct((TsRoot)null);
             transferer.SubscribeToAllTransferEvents();
 
             ClientSimMain.SpawnRemotePlayer("RemoteReceiver");
@@ -209,7 +209,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("DataTransferer_RemoteDepartsDuringGap");
             DataTransfererTestSubclass transferer = go.AddComponent<DataTransfererTestSubclass>();
-            transferer.TsConstruct((TsvrcRoot)null);
+            transferer.TsConstruct((TsRoot)null);
             transferer.SubscribeToAllTransferEvents();
 
             ClientSimMain.SpawnRemotePlayer("WillDepart");
@@ -252,7 +252,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("DataTransferer_AbandonmentDuringChunk");
             DataTransfererTestSubclass transferer = go.AddComponent<DataTransfererTestSubclass>();
-            transferer.TsConstruct((TsvrcRoot)null);
+            transferer.TsConstruct((TsRoot)null);
             transferer.SubscribeToAllTransferEvents();
 
             ClientSimMain.SpawnRemotePlayer("OwnerWhoLeaves");

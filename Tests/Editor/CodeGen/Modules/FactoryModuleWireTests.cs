@@ -77,7 +77,7 @@ namespace Tsvrc.Tests.Editor
             var prefab = CreateScratchPrefab("Widget");
             var entry = CodeGenModuleReflection.BuildEntry(EntryType,
                 ("Name", "DefinitelyNotReal"), ("TypeName", "GameObject"), ("TypeNamespace", ""),
-                ("IsTsvrcBehaviour", false), ("PrefabAsset", prefab));
+                ("IsTsBehaviour", false), ("PrefabAsset", prefab));
             var module = new FactoryModule();
             PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, new object[] { entry }));
 
@@ -97,7 +97,7 @@ namespace Tsvrc.Tests.Editor
         {
             var entry = CodeGenModuleReflection.BuildEntry(EntryType,
                 ("Name", name), ("TypeName", "GameObject"), ("TypeNamespace", ""),
-                ("IsTsvrcBehaviour", false), ("PrefabAsset", prefab));
+                ("IsTsBehaviour", false), ("PrefabAsset", prefab));
             var module = new FactoryModule();
             PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, new object[] { entry }));
             return module;

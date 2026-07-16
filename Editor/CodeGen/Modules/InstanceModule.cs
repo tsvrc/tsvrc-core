@@ -12,23 +12,23 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Handles the single TsvrcInstance for the world. There is no manual override: the module
-    // scans loaded assemblies for a TsvrcInstance subclass and fully owns a single child object
-    // named "TsvrcInstance" under TsvrcGenerated, creating/repairing/removing it as needed so the
+    // Handles the single TsInstance for the world. There is no manual override: the module
+    // scans loaded assemblies for a TsInstance subclass and fully owns a single child object
+    // named "TsInstance" under TsGenerated, creating/repairing/removing it as needed so the
     // wiring is self-recovering without any user action.
     //
     // Generates _TsInstanceStart() which calls TsConstruct(this) then OnInstanceStart() on the
     // resolved instance.
-    internal class InstanceModule : TsvrcModule
+    internal class InstanceModule : TsModule
     {
-        private const string ChildName = "TsvrcInstance";
+        private const string ChildName = "TsInstance";
         private const string FieldName = "_instance";
-        private const string GeneratedFolder = "Assets/TsvrcGenerated";
+        private const string GeneratedFolder = "Assets/TsGenerated";
 
         private Type _detectedType;
         private bool _ambiguous;
 
-        internal override string FileName => "TsvrcGeneratedInstance.cs";
+        internal override string FileName => "TsGeneratedInstance.cs";
 
         internal override IEnumerable<string> WatchedAssets()
         {
@@ -45,9 +45,9 @@ namespace Tsvrc.Editor
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
             using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
-                w.Line("[ReadOnly] [SerializeField] private TsvrcInstance _instance;");
+                w.Line("[ReadOnly] [SerializeField] private TsInstance _instance;");
                 w.BlankLine();
-                w.Line("public override TsvrcInstance Instance => _instance;");
+                w.Line("public override TsInstance Instance => _instance;");
                 w.BlankLine();
                 using (w.Method("public void _TsInstanceStart()"))
                 {
@@ -79,7 +79,7 @@ namespace Tsvrc.Editor
         internal override void Wire()
         {
             // Ambiguous: leave whatever is currently wired alone until the project is back down
-            // to at most one TsvrcInstance subclass. Destroying a working setup because a second,
+            // to at most one TsInstance subclass. Destroying a working setup because a second,
             // possibly transient, subclass appeared would be worse than doing nothing.
             if (_ambiguous) return;
 
@@ -184,14 +184,14 @@ namespace Tsvrc.Editor
                 catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
 
                 foreach (var type in types)
-                    if (type != typeof(TsvrcInstance) && !type.IsAbstract && typeof(TsvrcInstance).IsAssignableFrom(type))
+                    if (type != typeof(TsInstance) && !type.IsAbstract && typeof(TsInstance).IsAssignableFrom(type))
                         if (seen.Add(type.FullName))
                             candidates.Add(type);
             }
 
             if (candidates.Count > 1)
             {
-                Debug.LogError($"[InstanceModule] Multiple TsvrcInstance subclasses found ({string.Join(", ", candidates.Select(t => t.Name))}). " +
+                Debug.LogError($"[InstanceModule] Multiple TsInstance subclasses found ({string.Join(", ", candidates.Select(t => t.Name))}). " +
                     "Exactly one is required; leaving the current wiring untouched until this is resolved.");
                 return (null, true);
             }

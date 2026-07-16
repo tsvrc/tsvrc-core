@@ -8,7 +8,7 @@ using UnityEngine.TestTools;
 namespace Tsvrc.Tests.Editor
 {
     // SingletonModule.Resolve() called directly via reflection with fully synthetic
-    // UnityEngine.Object instances - no AssetDatabase, no TsvrcConfig/TsvrcBuiltinConfig
+    // UnityEngine.Object instances - no AssetDatabase, no TsConfig/TsBuiltinConfig
     // asset touched at all.
     public class SingletonModuleResolveTests
     {

@@ -72,14 +72,14 @@ namespace Tsvrc.Tests.Editor
         {
             // StartReadyCheck has no guard of its own; it forwards straight to
             // PlayerTracker.StartPlayerTracking, whose own already-running check
-            // (TsvrcProcess.StartProcess's) must reject a second call untouched.
+            // (TsProcess.StartProcess's) must reject a second call untouched.
             var tracker = CreateProcess<ReadyCheckProcessTestSubclass>();
             SeedAsOwner(tracker);
             tracker.StartReadyCheck(new[] { "A", "B" });
             tracker.BroadcastAddReadyPlayer("A");
             Assert.AreEqual(1, tracker.OnReadyCheckStartedCount);
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcProcess] Process is already running.");
+            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is already running.");
             tracker.StartReadyCheck(new[] { "Z" });
 
             Assert.AreEqual(1, tracker.OnReadyCheckStartedCount,
@@ -97,7 +97,7 @@ namespace Tsvrc.Tests.Editor
             SeedAsOwner(tracker);
             // Never started.
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcProcess] Process is not running.");
+            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is not running.");
             tracker.StopReadyCheck();
 
             Assert.AreEqual(0, tracker.OnReadyCheckStoppedCount);
@@ -110,7 +110,7 @@ namespace Tsvrc.Tests.Editor
             var tracker = CreateProcess<ReadyCheckProcessTestSubclass>();
             SeedAsOwner(tracker);
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcProcess] Process is not running.");
+            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is not running.");
             tracker.CompleteReadyCheck();
 
             Assert.AreEqual(0, tracker.OnReadyCheckCompletedCount);

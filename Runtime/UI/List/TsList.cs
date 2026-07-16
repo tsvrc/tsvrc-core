@@ -6,7 +6,7 @@ using VRC.SDK3.Data;
 namespace Tsvrc.UI
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class TsList : TsvrcBehaviour
+    public class TsList : TsBehaviour
     {
         public const string OnItemSelectedEvent = "OnItemSelected";
         protected const int STATE_LOADING = 0;

@@ -78,7 +78,7 @@ namespace Tsvrc.Tests.PlayMode
         {
             var go = new GameObject("HeadClipGuard");
             HeadClipGuard guard = go.AddComponent<HeadClipGuard>();
-            guard.TsConstruct((TsvrcRoot)null); // runs TsStart(), caching _localPlayer
+            guard.TsConstruct((TsRoot)null); // runs TsStart(), caching _localPlayer
             return guard;
         }
 

@@ -12,12 +12,12 @@ using VRC.SDK3.Components;
 namespace Tsvrc.Tests.PlayMode
 {
     // Real ClientSim Play Mode test for RankedGameSession's master gate, following the
-    // established harness/methodology (TsvrcProcessOwnershipHandoverTests.cs,
-    // TsvrcTimerPlayModeTests.cs): NUnit Assert.X failures are silent in Play Mode here,
+    // established harness/methodology (TsProcessOwnershipHandoverTests.cs,
+    // TsTimerPlayModeTests.cs): NUnit Assert.X failures are silent in Play Mode here,
     // so this logs exactly one PLAYMODE_TEST_RESULT marker, verified via the -logFile
     // Console output, not the Test Runner's pass/fail indicator.
     //
-    // The Edit Mode suite already confirmed a real TsvrcInstance's IsTsMaster defaults
+    // The Edit Mode suite already confirmed a real TsInstance's IsTsMaster defaults
     // to true with no networking session established at all, which only reaches the
     // master-only ALLOWED branch. The DENIED branch needs a real local player that is
     // genuinely not master, which ClientSimSettings.localPlayerIsMaster=false provides
@@ -91,7 +91,7 @@ namespace Tsvrc.Tests.PlayMode
             var readyCheck = new GameObject("ReadyCheck").AddComponent<ReadyCheckProcessTestSubclass>();
             var gameTracker = new GameObject("Game").AddComponent<PlayerTrackerTestSubclass>();
             var completedTracker = new GameObject("Completed").AddComponent<PlayerTrackerTestSubclass>();
-            var timer = new GameObject("Timer").AddComponent<TsvrcTimerTestSubclass>();
+            var timer = new GameObject("Timer").AddComponent<TsTimerTestSubclass>();
 
             PrivateFieldAccess.SetField(session, "_lobbyTracker", lobbyTracker);
             PrivateFieldAccess.SetField(session, "_readyCheck", readyCheck);
@@ -99,8 +99,8 @@ namespace Tsvrc.Tests.PlayMode
             PrivateFieldAccess.SetField(session, "_completedTracker", completedTracker);
             PrivateFieldAccess.SetField(session, "_timer", timer);
 
-            var instance = new GameObject("Instance").AddComponent<TsvrcInstance>();
-            var root = new InstanceOnlyTsvrcRootDouble { FakeInstance = instance };
+            var instance = new GameObject("Instance").AddComponent<TsInstance>();
+            var root = new InstanceOnlyTsRootDouble { FakeInstance = instance };
 
             session.TsConstruct(root);
             bool isMasterObserved = instance.IsTsMaster;

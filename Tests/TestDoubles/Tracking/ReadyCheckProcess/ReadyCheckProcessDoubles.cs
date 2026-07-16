@@ -4,14 +4,14 @@ using Tsvrc.Tracking;
 
 namespace Tsvrc.Tests.Editor
 {
-    // ReadyCheckProcess inherits TsvrcProcess's [UdonBehaviourSyncMode] attribute (through
+    // ReadyCheckProcess inherits TsProcess's [UdonBehaviourSyncMode] attribute (through
     // PlayerTracker), so this double lives in Tsvrc.Tests.Doubles for the same reason
-    // PlayerTrackerTestSubclass/TsvrcProcessTestSubclass do - AddComponent() silently returns
+    // PlayerTrackerTestSubclass/TsProcessTestSubclass do - AddComponent() silently returns
     // null for such a script when it's defined in an Editor-platform-restricted assembly.
     //
     // Records every OnReadyCheck* hook invocation (call count + ordered args where relevant)
     // and the OnTrackingPlayersRemoved override so tests can assert both "did it fire" and
-    // "in what order relative to the inherited PlayerTracker/TsvrcProcess events", mirroring
+    // "in what order relative to the inherited PlayerTracker/TsProcess events", mirroring
     // PlayerTrackerTestSubclass's CallLog/counter style.
     public class ReadyCheckProcessTestSubclass : ReadyCheckProcess
     {
@@ -44,7 +44,7 @@ namespace Tsvrc.Tests.Editor
         // Lets a test inject reentrant behavior from the latest possible point - after the
         // full inherited PlayerTracker.OnProcessStopped/Completed broadcast (including every
         // OnReadyCheck*/OnTracking* hook and event above) has already returned, but still
-        // before TsvrcProcess.InternalCleanup runs. Mirrors PlayerTrackerTestSubclass's
+        // before TsProcess.InternalCleanup runs. Mirrors PlayerTrackerTestSubclass's
         // identically-named hooks, one level up the inheritance chain.
         public Action OnProcessStoppedAction;
         public Action OnProcessCompletedAction;

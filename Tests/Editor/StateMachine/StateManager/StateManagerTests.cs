@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Tsvrc.Tests.Editor
 {
     // StateManager never touches Networking/VRCPlayerApi, so - same reasoning as
-    // TsvrcBehaviourTests - nothing here needs ClientSim or Play Mode. Play Mode
+    // TsBehaviourTests - nothing here needs ClientSim or Play Mode. Play Mode
     // coverage (Tests/PlayMode/StateMachine/StateManager/) is limited to the one thing
     // Edit Mode structurally can't prove: real deferred GameObject destruction and
     // multi-frame sequencing.
@@ -348,11 +348,11 @@ namespace Tsvrc.Tests.Editor
             var log = new List<string>();
             var target = CreateBehaviour<StateTargetDouble>();
             target.Log = log;
-            var externalListener = CreateBehaviour<TsvrcListenerDouble>("External");
+            var externalListener = CreateBehaviour<TsListenerDouble>("External");
             externalListener.Log = log;
             manager.RegisterState(StateA, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA), target);
             manager.RegisterState(StateB, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB), target);
-            manager.TsSubscribe(externalListener, "OnStateChanged", nameof(TsvrcListenerDouble.CallbackA));
+            manager.TsSubscribe(externalListener, "OnStateChanged", nameof(TsListenerDouble.CallbackA));
             manager.SetState(StateA);
             log.Clear();
 
@@ -367,8 +367,8 @@ namespace Tsvrc.Tests.Editor
         public void SetState_TsEmit_NotifiesExternalTsSubscribeSubscribers()
         {
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var listener = CreateBehaviour<TsvrcListenerDouble>();
-            manager.TsSubscribe(listener, "OnStateChanged", nameof(TsvrcListenerDouble.CallbackA));
+            var listener = CreateBehaviour<TsListenerDouble>();
+            manager.TsSubscribe(listener, "OnStateChanged", nameof(TsListenerDouble.CallbackA));
 
             manager.SetState(StateA);
             manager.SetState(StateB);
@@ -380,8 +380,8 @@ namespace Tsvrc.Tests.Editor
         public void SetState_TsEmit_DoesNotNotifySubscribersOfDifferentEventNames()
         {
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var listener = CreateBehaviour<TsvrcListenerDouble>();
-            manager.TsSubscribe(listener, "SomeOtherEvent", nameof(TsvrcListenerDouble.CallbackA));
+            var listener = CreateBehaviour<TsListenerDouble>();
+            manager.TsSubscribe(listener, "SomeOtherEvent", nameof(TsListenerDouble.CallbackA));
 
             manager.SetState(StateA);
 

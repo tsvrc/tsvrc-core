@@ -22,7 +22,7 @@ namespace Tsvrc.Tests.Editor
         }
 
         [Test]
-        public void OnSceneHierarchyChanged_RootPresentTsvrcMemoryChildAbsent_ReturnsTrue()
+        public void OnSceneHierarchyChanged_RootPresentTsMemoryChildAbsent_ReturnsTrue()
         {
             CompiledRootFixture.AddTo(_scope);
 
@@ -30,10 +30,10 @@ namespace Tsvrc.Tests.Editor
         }
 
         [Test]
-        public void OnSceneHierarchyChanged_RootPresentTsvrcMemoryChildPresent_ReturnsFalse()
+        public void OnSceneHierarchyChanged_RootPresentTsMemoryChildPresent_ReturnsFalse()
         {
             var root = CompiledRootFixture.AddTo(_scope);
-            var child = _scope.CreateGameObject("TsvrcMemory");
+            var child = _scope.CreateGameObject("TsMemory");
             child.transform.SetParent(root.transform, false);
             child.AddComponent<TsMemory>();
 

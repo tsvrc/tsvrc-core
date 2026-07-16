@@ -11,13 +11,13 @@ using UnityEngine.SceneManagement;
 
 namespace Tsvrc.Editor
 {
-    // Generates per-type pool slots on TsvrcGenerated and instantiates the configured
+    // Generates per-type pool slots on TsGenerated and instantiates the configured
     // prefabs under a "Pool" child object at wire time. Slot counts are derived from
     // a dependency graph: external scene refs + contributions from parent pool types,
     // so nested [WirePool] fields inside pool types produce the correct slot totals.
     // Wiring is two-phase: instantiate first, then collect targets (including the new
     // instances) and assign [WirePool] fields on all of them.
-    internal class PoolModule : TsvrcModule
+    internal class PoolModule : TsModule
     {
         private List<(Component prefab, string typeName)> _poolEntries = new List<(Component, string)>();
         private Dictionary<string, PoolTypeInfo> _poolTypeInfos = new Dictionary<string, PoolTypeInfo>(StringComparer.Ordinal);
@@ -33,7 +33,7 @@ namespace Tsvrc.Editor
             public int TotalSlots;
         }
 
-        internal override string FileName => "TsvrcGeneratedPool.cs";
+        internal override string FileName => "TsGeneratedPool.cs";
 
         internal override string TabLabel => "Pool";
         internal override string TabDescription =>
@@ -48,8 +48,8 @@ namespace Tsvrc.Editor
 
         internal override void LoadConfig()
         {
-            var userConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
-            var builtinConfig = AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(BuiltinConfigPath);
+            var userConfig = UnityEngine.Object.FindObjectOfType<TsConfig>(true);
+            var builtinConfig = AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(BuiltinConfigPath);
 
             _poolEntries = ResolveConfig(userConfig, builtinConfig);
 
@@ -189,7 +189,7 @@ namespace Tsvrc.Editor
                 {
                     foreach (var info in eligible)
                     {
-                        if (!IsTsvrcBehaviourType(info.TypeName, info.TypeNamespace)) continue;
+                        if (!IsTsBehaviourType(info.TypeName, info.TypeNamespace)) continue;
                         for (int i = 0; i < info.TotalSlots; i++)
                             w.Line($"{SlotFieldName(info.TypeName, i)}.TsConstruct(this);");
                     }
@@ -250,7 +250,7 @@ namespace Tsvrc.Editor
             GameObject poolContainer = null;
             var allInstances = new Dictionary<string, List<Component>>(StringComparer.Ordinal);
 
-            // Phase 1: instantiate all pool slots and assign _pool_* fields on TsvrcGenerated.
+            // Phase 1: instantiate all pool slots and assign _pool_* fields on TsGenerated.
             foreach (var (prefabComponent, typeName) in _poolEntries)
             {
                 if (!_poolTypeInfos.TryGetValue(typeName, out var info) || info.TotalSlots == 0)
@@ -395,7 +395,7 @@ namespace Tsvrc.Editor
         // Builtins are processed before user config so builtin types always occupy the
         // lower slot indices — slot 0 for a given type is always the same prefab regardless
         // of how many user entries are added.
-        private static List<(Component prefab, string typeName)> ResolveConfig(TsvrcConfig userConfig, TsvrcBuiltinConfig builtinConfig)
+        private static List<(Component prefab, string typeName)> ResolveConfig(TsConfig userConfig, TsBuiltinConfig builtinConfig)
         {
             var entries = new List<(Component, string)>();
 

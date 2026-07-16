@@ -2,11 +2,11 @@ using Tsvrc.Tracking;
 
 namespace Tsvrc.Tests.Editor
 {
-    // Extends TsvrcProcessTestBase (Tests/Editor/Core/TsvrcProcess/TsvrcProcessTestBase.cs)
+    // Extends TsProcessTestBase (Tests/Editor/Core/TsProcess/TsProcessTestBase.cs)
     // to reuse CreateProcess<T>/SeedAsOwner/TearDown instead of duplicating them -
-    // PlayerTracker IS a TsvrcProcess, so every dual-authority-bypass trick that base
+    // PlayerTracker IS a TsProcess, so every dual-authority-bypass trick that base
     // provides applies here unchanged.
-    public abstract class PlayerTrackerTestBase : TsvrcProcessTestBase
+    public abstract class PlayerTrackerTestBase : TsProcessTestBase
     {
         protected static string[] GetTrackedPlayerIds(PlayerTracker tracker)
         {

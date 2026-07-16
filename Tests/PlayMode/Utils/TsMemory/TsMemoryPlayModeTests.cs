@@ -17,7 +17,7 @@ namespace Tsvrc.Tests.PlayMode
     // genuinely player/session-dependent surface: OnPlayerRestored with a real VRCPlayerApi,
     // a real PlayerData round trip, and confirming ownership-transfer calls don't disrupt a
     // solo session. Follows the ClientSim bootstrap and PLAYMODE_TEST_RESULT log-marker
-    // conventions established in Tests/PlayMode/Core/TsvrcProcess/TsvrcProcessOwnershipHandoverTests.cs.
+    // conventions established in Tests/PlayMode/Core/TsProcess/TsProcessOwnershipHandoverTests.cs.
     public class TsMemoryPlayModeTests
     {
         private GameObject _descriptorObject;

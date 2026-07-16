@@ -67,7 +67,7 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void StartSession_MasterOnlyFalse_NonMasterStillStarts()
         {
-            var h = CreateWiredSession(); // TestTsvrcRoot: _ts.Instance is null, never dereferenced when _masterOnly is false
+            var h = CreateWiredSession(); // TestTsRoot: _ts.Instance is null, never dereferenced when _masterOnly is false
             SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
@@ -78,15 +78,15 @@ namespace Tsvrc.Tests.Editor
         }
 
         [Test]
-        public void StartSession_MasterOnlyTrueWithRealTsvrcInstance_DefaultIsTsMasterTrue_Starts()
+        public void StartSession_MasterOnlyTrueWithRealTsInstance_DefaultIsTsMasterTrue_Starts()
         {
-            // A real (non-subclassed) TsvrcInstance's IsTsMaster defaults to
+            // A real (non-subclassed) TsInstance's IsTsMaster defaults to
             // Networking.IsMaster - confirmed here to be true with no real networking
             // session established, not false as might be assumed from "no one is
             // master yet". Only the master-only ALLOWED path is reachable this way;
             // the denied (not master) path needs a real non-master ClientSim local
             // player and lives in the Play Mode suite.
-            var root = new InstanceOnlyTsvrcRootDouble { FakeInstance = CreateComponent<Tsvrc.Core.TsvrcInstance>() };
+            var root = new InstanceOnlyTsRootDouble { FakeInstance = CreateComponent<Tsvrc.Core.TsInstance>() };
             var h = CreateWiredSession(root);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });

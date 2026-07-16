@@ -11,24 +11,24 @@ using UnityEngine;
 namespace Tsvrc.Editor
 {
     // Generates the Language enum, SetLanguage(), Translate(), and _TsApplyTranslationBatch()
-    // on TsvrcGenerated from JSON language files. Translation targets are discovered by
+    // on TsGenerated from JSON language files. Translation targets are discovered by
     // scanning the scene for TextMeshProUGUI components whose GameObject name matches the
     // _key_ pattern and appears in at least one language file.
-    internal class TranslationModule : TsvrcModule
+    internal class TranslationModule : TsModule
     {
-        internal const string ConfigAssetPath = "Assets/TsvrcGenerated/TsvrcTranslationConfig.asset";
+        internal const string ConfigAssetPath = "Assets/TsGenerated/TsTranslationConfig.asset";
         private const int BatchSize = 20;
 
         // Matches TMP GameObjects named with a single underscore on each side, e.g. "_greeting_".
         private static readonly Regex TmpTargetPattern = new Regex(@"^_[^_].*[^_]_$|^_[^_]_$", RegexOptions.Compiled);
 
-        private TsvrcTranslationConfig _config;
+        private TsTranslationConfig _config;
         private List<LanguageEntry> _languages = new List<LanguageEntry>();
         private HashSet<string> _translationKeys = new HashSet<string>(StringComparer.Ordinal);
         private HashSet<string> _effectiveKeys = new HashSet<string>(StringComparer.Ordinal);
         private List<TMPro.TextMeshProUGUI> _cachedTmpTargets = new List<TMPro.TextMeshProUGUI>();
 
-        internal override string FileName => "TsvrcGeneratedTranslation.cs";
+        internal override string FileName => "TsGeneratedTranslation.cs";
 
         internal override IEnumerable<string> WatchedAssets()
         {
@@ -42,7 +42,7 @@ namespace Tsvrc.Editor
 
         internal override void LoadConfig()
         {
-            _config = AssetDatabase.LoadAssetAtPath<TsvrcTranslationConfig>(ConfigAssetPath);
+            _config = AssetDatabase.LoadAssetAtPath<TsTranslationConfig>(ConfigAssetPath);
             _languages = _config != null ? ParseLanguageFiles(_config) : new List<LanguageEntry>();
             _translationKeys = BuildTranslationKeys(_languages);
             _cachedTmpTargets = FindTmpTargets();
@@ -100,7 +100,7 @@ namespace Tsvrc.Editor
                         // `_tsIdx` one interpolation layer too deep ({{{{_tsIdx}}}}), producing
                         // a literal, non-interpolating "{_tsIdx}" in the generated code's own
                         // interpolated string instead of substituting the real invalid index.
-                        w.Line($"else {{ Debug.LogError($\"[TsvrcGenerated] Language index {{_tsIdx}} is not available.\"); return; }}");
+                        w.Line($"else {{ Debug.LogError($\"[TsGenerated] Language index {{_tsIdx}} is not available.\"); return; }}");
                         w.Line("_tsCurrentLang = _tsIdx;");
                         w.Line("_tsBatchIndex = 0;");
                         w.Line("_tsBatchRunning = true;");
@@ -118,7 +118,7 @@ namespace Tsvrc.Editor
 
                     using (w.Method("public string Translate(string key)"))
                     {
-                        w.Line("if (_tsCurrentKeys == null) { Debug.LogWarning(\"[TsvrcGenerated] Translate called before SetLanguage.\"); return key; }");
+                        w.Line("if (_tsCurrentKeys == null) { Debug.LogWarning(\"[TsGenerated] Translate called before SetLanguage.\"); return key; }");
                         using (w.Block("for (int _tsI = 0; _tsI < _tsCurrentKeys.Length; _tsI++)"))
                             w.Line("if (_tsCurrentKeys[_tsI] == key) return _tsCurrentVals[_tsI];");
                         w.Line("return key;");
@@ -126,7 +126,7 @@ namespace Tsvrc.Editor
 
                     using (w.Method("public string Translate(string key, string param)"))
                     {
-                        w.Line("if (_tsCurrentKeys == null) { Debug.LogWarning(\"[TsvrcGenerated] Translate called before SetLanguage.\"); return key; }");
+                        w.Line("if (_tsCurrentKeys == null) { Debug.LogWarning(\"[TsGenerated] Translate called before SetLanguage.\"); return key; }");
                         using (w.Block("for (int _tsI = 0; _tsI < _tsCurrentKeys.Length; _tsI++)"))
                             w.Line("if (_tsCurrentKeys[_tsI] == key) return _tsCurrentVals[_tsI].Replace(\"{value}\", param);");
                         w.Line("return key;");
@@ -233,7 +233,7 @@ namespace Tsvrc.Editor
         private static HashSet<string> BuildTranslationKeys(List<LanguageEntry> languages)
             => new HashSet<string>(languages.SelectMany(l => l.Entries.Keys), StringComparer.Ordinal);
 
-        private static List<LanguageEntry> ParseLanguageFiles(TsvrcTranslationConfig config)
+        private static List<LanguageEntry> ParseLanguageFiles(TsTranslationConfig config)
         {
             var result = new List<LanguageEntry>();
             if (config.LanguageFiles == null) return result;

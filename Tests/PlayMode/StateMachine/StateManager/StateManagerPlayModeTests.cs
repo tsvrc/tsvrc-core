@@ -6,17 +6,17 @@ using UnityEngine.TestTools;
 namespace Tsvrc.Tests.PlayMode
 {
     // StateManager touches no Networking/VRCPlayerApi API, so - same reasoning as
-    // TsvrcBehaviourTests - ClientSim adds nothing here and none of these tests use it.
+    // TsBehaviourTests - ClientSim adds nothing here and none of these tests use it.
     // Edit Mode (Tests/Editor/StateMachine/StateManager/StateManagerTests.cs) covers the
     // full logical surface. What Play Mode adds that Edit Mode structurally cannot:
     // real *deferred* UnityEngine.Object.Destroy() completing across an actual frame
     // boundary (Edit Mode can only assert Destroy() was invoked - see
-    // TsvrcBehaviourTests.TsDestroy_Default_DoesNotDestroySynchronously - Play Mode can
+    // TsBehaviourTests.TsDestroy_Default_DoesNotDestroySynchronously - Play Mode can
     // observe the GameObject actually gone afterward), and driving a transition chain
     // across real yielded frames rather than synchronously in one call stack.
     //
-    // Per this project's established Play Mode methodology (TsvrcTimerPlayModeTests,
-    // TsvrcInstancePlayModeTests): NUnit Assert failures inside a [UnityTest] are silent
+    // Per this project's established Play Mode methodology (TsTimerPlayModeTests,
+    // TsInstancePlayModeTests): NUnit Assert failures inside a [UnityTest] are silent
     // in this environment, so every test here does its own manual pass/fail check and
     // logs exactly one PLAYMODE_TEST_RESULT marker rather than relying on Assert for the
     // actual assertion.

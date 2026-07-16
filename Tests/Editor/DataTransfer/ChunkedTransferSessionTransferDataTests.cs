@@ -22,7 +22,7 @@ namespace Tsvrc.Tests.Editor
             session.TransferData("hello", new[] { ownerId, "Other#1" });
             Assert.AreEqual(1, session.OnChunkSequenceStartedCount);
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcDataSender] Transfer already in progress. Call CancelDataTransfer() first.");
+            LogAssert.Expect(LogType.Warning, "[TsDataSender] Transfer already in progress. Call CancelDataTransfer() first.");
             session.TransferData("world", new[] { ownerId });
 
             Assert.AreEqual(1, session.OnChunkSequenceStartedCount, "A second call while running must not restart the sequence.");
@@ -39,7 +39,7 @@ namespace Tsvrc.Tests.Editor
             // full multi-chunk sequence, to isolate this specific guard.
             SetPendingNextChunk(session, true);
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcDataSender] Transfer already in progress. Call CancelDataTransfer() first.");
+            LogAssert.Expect(LogType.Warning, "[TsDataSender] Transfer already in progress. Call CancelDataTransfer() first.");
             session.TransferData("hello", new[] { "TestOwner#" + OwnerPlayerId });
 
             Assert.AreEqual(0, session.OnChunkSequenceStartedCount);
@@ -51,7 +51,7 @@ namespace Tsvrc.Tests.Editor
             var session = CreateProcess<ChunkedTransferSessionTestSubclass>();
             SeedAsOwner(session);
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcDataSender] Cannot transfer to null or empty player list.");
+            LogAssert.Expect(LogType.Warning, "[TsDataSender] Cannot transfer to null or empty player list.");
             session.TransferData("hello", null);
 
             Assert.AreEqual(0, session.OnChunkSequenceStartedCount);
@@ -64,7 +64,7 @@ namespace Tsvrc.Tests.Editor
             var session = CreateProcess<ChunkedTransferSessionTestSubclass>();
             SeedAsOwner(session);
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcDataSender] Cannot transfer to null or empty player list.");
+            LogAssert.Expect(LogType.Warning, "[TsDataSender] Cannot transfer to null or empty player list.");
             session.TransferData("hello", new string[0]);
 
             Assert.AreEqual(0, session.OnChunkSequenceStartedCount);
@@ -138,7 +138,7 @@ namespace Tsvrc.Tests.Editor
             session.SetReady(); // sole tracked player acks -> completes the single-chunk transfer
 
             Assert.IsFalse(session.IsProcessRunning());
-            // TsvrcProcess.InternalCleanup unconditionally zeroes _ownerPlayerIdInt on every
+            // TsProcess.InternalCleanup unconditionally zeroes _ownerPlayerIdInt on every
             // stop/complete, before OnProcessCleanup even runs. In real Play Mode the next
             // StartProcess call harmlessly re-claims ownership via the real Networking.LocalPlayer;
             // in Edit Mode that's null, so a second, non-reentrant start needs re-seeding.

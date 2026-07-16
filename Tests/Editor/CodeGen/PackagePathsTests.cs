@@ -10,7 +10,7 @@ namespace Tsvrc.Tests.Editor
     public class PackagePathsTests
     {
         [Test]
-        public void Root_ResolvesToProjectRelativeAssetsTsvrcFolder()
+        public void Root_ResolvesToProjectRelativeAssetsTsFolder()
         {
             Assert.AreEqual("Assets/Tsvrc", PackagePaths.Root);
         }

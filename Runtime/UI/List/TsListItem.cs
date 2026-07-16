@@ -10,7 +10,7 @@ namespace Tsvrc.UI
     /// Receives a <see cref="DataDictionary"/> on bind; override <see cref="_OnBind"/> to populate UI.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class TsListItem : TsvrcBehaviour
+    public class TsListItem : TsBehaviour
     {
         protected TsList _list = null;
         protected DataDictionary _itemData = null;

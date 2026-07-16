@@ -62,7 +62,7 @@ MonoBehaviour:
       Data: 3|System.RuntimeType, mscorlib
     - Name: 
       Entry: 1
-      Data: Tsvrc.Core.Generated.TsvrcRoot, Tsvrc.Runtime
+      Data: Tsvrc.Core.Generated.TsRoot, Tsvrc.Runtime
     - Name: 
       Entry: 8
       Data: 

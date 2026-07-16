@@ -70,7 +70,7 @@ namespace Tsvrc.Tests.Editor
         // members are only reflectively visible via GetMethod on the exact type that
         // declares them. Walk the hierarchy explicitly, same as FindField above, so
         // InvokeInstance works through test-double subclasses of a production type
-        // (e.g. calling a private TsvrcProcess method through a TsvrcProcessTestSubclass
+        // (e.g. calling a private TsProcess method through a TsProcessTestSubclass
         // instance).
         private static MethodInfo FindMethod(Type type, string name)
         {

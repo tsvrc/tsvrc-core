@@ -11,19 +11,19 @@ namespace Tsvrc.Tests.Editor
     // InstanceModule.Wire() against a real compiled root. Creating a real child+component
     // (CreateComponent) needs `_detectedType` to be a genuine, already-compiled
     // UdonSharpBehaviour with a real script asset - using an actual production
-    // TsvrcInstance subclass would work, but this project intentionally has none yet, and
-    // adding one as a permanent test double would change TsvrcGenerator.HasBootstrapSignal()
+    // TsInstance subclass would work, but this project intentionally has none yet, and
+    // adding one as a permanent test double would change TsGenerator.HasBootstrapSignal()
     // for the whole project, not just tests (InstanceModule doesn't care whether the
-    // "detected" type is actually a TsvrcInstance subclass for the plumbing exercised here,
+    // "detected" type is actually a TsInstance subclass for the plumbing exercised here,
     // only DetectInstanceType() does - which isn't under test in this file). So
     // `StateManager` stands in as a real, already-compiled UdonSharpBehaviour:
     // CreateComponent()'s mechanics (script lookup, program asset creation, component add)
-    // don't care that it isn't a TsvrcInstance. Its transient
-    // "Assets/TsvrcGenerated/StateManager.asset" program asset is backed up/restored like
+    // don't care that it isn't a TsInstance. Its transient
+    // "Assets/TsGenerated/StateManager.asset" program asset is backed up/restored like
     // every other real-file side effect in this suite.
     public class InstanceModuleWireTests
     {
-        private const string StateManagerAssetPath = "Assets/TsvrcGenerated/StateManager.asset";
+        private const string StateManagerAssetPath = "Assets/TsGenerated/StateManager.asset";
 
         private TempSceneScope _scope;
         private Component _root;
@@ -84,9 +84,9 @@ namespace Tsvrc.Tests.Editor
         private UnityEngine.Object InstanceFieldValue()
             => new SerializedObject(_root).FindProperty("_instance").objectReferenceValue;
 
-        // Note: `_instance` is declared as `TsvrcInstance`, and `StateManager` (the real,
+        // Note: `_instance` is declared as `TsInstance`, and `StateManager` (the real,
         // already-compiled stand-in type used throughout this file - see the class comment)
-        // does NOT extend TsvrcInstance. Unity's SerializedProperty.objectReferenceValue
+        // does NOT extend TsInstance. Unity's SerializedProperty.objectReferenceValue
         // setter silently clamps an incompatible-type assignment to null rather than
         // throwing, so the *field value* can't be faithfully asserted against a StateManager
         // instance here - only the scene-structure half (child/component creation) can be.
@@ -97,7 +97,7 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void Wire_Ambiguous_IsCompleteNoOpEvenWithAValidExistingChild()
         {
-            var existingChild = _scope.CreateGameObject("TsvrcInstance");
+            var existingChild = _scope.CreateGameObject("TsInstance");
             existingChild.transform.SetParent(_root.transform, false);
             existingChild.AddComponent<StateManager>();
 
@@ -105,20 +105,20 @@ namespace Tsvrc.Tests.Editor
             module.Wire();
 
             Assert.AreEqual(1, _root.transform.childCount, "Ambiguous must leave the existing child untouched.");
-            Assert.IsNotNull(_root.transform.Find("TsvrcInstance").GetComponent<StateManager>(), "Ambiguous must leave the existing component untouched.");
+            Assert.IsNotNull(_root.transform.Find("TsInstance").GetComponent<StateManager>(), "Ambiguous must leave the existing component untouched.");
         }
 
         [Test]
         public void Wire_NoDetectedType_RemovesExistingChildAndClearsField()
         {
-            var existingChild = _scope.CreateGameObject("TsvrcInstance");
+            var existingChild = _scope.CreateGameObject("TsInstance");
             existingChild.transform.SetParent(_root.transform, false);
             existingChild.AddComponent<StateManager>();
 
             var module = ModuleWith(null, ambiguous: false);
             module.Wire();
 
-            Assert.IsNull(_root.transform.Find("TsvrcInstance"));
+            Assert.IsNull(_root.transform.Find("TsInstance"));
             Assert.IsNull(InstanceFieldValue());
         }
 
@@ -129,7 +129,7 @@ namespace Tsvrc.Tests.Editor
 
             module.Wire();
 
-            var child = _root.transform.Find("TsvrcInstance");
+            var child = _root.transform.Find("TsInstance");
             Assert.IsNotNull(child);
             Assert.IsNotNull(child.GetComponent<StateManager>());
         }
@@ -139,11 +139,11 @@ namespace Tsvrc.Tests.Editor
         {
             var module = ModuleWith(typeof(StateManager), ambiguous: false);
             module.Wire();
-            var firstComponent = _root.transform.Find("TsvrcInstance").GetComponent<StateManager>();
+            var firstComponent = _root.transform.Find("TsInstance").GetComponent<StateManager>();
 
             module.Wire();
 
-            var child = _root.transform.Find("TsvrcInstance");
+            var child = _root.transform.Find("TsInstance");
             Assert.AreEqual(1, _root.transform.childCount);
             Assert.AreEqual(firstComponent, child.GetComponent<StateManager>(), "Re-wiring an already-correct child must not recreate it.");
         }
@@ -158,7 +158,7 @@ namespace Tsvrc.Tests.Editor
 
             module.Wire();
 
-            var child = _root.transform.Find("TsvrcInstance");
+            var child = _root.transform.Find("TsInstance");
             Assert.IsNotNull(child);
             Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>(StateManagerAssetPath), "Program asset must be recreated.");
             Assert.IsNotNull(child.GetComponent<StateManager>());

@@ -6,7 +6,7 @@ namespace Tsvrc.Tests.Editor
 {
     // RankedGameSession carries [UdonBehaviourSyncMode], so this double lives in
     // Tsvrc.Tests.Doubles for the same reason PlayerTrackerTestSubclass/
-    // TsvrcProcessTestSubclass do - AddComponent() silently returns null for such a
+    // TsProcessTestSubclass do - AddComponent() silently returns null for such a
     // script when it's defined in an Editor-platform-restricted assembly.
     //
     // Records every OnSession*/OnLobbyPlayer*/OnGamePlayer*/OnPlayerCompleted hook

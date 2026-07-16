@@ -143,7 +143,7 @@ namespace Tsvrc.Tests.Editor
         public void Wire_ExternalWirePoolTarget_FieldGetsAssignedToNewInstance()
         {
             // Phase 2 of Wire() assigns [WirePool] fields on the TARGET behaviour's own
-            // SerializedObject, independent of whether the TsvrcGenerated slot field exists -
+            // SerializedObject, independent of whether the TsGenerated slot field exists -
             // this is the actual "did wiring work" behavior a world author cares about, and
             // it's fully testable without any bootstrap.
             var prefab = CreateScratchPrefab("Widget3");
@@ -181,7 +181,7 @@ namespace Tsvrc.Tests.Editor
             // target for assignment in the first place. As a consequence the slot has zero
             // targets, so it logs the ordinary "unassigned" mismatch warning instead (same as
             // any other under-targeted slot). The unrelated "slot field not found on
-            // TsvrcGenerated" warning is expected too - this project's compiled type never has
+            // TsGenerated" warning is expected too - this project's compiled type never has
             // a real "_pool_StateManager_0" field, same as every other test in this fixture.
             var prefab = CreateScratchPrefab("Widget5b");
             _scope.CreateGameObject("Target").AddComponent<PoolWireOnlyNonSerializedFieldDouble>();

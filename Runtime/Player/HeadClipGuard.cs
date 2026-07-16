@@ -31,7 +31,7 @@ namespace Tsvrc.Player
     /// Usage: Begin(colliders, count). Call End() to stop.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class HeadClipGuard : TsvrcBehaviour
+    public class HeadClipGuard : TsBehaviour
     {
         [Header("Configuration")]
         [SerializeField, Tooltip("Margin (metres) added to solid OBB half-extents. Keeps the head a small distance from the wall surface and prevents jitter at grazing incidence.")]

@@ -45,8 +45,8 @@ namespace Tsvrc.Tests.Editor
         {
             var tracker = CreateProcess<AutoPlayerTracker>();
             PrivateFieldAccess.SetField(tracker, "_isBroadcasting", true);
-            var listener = CreateComponent<TsvrcListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingStartedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            var listener = CreateComponent<TsListenerDouble>();
+            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingStartedEvent, nameof(TsListenerDouble.CallbackA));
 
             tracker.NotifyTrackedPlayersProcessStarted(new[] { "A", "B" });
 
@@ -59,8 +59,8 @@ namespace Tsvrc.Tests.Editor
         {
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new[] { "A", "B" });
-            var listener = CreateComponent<TsvrcListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingStoppedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            var listener = CreateComponent<TsListenerDouble>();
+            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingStoppedEvent, nameof(TsListenerDouble.CallbackA));
 
             tracker.StopAutoTracking();
 
@@ -74,10 +74,10 @@ namespace Tsvrc.Tests.Editor
         public void StopAutoTracking_NotRunning_LogsWarningAndFiresNoEvent()
         {
             var tracker = CreateProcess<AutoPlayerTracker>();
-            var listener = CreateComponent<TsvrcListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingStoppedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            var listener = CreateComponent<TsListenerDouble>();
+            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingStoppedEvent, nameof(TsListenerDouble.CallbackA));
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcProcess] Process is not running.");
+            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is not running.");
             tracker.StopAutoTracking();
 
             Assert.AreEqual(0, listener.CallbackACount);
@@ -88,8 +88,8 @@ namespace Tsvrc.Tests.Editor
         {
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new[] { "A", "B" });
-            var listener = CreateComponent<TsvrcListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingCompletedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            var listener = CreateComponent<TsListenerDouble>();
+            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingCompletedEvent, nameof(TsListenerDouble.CallbackA));
 
             tracker.CompleteAutoTracking();
 
@@ -103,10 +103,10 @@ namespace Tsvrc.Tests.Editor
         public void CompleteAutoTracking_NotRunning_LogsWarningAndFiresNoEvent()
         {
             var tracker = CreateProcess<AutoPlayerTracker>();
-            var listener = CreateComponent<TsvrcListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingCompletedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            var listener = CreateComponent<TsListenerDouble>();
+            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingCompletedEvent, nameof(TsListenerDouble.CallbackA));
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcProcess] Process is not running.");
+            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is not running.");
             tracker.CompleteAutoTracking();
 
             Assert.AreEqual(0, listener.CallbackACount);
@@ -117,8 +117,8 @@ namespace Tsvrc.Tests.Editor
         {
             var tracker = CreateProcess<AutoPlayerTracker>();
             SetTrackedPlayerIds(tracker, new[] { "A" });
-            var listener = CreateComponent<TsvrcListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingDeserializationEvent, nameof(TsvrcListenerDouble.CallbackA));
+            var listener = CreateComponent<TsListenerDouble>();
+            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingDeserializationEvent, nameof(TsListenerDouble.CallbackA));
 
             tracker.OnDeserialization();
 
@@ -131,8 +131,8 @@ namespace Tsvrc.Tests.Editor
         {
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new string[0]);
-            var listener = CreateComponent<TsvrcListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingPlayersAddedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            var listener = CreateComponent<TsListenerDouble>();
+            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingPlayersAddedEvent, nameof(TsListenerDouble.CallbackA));
 
             tracker.AddTrackedPlayers(new[] { "X", "Y" });
 
@@ -146,8 +146,8 @@ namespace Tsvrc.Tests.Editor
         {
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new[] { "X", "Y" });
-            var listener = CreateComponent<TsvrcListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingPlayersRemovedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            var listener = CreateComponent<TsListenerDouble>();
+            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingPlayersRemovedEvent, nameof(TsListenerDouble.CallbackA));
 
             tracker.RemoveTrackedPlayers(new[] { "X" });
 
@@ -166,7 +166,7 @@ namespace Tsvrc.Tests.Editor
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new[] { "A", "B" });
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcProcess] Process is already running.");
+            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is already running.");
             Assert.DoesNotThrow(() => tracker.StartAutoTracking());
 
             CollectionAssert.AreEqual(new[] { "A", "B" }, GetTrackedPlayerIds(tracker));
@@ -178,7 +178,7 @@ namespace Tsvrc.Tests.Editor
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new[] { "A" });
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcProcess] Process is already running.");
+            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is already running.");
             Assert.DoesNotThrow(() => tracker.StartPlayerTracking(new[] { "Z", "Y" }, true));
 
             CollectionAssert.AreEqual(new[] { "A" }, GetTrackedPlayerIds(tracker));

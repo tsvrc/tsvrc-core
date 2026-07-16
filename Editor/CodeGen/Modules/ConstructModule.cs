@@ -9,29 +9,29 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Generates a _construct{Name} field per TsvrcBehaviour listed in TsvrcConfig.Constructs,
+    // Generates a _construct{Name} field per TsBehaviour listed in TsConfig.Constructs,
     // and wires each directly from the scene. At runtime, _TsConstructStart() calls
     // TsConstruct(this) on every wired behaviour in field-name order.
-    internal class ConstructModule : TsvrcModule
+    internal class ConstructModule : TsModule
     {
         private List<ConstructEntry> _entries = new List<ConstructEntry>();
 
-        internal override string FileName => "TsvrcGeneratedConstruct.cs";
+        internal override string FileName => "TsGeneratedConstruct.cs";
 
         internal override string TabLabel => "Constructs";
         internal override string TabDescription =>
-            "Register TsvrcBehaviours that are always active in the scene, not pooled. TsConstruct() is called once on each at startup. Example: add your HudManager here and it is initialized automatically when the world loads.";
+            "Register TsBehaviours that are always active in the scene, not pooled. TsConstruct() is called once on each at startup. Example: add your HudManager here and it is initialized automatically when the world loads.";
         internal override void DrawTab(SerializedObject so) => ObjectListGUI.DrawObjectList(so, "Constructs");
 
         internal override void LoadConfig()
         {
-            var sceneConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
+            var sceneConfig = UnityEngine.Object.FindObjectOfType<TsConfig>(true);
             if (sceneConfig == null) { _entries = new List<ConstructEntry>(); return; }
             var so = new SerializedObject(sceneConfig);
             var prop = so.FindProperty("Constructs");
-            var constructs = new TsvrcBehaviour[prop.arraySize];
+            var constructs = new TsBehaviour[prop.arraySize];
             for (int i = 0; i < prop.arraySize; i++)
-                constructs[i] = prop.GetArrayElementAtIndex(i).objectReferenceValue as TsvrcBehaviour;
+                constructs[i] = prop.GetArrayElementAtIndex(i).objectReferenceValue as TsBehaviour;
             _entries = Resolve(constructs);
         }
 
@@ -88,7 +88,7 @@ namespace Tsvrc.Editor
             {
                 if (entry.SourceObject == null)
                 {
-                    Debug.LogWarning($"[ConstructModule] Construct '{entry.Name}' source object is null. Remove the missing entry from TsvrcConfig.");
+                    Debug.LogWarning($"[ConstructModule] Construct '{entry.Name}' source object is null. Remove the missing entry from TsConfig.");
                     continue;
                 }
 
@@ -105,7 +105,7 @@ namespace Tsvrc.Editor
             ApplyAndMarkDirty(so, root);
         }
 
-        private static List<ConstructEntry> Resolve(TsvrcBehaviour[] constructs)
+        private static List<ConstructEntry> Resolve(TsBehaviour[] constructs)
         {
             if (constructs == null) return new List<ConstructEntry>();
 

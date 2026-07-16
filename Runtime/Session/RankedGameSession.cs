@@ -19,7 +19,7 @@ namespace Tsvrc.Session
     /// when a condition is met. Subscribe to the On... event constants to react to each state change.
     /// Call <see cref="StartLobbyTracking"/> before adding players with <see cref="AddLobbyPlayer"/>.</summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class RankedGameSession : TsvrcBehaviour
+    public class RankedGameSession : TsBehaviour
     {
         /// <summary>Emitted when a game start is initiated and the ready check begins. Read <see cref="LobbyPlayerIds"/>.</summary>
         public const string OnSessionLoadingEvent = "OnSessionLoading";
@@ -44,7 +44,7 @@ namespace Tsvrc.Session
         [WirePool][SerializeField] private ReadyCheckProcess _readyCheck;
         [WirePool][SerializeField] private PlayerTracker _gameTracker;
         [WirePool][SerializeField] private PlayerTracker _completedTracker;
-        [WirePool][SerializeField] private TsvrcTimer _timer;
+        [WirePool][SerializeField] private TsTimer _timer;
 
         [Header("Session")]
         [SerializeField] private bool _masterOnly = true;
@@ -110,8 +110,8 @@ namespace Tsvrc.Session
 
             _completedTracker.TsSubscribe(this, PlayerTracker.OnTrackingPlayersAddedEvent, nameof(_OnPlayersCompleted));
 
-            _timer.TsSubscribe(this, TsvrcTimer.OnTimerUpdatedEvent, nameof(_OnTimerUpdated));
-            _timer.TsSubscribe(this, TsvrcTimer.OnTimerCompletedEvent, nameof(_OnTimerCompleted));
+            _timer.TsSubscribe(this, TsTimer.OnTimerUpdatedEvent, nameof(_OnTimerUpdated));
+            _timer.TsSubscribe(this, TsTimer.OnTimerCompletedEvent, nameof(_OnTimerCompleted));
         }
 
         public void StartLobbyTracking() => _lobbyTracker.StartPlayerTracking(new string[0]);

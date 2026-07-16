@@ -8,23 +8,23 @@ using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.Editor
 {
-    // FactoryModule.BuildEntries() via reflection with synthetic TsvrcConfig/
-    // TsvrcBuiltinConfig instances (ScriptableObject.CreateInstance - never touching the
+    // FactoryModule.BuildEntries() via reflection with synthetic TsConfig/
+    // TsBuiltinConfig instances (ScriptableObject.CreateInstance - never touching the
     // real AssetDatabase-backed builtin config).
     public class FactoryModuleBuildEntriesTests
     {
         private const string ScratchPrefabPath = ScratchAssets.Folder + "/FactoryBuildEntriesPrefab.prefab";
 
         private TempSceneScope _scope;
-        private TsvrcConfig _userConfig;
-        private TsvrcBuiltinConfig _builtinConfig;
+        private TsConfig _userConfig;
+        private TsBuiltinConfig _builtinConfig;
 
         [SetUp]
         public void SetUp()
         {
             _scope = new TempSceneScope();
-            _userConfig = _scope.CreateGameObject("Config").AddComponent<TsvrcConfig>();
-            _builtinConfig = ScriptableObject.CreateInstance<TsvrcBuiltinConfig>();
+            _userConfig = _scope.CreateGameObject("Config").AddComponent<TsConfig>();
+            _builtinConfig = ScriptableObject.CreateInstance<TsBuiltinConfig>();
             ScratchAssets.EnsureFolder();
         }
 
@@ -36,7 +36,7 @@ namespace Tsvrc.Tests.Editor
             ScratchAssets.DeleteAll();
         }
 
-        private static IList BuildEntries(TsvrcConfig userConfig, TsvrcBuiltinConfig builtinConfig)
+        private static IList BuildEntries(TsConfig userConfig, TsBuiltinConfig builtinConfig)
             => (IList)PrivateFieldAccess.InvokeStatic(typeof(FactoryModule), "BuildEntries", userConfig, builtinConfig);
 
         private static string NameOf(object entry) => PrivateFieldAccess.GetField<string>(entry, "Name");
@@ -52,7 +52,7 @@ namespace Tsvrc.Tests.Editor
         public void BuildEntries_SceneObjectDraggedInAsPrefab_WarnsAndSkips()
         {
             var sceneGo = _scope.CreateGameObject("NotAPrefab");
-            _userConfig.Factories = new[] { new TsvrcFactoryGroup { GroupName = "", Prefabs = new Object[] { sceneGo } } };
+            _userConfig.Factories = new[] { new TsFactoryGroup { GroupName = "", Prefabs = new Object[] { sceneGo } } };
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*is a scene object, not a prefab asset.*"));
 
@@ -64,7 +64,7 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void BuildEntries_NullEntryInPrefabsArray_SilentlySkipped()
         {
-            _userConfig.Factories = new[] { new TsvrcFactoryGroup { GroupName = "", Prefabs = new Object[] { null } } };
+            _userConfig.Factories = new[] { new TsFactoryGroup { GroupName = "", Prefabs = new Object[] { null } } };
 
             var result = BuildEntries(_userConfig, null);
 
@@ -74,7 +74,7 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void BuildEntries_GroupWithNullPrefabsArray_DoesNotThrow()
         {
-            _userConfig.Factories = new[] { new TsvrcFactoryGroup { GroupName = "Foo", Prefabs = null } };
+            _userConfig.Factories = new[] { new TsFactoryGroup { GroupName = "Foo", Prefabs = null } };
 
             Assert.DoesNotThrow(() => BuildEntries(_userConfig, null));
         }
@@ -83,8 +83,8 @@ namespace Tsvrc.Tests.Editor
         public void BuildEntries_ComponentDraggedIn_ResolvesToRootGameObjectSameAsGameObjectDragged()
         {
             var prefab = CreateScratchPrefab("CompVsGo");
-            var byGameObject = new TsvrcFactoryGroup { GroupName = "", Prefabs = new Object[] { prefab } };
-            var byComponent = new TsvrcFactoryGroup { GroupName = "", Prefabs = new Object[] { prefab.transform } };
+            var byGameObject = new TsFactoryGroup { GroupName = "", Prefabs = new Object[] { prefab } };
+            var byComponent = new TsFactoryGroup { GroupName = "", Prefabs = new Object[] { prefab.transform } };
 
             _userConfig.Factories = new[] { byGameObject };
             var resultGo = BuildEntries(_userConfig, null);
@@ -101,8 +101,8 @@ namespace Tsvrc.Tests.Editor
             var prefabA = CreateScratchPrefab("Shared");
             var prefabB = CreateScratchPrefab("Shared2");
             // "Foo" + "Shared" and "Foo " + "Shared" both sanitize to "FooShared".
-            var groupA = new TsvrcFactoryGroup { GroupName = "Foo", Prefabs = new Object[] { prefabA } };
-            var groupB = new TsvrcFactoryGroup { GroupName = "Foo", Prefabs = new Object[] { prefabA } };
+            var groupA = new TsFactoryGroup { GroupName = "Foo", Prefabs = new Object[] { prefabA } };
+            var groupB = new TsFactoryGroup { GroupName = "Foo", Prefabs = new Object[] { prefabA } };
             _userConfig.Factories = new[] { groupA, groupB };
 
             var result = BuildEntries(_userConfig, null);
@@ -117,8 +117,8 @@ namespace Tsvrc.Tests.Editor
         {
             var builtinPrefab = CreateScratchPrefab("BuiltinOne");
             var userPrefab = CreateScratchPrefab("UserOne");
-            _builtinConfig.Factories = new[] { new TsvrcFactoryGroup { GroupName = "", Prefabs = new Object[] { builtinPrefab } } };
-            _userConfig.Factories = new[] { new TsvrcFactoryGroup { GroupName = "", Prefabs = new Object[] { userPrefab } } };
+            _builtinConfig.Factories = new[] { new TsFactoryGroup { GroupName = "", Prefabs = new Object[] { builtinPrefab } } };
+            _userConfig.Factories = new[] { new TsFactoryGroup { GroupName = "", Prefabs = new Object[] { userPrefab } } };
 
             var result = BuildEntries(_userConfig, _builtinConfig);
 

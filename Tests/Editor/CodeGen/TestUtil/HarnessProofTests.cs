@@ -28,13 +28,13 @@ namespace Tsvrc.Tests.Editor
             Assert.IsTrue(AssetDatabase.IsValidFolder(ScratchAssets.Folder));
 
             var assetPath = ScratchAssets.Folder + "/DummyProofAsset.asset";
-            var dummy = ScriptableObject.CreateInstance<TsvrcBuiltinConfig>();
+            var dummy = ScriptableObject.CreateInstance<TsBuiltinConfig>();
             AssetDatabase.CreateAsset(dummy, assetPath);
-            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(assetPath));
+            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(assetPath));
 
             ScratchAssets.DeleteAll();
             Assert.IsFalse(AssetDatabase.IsValidFolder(ScratchAssets.Folder));
-            Assert.IsNull(AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(assetPath));
+            Assert.IsNull(AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(assetPath));
         }
 
         [Test]

@@ -79,7 +79,7 @@ namespace Tsvrc.Tests.Editor
             tracker.StartPlayerTracking(new[] { "A" });
             Assert.AreEqual(1, tracker.OnTrackingStartedCount);
 
-            LogAssert.Expect(LogType.Warning, "[TsvrcProcess] Process is already running.");
+            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is already running.");
             tracker.StartPlayerTracking(new[] { "Z", "Y" });
 
             Assert.AreEqual(1, tracker.OnTrackingStartedCount, "A second call while running must not restart tracking.");
@@ -160,7 +160,7 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void OnProcessCleanup_ReentrantRestartFromOnProcessStopped_SkipsClearingTrackedState()
         {
-            // Mirrors TsvrcProcessCleanupTests's reentrant-restart test: a subscriber reacting
+            // Mirrors TsProcessCleanupTests's reentrant-restart test: a subscriber reacting
             // to OnProcessStopped by immediately starting a new run must not have its brand-new
             // _trackedPlayerIds wiped by the old run's cleanup.
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
@@ -198,7 +198,7 @@ namespace Tsvrc.Tests.Editor
 
         // LastPlayerIds is assigned before the OnTracking* hook is called in every Notify*
         // method - the following three tests pin that ordering directly, mirroring
-        // TsvrcProcessLifecycleTests' RunningStateInsideOnProcessStopped-style pattern.
+        // TsProcessLifecycleTests' RunningStateInsideOnProcessStopped-style pattern.
 
         [Test]
         public void StartPlayerTracking_LastPlayerIdsAlreadyCurrentInsideOnTrackingStartedHook()

@@ -12,9 +12,9 @@ namespace Tsvrc.Editor
 {
     // Generates a Create{Name}(Transform parent) factory method per configured prefab.
     // At wire time, instantiates each prefab under a "Factories" child (inactive by
-    // default) so TsvrcGenerated can hand out instances on demand without a Resources
+    // default) so TsGenerated can hand out instances on demand without a Resources
     // load. Builtin and user factory groups are merged; group names become a name prefix.
-    internal class FactoryModule : TsvrcModule
+    internal class FactoryModule : TsModule
     {
         private List<FactoryEntry> _entries = new List<FactoryEntry>();
 
@@ -24,7 +24,7 @@ namespace Tsvrc.Editor
         private static readonly GUIContent LabelGroupName = new GUIContent("Group Name");
         private static readonly GUIContent LabelPrefabs = new GUIContent("Prefabs");
 
-        internal override string FileName => "TsvrcGeneratedFactory.cs";
+        internal override string FileName => "TsGeneratedFactory.cs";
 
         internal override string TabLabel => "Factories";
         internal override string TabDescription =>
@@ -53,7 +53,7 @@ namespace Tsvrc.Editor
 
                 EditorGUILayout.BeginHorizontal();
                 // Foldout is UI-only state, save/restore GUI.changed so toggling it does not
-                // bubble up to TsvrcWindow's EndChangeCheck and mark the config as dirty.
+                // bubble up to TsWindow's EndChangeCheck and mark the config as dirty.
                 bool prevChanged = GUI.changed;
                 GUI.changed = false;
                 expanded = EditorGUILayout.Foldout(expanded, foldoutLabel, true);
@@ -121,8 +121,8 @@ namespace Tsvrc.Editor
 
         internal override void LoadConfig()
         {
-            var userConfig = UnityEngine.Object.FindObjectOfType<TsvrcConfig>(true);
-            var builtinConfig = AssetDatabase.LoadAssetAtPath<TsvrcBuiltinConfig>(BuiltinConfigPath);
+            var userConfig = UnityEngine.Object.FindObjectOfType<TsConfig>(true);
+            var builtinConfig = AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(BuiltinConfigPath);
             _entries = BuildEntries(userConfig, builtinConfig);
         }
 
@@ -158,7 +158,7 @@ namespace Tsvrc.Editor
                         {
                             w.Line("return go;");
                         }
-                        else if (entry.IsTsvrcBehaviour)
+                        else if (entry.IsTsBehaviour)
                         {
                             w.Line($"var instance = go.GetComponent<{entry.TypeName}>();");
                             w.Line("if (instance != null) instance.TsConstruct(this);");
@@ -235,13 +235,13 @@ namespace Tsvrc.Editor
             ApplyAndMarkDirty(so, root);
         }
 
-        private static List<FactoryEntry> BuildEntries(TsvrcConfig config, TsvrcBuiltinConfig builtinConfig)
+        private static List<FactoryEntry> BuildEntries(TsConfig config, TsBuiltinConfig builtinConfig)
         {
             var usedNames = new HashSet<string>(StringComparer.Ordinal);
             var entries = new List<FactoryEntry>();
 
-            var allGroups = (builtinConfig?.Factories ?? Array.Empty<TsvrcFactoryGroup>())
-                .Concat(config?.Factories ?? Array.Empty<TsvrcFactoryGroup>());
+            var allGroups = (builtinConfig?.Factories ?? Array.Empty<TsFactoryGroup>())
+                .Concat(config?.Factories ?? Array.Empty<TsFactoryGroup>());
 
             foreach (var group in allGroups)
             {
@@ -264,7 +264,7 @@ namespace Tsvrc.Editor
                     string name = Deduplicate(prefix + Sanitize(prefab.name), usedNames);
                     usedNames.Add(name);
 
-                    var behaviour = prefab.GetComponent<TsvrcBehaviour>();
+                    var behaviour = prefab.GetComponent<TsBehaviour>();
                     string typeName = behaviour != null ? behaviour.GetType().Name : "GameObject";
                     string typeNamespace = behaviour != null ? (behaviour.GetType().Namespace ?? string.Empty) : string.Empty;
 
@@ -273,7 +273,7 @@ namespace Tsvrc.Editor
                         Name = name,
                         TypeName = typeName,
                         TypeNamespace = typeNamespace,
-                        IsTsvrcBehaviour = behaviour != null,
+                        IsTsBehaviour = behaviour != null,
                         PrefabAsset = prefab,
                     });
                 }
@@ -366,7 +366,7 @@ namespace Tsvrc.Editor
             public string Name;
             public string TypeName;
             public string TypeNamespace;
-            public bool IsTsvrcBehaviour;
+            public bool IsTsBehaviour;
             public GameObject PrefabAsset;
         }
     }

@@ -27,7 +27,7 @@ namespace Tsvrc.Utils
     /// <b>Reference:</b> <see href="https://creators.vrchat.com/worlds/udon/persistence/">VRChat Persistence docs</see>
     /// </remarks>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsMemory : TsvrcBehaviour
+    public class TsMemory : TsBehaviour
     {
         // Flag values. Stored as double in _registry to survive DataToken roundtrip.
         private const int FLAG_PERSIST = 1;

@@ -23,7 +23,7 @@ namespace Tsvrc.Tests.PlayMode
     //
     // Follows the exact harness/verification pattern established by
     // Tests/PlayMode/Tracking/PlayerTracker/PlayerTrackerAbandonmentTests.cs and
-    // Tests/PlayMode/Core/TsvrcProcess/TsvrcProcessOwnershipHandoverTests.cs: NUnit Assert
+    // Tests/PlayMode/Core/TsProcess/TsProcessOwnershipHandoverTests.cs: NUnit Assert
     // failures are silent in this project's Play Mode environment (no exception, no results
     // XML), so every test computes its own bool and logs exactly one PLAYMODE_TEST_RESULT
     // marker with PASS/FAIL plus observed values. ClientSim never organically delivers a
@@ -122,7 +122,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("ReadyCheck_RemoteLeavesNotReady");
             ReadyCheckProcessTestSubclass tracker = go.AddComponent<ReadyCheckProcessTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             const string remoteName = "NotReadyLeaver";
             ClientSimMain.SpawnRemotePlayer(remoteName);
@@ -171,7 +171,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("ReadyCheck_RemoteLeavesReady");
             ReadyCheckProcessTestSubclass tracker = go.AddComponent<ReadyCheckProcessTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             ClientSimMain.SpawnRemotePlayer("ReadyThenLeaves");
             ClientSimMain.SpawnRemotePlayer("StaysNotReady");
@@ -224,7 +224,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("ReadyCheck_AbandonmentSyncCompleteRestart");
             ReadyCheckProcessTestSubclass tracker = go.AddComponent<ReadyCheckProcessTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             ClientSimMain.SpawnRemotePlayer("DepartsNeverReady");
             yield return null;
@@ -269,7 +269,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("ReadyCheck_RealOwnerSetReady");
             ReadyCheckProcessTestSubclass tracker = go.AddComponent<ReadyCheckProcessTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             string localId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
 
@@ -308,7 +308,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("ReadyCheck_OwnerAbandonedRealScan");
             ReadyCheckProcessTestSubclass tracker = go.AddComponent<ReadyCheckProcessTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             ClientSimMain.SpawnRemotePlayer("StaysActive");
             yield return null;
@@ -357,7 +357,7 @@ namespace Tsvrc.Tests.PlayMode
 
             GameObject go = new GameObject("ReadyCheck_CallingPlayerDiagnostic");
             ReadyCheckProcessTestSubclass tracker = go.AddComponent<ReadyCheckProcessTestSubclass>();
-            tracker.TsConstruct((TsvrcRoot)null);
+            tracker.TsConstruct((TsRoot)null);
 
             const string remoteName = "SomeoneElse";
             ClientSimMain.SpawnRemotePlayer(remoteName);

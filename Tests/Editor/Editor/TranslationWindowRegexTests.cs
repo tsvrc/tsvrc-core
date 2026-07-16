@@ -6,24 +6,24 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.Editor
 {
-    // TsvrcTranslationWindow.PeekKeyLabel and its backing regexes are all private —
+    // TsTranslationWindow.PeekKeyLabel and its backing regexes are all private —
     // reflection is the only way in (InternalsVisibleTo only reaches internal members,
     // and this class/its members are all private).
     public class TranslationWindowRegexTests
     {
-        private static readonly Type WindowType = typeof(TsvrcTranslationWindow);
+        private static readonly Type WindowType = typeof(TsTranslationWindow);
 
         private static (string key, string label) PeekKeyLabel(string json)
         {
             MethodInfo m = WindowType.GetMethod("PeekKeyLabel", BindingFlags.NonPublic | BindingFlags.Static);
-            Assert.IsNotNull(m, "TsvrcTranslationWindow.PeekKeyLabel method changed or was removed.");
+            Assert.IsNotNull(m, "TsTranslationWindow.PeekKeyLabel method changed or was removed.");
             return ((string, string))m.Invoke(null, new object[] { json });
         }
 
         private static Regex TargetPattern()
         {
             FieldInfo f = WindowType.GetField("TargetPattern", BindingFlags.NonPublic | BindingFlags.Static);
-            Assert.IsNotNull(f, "TsvrcTranslationWindow.TargetPattern field changed or was removed.");
+            Assert.IsNotNull(f, "TsTranslationWindow.TargetPattern field changed or was removed.");
             return (Regex)f.GetValue(null);
         }
 

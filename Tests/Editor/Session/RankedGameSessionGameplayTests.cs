@@ -252,7 +252,7 @@ namespace Tsvrc.Tests.Editor
         {
             // _timerDurationMs's own doc comment: "0 = timer will not end the
             // session." An open-ended timer never calls CompleteProcess at all
-            // (TsvrcTimer.OnProcessUpdate only completes when _durationMs > 0), so
+            // (TsTimer.OnProcessUpdate only completes when _durationMs > 0), so
             // _OnTimerCompleted is never invoked regardless of _endOnTimerComplete -
             // the flag being true (the default) is irrelevant when duration is 0.
             var h = StartInGame("A"); // default SetTimerDuration is never called - duration stays 0

@@ -6,7 +6,7 @@ using VRC.SDK3.Data;
 namespace Tsvrc.StateMachine
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class StateManager : TsvrcBehaviour
+    public class StateManager : TsBehaviour
     {
         // -1 means no state has been set yet
         protected int _currentState = -1;

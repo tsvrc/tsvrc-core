@@ -29,7 +29,7 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void Wire_TsMemoryPresentInScene_FieldAssigned()
         {
-            var memoryGo = _scope.CreateGameObject("TsvrcMemory");
+            var memoryGo = _scope.CreateGameObject("TsMemory");
             var memory = memoryGo.AddComponent<TsMemory>();
 
             new MemoryModule().Wire();
@@ -48,7 +48,7 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void Wire_CalledTwiceWithSameMemory_SecondCallLeavesFieldUnchanged()
         {
-            var memoryGo = _scope.CreateGameObject("TsvrcMemory");
+            var memoryGo = _scope.CreateGameObject("TsMemory");
             var memory = memoryGo.AddComponent<TsMemory>();
             var module = new MemoryModule();
             module.Wire();
@@ -62,25 +62,25 @@ namespace Tsvrc.Tests.Editor
         }
 
         [Test]
-        public void AfterFilesStable_TsvrcMemoryChildAbsent_IsCreated()
+        public void AfterFilesStable_TsMemoryChildAbsent_IsCreated()
         {
             bool programAssetMissing = new MemoryModule().AfterFilesStable();
 
-            Assert.IsNotNull(_root.transform.Find("TsvrcMemory"));
-            Assert.IsNotNull(_root.transform.Find("TsvrcMemory").GetComponent<TsMemory>());
+            Assert.IsNotNull(_root.transform.Find("TsMemory"));
+            Assert.IsNotNull(_root.transform.Find("TsMemory").GetComponent<TsMemory>());
             Assert.IsFalse(programAssetMissing, "TsMemory.asset already exists in this project.");
         }
 
         [Test]
-        public void AfterFilesStable_TsvrcMemoryChildAlreadyPresent_LeftAlone()
+        public void AfterFilesStable_TsMemoryChildAlreadyPresent_LeftAlone()
         {
-            var existing = _scope.CreateGameObject("TsvrcMemory");
+            var existing = _scope.CreateGameObject("TsMemory");
             existing.transform.SetParent(_root.transform, false);
             existing.AddComponent<TsMemory>();
 
             new MemoryModule().AfterFilesStable();
 
-            Assert.AreEqual(1, _root.transform.childCount, "Must not create a second TsvrcMemory child.");
+            Assert.AreEqual(1, _root.transform.childCount, "Must not create a second TsMemory child.");
         }
     }
 }

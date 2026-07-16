@@ -26,7 +26,7 @@ namespace Tsvrc.Tests.Editor
         public void OnSceneHierarchyChanged_Ambiguous_AlwaysReturnsFalse()
         {
             var root = CompiledRootFixture.AddTo(_scope);
-            // Even with a root and no TsvrcInstance child present, ambiguous must never
+            // Even with a root and no TsInstance child present, ambiguous must never
             // self-trigger - it's the one deliberate "leave broken things alone" branch.
             var module = ModuleWith(typeof(object), ambiguous: true);
 
@@ -63,7 +63,7 @@ namespace Tsvrc.Tests.Editor
         public void OnSceneHierarchyChanged_RootPresentChildPresent_ReturnsFalse()
         {
             var root = CompiledRootFixture.AddTo(_scope);
-            var child = _scope.CreateGameObject("TsvrcInstance");
+            var child = _scope.CreateGameObject("TsInstance");
             child.transform.SetParent(root.transform, false);
             var module = ModuleWith(typeof(object), ambiguous: false);
 

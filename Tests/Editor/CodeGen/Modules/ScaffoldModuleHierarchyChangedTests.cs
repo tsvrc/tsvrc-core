@@ -19,7 +19,7 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void OnSceneHierarchyChanged_CompiledTypeNotFoundCase_IsUnreachableInThisProject_DocumentedNotTested()
         {
-            // FindCompiledType() always succeeds in this project (the real TsvrcGenerated
+            // FindCompiledType() always succeeds in this project (the real TsGenerated
             // class is always compiled and loaded), so the `compiledType == null` branch
             // cannot be reached from an Edit Mode test here - it would only apply to a
             // project where the generator has never produced its first .cs file at all.
@@ -44,9 +44,9 @@ namespace Tsvrc.Tests.Editor
         public void OnSceneHierarchyChanged_ExactlyOneInstanceWithConfigChild_ReturnsFalse()
         {
             var root = CompiledRootFixture.AddTo(_scope);
-            var configGo = _scope.CreateGameObject("TsvrcConfig");
+            var configGo = _scope.CreateGameObject("TsConfig");
             configGo.transform.SetParent(root.transform, false);
-            configGo.AddComponent<TsvrcConfig>();
+            configGo.AddComponent<TsConfig>();
 
             Assert.IsFalse(new ScaffoldModule().OnSceneHierarchyChanged());
         }

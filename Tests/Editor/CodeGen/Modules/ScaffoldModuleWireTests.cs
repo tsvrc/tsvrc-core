@@ -70,43 +70,43 @@ namespace Tsvrc.Tests.Editor
         }
 
         [Test]
-        public void AfterFilesStable_TsvrcConfigChildAbsent_IsCreatedAndTaggedEditorOnly()
+        public void AfterFilesStable_TsConfigChildAbsent_IsCreatedAndTaggedEditorOnly()
         {
             var root = CompiledRootFixture.AddTo(_scope);
 
             new ScaffoldModule().AfterFilesStable();
 
-            var child = root.transform.Find("TsvrcConfig");
+            var child = root.transform.Find("TsConfig");
             Assert.IsNotNull(child);
-            Assert.IsNotNull(child.GetComponent<TsvrcConfig>());
+            Assert.IsNotNull(child.GetComponent<TsConfig>());
             Assert.AreEqual("EditorOnly", child.gameObject.tag);
         }
 
         [Test]
-        public void AfterFilesStable_TsvrcConfigChildPresentWithoutComponent_ComponentAddedToExistingChild()
+        public void AfterFilesStable_TsConfigChildPresentWithoutComponent_ComponentAddedToExistingChild()
         {
             var root = CompiledRootFixture.AddTo(_scope);
-            var existingChild = _scope.CreateGameObject("TsvrcConfig");
+            var existingChild = _scope.CreateGameObject("TsConfig");
             existingChild.transform.SetParent(root.transform, false);
 
             new ScaffoldModule().AfterFilesStable();
 
-            Assert.AreEqual(1, root.transform.childCount, "Must not create a second TsvrcConfig child.");
-            Assert.IsNotNull(root.transform.Find("TsvrcConfig").GetComponent<TsvrcConfig>());
+            Assert.AreEqual(1, root.transform.childCount, "Must not create a second TsConfig child.");
+            Assert.IsNotNull(root.transform.Find("TsConfig").GetComponent<TsConfig>());
         }
 
         [Test]
-        public void AfterFilesStable_TsvrcConfigChildWithWrongTag_TagSelfHeals()
+        public void AfterFilesStable_TsConfigChildWithWrongTag_TagSelfHeals()
         {
             var root = CompiledRootFixture.AddTo(_scope);
-            var existingChild = _scope.CreateGameObject("TsvrcConfig");
+            var existingChild = _scope.CreateGameObject("TsConfig");
             existingChild.transform.SetParent(root.transform, false);
-            existingChild.AddComponent<TsvrcConfig>();
+            existingChild.AddComponent<TsConfig>();
             existingChild.tag = "Untagged";
 
             new ScaffoldModule().AfterFilesStable();
 
-            Assert.AreEqual("EditorOnly", root.transform.Find("TsvrcConfig").gameObject.tag);
+            Assert.AreEqual("EditorOnly", root.transform.Find("TsConfig").gameObject.tag);
         }
 
         [Test]
@@ -120,8 +120,8 @@ namespace Tsvrc.Tests.Editor
         [Test]
         public void NormalizeProgramAsset_CalledTwiceOnRealAsset_SecondCallIsNoOp()
         {
-            var asset = AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>("Assets/TsvrcGenerated/TsvrcGenerated.asset");
-            Assert.IsNotNull(asset, "This project's own bootstrap TsvrcGenerated.asset must already exist (see CompiledRootFixture).");
+            var asset = AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>("Assets/TsGenerated/TsGenerated.asset");
+            Assert.IsNotNull(asset, "This project's own bootstrap TsGenerated.asset must already exist (see CompiledRootFixture).");
 
             ScaffoldModule.NormalizeProgramAsset(asset); // settle into sorted order first
             bool secondCall = ScaffoldModule.NormalizeProgramAsset(asset);

@@ -7,8 +7,8 @@ using UnityEngine;
 
 namespace Tsvrc.Tests.Editor
 {
-    // Backs up and byte-for-byte restores Assets/TsvrcGenerated/*.cs around any test that
-    // drives the real, static, project-wide TsvrcGenerator.Run() - which really does write
+    // Backs up and byte-for-byte restores Assets/TsGenerated/*.cs around any test that
+    // drives the real, static, project-wide TsGenerator.Run() - which really does write
     // those files to disk (WriteIfChanged is a genuine file write, not scratch). Without
     // this, a test running Run() against an empty synthetic scene/config could silently
     // overwrite a developer's actual configured output with "stub" content.
@@ -18,13 +18,13 @@ namespace Tsvrc.Tests.Editor
     // default, which would otherwise leave a spurious BOM-only diff on every restore.
     internal sealed class GeneratedFileBackup : IDisposable
     {
-        private const string GeneratedFolder = "Assets/TsvrcGenerated";
+        private const string GeneratedFolder = "Assets/TsGenerated";
 
-        // Derived from the real module list (TsvrcGenerator.CreateModules()) rather than a
+        // Derived from the real module list (TsGenerator.CreateModules()) rather than a
         // second hardcoded copy of the filenames, so a new/renamed module's generated file
         // can never silently fall outside backup/restore coverage.
         private static IEnumerable<string> GeneratedFileNames =>
-            TsvrcGenerator.CreateModules().Select(m => m.FileName).Where(n => n != null);
+            TsGenerator.CreateModules().Select(m => m.FileName).Where(n => n != null);
 
         private readonly Dictionary<string, byte[]> _backup = new();
 

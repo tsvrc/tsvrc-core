@@ -6,16 +6,16 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Generates the _memory field and _TsMemoryStart() on TsvrcGenerated, and wires
+    // Generates the _memory field and _TsMemoryStart() on TsGenerated, and wires
     // the scene TsMemory component into it. Every other system accesses shared memory
-    // through TsvrcGenerated.Memory; this module ensures that reference is always set.
-    internal class MemoryModule : TsvrcModule
+    // through TsGenerated.Memory; this module ensures that reference is always set.
+    internal class MemoryModule : TsModule
     {
         // Package-relative, not a literal - see PackagePaths.
         private static string MemoryScriptPath => $"{PackagePaths.Root}/Runtime/Utils/TsMemory.cs";
         private static string MemoryAssetPath => $"{PackagePaths.Root}/Runtime/Utils/TsMemory.asset";
 
-        internal override string FileName => "TsvrcGeneratedMemory.cs";
+        internal override string FileName => "TsGeneratedMemory.cs";
 
         internal override IEnumerable<string> WatchedAssets() => new[] { MemoryAssetPath };
 
@@ -48,7 +48,7 @@ namespace Tsvrc.Editor
             var root = FindRoot();
             if (root == null) return programAssetMissing;
 
-            ScaffoldModule.EnsureChildSceneObject("TsvrcMemory", typeof(TsMemory), root);
+            ScaffoldModule.EnsureChildSceneObject("TsMemory", typeof(TsMemory), root);
             return programAssetMissing;
         }
 
@@ -75,7 +75,7 @@ namespace Tsvrc.Editor
         {
             var root = FindRoot();
             if (root == null) return false;
-            return root.transform.Find("TsvrcMemory") == null;
+            return root.transform.Find("TsMemory") == null;
         }
     }
 }

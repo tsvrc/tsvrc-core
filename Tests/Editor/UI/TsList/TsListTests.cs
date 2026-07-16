@@ -476,8 +476,8 @@ namespace Tsvrc.Tests.Editor
             TsList list = CreateList();
             var listenerGO = new GameObject("Listener");
             _spawned.Add(listenerGO);
-            var listener = listenerGO.AddComponent<TsvrcListenerDouble>();
-            list.TsSubscribe(listener, TsList.OnItemSelectedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            var listener = listenerGO.AddComponent<TsListenerDouble>();
+            list.TsSubscribe(listener, TsList.OnItemSelectedEvent, nameof(TsListenerDouble.CallbackA));
 
             list.OnItemSelected(2);
 
@@ -494,8 +494,8 @@ namespace Tsvrc.Tests.Editor
             list.SetData(MakeData(2));
             var listenerGO = new GameObject("Listener");
             _spawned.Add(listenerGO);
-            var listener = listenerGO.AddComponent<TsvrcListenerDouble>();
-            list.TsSubscribe(listener, TsList.OnItemSelectedEvent, nameof(TsvrcListenerDouble.CallbackA));
+            var listener = listenerGO.AddComponent<TsListenerDouble>();
+            list.TsSubscribe(listener, TsList.OnItemSelectedEvent, nameof(TsListenerDouble.CallbackA));
 
             list.OnItemSelected(9999);
 
