@@ -54,6 +54,12 @@ namespace Tsvrc.Editor
                 return;
             }
 
+            if (_tabs.Count == 0)
+            {
+                EditorGUILayout.HelpBox("No configurable modules found.", MessageType.Info);
+                return;
+            }
+
             int newIndex = GUILayout.Toolbar(_tabIndex, _tabLabels);
             if (newIndex != _tabIndex) { _tabIndex = newIndex; _scroll = Vector2.zero; }
 

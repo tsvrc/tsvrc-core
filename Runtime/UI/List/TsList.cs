@@ -43,8 +43,6 @@ namespace Tsvrc.UI
         public bool HasNextPage => _currentPage < PageCount - 1;
         public bool HasPreviousPage => _currentPage > 0;
 
-        #region Public API
-
         /// <summary>Loads data and resets to the first page.</summary>
         public void SetData(DataList data)
         {
@@ -90,17 +88,14 @@ namespace Tsvrc.UI
             _selectedIndex = -1;
         }
 
-        #endregion
-
-        #region Private
-
         private void _SetState(int state)
         {
             _listState = state;
-            _ClearPool();
-            _UpdateVisualState();
             if (state == STATE_POPULATED)
-                _RebuildPool();
+                _RebuildPool(); // Clears the pool itself before rebuilding.
+            else
+                _ClearPool();
+            _UpdateVisualState();
         }
 
         private void _UpdateVisualState()
@@ -149,7 +144,5 @@ namespace Tsvrc.UI
             }
             _pool = new TsListItem[0];
         }
-
-        #endregion
     }
 }

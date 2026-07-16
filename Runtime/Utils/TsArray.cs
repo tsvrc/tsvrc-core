@@ -32,27 +32,19 @@ namespace Tsvrc.Utils
         {
             int originalLen = original.Length;
             int itemsLen = items.Length;
+            string[] buffer = new string[originalLen];
             int count = 0;
-            bool shouldRemove;
-            string current;
             for (int i = 0; i < originalLen; i++)
             {
-                shouldRemove = false;
-                current = original[i];
+                string current = original[i];
+                bool shouldRemove = false;
                 for (int j = 0; j < itemsLen; j++)
                     if (current == items[j]) { shouldRemove = true; break; }
-                if (!shouldRemove) count++;
+                if (!shouldRemove) buffer[count++] = current;
             }
+            if (count == originalLen) return buffer;
             string[] result = new string[count];
-            int index = 0;
-            for (int i = 0; i < originalLen; i++)
-            {
-                shouldRemove = false;
-                current = original[i];
-                for (int j = 0; j < itemsLen; j++)
-                    if (current == items[j]) { shouldRemove = true; break; }
-                if (!shouldRemove) result[index++] = current;
-            }
+            System.Array.Copy(buffer, result, count);
             return result;
         }
 
@@ -72,7 +64,12 @@ namespace Tsvrc.Utils
         public static string[] Dedupe(string[] original)
         {
             int originalLen = original.Length;
-            if (originalLen < 2) return original;
+            if (originalLen < 2)
+            {
+                string[] copy = new string[originalLen];
+                System.Array.Copy(original, copy, originalLen);
+                return copy;
+            }
 
             string[] deduped = new string[originalLen];
             int dedupedCount = 0;
@@ -118,27 +115,19 @@ namespace Tsvrc.Utils
         {
             int originalLen = original.Length;
             int itemsLen = items.Length;
+            UdonSharpBehaviour[] buffer = new UdonSharpBehaviour[originalLen];
             int count = 0;
-            bool shouldRemove;
-            UdonSharpBehaviour current;
             for (int i = 0; i < originalLen; i++)
             {
-                shouldRemove = false;
-                current = original[i];
+                UdonSharpBehaviour current = original[i];
+                bool shouldRemove = false;
                 for (int j = 0; j < itemsLen; j++)
                     if (current == items[j]) { shouldRemove = true; break; }
-                if (!shouldRemove) count++;
+                if (!shouldRemove) buffer[count++] = current;
             }
+            if (count == originalLen) return buffer;
             UdonSharpBehaviour[] result = new UdonSharpBehaviour[count];
-            int index = 0;
-            for (int i = 0; i < originalLen; i++)
-            {
-                shouldRemove = false;
-                current = original[i];
-                for (int j = 0; j < itemsLen; j++)
-                    if (current == items[j]) { shouldRemove = true; break; }
-                if (!shouldRemove) result[index++] = current;
-            }
+            System.Array.Copy(buffer, result, count);
             return result;
         }
 
