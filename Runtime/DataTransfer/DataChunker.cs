@@ -1,5 +1,4 @@
 using Tsvrc.Tracking;
-using UnityEngine;
 
 namespace Tsvrc.DataTransfer
 {
@@ -49,13 +48,13 @@ namespace Tsvrc.DataTransfer
         {
             if (string.IsNullOrEmpty(message))
             {
-                Debug.LogWarning("[DataChunker] Cannot send empty message");
+                LogWarning("Cannot send empty message");
                 return false;
             }
 
             if (message.Length > MAX_MESSAGE_SIZE)
             {
-                Debug.LogError($"[DataChunker] Message too large: {message.Length} chars (max {MAX_MESSAGE_SIZE})");
+                LogError($"Message too large: {message.Length} chars (max {MAX_MESSAGE_SIZE})");
                 return false;
             }
 

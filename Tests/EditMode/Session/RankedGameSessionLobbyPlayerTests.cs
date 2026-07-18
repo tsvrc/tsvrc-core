@@ -14,7 +14,7 @@ namespace Tsvrc.Tests.EditMode
             var h = CreateWiredSession();
 
             LogAssert.Expect(LogType.Error,
-                "[TsVRC] RankedGameSession.AddLobbyPlayer: lobby tracker is not running. Call StartLobbyTracking() first.");
+                "[RankedGameSessionTestSubclass] AddLobbyPlayer: lobby tracker is not running. Call StartLobbyTracking() first.");
             h.Session.AddLobbyPlayer("A");
 
             CollectionAssert.AreEqual(new string[0], h.Session.LobbyPlayerIds);
@@ -42,7 +42,7 @@ namespace Tsvrc.Tests.EditMode
             var h = CreateWiredSession();
 
             LogAssert.Expect(LogType.Error,
-                "[TsVRC] RankedGameSession.RemoveLobbyPlayer: lobby tracker is not running. Call StartLobbyTracking() first.");
+                "[RankedGameSessionTestSubclass] RemoveLobbyPlayer: lobby tracker is not running. Call StartLobbyTracking() first.");
             h.Session.RemoveLobbyPlayer("A");
         }
 

@@ -132,7 +132,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var h = CreateWiredSession();
 
-            LogAssert.Expect(LogType.Error, "[TsVRC] RankedGameSession.AddCompletedPlayer: session is not in game state.");
+            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] AddCompletedPlayer: session is not in game state.");
             h.Session.AddCompletedPlayer("A");
         }
 
@@ -145,7 +145,7 @@ namespace Tsvrc.Tests.EditMode
             // real game player had actually completed.
             var h = StartInGame("A", "B");
 
-            LogAssert.Expect(LogType.Error, "[TsVRC] RankedGameSession.AddCompletedPlayer: playerId is not an active game player.");
+            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] AddCompletedPlayer: playerId is not an active game player.");
             h.Session.AddCompletedPlayer("SpoofedPlayer");
 
             CollectionAssert.AreEqual(new string[0], h.Session.CompletedPlayerIds);

@@ -11,5 +11,6 @@ namespace Tsvrc.Core.Generated
     {
         public virtual TsInstance Instance => null;
         public virtual TsMemory Memory => null;
+        public virtual TsLogger Log => null;
     }
 }

@@ -75,27 +75,27 @@ namespace Tsvrc.Session
 
             if (_lobbyTracker == null)
             {
-                Debug.LogError("[TsVRC] RankedGameSession._lobbyTracker is not assigned. Try regenerating TsVRC.", this);
+                LogError("_lobbyTracker is not assigned. Try regenerating TsVRC.");
                 return;
             }
             if (_readyCheck == null)
             {
-                Debug.LogError("[TsVRC] RankedGameSession._readyCheck is not assigned. Try regenerating TsVRC.", this);
+                LogError("_readyCheck is not assigned. Try regenerating TsVRC.");
                 return;
             }
             if (_gameTracker == null)
             {
-                Debug.LogError("[TsVRC] RankedGameSession._gameTracker is not assigned. Try regenerating TsVRC.", this);
+                LogError("_gameTracker is not assigned. Try regenerating TsVRC.");
                 return;
             }
             if (_completedTracker == null)
             {
-                Debug.LogError("[TsVRC] RankedGameSession._completedTracker is not assigned. Try regenerating TsVRC.", this);
+                LogError("_completedTracker is not assigned. Try regenerating TsVRC.");
                 return;
             }
             if (_timer == null)
             {
-                Debug.LogError("[TsVRC] RankedGameSession._timer is not assigned. Try regenerating TsVRC.", this);
+                LogError("_timer is not assigned. Try regenerating TsVRC.");
                 return;
             }
 
@@ -122,12 +122,12 @@ namespace Tsvrc.Session
         {
             if (_masterOnly && !_ts.Instance.IsTsMaster)
             {
-                Debug.LogWarning("[TsVRC] RankedGameSession.StartSession: ignored, local player is not TsMaster.", this);
+                LogWarning("StartSession: ignored, local player is not TsMaster.");
                 return;
             }
             if (CurrentState != RankedGameSessionState.Idle)
             {
-                Debug.LogError("[TsVRC] RankedGameSession.StartSession: session is already running.", this);
+                LogError("StartSession: session is already running.");
                 return;
             }
             // ReadyCheckProcess.CheckAllPlayersReady returns early (never auto-completes)
@@ -136,7 +136,7 @@ namespace Tsvrc.Session
             // the check - only StopSession could recover it.
             if (LobbyPlayerIds.Length == 0)
             {
-                Debug.LogError("[TsVRC] RankedGameSession.StartSession: lobby is empty.", this);
+                LogError("StartSession: lobby is empty.");
                 return;
             }
             _readyCheck.StartReadyCheck(LobbyPlayerIds);
@@ -147,7 +147,7 @@ namespace Tsvrc.Session
         {
             if (CurrentState == RankedGameSessionState.Idle)
             {
-                Debug.LogError("[TsVRC] RankedGameSession.StopSession: no session is running.", this);
+                LogError("StopSession: no session is running.");
                 return;
             }
             if (CurrentState == RankedGameSessionState.Loading)
@@ -171,7 +171,7 @@ namespace Tsvrc.Session
         {
             if (!_lobbyTracker.IsProcessRunning())
             {
-                Debug.LogError("[TsVRC] RankedGameSession.AddLobbyPlayer: lobby tracker is not running. Call StartLobbyTracking() first.", this);
+                LogError("AddLobbyPlayer: lobby tracker is not running. Call StartLobbyTracking() first.");
                 return;
             }
             _lobbyTracker.AddTrackedPlayers(new[] { playerId });
@@ -181,7 +181,7 @@ namespace Tsvrc.Session
         {
             if (!_lobbyTracker.IsProcessRunning())
             {
-                Debug.LogError("[TsVRC] RankedGameSession.RemoveLobbyPlayer: lobby tracker is not running. Call StartLobbyTracking() first.", this);
+                LogError("RemoveLobbyPlayer: lobby tracker is not running. Call StartLobbyTracking() first.");
                 return;
             }
             _lobbyTracker.RemoveTrackedPlayers(new[] { playerId });
@@ -201,7 +201,7 @@ namespace Tsvrc.Session
         {
             if (CurrentState != RankedGameSessionState.InGame)
             {
-                Debug.LogError("[TsVRC] RankedGameSession.AddCompletedPlayer: session is not in game state.", this);
+                LogError("AddCompletedPlayer: session is not in game state.");
                 return;
             }
             // Without this check, a caller passing an arbitrary/spoofed playerId not in
@@ -210,7 +210,7 @@ namespace Tsvrc.Session
             // every real game player has actually completed.
             if (!TsArray.Contains(GamePlayerIds, playerId))
             {
-                Debug.LogError("[TsVRC] RankedGameSession.AddCompletedPlayer: playerId is not an active game player.", this);
+                LogError("AddCompletedPlayer: playerId is not an active game player.");
                 return;
             }
             _completedTracker.AddTrackedPlayers(new[] { playerId });
@@ -282,7 +282,7 @@ namespace Tsvrc.Session
         {
             if (CurrentState != RankedGameSessionState.InGame)
             {
-                Debug.LogError("[TsVRC] RankedGameSession._EndSession: session is not in game state.", this);
+                LogError("_EndSession: session is not in game state.");
                 return;
             }
             CurrentState = RankedGameSessionState.Idle;

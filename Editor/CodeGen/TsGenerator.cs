@@ -218,6 +218,7 @@ namespace Tsvrc.Editor
         // Also used by TsWindow to build its tab list.
         internal static List<TsModule> CreateModules() => new List<TsModule>
         {
+            new LogModule(),
             new MemoryModule(),
             new PoolModule(),
             new TranslationModule(),

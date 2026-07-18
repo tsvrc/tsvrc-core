@@ -176,7 +176,7 @@ namespace Tsvrc.Core
         {
             if (_isRunning)
             {
-                Debug.LogWarning("[TsProcess] Process is already running.");
+                LogWarning("Process is already running.");
                 return;
             }
 
@@ -220,7 +220,7 @@ namespace Tsvrc.Core
         {
             if (!_isRunning)
             {
-                Debug.LogWarning("[TsProcess] Process is not running.");
+                LogWarning("Process is not running.");
                 return;
             }
 
@@ -248,7 +248,7 @@ namespace Tsvrc.Core
         {
             if (!_isRunning)
             {
-                Debug.LogWarning("[TsProcess] Process is not running.");
+                LogWarning("Process is not running.");
                 return;
             }
 

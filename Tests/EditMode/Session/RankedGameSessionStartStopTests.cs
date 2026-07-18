@@ -105,7 +105,7 @@ namespace Tsvrc.Tests.EditMode
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
 
-            LogAssert.Expect(LogType.Error, "[TsVRC] RankedGameSession.StartSession: session is already running.");
+            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] StartSession: session is already running.");
             h.Session.StartSession();
 
             Assert.AreEqual(1, h.Session.OnSessionLoadingCount);
@@ -122,7 +122,7 @@ namespace Tsvrc.Tests.EditMode
             SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
 
-            LogAssert.Expect(LogType.Error, "[TsVRC] RankedGameSession.StartSession: lobby is empty.");
+            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] StartSession: lobby is empty.");
             h.Session.StartSession();
 
             Assert.AreEqual(RankedGameSessionState.Idle, h.Session.CurrentState);
@@ -149,7 +149,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var h = CreateWiredSession();
 
-            LogAssert.Expect(LogType.Error, "[TsVRC] RankedGameSession.StopSession: no session is running.");
+            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] StopSession: no session is running.");
             h.Session.StopSession();
 
             Assert.AreEqual(0, h.Session.OnSessionStoppedCount);

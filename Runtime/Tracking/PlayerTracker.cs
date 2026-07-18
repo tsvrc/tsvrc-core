@@ -2,7 +2,6 @@ using Tsvrc.Core;
 using Tsvrc.Player;
 using Tsvrc.Utils;
 using UdonSharp;
-using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
@@ -279,7 +278,7 @@ namespace Tsvrc.Tracking
         {
             if (playerIds == null || playerIds.Length == 0)
             {
-                Debug.LogWarning("AddTrackedPlayers called with null or empty array");
+                LogWarning("AddTrackedPlayers called with null or empty array");
                 return;
             }
 
@@ -300,7 +299,7 @@ namespace Tsvrc.Tracking
         {
             if (playerIds == null || playerIds.Length == 0)
             {
-                Debug.LogWarning("RemoveTrackedPlayers called with null or empty array");
+                LogWarning("RemoveTrackedPlayers called with null or empty array");
                 return;
             }
 

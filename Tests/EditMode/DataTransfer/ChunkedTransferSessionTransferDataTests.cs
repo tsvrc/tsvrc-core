@@ -22,7 +22,7 @@ namespace Tsvrc.Tests.EditMode
             session.TransferData("hello", new[] { ownerId, "Other#1" });
             Assert.AreEqual(1, session.OnChunkSequenceStartedCount);
 
-            LogAssert.Expect(LogType.Warning, "[TsDataSender] Transfer already in progress. Call CancelDataTransfer() first.");
+            LogAssert.Expect(LogType.Warning, "[ChunkedTransferSessionTestSubclass] Transfer already in progress. Call CancelDataTransfer() first.");
             session.TransferData("world", new[] { ownerId });
 
             Assert.AreEqual(1, session.OnChunkSequenceStartedCount, "A second call while running must not restart the sequence.");
@@ -39,7 +39,7 @@ namespace Tsvrc.Tests.EditMode
             // full multi-chunk sequence, to isolate this specific guard.
             SetPendingNextChunk(session, true);
 
-            LogAssert.Expect(LogType.Warning, "[TsDataSender] Transfer already in progress. Call CancelDataTransfer() first.");
+            LogAssert.Expect(LogType.Warning, "[ChunkedTransferSessionTestSubclass] Transfer already in progress. Call CancelDataTransfer() first.");
             session.TransferData("hello", new[] { "TestOwner#" + OwnerPlayerId });
 
             Assert.AreEqual(0, session.OnChunkSequenceStartedCount);
@@ -51,7 +51,7 @@ namespace Tsvrc.Tests.EditMode
             var session = CreateProcess<ChunkedTransferSessionTestSubclass>();
             SeedAsOwner(session);
 
-            LogAssert.Expect(LogType.Warning, "[TsDataSender] Cannot transfer to null or empty player list.");
+            LogAssert.Expect(LogType.Warning, "[ChunkedTransferSessionTestSubclass] Cannot transfer to null or empty player list.");
             session.TransferData("hello", null);
 
             Assert.AreEqual(0, session.OnChunkSequenceStartedCount);
@@ -64,7 +64,7 @@ namespace Tsvrc.Tests.EditMode
             var session = CreateProcess<ChunkedTransferSessionTestSubclass>();
             SeedAsOwner(session);
 
-            LogAssert.Expect(LogType.Warning, "[TsDataSender] Cannot transfer to null or empty player list.");
+            LogAssert.Expect(LogType.Warning, "[ChunkedTransferSessionTestSubclass] Cannot transfer to null or empty player list.");
             session.TransferData("hello", new string[0]);
 
             Assert.AreEqual(0, session.OnChunkSequenceStartedCount);
@@ -76,7 +76,7 @@ namespace Tsvrc.Tests.EditMode
             var session = CreateProcess<ChunkedTransferSessionTestSubclass>();
             SeedAsOwner(session);
 
-            LogAssert.Expect(LogType.Warning, "[DataChunker] Cannot send empty message");
+            LogAssert.Expect(LogType.Warning, "[ChunkedTransferSessionTestSubclass] Cannot send empty message");
             session.TransferData(null, new[] { "TestOwner#" + OwnerPlayerId });
 
             Assert.AreEqual(0, session.OnChunkSequenceStartedCount);
@@ -90,7 +90,7 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(session);
             string tooLarge = BuildString(DataChunkerTestSubclass.MaxMessageSizeConst + 1);
 
-            LogAssert.Expect(LogType.Error, $"[DataChunker] Message too large: {tooLarge.Length} chars (max {DataChunkerTestSubclass.MaxMessageSizeConst})");
+            LogAssert.Expect(LogType.Error, $"[ChunkedTransferSessionTestSubclass] Message too large: {tooLarge.Length} chars (max {DataChunkerTestSubclass.MaxMessageSizeConst})");
             session.TransferData(tooLarge, new[] { "TestOwner#" + OwnerPlayerId });
 
             Assert.AreEqual(0, session.OnChunkSequenceStartedCount);

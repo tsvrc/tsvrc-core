@@ -16,7 +16,7 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(tracker);
             tracker.StartPlayerTracking(new string[0]);
 
-            LogAssert.Expect(LogType.Warning, "AddTrackedPlayers called with null or empty array");
+            LogAssert.Expect(LogType.Warning, "[PlayerTrackerTestSubclass] AddTrackedPlayers called with null or empty array");
             tracker.AddTrackedPlayers(null);
 
             CollectionAssert.AreEqual(new string[0], GetTrackedPlayerIds(tracker));
@@ -29,7 +29,7 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(tracker);
             tracker.StartPlayerTracking(new string[0]);
 
-            LogAssert.Expect(LogType.Warning, "AddTrackedPlayers called with null or empty array");
+            LogAssert.Expect(LogType.Warning, "[PlayerTrackerTestSubclass] AddTrackedPlayers called with null or empty array");
             tracker.AddTrackedPlayers(new string[0]);
 
             CollectionAssert.AreEqual(new string[0], GetTrackedPlayerIds(tracker));
@@ -72,7 +72,7 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(tracker);
             tracker.StartPlayerTracking(new[] { "A" });
 
-            LogAssert.Expect(LogType.Warning, "RemoveTrackedPlayers called with null or empty array");
+            LogAssert.Expect(LogType.Warning, "[PlayerTrackerTestSubclass] RemoveTrackedPlayers called with null or empty array");
             tracker.RemoveTrackedPlayers(null);
 
             CollectionAssert.AreEqual(new[] { "A" }, GetTrackedPlayerIds(tracker));
@@ -85,7 +85,7 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(tracker);
             tracker.StartPlayerTracking(new[] { "A" });
 
-            LogAssert.Expect(LogType.Warning, "RemoveTrackedPlayers called with null or empty array");
+            LogAssert.Expect(LogType.Warning, "[PlayerTrackerTestSubclass] RemoveTrackedPlayers called with null or empty array");
             tracker.RemoveTrackedPlayers(new string[0]);
 
             CollectionAssert.AreEqual(new[] { "A" }, GetTrackedPlayerIds(tracker));

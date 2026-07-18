@@ -175,19 +175,19 @@ namespace Tsvrc.UI
         {
             if (OverlayImage == null)
             {
-                Debug.LogError("[TsPlayerPositionOverlay] OverlayImage is not assigned.");
+                LogError("OverlayImage is not assigned.");
                 return;
             }
 
             if (width <= 0 || height <= 0)
             {
-                Debug.LogError("[TsPlayerPositionOverlay] Texture dimensions must be positive.");
+                LogError("Texture dimensions must be positive.");
                 return;
             }
 
             if (pixelsPerUnitX <= 0f || pixelsPerUnitZ <= 0f)
             {
-                Debug.LogError("[TsPlayerPositionOverlay] PixelsPerUnit values must be positive.");
+                LogError("PixelsPerUnit values must be positive.");
                 return;
             }
 
@@ -247,7 +247,7 @@ namespace Tsvrc.UI
         {
             if (!_isSetup)
             {
-                Debug.LogError("[TsPlayerPositionOverlay] Setup() must be called before StartOverlay().");
+                LogError("Setup() must be called before StartOverlay().");
                 return;
             }
             StartPlayerTracking(playerIds);

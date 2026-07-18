@@ -8,19 +8,20 @@ namespace Tsvrc.Tests.EditMode
     public class TsGeneratorCreateModulesTests
     {
         [Test]
-        public void CreateModules_ReturnsAllEightModulesInDocumentedOrder()
+        public void CreateModules_ReturnsAllNineModulesInDocumentedOrder()
         {
             var modules = TsGenerator.CreateModules();
 
-            Assert.AreEqual(8, modules.Count);
-            Assert.IsInstanceOf<MemoryModule>(modules[0]);
-            Assert.IsInstanceOf<PoolModule>(modules[1]);
-            Assert.IsInstanceOf<TranslationModule>(modules[2]);
-            Assert.IsInstanceOf<InstanceModule>(modules[3]);
-            Assert.IsInstanceOf<SingletonModule>(modules[4]);
-            Assert.IsInstanceOf<ConstructModule>(modules[5]);
-            Assert.IsInstanceOf<FactoryModule>(modules[6]);
-            Assert.IsInstanceOf<ScaffoldModule>(modules[7]);
+            Assert.AreEqual(9, modules.Count);
+            Assert.IsInstanceOf<LogModule>(modules[0]);
+            Assert.IsInstanceOf<MemoryModule>(modules[1]);
+            Assert.IsInstanceOf<PoolModule>(modules[2]);
+            Assert.IsInstanceOf<TranslationModule>(modules[3]);
+            Assert.IsInstanceOf<InstanceModule>(modules[4]);
+            Assert.IsInstanceOf<SingletonModule>(modules[5]);
+            Assert.IsInstanceOf<ConstructModule>(modules[6]);
+            Assert.IsInstanceOf<FactoryModule>(modules[7]);
+            Assert.IsInstanceOf<ScaffoldModule>(modules[8]);
         }
 
         [Test]

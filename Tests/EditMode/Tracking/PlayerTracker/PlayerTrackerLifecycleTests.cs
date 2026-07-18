@@ -79,7 +79,7 @@ namespace Tsvrc.Tests.EditMode
             tracker.StartPlayerTracking(new[] { "A" });
             Assert.AreEqual(1, tracker.OnTrackingStartedCount);
 
-            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is already running.");
+            LogAssert.Expect(LogType.Warning, "[PlayerTrackerTestSubclass] Process is already running.");
             tracker.StartPlayerTracking(new[] { "Z", "Y" });
 
             Assert.AreEqual(1, tracker.OnTrackingStartedCount, "A second call while running must not restart tracking.");

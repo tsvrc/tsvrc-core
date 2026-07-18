@@ -1,5 +1,7 @@
 using Tsvrc.Core.Generated;
+using Tsvrc.Utils;
 using UdonSharp;
+using UnityEngine;
 
 namespace Tsvrc.Core
 {
@@ -124,6 +126,46 @@ namespace Tsvrc.Core
         public virtual void TsDestroy()
         {
             Destroy(gameObject);
+        }
+
+        /// <summary>
+        /// Logs an informational message via <c>_ts.Log</c>, tagged with this behaviour's
+        /// class name (via <see cref="UdonSharpBehaviour.GetUdonTypeName"/>) and this instance
+        /// as the click-to-select console context. No-op when Info logging is disabled.
+        /// Falls back to <see cref="Debug.Log(object, UnityEngine.Object)"/> directly, with the
+        /// same tag, if called before <see cref="TsConstruct(TsRoot)"/> has wired up <c>_ts</c>.
+        /// </summary>
+        protected void LogInfo(string message)
+        {
+            TsLogger log = _ts != null ? _ts.Log : null;
+            if (log != null) { log.Info(GetUdonTypeName(), message, this); return; }
+            Debug.Log(TsLogger.Format(GetUdonTypeName(), message), this);
+        }
+
+        /// <summary>
+        /// Logs a warning via <c>_ts.Log</c>, tagged with this behaviour's class name (via
+        /// <see cref="UdonSharpBehaviour.GetUdonTypeName"/>) and this instance as the
+        /// click-to-select console context. Falls back to <see cref="Debug.LogWarning(object, UnityEngine.Object)"/>
+        /// directly, with the same tag, if called before <see cref="TsConstruct(TsRoot)"/> has wired up <c>_ts</c>.
+        /// </summary>
+        protected void LogWarning(string message)
+        {
+            TsLogger log = _ts != null ? _ts.Log : null;
+            if (log != null) { log.Warning(GetUdonTypeName(), message, this); return; }
+            Debug.LogWarning(TsLogger.Format(GetUdonTypeName(), message), this);
+        }
+
+        /// <summary>
+        /// Logs an error via <c>_ts.Log</c>, tagged with this behaviour's class name (via
+        /// <see cref="UdonSharpBehaviour.GetUdonTypeName"/>) and this instance as the
+        /// click-to-select console context. Falls back to <see cref="Debug.LogError(object, UnityEngine.Object)"/>
+        /// directly, with the same tag, if called before <see cref="TsConstruct(TsRoot)"/> has wired up <c>_ts</c>.
+        /// </summary>
+        protected void LogError(string message)
+        {
+            TsLogger log = _ts != null ? _ts.Log : null;
+            if (log != null) { log.Error(GetUdonTypeName(), message, this); return; }
+            Debug.LogError(TsLogger.Format(GetUdonTypeName(), message), this);
         }
 
         protected virtual void TsStart() { }

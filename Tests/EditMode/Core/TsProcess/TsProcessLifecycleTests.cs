@@ -68,7 +68,7 @@ namespace Tsvrc.Tests.EditMode
             process.StartProcess();
             Assert.AreEqual(1, process.OnProcessStartedCount);
 
-            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is already running.");
+            LogAssert.Expect(LogType.Warning, "[TsProcessTestSubclass] Process is already running.");
             process.StartProcess();
 
             Assert.AreEqual(1, process.OnProcessStartedCount);
@@ -122,7 +122,7 @@ namespace Tsvrc.Tests.EditMode
             var process = CreateProcess<TsProcessTestSubclass>();
             SeedAsOwner(process);
 
-            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is not running.");
+            LogAssert.Expect(LogType.Warning, "[TsProcessTestSubclass] Process is not running.");
             process.StopProcess();
 
             Assert.AreEqual(0, process.OnProcessStoppedCount);
@@ -161,7 +161,7 @@ namespace Tsvrc.Tests.EditMode
             var process = CreateProcess<TsProcessTestSubclass>();
             SeedAsOwner(process);
 
-            LogAssert.Expect(LogType.Warning, "[TsProcess] Process is not running.");
+            LogAssert.Expect(LogType.Warning, "[TsProcessTestSubclass] Process is not running.");
             process.CompleteProcess();
 
             Assert.AreEqual(0, process.OnProcessCompletedCount);

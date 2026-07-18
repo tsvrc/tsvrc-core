@@ -29,7 +29,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var chunker = CreateProcess<DataChunkerTestSubclass>();
 
-            LogAssert.Expect(LogType.Warning, "[DataChunker] Cannot send empty message");
+            LogAssert.Expect(LogType.Warning, "[DataChunkerTestSubclass] Cannot send empty message");
             Assert.IsFalse(chunker.InvokeValidateMessage(null));
         }
 
@@ -38,7 +38,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var chunker = CreateProcess<DataChunkerTestSubclass>();
 
-            LogAssert.Expect(LogType.Warning, "[DataChunker] Cannot send empty message");
+            LogAssert.Expect(LogType.Warning, "[DataChunkerTestSubclass] Cannot send empty message");
             Assert.IsFalse(chunker.InvokeValidateMessage(""));
         }
 
@@ -65,7 +65,7 @@ namespace Tsvrc.Tests.EditMode
             var chunker = CreateProcess<DataChunkerTestSubclass>();
             string message = BuildString(DataChunkerTestSubclass.MaxMessageSizeConst + 1);
 
-            LogAssert.Expect(LogType.Error, $"[DataChunker] Message too large: {message.Length} chars (max {DataChunkerTestSubclass.MaxMessageSizeConst})");
+            LogAssert.Expect(LogType.Error, $"[DataChunkerTestSubclass] Message too large: {message.Length} chars (max {DataChunkerTestSubclass.MaxMessageSizeConst})");
             Assert.IsFalse(chunker.InvokeValidateMessage(message));
         }
 

@@ -1,7 +1,6 @@
 using Tsvrc.Player;
 using Tsvrc.Utils;
 using UdonSharp;
-using UnityEngine;
 using VRC.SDKBase;
 
 namespace Tsvrc.DataTransfer
@@ -262,14 +261,14 @@ namespace Tsvrc.DataTransfer
         {
             if (IsProcessRunning() || _pendingNextChunk)
             {
-                Debug.LogWarning("[TsDataSender] Transfer already in progress. Call CancelDataTransfer() first.");
+                LogWarning("Transfer already in progress. Call CancelDataTransfer() first.");
                 return;
             }
 
             // An empty player list would stall the process permanently with no way to complete.
             if (playerIds == null || playerIds.Length == 0)
             {
-                Debug.LogWarning("[TsDataSender] Cannot transfer to null or empty player list.");
+                LogWarning("Cannot transfer to null or empty player list.");
                 return;
             }
 
@@ -297,7 +296,7 @@ namespace Tsvrc.DataTransfer
         {
             if (_currentChunkIndex > 0)
             {
-                Debug.LogWarning("[TsDataSender] Cannot add tracked players while a transfer is in progress.");
+                LogWarning("Cannot add tracked players while a transfer is in progress.");
                 return false;
             }
 

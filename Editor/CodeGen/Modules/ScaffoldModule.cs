@@ -49,6 +49,7 @@ namespace {CompiledNamespace}
     {{
         void Start()
         {{
+            _TsLogStart();
             _TsMemoryStart();
             _TsSingletonStart();
             _TsPoolStart();

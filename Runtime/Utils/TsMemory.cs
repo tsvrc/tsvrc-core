@@ -1,6 +1,5 @@
 using Tsvrc.Core;
 using UdonSharp;
-using UnityEngine;
 using VRC.SDK3.Data;
 using VRC.SDK3.Persistence;
 using VRC.SDKBase;
@@ -79,19 +78,19 @@ namespace Tsvrc.Utils
         {
             if (_registry.ContainsKey(key))
             {
-                Debug.LogError($"[TsMemory] Key '{key}' is already registered.");
+                LogError($"Key '{key}' is already registered.");
                 return;
             }
 
             if (persist && synced)
             {
-                Debug.LogError($"[TsMemory] Key '{key}': persist and synced are mutually exclusive.");
+                LogError($"Key '{key}': persist and synced are mutually exclusive.");
                 return;
             }
 
             if (!persist && !synced)
             {
-                Debug.LogError($"[TsMemory] Key '{key}': Register called with no tier. Unregistered keys are already ephemeral.");
+                LogError($"Key '{key}': Register called with no tier. Unregistered keys are already ephemeral.");
                 return;
             }
 
@@ -133,7 +132,7 @@ namespace Tsvrc.Utils
             if (store.ContainsKey(key))
             {
                 if (!_IsSynced(flags))
-                    Debug.LogError($"[TsMemory] Key '{key}' already exists. Use Set to overwrite.");
+                    LogError($"Key '{key}' already exists. Use Set to overwrite.");
                 return;
             }
             store[key] = value;
@@ -198,7 +197,7 @@ namespace Tsvrc.Utils
             }
 
             if (_IsPersist(flags) && _persistStore.ContainsKey(key))
-                Debug.LogWarning($"[TsMemory] '{key}' is persistent. PlayerData cannot be deleted; local cache cleared.");
+                LogWarning($"'{key}' is persistent. PlayerData cannot be deleted; local cache cleared.");
 
             _Store(flags).Remove(key);
             _types.Remove(key);
@@ -258,7 +257,7 @@ namespace Tsvrc.Utils
 
                 if (!_types.ContainsKey(key))
                 {
-                    Debug.LogWarning($"[TsMemory] Cannot restore '{key}' from PlayerData: type unknown. Call Add or Set before OnPlayerRestored.");
+                    LogWarning($"Cannot restore '{key}' from PlayerData: type unknown. Call Add or Set before OnPlayerRestored.");
                     continue;
                 }
 
@@ -308,7 +307,7 @@ namespace Tsvrc.Utils
         {
             if (!_playerRestored)
             {
-                Debug.LogWarning($"[TsMemory] Set('{key}') before OnPlayerRestored. Value will not be saved to PlayerData.");
+                LogWarning($"Set('{key}') before OnPlayerRestored. Value will not be saved to PlayerData.");
                 return;
             }
             switch ((int)_types[key].Double)
