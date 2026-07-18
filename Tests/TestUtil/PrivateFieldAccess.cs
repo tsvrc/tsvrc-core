@@ -2,7 +2,7 @@ using System;
 using System.Reflection;
 using NUnit.Framework;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     // Shared reflection helpers for poking private fields/methods on production
     // instances and static types from tests, across every test assembly (Edit Mode,

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Tsvrc.Core;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     // TsProcess carries [UdonBehaviourSyncMode], and AddComponent() silently
     // returns null for a script with that attribute when it's defined in an

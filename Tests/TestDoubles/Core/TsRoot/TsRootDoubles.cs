@@ -2,7 +2,7 @@ using Tsvrc.Core;
 using Tsvrc.Core.Generated;
 using Tsvrc.Utils;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     // TestTsRoot (Tests/TestDoubles/Core/TsBehaviour/TsBehaviourDoubles.cs)
     // already covers the no-override case (both Instance/Memory stay null) and is

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Tsvrc.Session;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     // RankedGameSession carries [UdonBehaviourSyncMode], so this double lives in
     // Tsvrc.Tests.Doubles for the same reason PlayerTrackerTestSubclass/

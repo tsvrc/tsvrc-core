@@ -3,12 +3,12 @@ using Tsvrc.Core;
 using Tsvrc.StateMachine;
 using UnityEngine;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     // Plain (non-UdonSharp) MonoBehaviour test doubles carrying [WirePool] fields in every
     // shape PoolModule.ScanExternalRefs()/ScanInternalDeps() need to discriminate: public,
     // serialized-private, non-serialized-private (excluded), array (excluded), and generic
-    // (excluded). Live in their own Tsvrc.Tests.Doubles asmdef (not Tsvrc.Tests.Editor,
+    // (excluded). Live in their own Tsvrc.Tests.Doubles asmdef (not Tsvrc.Tests.EditMode,
     // which is Editor-platform-restricted) because AddComponent() refuses to attach an
     // Editor-only script to a real scene GameObject.
     public class PoolWireTargetDouble : MonoBehaviour

@@ -1,7 +1,7 @@
 using Tsvrc.UI;
 using VRC.SDK3.Data;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     public class TsListItemTestSubclass : TsListItem
     {

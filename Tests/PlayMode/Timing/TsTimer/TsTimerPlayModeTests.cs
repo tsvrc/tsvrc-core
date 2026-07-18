@@ -3,7 +3,7 @@ using NUnit.Framework;
 using Tsvrc.Core;
 using Tsvrc.Core.Generated;
 using Tsvrc.Player;
-using Tsvrc.Tests.Editor;
+using Tsvrc.Tests.EditMode;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VRC.SDK3.ClientSim;

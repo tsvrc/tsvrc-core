@@ -3,7 +3,7 @@ using Tsvrc.Core;
 using Tsvrc.Core.Generated;
 using UdonSharp;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     // TsRoot is abstract with only two virtual properties (Instance/Memory), both
     // null by default. Neither TsBehaviour nor TsProcess dereferences them, so a

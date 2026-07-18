@@ -1,0 +1,36 @@
+{
+    "name": "Tsvrc.Tests.EditMode",
+    "rootNamespace": "Tsvrc.Tests.EditMode",
+    "references": [
+        "UnityEngine.TestRunner",
+        "Tsvrc.Runtime",
+        "Tsvrc.Editor",
+        "Tsvrc.Tests.Doubles",
+        "Tsvrc.Tests.TestUtil",
+        "UdonSharp.Runtime",
+        "UdonSharp.Editor",
+        "Unity.TextMeshPro",
+        "VRC.SDKBase",
+        "VRC.SDK3",
+        "VRC.Udon",
+        "VRC.Udon.Editor",
+        "GUID:21332e1f0d937794d916d2402ba1943a"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll",
+        "VRCSDKBase-Editor.dll",
+        "VRCSDK3.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

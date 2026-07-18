@@ -1,5 +1,5 @@
 using System.Collections;
-using Tsvrc.Tests.Editor;
+using Tsvrc.Tests.EditMode;
 using UnityEngine;
 using UnityEngine.TestTools;
 

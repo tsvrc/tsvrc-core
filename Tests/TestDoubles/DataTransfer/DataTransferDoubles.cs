@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Tsvrc.DataTransfer;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     // One test subclass per layer of the DataTransferer chain (DataChunker : ReadyCheckProcess :
     // PlayerTracker : TsProcess): lower classes get focused tests through their own type,

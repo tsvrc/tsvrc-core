@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Tsvrc.Timing;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     // TsTimer carries TsProcess's [UdonBehaviourSyncMode] attribute, so this double
     // lives in Tsvrc.Tests.Doubles for the same reason PlayerTrackerTestSubclass/

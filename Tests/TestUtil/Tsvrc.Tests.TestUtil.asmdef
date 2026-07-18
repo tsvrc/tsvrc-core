@@ -1,6 +1,6 @@
 {
     "name": "Tsvrc.Tests.TestUtil",
-    "rootNamespace": "Tsvrc.Tests.Editor",
+    "rootNamespace": "Tsvrc.Tests.EditMode",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],

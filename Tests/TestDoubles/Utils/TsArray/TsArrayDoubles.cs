@@ -1,6 +1,6 @@
 using UdonSharp;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     // Plain UdonSharpBehaviour with no behavior of its own; used purely as a reference-typed
     // element for the UdonSharpBehaviour[] overloads of TsArray.

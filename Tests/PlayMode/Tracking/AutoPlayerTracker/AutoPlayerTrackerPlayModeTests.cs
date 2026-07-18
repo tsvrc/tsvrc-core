@@ -2,7 +2,7 @@ using System.Collections;
 using NUnit.Framework;
 using Tsvrc.Core.Generated;
 using Tsvrc.Player;
-using Tsvrc.Tests.Editor;
+using Tsvrc.Tests.EditMode;
 using Tsvrc.Tracking;
 using UnityEngine;
 using UnityEngine.TestTools;

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Tsvrc.Tracking;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     // PlayerTracker inherits TsProcess's [UdonBehaviourSyncMode] attribute, so this
     // double lives in Tsvrc.Tests.Doubles for the same reason TsProcessTestSubclass

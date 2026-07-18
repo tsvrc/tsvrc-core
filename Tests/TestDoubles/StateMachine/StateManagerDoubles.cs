@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Tsvrc.StateMachine;
 using UdonSharp;
 
-namespace Tsvrc.Tests.Editor
+namespace Tsvrc.Tests.EditMode
 {
     // Records every OnStateChanged(oldState, newState) call in arrival order, so tests
     // can assert both the values passed and that it fires before TsEmit/enter dispatch.
