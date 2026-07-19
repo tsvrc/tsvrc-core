@@ -8,6 +8,8 @@ namespace Tsvrc.UI
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class TsList : TsBehaviour
     {
+        protected override bool IsTsvrcInternal => true;
+
         public const string OnItemSelectedEvent = "OnItemSelected";
         protected const int STATE_LOADING = 0;
         protected const int STATE_EMPTY = 1;

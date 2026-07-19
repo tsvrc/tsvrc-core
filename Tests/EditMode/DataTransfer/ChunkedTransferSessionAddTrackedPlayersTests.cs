@@ -19,7 +19,7 @@ namespace Tsvrc.Tests.EditMode
             session.TransferData("hello", new[] { "TestOwner#" + OwnerPlayerId }); // chunk 1 actively in flight
             Assert.IsTrue(session.IsProcessRunning());
 
-            LogAssert.Expect(LogType.Warning, "[ChunkedTransferSessionTestSubclass] Cannot add tracked players while a transfer is in progress.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [ChunkedTransferSessionTestSubclass] Cannot add tracked players while a transfer is in progress.");
             session.AddTrackedPlayers(new[] { "LateJoiner#5" });
 
             CollectionAssert.DoesNotContain(GetTrackedPlayerIds(session), "LateJoiner#5");
@@ -34,7 +34,7 @@ namespace Tsvrc.Tests.EditMode
             var session = CreateProcess<ChunkedTransferSessionTestSubclass>();
             SeedAsOwner(session);
             session.TransferData("hello", new[] { "TestOwner#" + OwnerPlayerId });
-            LogAssert.Expect(LogType.Warning, "[ChunkedTransferSessionTestSubclass] Cannot add tracked players while a transfer is in progress.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [ChunkedTransferSessionTestSubclass] Cannot add tracked players while a transfer is in progress.");
             session.AddTrackedPlayers(new[] { "LateJoiner#5" });
 
             session.SetReady(); // the original owner's own ack
@@ -76,7 +76,7 @@ namespace Tsvrc.Tests.EditMode
             session.TransferData("hello", new[] { "TestOwner#" + OwnerPlayerId }); // chunk 1 actively in flight
             Assert.IsTrue(session.IsProcessRunning());
 
-            LogAssert.Expect(LogType.Warning, "[ChunkedTransferSessionTestSubclass] Cannot add tracked players while a transfer is in progress.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [ChunkedTransferSessionTestSubclass] Cannot add tracked players while a transfer is in progress.");
             session.BroadcastAddTrackedPlayers(new[] { "LateJoiner#5" });
 
             CollectionAssert.DoesNotContain(GetTrackedPlayerIds(session), "LateJoiner#5");

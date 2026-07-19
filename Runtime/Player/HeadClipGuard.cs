@@ -33,6 +33,8 @@ namespace Tsvrc.Player
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class HeadClipGuard : TsBehaviour
     {
+        protected override bool IsTsvrcInternal => true;
+
         [Header("Configuration")]
         [SerializeField, Tooltip("Margin (metres) added to solid OBB half-extents. Keeps the head a small distance from the wall surface and prevents jitter at grazing incidence.")]
         private float _margin = 0.05f;

@@ -12,6 +12,8 @@ namespace Tsvrc.UI
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class TsListItem : TsBehaviour
     {
+        protected override bool IsTsvrcInternal => true;
+
         protected TsList _list = null;
         protected DataDictionary _itemData = null;
         protected int _dataIndex = -1;
@@ -19,8 +21,6 @@ namespace Tsvrc.UI
 
         public int DataIndex => _dataIndex;
         public bool IsBound => _isBound;
-
-        #region Binding
 
         /// <summary>Called by <see cref="TsList"/> when this item enters the viewport.</summary>
         public void Bind(TsList list, int dataIndex, DataDictionary data)
@@ -42,17 +42,11 @@ namespace Tsvrc.UI
             _list = null;
         }
 
-        #endregion
-
-        #region Overrideable
-
         /// <summary>Override to populate UI children from <see cref="_itemData"/>.</summary>
         protected virtual void _OnBind() { }
 
         /// <summary>Override to clear UI children. <see cref="_itemData"/> and <see cref="_dataIndex"/> are still valid here.</summary>
         protected virtual void _OnUnbind() { }
-
-        #endregion
 
         /// <summary>Wire to a Button.onClick. Emits "OnItemSelected" on the owning list.</summary>
         public void _OnItemPressed()

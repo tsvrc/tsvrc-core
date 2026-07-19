@@ -105,7 +105,7 @@ namespace Tsvrc.Tests.EditMode
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
 
-            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] StartSession: session is already running.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] StartSession: session is already running.");
             h.Session.StartSession();
 
             Assert.AreEqual(1, h.Session.OnSessionLoadingCount);
@@ -114,15 +114,14 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void StartSession_EmptyLobby_LogsErrorAndNoOps()
         {
-            // Regression test for the fix: starting a ready check with zero tracked
-            // players would otherwise leave the session stuck in Loading forever,
-            // since ReadyCheckProcess.CheckAllPlayersReady never auto-completes with
-            // no tracked players.
+            // Starting a ready check with zero tracked players would otherwise leave the
+            // session stuck in Loading forever, since ReadyCheckProcess.CheckAllPlayersReady
+            // never auto-completes with no tracked players.
             var h = CreateWiredSession();
             SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
 
-            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] StartSession: lobby is empty.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] StartSession: lobby is empty.");
             h.Session.StartSession();
 
             Assert.AreEqual(RankedGameSessionState.Idle, h.Session.CurrentState);
@@ -149,7 +148,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var h = CreateWiredSession();
 
-            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] StopSession: no session is running.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] StopSession: no session is running.");
             h.Session.StopSession();
 
             Assert.AreEqual(0, h.Session.OnSessionStoppedCount);

@@ -10,45 +10,102 @@ namespace Tsvrc.Utils
     /// wrappers, which supply the tag and context automatically.
     /// </summary>
     /// <remarks>
-    /// Every message is formatted as <c>[tag] message</c>. <b>Warning and Error always fire</b> -
-    /// only <see cref="Info"/> is gated by <see cref="InfoEnabled"/>, matching the convention that
-    /// diagnostics you can silence are never the ones that indicate something actually went wrong.
-    /// The <see cref="InfoEnabled"/> check runs before any string formatting, so a disabled Info
-    /// call costs a single branch, never an allocation.
+    /// Format: <c>[TsVRC] [prefix] [tag] message</c>. <c>TsVRC</c> (<see cref="FrameworkTag"/>) is
+    /// fixed and internal-only, never configurable; <c>prefix</c> is each world's own optional
+    /// <see cref="Prefix"/> (omitted when empty); <c>tag</c> is the logging class's name.
+    /// Info/Warning/Error are each independently toggleable for Tsvrc Internal vs Your World
+    /// (<see cref="TsBehaviour.IsTsvrcInternal"/>), all six defaulting to <c>true</c> - configure
+    /// via Tsvrc &gt; Configure &gt; Logging or directly on this component.
     /// </remarks>
     public class TsLogger : TsBehaviour
     {
-        [Tooltip("When disabled, Info() calls are skipped entirely (no formatting, no Debug.Log). Warning and Error are never gated.")]
-        [SerializeField] private bool _infoEnabled = true;
+        protected override bool IsTsvrcInternal => true;
 
-        /// <summary>Enables or disables <see cref="Info"/> logging at runtime.</summary>
-        public bool InfoEnabled
+        // Fixed, internal-only - identifies Tsvrc itself in every message. Also used directly
+        // by TsBehaviour's fallback path and TsJson, which have no Prefix to read.
+        internal const string FrameworkTag = "TsVRC";
+
+        [Tooltip("Optional project-specific tag shown after [TsVRC], e.g. \"SomeWorld\" -> \"[TsVRC] [SomeWorld] [ClassName] message\". Leave empty to omit.")]
+        [SerializeField] private string _prefix = "";
+
+        [Header("Tsvrc Internal")]
+        [Tooltip("Shows/hides Info-level logs from the Tsvrc framework's own classes (TsMemory, TsProcess, etc.).")]
+        [SerializeField] private bool _internalInfoEnabled = true;
+        [Tooltip("Shows/hides Warning-level logs from the Tsvrc framework's own classes.")]
+        [SerializeField] private bool _internalWarningEnabled = true;
+        [Tooltip("Shows/hides Error-level logs from the Tsvrc framework's own classes.")]
+        [SerializeField] private bool _internalErrorEnabled = true;
+
+        [Header("Your World")]
+        [Tooltip("Shows/hides Info-level logs from your own world's scripts.")]
+        [SerializeField] private bool _worldInfoEnabled = true;
+        [Tooltip("Shows/hides Warning-level logs from your own world's scripts.")]
+        [SerializeField] private bool _worldWarningEnabled = true;
+        [Tooltip("Shows/hides Error-level logs from your own world's scripts.")]
+        [SerializeField] private bool _worldErrorEnabled = true;
+
+        /// <summary>
+        /// This project's optional tag, shown after the always-present <see cref="FrameworkTag"/>.
+        /// Empty by default; set to your world/product's name if you want it in every log line.
+        /// </summary>
+        public string Prefix
         {
-            get => _infoEnabled;
-            set => _infoEnabled = value;
+            get => _prefix;
+            set => _prefix = value;
         }
 
-        /// <summary>Logs an informational message. No-op when <see cref="InfoEnabled"/> is <c>false</c>.</summary>
-        public void Info(string tag, string message, UdonSharpBehaviour context = null)
+        /// <summary>Shows/hides Info-level logs from the Tsvrc framework's own classes.</summary>
+        public bool InternalInfoEnabled { get => _internalInfoEnabled; set => _internalInfoEnabled = value; }
+        /// <summary>Shows/hides Warning-level logs from the Tsvrc framework's own classes.</summary>
+        public bool InternalWarningEnabled { get => _internalWarningEnabled; set => _internalWarningEnabled = value; }
+        /// <summary>Shows/hides Error-level logs from the Tsvrc framework's own classes.</summary>
+        public bool InternalErrorEnabled { get => _internalErrorEnabled; set => _internalErrorEnabled = value; }
+
+        /// <summary>Shows/hides Info-level logs from your own world's scripts.</summary>
+        public bool WorldInfoEnabled { get => _worldInfoEnabled; set => _worldInfoEnabled = value; }
+        /// <summary>Shows/hides Warning-level logs from your own world's scripts.</summary>
+        public bool WorldWarningEnabled { get => _worldWarningEnabled; set => _worldWarningEnabled = value; }
+        /// <summary>Shows/hides Error-level logs from your own world's scripts.</summary>
+        public bool WorldErrorEnabled { get => _worldErrorEnabled; set => _worldErrorEnabled = value; }
+
+        /// <summary>
+        /// Logs an informational message. <paramref name="isInternal"/> selects which of
+        /// <see cref="InternalInfoEnabled"/>/<see cref="WorldInfoEnabled"/> gates it; defaults to
+        /// <c>false</c> (world) for direct calls not routed through a <see cref="TsBehaviour"/>.
+        /// </summary>
+        public void Info(string tag, string message, bool isInternal = false, UdonSharpBehaviour context = null)
         {
-            if (!_infoEnabled) return;
-            Debug.Log(Format(tag, message), context);
+            if (!(isInternal ? _internalInfoEnabled : _worldInfoEnabled)) return;
+            Debug.Log(Format(_prefix, tag, message), context);
         }
 
-        /// <summary>Logs a warning. Always fires, regardless of <see cref="InfoEnabled"/>.</summary>
-        public void Warning(string tag, string message, UdonSharpBehaviour context = null)
+        /// <summary>
+        /// Logs a warning. <paramref name="isInternal"/> selects which of
+        /// <see cref="InternalWarningEnabled"/>/<see cref="WorldWarningEnabled"/> gates it;
+        /// defaults to <c>false</c> (world) for direct calls not routed through a <see cref="TsBehaviour"/>.
+        /// </summary>
+        public void Warning(string tag, string message, bool isInternal = false, UdonSharpBehaviour context = null)
         {
-            Debug.LogWarning(Format(tag, message), context);
+            if (!(isInternal ? _internalWarningEnabled : _worldWarningEnabled)) return;
+            Debug.LogWarning(Format(_prefix, tag, message), context);
         }
 
-        /// <summary>Logs an error. Always fires, regardless of <see cref="InfoEnabled"/>.</summary>
-        public void Error(string tag, string message, UdonSharpBehaviour context = null)
+        /// <summary>
+        /// Logs an error. <paramref name="isInternal"/> selects which of
+        /// <see cref="InternalErrorEnabled"/>/<see cref="WorldErrorEnabled"/> gates it; defaults
+        /// to <c>false</c> (world) for direct calls not routed through a <see cref="TsBehaviour"/>.
+        /// </summary>
+        public void Error(string tag, string message, bool isInternal = false, UdonSharpBehaviour context = null)
         {
-            Debug.LogError(Format(tag, message), context);
+            if (!(isInternal ? _internalErrorEnabled : _worldErrorEnabled)) return;
+            Debug.LogError(Format(_prefix, tag, message), context);
         }
 
-        // Internal so TsBehaviour's fallback path (used when _ts/_ts.Log is not yet wired,
-        // e.g. before TsConstruct) can format identically without duplicating the format string.
-        internal static string Format(string tag, string message) => $"[{tag}] {message}";
+        // Internal so TsBehaviour's fallback path can format identically without duplicating the format string.
+        // prefix may be null/empty - the optional project tag is simply omitted in that case.
+        internal static string Format(string prefix, string tag, string message) =>
+            string.IsNullOrEmpty(prefix)
+                ? $"[{FrameworkTag}] [{tag}] {message}"
+                : $"[{FrameworkTag}] [{prefix}] [{tag}] {message}";
     }
 }

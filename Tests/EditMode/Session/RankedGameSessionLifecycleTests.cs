@@ -158,7 +158,7 @@ namespace Tsvrc.Tests.EditMode
             // A late-arriving "all players left" notification for the same now-idle
             // session must not fire a second OnSessionEnded. _EndSession's own guard
             // rejects it, logging the same error every other rejected call site does.
-            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] _EndSession: session is not in game state.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] _EndSession: session is not in game state.");
             h.Session._OnGamePlayersRemoved();
 
             Assert.AreEqual(1, h.Session.OnSessionEndedCount);

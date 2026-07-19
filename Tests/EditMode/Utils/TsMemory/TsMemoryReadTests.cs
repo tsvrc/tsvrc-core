@@ -221,7 +221,7 @@ namespace Tsvrc.Tests.EditMode
             // _Store(flags) to the persist tier.
             TsMemory memory = CreateMemory();
             memory.Register("k", true, false);
-            UnityEngine.TestTools.LogAssert.Expect(LogType.Warning, "[TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
             memory.Set("k", new DataToken(9.0d));
 
             Assert.AreEqual(9, memory.GetInt("k"));
@@ -255,7 +255,7 @@ namespace Tsvrc.Tests.EditMode
         {
             TsMemory memory = CreateMemory();
             memory.Register("k", true, false);
-            UnityEngine.TestTools.LogAssert.Expect(LogType.Warning, "[TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
             memory.Set("k", new DataToken("v"));
 
             Assert.AreEqual("v", memory.GetString("k"));

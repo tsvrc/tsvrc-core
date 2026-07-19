@@ -29,7 +29,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var chunker = CreateProcess<DataChunkerTestSubclass>();
 
-            LogAssert.Expect(LogType.Warning, "[DataChunkerTestSubclass] Cannot send empty message");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [DataChunkerTestSubclass] Cannot send empty message");
             Assert.IsFalse(chunker.InvokeValidateMessage(null));
         }
 
@@ -38,7 +38,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var chunker = CreateProcess<DataChunkerTestSubclass>();
 
-            LogAssert.Expect(LogType.Warning, "[DataChunkerTestSubclass] Cannot send empty message");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [DataChunkerTestSubclass] Cannot send empty message");
             Assert.IsFalse(chunker.InvokeValidateMessage(""));
         }
 
@@ -65,7 +65,7 @@ namespace Tsvrc.Tests.EditMode
             var chunker = CreateProcess<DataChunkerTestSubclass>();
             string message = BuildString(DataChunkerTestSubclass.MaxMessageSizeConst + 1);
 
-            LogAssert.Expect(LogType.Error, $"[DataChunkerTestSubclass] Message too large: {message.Length} chars (max {DataChunkerTestSubclass.MaxMessageSizeConst})");
+            LogAssert.Expect(LogType.Error, $"[TsVRC] [DataChunkerTestSubclass] Message too large: {message.Length} chars (max {DataChunkerTestSubclass.MaxMessageSizeConst})");
             Assert.IsFalse(chunker.InvokeValidateMessage(message));
         }
 
@@ -105,7 +105,7 @@ namespace Tsvrc.Tests.EditMode
         public void ExtractChunk_FullSizeChunk_ReturnsExactSlice()
         {
             var chunker = CreateProcess<DataChunkerTestSubclass>();
-            string data = BuildString(DataChunkerTestSubclass.ChunkSizeConst * 2, 'a') ;
+            string data = BuildString(DataChunkerTestSubclass.ChunkSizeConst * 2, 'a');
             // Make the two halves distinguishable.
             data = BuildString(DataChunkerTestSubclass.ChunkSizeConst, 'a') + BuildString(DataChunkerTestSubclass.ChunkSizeConst, 'b');
 

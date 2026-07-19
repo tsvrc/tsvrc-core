@@ -25,59 +25,148 @@ namespace Tsvrc.Tests.EditMode
             return go.AddComponent<TsLogger>();
         }
 
-        [Test]
-        public void InfoEnabled_DefaultsToTrue()
+        private static int CountLogMessages(System.Action act)
         {
-            Assert.IsTrue(CreateLogger().InfoEnabled);
-        }
-
-        [Test]
-        public void Info_Enabled_LogsWithTagFormat()
-        {
-            var logger = CreateLogger();
-
-            LogAssert.Expect(LogType.Log, "[MyTag] hello");
-            logger.Info("MyTag", "hello");
-        }
-
-        [Test]
-        public void Info_Disabled_DoesNotInvokeDebugLog()
-        {
-            var logger = CreateLogger();
-            logger.InfoEnabled = false;
             int callCount = 0;
             void Handler(string condition, string stackTrace, LogType type) => callCount++;
 
             Application.logMessageReceived += Handler;
-            try
-            {
-                logger.Info("MyTag", "hello");
-            }
-            finally
-            {
-                Application.logMessageReceived -= Handler;
-            }
+            try { act(); }
+            finally { Application.logMessageReceived -= Handler; }
 
-            Assert.AreEqual(0, callCount);
+            return callCount;
         }
 
         [Test]
-        public void Warning_Fires_RegardlessOfInfoEnabled()
+        public void AllSixLevelToggles_DefaultToTrue()
         {
             var logger = CreateLogger();
-            logger.InfoEnabled = false;
 
-            LogAssert.Expect(LogType.Warning, "[MyTag] careful");
+            Assert.IsTrue(logger.InternalInfoEnabled);
+            Assert.IsTrue(logger.InternalWarningEnabled);
+            Assert.IsTrue(logger.InternalErrorEnabled);
+            Assert.IsTrue(logger.WorldInfoEnabled);
+            Assert.IsTrue(logger.WorldWarningEnabled);
+            Assert.IsTrue(logger.WorldErrorEnabled);
+        }
+
+        [Test]
+        public void Prefix_DefaultsToEmpty()
+        {
+            Assert.AreEqual("", CreateLogger().Prefix);
+        }
+
+        [Test]
+        public void Info_Enabled_DefaultPrefix_LogsWithFrameworkTagAndTagFormatOnly()
+        {
+            var logger = CreateLogger();
+
+            // No project Prefix configured: the framework tag [TsVRC] still always appears,
+            // but the optional project tag is omitted entirely (no empty [] pair).
+            LogAssert.Expect(LogType.Log, "[TsVRC] [MyTag] hello");
+            logger.Info("MyTag", "hello");
+        }
+
+        [Test]
+        public void Info_CustomPrefix_LogsWithFrameworkTagThenCustomPrefix()
+        {
+            var logger = CreateLogger();
+            logger.Prefix = "MyGame";
+
+            // The hardcoded [TsVRC] framework tag always leads, even when a project sets
+            // its own Prefix - a world author's prefix never replaces or hides it.
+            LogAssert.Expect(LogType.Log, "[TsVRC] [MyGame] [MyTag] hello");
+            logger.Info("MyTag", "hello");
+        }
+
+        [Test]
+        public void Info_IsInternalDefaultsToFalse_GatedByWorldToggleNotInternal()
+        {
+            var logger = CreateLogger();
+            logger.WorldInfoEnabled = false;
+            logger.InternalInfoEnabled = true;
+
+            // A direct call with no isInternal argument is "world" by default, so disabling
+            // WorldInfoEnabled (while leaving InternalInfoEnabled on) must suppress it.
+            Assert.AreEqual(0, CountLogMessages(() => logger.Info("MyTag", "hello")));
+        }
+
+        [Test]
+        public void Info_WorldDisabled_InternalCallStillLogs()
+        {
+            var logger = CreateLogger();
+            logger.WorldInfoEnabled = false;
+            logger.InternalInfoEnabled = true;
+
+            LogAssert.Expect(LogType.Log, "[TsVRC] [MyTag] hello");
+            logger.Info("MyTag", "hello", isInternal: true);
+        }
+
+        [Test]
+        public void Info_InternalDisabled_WorldCallStillLogs()
+        {
+            var logger = CreateLogger();
+            logger.InternalInfoEnabled = false;
+            logger.WorldInfoEnabled = true;
+
+            LogAssert.Expect(LogType.Log, "[TsVRC] [MyTag] hello");
+            logger.Info("MyTag", "hello", isInternal: false);
+        }
+
+        [Test]
+        public void Info_BothInternalAndWorldDisabled_NeitherLogs()
+        {
+            var logger = CreateLogger();
+            logger.InternalInfoEnabled = false;
+            logger.WorldInfoEnabled = false;
+
+            Assert.AreEqual(0, CountLogMessages(() => logger.Info("MyTag", "internal", isInternal: true)));
+            Assert.AreEqual(0, CountLogMessages(() => logger.Info("MyTag", "world", isInternal: false)));
+        }
+
+        [Test]
+        public void Warning_InternalDisabled_InternalCallSuppressed_WorldCallStillLogs()
+        {
+            var logger = CreateLogger();
+            logger.InternalWarningEnabled = false;
+
+            Assert.AreEqual(0, CountLogMessages(() => logger.Warning("MyTag", "careful", isInternal: true)));
+
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [MyTag] careful");
+            logger.Warning("MyTag", "careful", isInternal: false);
+        }
+
+        [Test]
+        public void Error_WorldDisabled_WorldCallSuppressed_InternalCallStillLogs()
+        {
+            var logger = CreateLogger();
+            logger.WorldErrorEnabled = false;
+
+            Assert.AreEqual(0, CountLogMessages(() => logger.Error("MyTag", "broken", isInternal: false)));
+
+            LogAssert.Expect(LogType.Error, "[TsVRC] [MyTag] broken");
+            logger.Error("MyTag", "broken", isInternal: true);
+        }
+
+        [Test]
+        public void Warning_Enabled_LogsRegardlessOfInfoToggle()
+        {
+            var logger = CreateLogger();
+            logger.InternalInfoEnabled = false;
+            logger.WorldInfoEnabled = false;
+
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [MyTag] careful");
             logger.Warning("MyTag", "careful");
         }
 
         [Test]
-        public void Error_Fires_RegardlessOfInfoEnabled()
+        public void Error_Enabled_LogsRegardlessOfInfoToggle()
         {
             var logger = CreateLogger();
-            logger.InfoEnabled = false;
+            logger.InternalInfoEnabled = false;
+            logger.WorldInfoEnabled = false;
 
-            LogAssert.Expect(LogType.Error, "[MyTag] broken");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [MyTag] broken");
             logger.Error("MyTag", "broken");
         }
     }

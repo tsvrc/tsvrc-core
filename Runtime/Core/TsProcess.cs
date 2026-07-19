@@ -15,6 +15,10 @@ namespace Tsvrc.Core
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsProcess : TsBehaviour
     {
+        // Covers the entire TsProcess subtree (PlayerTracker, ReadyCheckProcess,
+        // etc) with a single override - none of them need their own.
+        protected override bool IsTsvrcInternal => true;
+
         [UdonSynced] private bool _isRunning = false;
         // The full string ID of the current process owner, formatted as "DisplayName#playerId".
         // Only used for FindPlayerByID lookups. All equality comparisons use _ownerPlayerIdInt

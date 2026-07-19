@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Tsvrc.UI;
 using UnityEngine;
@@ -60,7 +60,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var overlay = CreateProcess<TsPlayerPositionOverlay>();
 
-            LogAssert.Expect(LogType.Error, "[TsPlayerPositionOverlay] OverlayImage is not assigned.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsPlayerPositionOverlay] OverlayImage is not assigned.");
             overlay.Setup(10, 10, Vector3.zero, 1f, 1f);
 
             Assert.IsFalse(IsSetUp(overlay));
@@ -71,7 +71,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var overlay = CreateOverlay();
 
-            LogAssert.Expect(LogType.Error, "[TsPlayerPositionOverlay] Texture dimensions must be positive.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsPlayerPositionOverlay] Texture dimensions must be positive.");
             overlay.Setup(0, 10, Vector3.zero, 1f, 1f);
 
             Assert.IsFalse(IsSetUp(overlay));
@@ -82,7 +82,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var overlay = CreateOverlay();
 
-            LogAssert.Expect(LogType.Error, "[TsPlayerPositionOverlay] Texture dimensions must be positive.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsPlayerPositionOverlay] Texture dimensions must be positive.");
             overlay.Setup(10, -5, Vector3.zero, 1f, 1f);
 
             Assert.IsFalse(IsSetUp(overlay));
@@ -93,7 +93,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var overlay = CreateOverlay();
 
-            LogAssert.Expect(LogType.Error, "[TsPlayerPositionOverlay] PixelsPerUnit values must be positive.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsPlayerPositionOverlay] PixelsPerUnit values must be positive.");
             overlay.Setup(10, 10, Vector3.zero, 0f, 1f);
 
             Assert.IsFalse(IsSetUp(overlay));
@@ -104,7 +104,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var overlay = CreateOverlay();
 
-            LogAssert.Expect(LogType.Error, "[TsPlayerPositionOverlay] PixelsPerUnit values must be positive.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsPlayerPositionOverlay] PixelsPerUnit values must be positive.");
             overlay.Setup(10, 10, Vector3.zero, 1f, -2f);
 
             Assert.IsFalse(IsSetUp(overlay));
@@ -238,7 +238,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var overlay = CreateOverlay();
 
-            LogAssert.Expect(LogType.Error, "[TsPlayerPositionOverlay] Setup() must be called before StartOverlay().");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsPlayerPositionOverlay] Setup() must be called before StartOverlay().");
             overlay.StartOverlay(new[] { "A" });
 
             Assert.IsFalse(overlay.IsProcessRunning());

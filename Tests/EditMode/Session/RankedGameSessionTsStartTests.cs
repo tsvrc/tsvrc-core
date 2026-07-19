@@ -19,7 +19,7 @@ namespace Tsvrc.Tests.EditMode
             PrivateFieldAccess.SetField(session, "_completedTracker", CreateProcess<PlayerTrackerTestSubclass>());
             PrivateFieldAccess.SetField(session, "_timer", CreateProcess<TsTimerTestSubclass>());
 
-            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] _lobbyTracker is not assigned. Try regenerating TsVRC.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] _lobbyTracker is not assigned. Try regenerating TsVRC.");
             session.TsConstruct(new TestTsRoot());
         }
 
@@ -33,7 +33,7 @@ namespace Tsvrc.Tests.EditMode
             PrivateFieldAccess.SetField(session, "_completedTracker", CreateProcess<PlayerTrackerTestSubclass>());
             PrivateFieldAccess.SetField(session, "_timer", CreateProcess<TsTimerTestSubclass>());
 
-            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] _readyCheck is not assigned. Try regenerating TsVRC.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] _readyCheck is not assigned. Try regenerating TsVRC.");
             session.TsConstruct(new TestTsRoot());
         }
 
@@ -47,7 +47,7 @@ namespace Tsvrc.Tests.EditMode
             PrivateFieldAccess.SetField(session, "_completedTracker", CreateProcess<PlayerTrackerTestSubclass>());
             PrivateFieldAccess.SetField(session, "_timer", CreateProcess<TsTimerTestSubclass>());
 
-            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] _gameTracker is not assigned. Try regenerating TsVRC.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] _gameTracker is not assigned. Try regenerating TsVRC.");
             session.TsConstruct(new TestTsRoot());
         }
 
@@ -61,7 +61,7 @@ namespace Tsvrc.Tests.EditMode
             PrivateFieldAccess.SetField(session, "_completedTracker", null);
             PrivateFieldAccess.SetField(session, "_timer", CreateProcess<TsTimerTestSubclass>());
 
-            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] _completedTracker is not assigned. Try regenerating TsVRC.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] _completedTracker is not assigned. Try regenerating TsVRC.");
             session.TsConstruct(new TestTsRoot());
         }
 
@@ -75,7 +75,7 @@ namespace Tsvrc.Tests.EditMode
             PrivateFieldAccess.SetField(session, "_completedTracker", CreateProcess<PlayerTrackerTestSubclass>());
             PrivateFieldAccess.SetField(session, "_timer", null);
 
-            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] _timer is not assigned. Try regenerating TsVRC.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] _timer is not assigned. Try regenerating TsVRC.");
             session.TsConstruct(new TestTsRoot());
         }
 

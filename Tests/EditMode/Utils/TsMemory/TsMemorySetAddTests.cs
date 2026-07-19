@@ -60,7 +60,7 @@ namespace Tsvrc.Tests.EditMode
             TsMemory memory = CreateMemory();
             memory.Register("k", true, false);
 
-            LogAssert.Expect(LogType.Warning, "[TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
             memory.Set("k", new DataToken("v"));
 
             const int TYPE_STRING = 1;
@@ -129,7 +129,7 @@ namespace Tsvrc.Tests.EditMode
             TsMemory memory = CreateMemory();
             memory.Register("k", true, false);
 
-            LogAssert.Expect(LogType.Warning, "[TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
             memory.Set("k", new DataToken("v"));
 
             Assert.IsTrue(memory.Has("k"));
@@ -200,7 +200,7 @@ namespace Tsvrc.Tests.EditMode
             TsMemory memory = CreateMemory();
             memory.Add("k", new DataToken("first"));
 
-            LogAssert.Expect(LogType.Error, "[TsMemory] Key 'k' already exists. Use Set to overwrite.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsMemory] Key 'k' already exists. Use Set to overwrite.");
             memory.Add("k", new DataToken("second"));
 
             Assert.AreEqual("first", memory.GetString("k"));
@@ -211,10 +211,10 @@ namespace Tsvrc.Tests.EditMode
         {
             TsMemory memory = CreateMemory();
             memory.Register("k", true, false);
-            LogAssert.Expect(LogType.Warning, "[TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
             memory.Set("k", new DataToken("first"));
 
-            LogAssert.Expect(LogType.Error, "[TsMemory] Key 'k' already exists. Use Set to overwrite.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsMemory] Key 'k' already exists. Use Set to overwrite.");
             memory.Add("k", new DataToken("second"));
 
             Assert.AreEqual("first", memory.GetString("k"));

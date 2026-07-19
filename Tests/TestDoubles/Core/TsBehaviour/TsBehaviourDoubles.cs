@@ -40,6 +40,18 @@ namespace Tsvrc.Tests.EditMode
         public void InvokeLogError(string message) => LogError(message);
     }
 
+    // Simulates a Tsvrc framework class (e.g. TsProcess, TsMemory) for tests that need to
+    // verify the Internal side of TsLogger's Internal/World level filtering without pulling
+    // in a real framework class.
+    public class TsInternalBehaviourTestSubclass : TsBehaviour
+    {
+        protected override bool IsTsvrcInternal => true;
+
+        public void InvokeLogInfo(string message) => LogInfo(message);
+        public void InvokeLogWarning(string message) => LogWarning(message);
+        public void InvokeLogError(string message) => LogError(message);
+    }
+
     public class TsBehaviourNoDestroySubclass : TsBehaviour
     {
         public int TsDestroyCallCount;

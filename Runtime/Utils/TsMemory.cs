@@ -28,6 +28,8 @@ namespace Tsvrc.Utils
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class TsMemory : TsBehaviour
     {
+        protected override bool IsTsvrcInternal => true;
+
         // Flag values. Stored as double in _registry to survive DataToken roundtrip.
         private const int FLAG_PERSIST = 1;
         private const int FLAG_SYNCED = 2;
@@ -65,8 +67,6 @@ namespace Tsvrc.Utils
         /// <summary>True after the local player's saved data has been loaded via <c>OnPlayerRestored</c>.</summary>
         public bool IsPlayerRestored => _playerRestored;
 
-        #region Register
-
         /// <summary>
         /// Declares the storage tier for <paramref name="key"/>. Must be called before <see cref="Add"/>.
         /// Tiers are exclusive: a key is either persistent or synced, not both.
@@ -97,10 +97,6 @@ namespace Tsvrc.Utils
             int flags = synced ? FLAG_SYNCED : FLAG_PERSIST;
             _registry[key] = new DataToken((double)flags);
         }
-
-        #endregion
-
-        #region Write
 
         /// <summary>
         /// Writes <paramref name="value"/> at <paramref name="key"/>, overwriting any existing value.
@@ -139,10 +135,6 @@ namespace Tsvrc.Utils
             _UpdateType(key, flags, value);
         }
 
-        #endregion
-
-        #region Read
-
         /// <summary>Returns true if the key has a value in its store.</summary>
         public bool Has(string key) => _Store(_Flags(key)).ContainsKey(key);
 
@@ -174,10 +166,6 @@ namespace Tsvrc.Utils
 
         /// <summary>Returns the nested <see cref="DataList"/> at <paramref name="key"/>.</summary>
         public DataList GetList(string key) => _Store(_Flags(key))[key].DataList;
-
-        #endregion
-
-        #region Manage
 
         /// <summary>
         /// Removes <paramref name="key"/> from its store.
@@ -223,10 +211,6 @@ namespace Tsvrc.Utils
             _Serialize();
         }
 
-        #endregion
-
-        #region Sync
-
         /// <summary>Event name for synced store change notifications. See class remarks for usage.</summary>
         public const string OnSyncedChangedEvent = "OnSyncedChanged";
 
@@ -264,10 +248,6 @@ namespace Tsvrc.Utils
                 _persistStore[key] = _LoadFromPd(player, key);
             }
         }
-
-        #endregion
-
-        #region Private
 
         private int _Flags(string key) =>
             _registry.ContainsKey(key) ? (int)_registry[key].Double : 0;
@@ -335,7 +315,5 @@ namespace Tsvrc.Utils
                 default: return new DataToken(PlayerData.GetDouble(player, key));
             }
         }
-
-        #endregion
     }
 }

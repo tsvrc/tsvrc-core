@@ -86,7 +86,7 @@ namespace Tsvrc.Tests.EditMode
             DataDictionary storeBefore = GetSyncedStore(memory);
             SetSyncedJson(memory, "{not valid json");
 
-            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, "[TsJson] Failed to deserialize JSON string.");
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Failed to deserialize JSON string.");
             Assert.DoesNotThrow(() => memory.OnDeserialization());
 
             Assert.AreEqual(0, listener.CallbackACount);
@@ -117,7 +117,7 @@ namespace Tsvrc.Tests.EditMode
             // VRCJson's underlying parser rejects a bare JSON scalar at the top level (only
             // object/array root values deserialize successfully), so this fails the same way
             // malformed JSON does.
-            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, "[TsJson] Failed to deserialize JSON string.");
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Failed to deserialize JSON string.");
             Assert.DoesNotThrow(() => memory.OnDeserialization());
 
             Assert.AreEqual(0, listener.CallbackACount);
@@ -131,7 +131,7 @@ namespace Tsvrc.Tests.EditMode
             memory.TsSubscribe(listener, TsMemory.OnSyncedChangedEvent, nameof(TsListenerDouble.CallbackA));
             SetSyncedJson(memory, "");
 
-            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, "[TsJson] Cannot deserialize null or empty JSON string.");
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Cannot deserialize null or empty JSON string.");
             Assert.DoesNotThrow(() => memory.OnDeserialization());
 
             Assert.AreEqual(0, listener.CallbackACount);

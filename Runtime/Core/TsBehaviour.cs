@@ -129,43 +129,58 @@ namespace Tsvrc.Core
         }
 
         /// <summary>
+        /// <c>true</c> if this class belongs to the Tsvrc framework itself, <c>false</c> for a
+        /// world's own scripts. Overridden to <c>true</c> once per framework base class (e.g.
+        /// <see cref="TsProcess"/>, <see cref="TsMemory"/>) so every subclass inherits the
+        /// correct classification automatically. Drives the Log*() methods below, which pass
+        /// this to <c>_ts.Log</c> so the "Tsvrc Internal" and "Your World" log levels configured
+        /// in Tsvrc &gt; Configure &gt; Logging can be shown/hidden independently.
+        /// </summary>
+        protected virtual bool IsTsvrcInternal => false;
+
+        /// <summary>
         /// Logs an informational message via <c>_ts.Log</c>, tagged with this behaviour's
         /// class name (via <see cref="UdonSharpBehaviour.GetUdonTypeName"/>) and this instance
-        /// as the click-to-select console context. No-op when Info logging is disabled.
-        /// Falls back to <see cref="Debug.Log(object, UnityEngine.Object)"/> directly, with the
-        /// same tag, if called before <see cref="TsConstruct(TsRoot)"/> has wired up <c>_ts</c>.
+        /// as the click-to-select console context. No-op when Info logging is disabled for
+        /// this behaviour's <see cref="IsTsvrcInternal"/> category. Falls back to
+        /// <see cref="Debug.Log(object, UnityEngine.Object)"/> directly, with the same tag and
+        /// no level filtering, if called before <see cref="TsConstruct(TsRoot)"/> has wired up <c>_ts</c>.
         /// </summary>
         protected void LogInfo(string message)
         {
             TsLogger log = _ts != null ? _ts.Log : null;
-            if (log != null) { log.Info(GetUdonTypeName(), message, this); return; }
-            Debug.Log(TsLogger.Format(GetUdonTypeName(), message), this);
+            if (log != null) { log.Info(GetUdonTypeName(), message, IsTsvrcInternal, this); return; }
+            Debug.Log(TsLogger.Format(string.Empty, GetUdonTypeName(), message), this);
         }
 
         /// <summary>
         /// Logs a warning via <c>_ts.Log</c>, tagged with this behaviour's class name (via
         /// <see cref="UdonSharpBehaviour.GetUdonTypeName"/>) and this instance as the
-        /// click-to-select console context. Falls back to <see cref="Debug.LogWarning(object, UnityEngine.Object)"/>
-        /// directly, with the same tag, if called before <see cref="TsConstruct(TsRoot)"/> has wired up <c>_ts</c>.
+        /// click-to-select console context. No-op when Warning logging is disabled for this
+        /// behaviour's <see cref="IsTsvrcInternal"/> category. Falls back to
+        /// <see cref="Debug.LogWarning(object, UnityEngine.Object)"/> directly, with the same tag
+        /// and no level filtering, if called before <see cref="TsConstruct(TsRoot)"/> has wired up <c>_ts</c>.
         /// </summary>
         protected void LogWarning(string message)
         {
             TsLogger log = _ts != null ? _ts.Log : null;
-            if (log != null) { log.Warning(GetUdonTypeName(), message, this); return; }
-            Debug.LogWarning(TsLogger.Format(GetUdonTypeName(), message), this);
+            if (log != null) { log.Warning(GetUdonTypeName(), message, IsTsvrcInternal, this); return; }
+            Debug.LogWarning(TsLogger.Format(string.Empty, GetUdonTypeName(), message), this);
         }
 
         /// <summary>
         /// Logs an error via <c>_ts.Log</c>, tagged with this behaviour's class name (via
         /// <see cref="UdonSharpBehaviour.GetUdonTypeName"/>) and this instance as the
-        /// click-to-select console context. Falls back to <see cref="Debug.LogError(object, UnityEngine.Object)"/>
-        /// directly, with the same tag, if called before <see cref="TsConstruct(TsRoot)"/> has wired up <c>_ts</c>.
+        /// click-to-select console context. No-op when Error logging is disabled for this
+        /// behaviour's <see cref="IsTsvrcInternal"/> category. Falls back to
+        /// <see cref="Debug.LogError(object, UnityEngine.Object)"/> directly, with the same tag
+        /// and no level filtering, if called before <see cref="TsConstruct(TsRoot)"/> has wired up <c>_ts</c>.
         /// </summary>
         protected void LogError(string message)
         {
             TsLogger log = _ts != null ? _ts.Log : null;
-            if (log != null) { log.Error(GetUdonTypeName(), message, this); return; }
-            Debug.LogError(TsLogger.Format(GetUdonTypeName(), message), this);
+            if (log != null) { log.Error(GetUdonTypeName(), message, IsTsvrcInternal, this); return; }
+            Debug.LogError(TsLogger.Format(string.Empty, GetUdonTypeName(), message), this);
         }
 
         protected virtual void TsStart() { }

@@ -25,7 +25,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Serialize_NullDictionary_LogsErrorAndReturnsEmptyString()
         {
-            LogAssert.Expect(LogType.Error, "[TsJson] Failed to serialize DataDictionary to JSON.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Failed to serialize DataDictionary to JSON.");
 
             string json = TsJson.Serialize(null);
 
@@ -93,7 +93,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void SerializeThenDeserialize_StringWithSpecialCharacters_RoundTrips()
         {
-            const string tricky = "quote\"back\\slash\nnewline\ttabéunicode";
+            const string tricky = "quote\"back\\slash\nnewline\ttabÃ©unicode";
             var dict = new DataDictionary();
             dict.Add("tricky", new DataToken(tricky));
 
@@ -105,7 +105,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Deserialize_NullString_LogsErrorAndReturnsNull()
         {
-            LogAssert.Expect(LogType.Error, "[TsJson] Cannot deserialize null or empty JSON string.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Cannot deserialize null or empty JSON string.");
 
             DataDictionary result = TsJson.Deserialize(null);
 
@@ -115,7 +115,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Deserialize_EmptyString_LogsErrorAndReturnsNull()
         {
-            LogAssert.Expect(LogType.Error, "[TsJson] Cannot deserialize null or empty JSON string.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Cannot deserialize null or empty JSON string.");
 
             DataDictionary result = TsJson.Deserialize(string.Empty);
 
@@ -125,7 +125,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Deserialize_MalformedJson_LogsErrorAndReturnsNull()
         {
-            LogAssert.Expect(LogType.Error, "[TsJson] Failed to deserialize JSON string to DataDictionary.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Failed to deserialize JSON string to DataDictionary.");
 
             DataDictionary result = TsJson.Deserialize("{not valid json");
 
@@ -135,7 +135,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Deserialize_ValidJsonButNotADictionary_LogsErrorAndReturnsNull()
         {
-            LogAssert.Expect(LogType.Error, "[TsJson] Deserialized JSON is not a DataDictionary.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Deserialized JSON is not a DataDictionary.");
 
             DataDictionary result = TsJson.Deserialize("[1,2,3]");
 
@@ -148,7 +148,7 @@ namespace Tsvrc.Tests.EditMode
             // VRCJson requires an object or array at the top level; a bare scalar fails to
             // parse at all (VRCJson.TryDeserializeFromJson returns false), rather than
             // succeeding with a non-dictionary token.
-            LogAssert.Expect(LogType.Error, "[TsJson] Failed to deserialize JSON string to DataDictionary.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Failed to deserialize JSON string to DataDictionary.");
 
             DataDictionary result = TsJson.Deserialize("5");
 
@@ -160,8 +160,8 @@ namespace Tsvrc.Tests.EditMode
         {
             // string.IsNullOrEmpty(" ") is false, so whitespace-only input skips the
             // "cannot deserialize null or empty" guard and falls through to VRCJson,
-            // which fails to parse it — a different error message than the empty-string case.
-            LogAssert.Expect(LogType.Error, "[TsJson] Failed to deserialize JSON string to DataDictionary.");
+            // which fails to parse it â€” a different error message than the empty-string case.
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Failed to deserialize JSON string to DataDictionary.");
 
             DataDictionary result = TsJson.Deserialize("   ");
 
@@ -205,7 +205,7 @@ namespace Tsvrc.Tests.EditMode
         {
             // Same VRCJson top-level restriction as Deserialize: a bare scalar is not
             // accepted at the top level, so this fails to parse entirely.
-            LogAssert.Expect(LogType.Error, "[TsJson] Failed to deserialize JSON string.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Failed to deserialize JSON string.");
 
             DataToken token = TsJson.DeserializeToken("5");
 
@@ -254,7 +254,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void DeserializeToken_NullString_LogsErrorAndReturnsDefaultToken()
         {
-            LogAssert.Expect(LogType.Error, "[TsJson] Cannot deserialize null or empty JSON string.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Cannot deserialize null or empty JSON string.");
 
             DataToken token = TsJson.DeserializeToken(null);
 
@@ -264,7 +264,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void DeserializeToken_EmptyString_LogsErrorAndReturnsDefaultToken()
         {
-            LogAssert.Expect(LogType.Error, "[TsJson] Cannot deserialize null or empty JSON string.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Cannot deserialize null or empty JSON string.");
 
             DataToken token = TsJson.DeserializeToken(string.Empty);
 
@@ -274,7 +274,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void DeserializeToken_MalformedJson_LogsErrorAndReturnsDefaultToken()
         {
-            LogAssert.Expect(LogType.Error, "[TsJson] Failed to deserialize JSON string.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Failed to deserialize JSON string.");
 
             DataToken token = TsJson.DeserializeToken("{not valid");
 
@@ -333,10 +333,10 @@ namespace Tsvrc.Tests.EditMode
         public void Clone_NullOriginal_LogsBothSerializeAndDeserializeErrorsAndReturnsNull()
         {
             // Clone(null) = Deserialize(Serialize(null)). Serialize(null) fails and logs,
-            // returning "", which Deserialize then also rejects (empty string) and logs —
+            // returning "", which Deserialize then also rejects (empty string) and logs â€”
             // two separate error messages for one Clone(null) call.
-            LogAssert.Expect(LogType.Error, "[TsJson] Failed to serialize DataDictionary to JSON.");
-            LogAssert.Expect(LogType.Error, "[TsJson] Cannot deserialize null or empty JSON string.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Failed to serialize DataDictionary to JSON.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsJson] Cannot deserialize null or empty JSON string.");
 
             DataDictionary clone = TsJson.Clone(null);
 

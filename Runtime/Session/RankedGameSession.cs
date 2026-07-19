@@ -21,6 +21,8 @@ namespace Tsvrc.Session
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class RankedGameSession : TsBehaviour
     {
+        protected override bool IsTsvrcInternal => true;
+
         /// <summary>Emitted when a game start is initiated and the ready check begins. Read <see cref="LobbyPlayerIds"/>.</summary>
         public const string OnSessionLoadingEvent = "OnSessionLoading";
         /// <summary>Emitted when all lobby players are ready and the game is active. Read <see cref="LobbyPlayerIds"/>.</summary>

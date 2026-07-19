@@ -132,20 +132,19 @@ namespace Tsvrc.Tests.EditMode
         {
             var h = CreateWiredSession();
 
-            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] AddCompletedPlayer: session is not in game state.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] AddCompletedPlayer: session is not in game state.");
             h.Session.AddCompletedPlayer("A");
         }
 
         [Test]
         public void AddCompletedPlayer_NotAnActiveGamePlayer_LogsErrorAndNoOps()
         {
-            // Regression test for the fix: AddCompletedPlayer used to accept any
-            // playerId with no membership check, so a spoofed/arbitrary id could
-            // inflate _completedTracker's count and end the session before every
-            // real game player had actually completed.
+            // Without this membership check, a spoofed/arbitrary playerId could inflate
+            // _completedTracker's count and end the session before every real game
+            // player had actually completed.
             var h = StartInGame("A", "B");
 
-            LogAssert.Expect(LogType.Error, "[RankedGameSessionTestSubclass] AddCompletedPlayer: playerId is not an active game player.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] AddCompletedPlayer: playerId is not an active game player.");
             h.Session.AddCompletedPlayer("SpoofedPlayer");
 
             CollectionAssert.AreEqual(new string[0], h.Session.CompletedPlayerIds);

@@ -54,7 +54,7 @@ namespace Tsvrc.Tests.EditMode
             TsMemory memory = CreateMemory();
             memory.Register("k", true, false);
 
-            LogAssert.Expect(LogType.Error, "[TsMemory] Key 'k' is already registered.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsMemory] Key 'k' is already registered.");
             memory.Register("k", false, true);
 
             Assert.AreEqual(1d, GetRegistry(memory)["k"].Double, "Second Register call must not overwrite the original tier.");
@@ -65,7 +65,7 @@ namespace Tsvrc.Tests.EditMode
         {
             TsMemory memory = CreateMemory();
 
-            LogAssert.Expect(LogType.Error, "[TsMemory] Key 'k': persist and synced are mutually exclusive.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsMemory] Key 'k': persist and synced are mutually exclusive.");
             memory.Register("k", true, true);
 
             Assert.IsFalse(GetRegistry(memory).ContainsKey("k"));
@@ -76,7 +76,7 @@ namespace Tsvrc.Tests.EditMode
         {
             TsMemory memory = CreateMemory();
 
-            LogAssert.Expect(LogType.Error, "[TsMemory] Key 'k': Register called with no tier. Unregistered keys are already ephemeral.");
+            LogAssert.Expect(LogType.Error, "[TsVRC] [TsMemory] Key 'k': Register called with no tier. Unregistered keys are already ephemeral.");
             memory.Register("k", false, false);
 
             Assert.IsFalse(GetRegistry(memory).ContainsKey("k"));

@@ -63,10 +63,10 @@ namespace Tsvrc.Tests.EditMode
         {
             TsMemory memory = CreateMemory();
             memory.Register("k", true, false);
-            LogAssert.Expect(LogType.Warning, "[TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
             memory.Set("k", new DataToken("v"));
 
-            LogAssert.Expect(LogType.Warning, "[TsMemory] 'k' is persistent. PlayerData cannot be deleted; local cache cleared.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] 'k' is persistent. PlayerData cannot be deleted; local cache cleared.");
             memory.Remove("k");
 
             Assert.IsFalse(memory.Has("k"));
@@ -89,9 +89,9 @@ namespace Tsvrc.Tests.EditMode
         {
             TsMemory memory = CreateMemory();
             memory.Register("k", true, false);
-            LogAssert.Expect(LogType.Warning, "[TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] Set('k') before OnPlayerRestored. Value will not be saved to PlayerData.");
             memory.Set("k", new DataToken("v"));
-            LogAssert.Expect(LogType.Warning, "[TsMemory] 'k' is persistent. PlayerData cannot be deleted; local cache cleared.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] 'k' is persistent. PlayerData cannot be deleted; local cache cleared.");
             memory.Remove("k");
 
             Assert.DoesNotThrow(() => memory.Add("k", new DataToken("v2")));
@@ -152,7 +152,7 @@ namespace Tsvrc.Tests.EditMode
             TsMemory memory = CreateMemory();
             memory.Set("ephemeralKey", new DataToken("e"));
             memory.Register("persistKey", true, false);
-            LogAssert.Expect(LogType.Warning, "[TsMemory] Set('persistKey') before OnPlayerRestored. Value will not be saved to PlayerData.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] Set('persistKey') before OnPlayerRestored. Value will not be saved to PlayerData.");
             memory.Set("persistKey", new DataToken("p"));
             memory.Register("syncedKey", false, true);
             memory.Set("syncedKey", new DataToken("s"));
@@ -169,7 +169,7 @@ namespace Tsvrc.Tests.EditMode
         {
             TsMemory memory = CreateMemory();
             memory.Register("persistKey", true, false);
-            LogAssert.Expect(LogType.Warning, "[TsMemory] Set('persistKey') before OnPlayerRestored. Value will not be saved to PlayerData.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] Set('persistKey') before OnPlayerRestored. Value will not be saved to PlayerData.");
             memory.Set("persistKey", new DataToken("p"));
 
             memory.Clear();
@@ -177,7 +177,7 @@ namespace Tsvrc.Tests.EditMode
             // If the registration survived, re-adding without Register succeeds and the
             // value routes to the persist tier again (proven by the before-restore warning
             // firing on Set, which only fires for persist-tier keys).
-            LogAssert.Expect(LogType.Warning, "[TsMemory] Set('persistKey') before OnPlayerRestored. Value will not be saved to PlayerData.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [TsMemory] Set('persistKey') before OnPlayerRestored. Value will not be saved to PlayerData.");
             memory.Set("persistKey", new DataToken("p2"));
             Assert.AreEqual("p2", memory.GetString("persistKey"));
         }

@@ -8,6 +8,8 @@ namespace Tsvrc.StateMachine
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class StateManager : TsBehaviour
     {
+        protected override bool IsTsvrcInternal => true;
+
         // -1 means no state has been set yet
         protected int _currentState = -1;
         protected int _previousState = -1;

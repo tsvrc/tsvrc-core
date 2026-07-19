@@ -118,7 +118,7 @@ namespace Tsvrc.Tests.EditMode
             var timer = CreateProcess<TsTimerTestSubclass>();
             SeedAsOwner(timer);
 
-            LogAssert.Expect(LogType.Warning, "[TsTimerTestSubclass] Process is not running.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [TsTimerTestSubclass] Process is not running.");
             timer.StopTimer();
 
             Assert.AreEqual(0, timer.OnTimerStoppedCount);
