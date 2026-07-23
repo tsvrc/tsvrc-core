@@ -88,7 +88,7 @@ namespace Tsvrc.Editor
                 // wrong field set. The real recompile that follows (e.g. UdonSharp's own
                 // build-time pass) triggers a fresh domain reload, which calls AfterDomainReload()
                 // again with the now-current compiled type (see TsDomainReloadHandler) — that
-                // pass is what actually wires. Fixed CODEGEN_TESTING_PLAN.md Part 4 item 3.
+                // pass is what actually wires.
                 if (!skipRefresh) AssetDatabase.Refresh();
                 return;
             }
@@ -148,7 +148,9 @@ namespace Tsvrc.Editor
         // True if there's a concrete reason to believe this project uses Tsvrc: an existing
         // TsConfig, an existing scaffold instance in the scene (already bootstrapped, this
         // is just maintenance), or a user-authored TsInstance subclass anywhere in the
-        // project (declared before ever placing it in a scene).
+        // project (declared before ever placing it in a scene). Types marked
+        // [TsCodegenIgnore] (e.g. a test double TsInstance subclass) are excluded from that
+        // last scan - see TsCodegenIgnoreAttribute's own doc comment for why.
         private static bool HasBootstrapSignal()
         {
             if (UnityEngine.Object.FindObjectOfType<TsConfig>(true) != null) return true;
@@ -163,7 +165,8 @@ namespace Tsvrc.Editor
                 catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
 
                 foreach (var type in types)
-                    if (type != typeof(TsInstance) && !type.IsAbstract && typeof(TsInstance).IsAssignableFrom(type))
+                    if (type != typeof(TsInstance) && !type.IsAbstract && typeof(TsInstance).IsAssignableFrom(type)
+                        && type.GetCustomAttribute<TsCodegenIgnoreAttribute>() == null)
                         return true;
             }
             return false;
@@ -231,11 +234,10 @@ namespace Tsvrc.Editor
 
         // Any field name exposed (via ExposedFieldNames()) by more than one module is
         // stripped from every module that declared it (via ExcludeFieldNames()), so a name
-        // collision never silently produces two same-named fields on TsGenerated.
-        // Extracted from Run() as its own method purely for testability (see
-        // CODEGEN_TESTING_PLAN.md Phase G6.3) - only SingletonModule currently overrides
-        // ExposedFieldNames()/ExcludeFieldNames() among the real modules, so this path is
-        // otherwise only exercisable with synthetic test modules.
+        // collision never silently produces two same-named fields on TsGenerated. Only
+        // SingletonModule currently overrides ExposedFieldNames()/ExcludeFieldNames() among
+        // the real modules, so this path is otherwise only exercisable with synthetic test
+        // modules.
         internal static void DetectAndExcludeFieldNameCollisions(List<TsModule> modules)
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);

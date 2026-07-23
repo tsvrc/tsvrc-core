@@ -172,7 +172,10 @@ namespace Tsvrc.Editor
         //
         // Deduplicated by full name: Unity's AppDomain can carry stale duplicate copies of the same
         // assembly across successive recompiles, which would otherwise make a single real subclass
-        // look "ambiguous" just because it was seen twice.
+        // look "ambiguous" just because it was seen twice. Types marked [TsCodegenIgnore] (e.g. a
+        // test double TsInstance subclass) are excluded from this scan the same way as
+        // TsGenerator.HasBootstrapSignal, so one never gets treated as the one real scaffold to
+        // wire, and never falsely trips the "multiple subclasses" ambiguity error against a real one.
         private static (Type, bool) DetectInstanceType()
         {
             var candidates = new List<Type>();
@@ -184,7 +187,8 @@ namespace Tsvrc.Editor
                 catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
 
                 foreach (var type in types)
-                    if (type != typeof(TsInstance) && !type.IsAbstract && typeof(TsInstance).IsAssignableFrom(type))
+                    if (type != typeof(TsInstance) && !type.IsAbstract && typeof(TsInstance).IsAssignableFrom(type)
+                        && type.GetCustomAttribute<TsCodegenIgnoreAttribute>() == null)
                         if (seen.Add(type.FullName))
                             candidates.Add(type);
             }

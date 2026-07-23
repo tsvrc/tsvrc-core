@@ -6,6 +6,7 @@
         "Tsvrc.Runtime",
         "Tsvrc.Tests.Doubles",
         "Tsvrc.Tests.TestUtil",
+        "Tsvrc.Testing.Framework",
         "UdonSharp.Runtime",
         "VRC.SDKBase",
         "VRC.SDK3",
