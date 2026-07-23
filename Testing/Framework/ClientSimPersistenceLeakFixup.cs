@@ -23,9 +23,13 @@ namespace Tsvrc.Testing.Framework
 
         public void OnUnityTearDown()
         {
+            // Resources.FindObjectsOfTypeAll returns every object of this type loaded in memory,
+            // including project Prefab Assets themselves, not just scene-instantiated leaks -
+            // scene.IsValid() is false for a loaded-but-not-instantiated asset, so this guard
+            // keeps this fixup from ever touching a Prefab Asset and scoped to genuine scene leaks.
             foreach (var storage in Resources.FindObjectsOfTypeAll<ClientSimPlayerObjectStorage>())
-                if (storage != null)
-                    Object.DestroyImmediate(storage.gameObject);
+                if (storage != null && storage.gameObject.scene.IsValid())
+                    Object.DestroyImmediate(storage.gameObject, true);
         }
     }
 }

@@ -3,7 +3,8 @@
     "rootNamespace": "Tsvrc.Tests.EditMode",
     "references": [
         "Tsvrc.Runtime",
-        "UdonSharp.Runtime"
+        "UdonSharp.Runtime",
+        "VRC.ClientSim"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

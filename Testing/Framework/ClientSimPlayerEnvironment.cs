@@ -67,8 +67,11 @@ namespace Tsvrc.Testing.Framework
 
             ClientSimRuntimeLoader.EndUnityTesting();
 
+            // allowDestroyingAssets: true - Unity otherwise rejects this DestroyImmediate as
+            // "destroying an asset" once ClientSimRuntimeLoader.EndUnityTesting() above has
+            // already torn down the session context this GameObject belonged to.
             if (_descriptorObject != null)
-                Object.DestroyImmediate(_descriptorObject);
+                Object.DestroyImmediate(_descriptorObject, true);
             _descriptorObject = null;
         }
 
