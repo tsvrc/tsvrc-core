@@ -27,9 +27,5 @@ namespace Tsvrc.Testing.Framework
                 if (storage != null)
                     Object.DestroyImmediate(storage.gameObject);
         }
-
-        public void OnAfterAllTests(bool allPassed)
-        {
-        }
     }
 }

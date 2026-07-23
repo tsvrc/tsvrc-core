@@ -10,21 +10,18 @@ using UnityEditor.Events;
 
 namespace Tsvrc.Tests.PlayMode.Testing.Framework
 {
-    // Not a fixup test - this proves the actual VRCSDK mechanism that BatchModeTerminationFixup
-    // and ConsoleLogVerdictSink exist to work around is real, not hypothetical: VRCSDK's
-    // VRC.Core.UnityEventFilter strips Unity Test Framework's own
-    // TestStarted/TestFinished/RunStarted/RunFinished event wiring the instant Play Mode
-    // starts, because that wiring is exactly a persistent UnityEvent listener targeting a type
-    // not on UnityEventFilter's allowlist - reproduced directly here against the real,
-    // unmodified VRC.Core.UnityEventFilter.FilterUnityEvents API.
+    // Not a fixup test - this proves the actual VRCSDK mechanism that UnityEventFilterAllowlistFixup
+    // exists to work around is real, not hypothetical: VRCSDK's VRC.Core.UnityEventFilter strips
+    // Unity Test Framework's own TestStarted/TestFinished/RunStarted/RunFinished event wiring the
+    // instant Play Mode starts, because that wiring is exactly a persistent UnityEvent listener
+    // targeting a type not on UnityEventFilter's allowlist - reproduced directly here against the
+    // real, unmodified VRC.Core.UnityEventFilter.FilterUnityEvents API.
     //
     // Lives under PlayMode, not EditMode: UnityEventFilter.IsTargetPermitted touches
     // VRC.Udon.UdonManager.Instance, which calls Object.DontDestroyOnLoad - Unity throws
     // InvalidOperationException if that runs outside Play Mode (confirmed by trying this in
     // EditMode first). This class deliberately does not extend TsPlayModeTestBase - it doesn't
-    // need ClientSim, and TsPlayModeTestBase's OneTimeTearDown calls
-    // EditorApplication.Exit()/isPlaying = false per-fixture, so a second class extending it
-    // would risk exiting before TsPlayerPlayModeTests' own tests finish.
+    // need ClientSim.
     public class UnityEventFilterRootCauseTests
     {
         private GameObject _gameObject;
@@ -59,8 +56,8 @@ namespace Tsvrc.Tests.PlayMode.Testing.Framework
             Assert.AreEqual(0, _target.OnSomething.GetPersistentEventCount(),
                 "UnityEventFilter did not strip a listener targeting a type absent from its " +
                 "allowlist - if this now passes because VRCSDK's allowlist behavior changed, " +
-                "BatchModeTerminationFixup and ConsoleLogVerdictSink's justification needs " +
-                "re-checking against real Unity Test Framework listeners, not just this proxy.");
+                "UnityEventFilterAllowlistFixup's justification needs re-checking against real " +
+                "Unity Test Framework listeners, not just this proxy.");
         }
 
         [UnityTest]

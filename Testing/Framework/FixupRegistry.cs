@@ -16,7 +16,6 @@ namespace Tsvrc.Testing.Framework
         private static readonly List<IPlayModeEnvironmentFixup> AllFixups = new List<IPlayModeEnvironmentFixup>
         {
             new ClientSimPersistenceLeakFixup(),
-            new BatchModeTerminationFixup(),
         };
 
         private static readonly HashSet<Type> DisabledTypes = new HashSet<Type>();

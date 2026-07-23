@@ -13,8 +13,5 @@ namespace Tsvrc.Testing.Framework
 
         /// <summary>Runs at the start of every [UnityTearDown], after ClientSim teardown.</summary>
         void OnUnityTearDown();
-
-        /// <summary>Runs once in [OneTimeTearDown], after the final pass/fail verdict is known.</summary>
-        void OnAfterAllTests(bool allPassed);
     }
 }
