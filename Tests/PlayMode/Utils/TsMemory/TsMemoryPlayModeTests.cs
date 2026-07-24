@@ -11,10 +11,9 @@ namespace Tsvrc.Tests.PlayMode.Utils.TsMemory
 {
     // Set/Remove/Clear's Networking.IsOwner(gameObject)-false ownership-claim branch (synced
     // tier) needs a real GameObject that genuinely isn't Unity-owned by the local player -
-    // FakeOwnershipSyncable produces that for real, the same technique
-    // Tests/PlayMode/Core/TsProcess/ already uses. OnPlayerRestored + real PlayerData is never
-    // exercised anywhere else: it needs a real local VRCPlayerApi, and ClientSim never
-    // organically dispatches it to a plain UdonSharpBehaviour, so it is invoked directly below.
+    // FakeOwnershipSyncable produces that for real. OnPlayerRestored + real PlayerData needs a
+    // real local VRCPlayerApi, and ClientSim never organically dispatches it to a plain
+    // UdonSharpBehaviour, so it is invoked directly below.
     public class TsMemoryPlayModeTests : TsPlayModeTestBase
     {
         private GameObject _gameObject;

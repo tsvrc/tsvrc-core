@@ -12,8 +12,7 @@ namespace Tsvrc.Tests.PlayMode.Timing.TsTimer
     // GetServerTimeMilliseconds() only advances with real wall-clock time under a live
     // ClientSim session - a platform fact, not tsvrc logic, proven with a real WaitForSeconds
     // coroutine. PauseTimer/ResumeTimer's non-owner-forwarding branch needs a GameObject that
-    // genuinely isn't Unity-owned by the local player - FakeOwnershipSyncable produces that for
-    // real, the same technique Tests/PlayMode/Core/TsProcess/ already uses.
+    // genuinely isn't Unity-owned by the local player - FakeOwnershipSyncable produces that for real.
     public class TsTimerPlayModeTests : TsProcessPlayModeTestBase
     {
         [UnityTest]

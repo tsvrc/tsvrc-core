@@ -43,9 +43,9 @@ namespace Tsvrc.Tests.PlayMode.UI.TsPlayerPositionOverlay
             yield return null;
             VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("Tracked");
             Assert.IsNotNull(remote, "Setup sanity check: Tracked was not found.");
-            // ClientSim remote players don't respond to TeleportTo (confirmed empirically -
-            // their position never changes), so this asserts against their real, actual spawned
-            // position rather than an assumed teleported one.
+            // ClientSim remote players don't respond to TeleportTo - their position never
+            // changes - so this asserts against their real, actual spawned position rather than
+            // an assumed teleported one.
             Vector3 realPos = remote.GetPosition();
             string trackedId = remote.displayName + "#" + remote.playerId;
 

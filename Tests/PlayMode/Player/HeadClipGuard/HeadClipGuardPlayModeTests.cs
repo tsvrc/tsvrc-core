@@ -11,9 +11,9 @@ namespace Tsvrc.Tests.PlayMode.Player.HeadClipGuard
     // PostLateUpdate's entire push/teleport logic operates on a real VRCPlayerApi's
     // GetTrackingData(Head)/GetPosition/GetRotation/TeleportTo - none of which resolve in Edit
     // Mode. ClientSim never organically dispatches PostLateUpdate to a plain UdonSharpBehaviour,
-    // so it is invoked directly below, same as every other such callback in this codebase.
-    // A live ClientSim local player's head tracking data proved real and stable (derived from
-    // the capsule position) rather than null/zero, so no new framework primitive was needed here.
+    // so it is invoked directly below, same as every other such callback in this codebase. A
+    // live ClientSim local player's head tracking data is a real, stable value derived from the
+    // capsule position, not null or zero.
     public class HeadClipGuardPlayModeTests : TsPlayModeTestBase
     {
         private GameObject _guardGameObject;

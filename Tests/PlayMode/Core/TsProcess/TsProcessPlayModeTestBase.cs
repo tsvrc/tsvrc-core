@@ -8,11 +8,8 @@ using VRC.SDKBase;
 
 namespace Tsvrc.Tests.PlayMode.Core.TsProcess
 {
-    // Real, ClientSim-backed counterpart to Tests/EditMode/Core/TsProcess/TsProcessTestBase.cs.
-    // That base class's own doc comment defers the not-owner forwarding paths and the four VRC
-    // callback overrides to a PlayMode suite - this is that suite. Everything here exercises
-    // real VRCPlayerApi identity and real ownership routing, neither of which the EditMode
-    // reflection approach can genuinely produce.
+    // Real, ClientSim-backed base for TsProcess PlayMode tests: real VRCPlayerApi identity and
+    // real ownership routing, neither of which reflection-based Edit Mode tests can produce.
     public abstract class TsProcessPlayModeTestBase : TsPlayModeTestBase
     {
         private readonly List<GameObject> _spawned = new List<GameObject>();

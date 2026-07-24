@@ -13,8 +13,8 @@ namespace Tsvrc.Tests.PlayMode.Session
     // already-covered TsProcess-derived sub-components (three PlayerTrackers, a
     // ReadyCheckProcess, a TsTimer). This is an end-to-end integration smoke test with real
     // spawned players flowing through the full lobby -> ready-check -> game -> completed
-    // pipeline, wiring the sub-components the same way RankedGameSessionTestBase (Edit Mode)
-    // does via reflection, reproducing what [WirePool] would wire at runtime.
+    // pipeline, wiring the sub-components into the session's private fields via reflection to
+    // reproduce what [WirePool] wires at runtime.
     public class RankedGameSessionPlayModeTests : TsProcessPlayModeTestBase
     {
         private GameObject _sessionGameObject;

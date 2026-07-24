@@ -9,17 +9,14 @@ using VRC.SDKBase;
 
 namespace Tsvrc.Tests.PlayMode.Core.TsProcess
 {
-    // TsProcessTestBase.cs (Tests/EditMode/Core/TsProcess/) documents that the four VRC
-    // callback overrides (OnPlayerLeft, OnOwnershipTransferred, OnPlayerSuspendChanged,
-    // OnDeserialization) need real Networking/VRCPlayerApi and belong here instead.
+    // The four VRC callback overrides (OnPlayerLeft, OnOwnershipTransferred,
+    // OnPlayerSuspendChanged, OnDeserialization) need real Networking/VRCPlayerApi.
     //
     // ClientSim never organically dispatches VRC lifecycle callbacks to a plain
     // UdonSharpBehaviour (only a compiled UdonBehaviour VM instance registered with
-    // UdonManager gets that) - these tests call the overrides directly, the same documented
-    // workaround the rest of this codebase's PlayMode tests use. What real PlayMode adds over
-    // EditMode's reflection approach is a genuine VRCPlayerApi from a real ClientSim spawn,
-    // exercising TsPlayer.GetPlayerID/FindPlayerByID against real player data instead of a
-    // hand-built string.
+    // UdonManager gets that), so these tests call the overrides directly against a genuine
+    // VRCPlayerApi from a real ClientSim spawn, exercising TsPlayer.GetPlayerID/FindPlayerByID
+    // against real player data instead of a hand-built string.
     //
     // A bare AddComponent<TsProcess>() GameObject has no IClientSimSyncable component, so
     // ClientSimPlayerManager.IsOwner (what Networking.IsOwner routes to) falls back to

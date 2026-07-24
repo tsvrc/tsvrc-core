@@ -6,11 +6,9 @@ using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.PlayMode.Core.TsBehaviour
 {
-    // TsBehaviour never touches Networking/VRCPlayerApi (see
-    // Tests/EditMode/Core/TsBehaviour/TsBehaviourTests.cs, which covers everything else
-    // about this class). This is its only PlayMode test: Destroy(gameObject) defers to
-    // end-of-frame in Play Mode, which EditMode cannot observe - Unity rejects the call
-    // there outright instead.
+    // TsBehaviour never touches Networking/VRCPlayerApi. This is its only PlayMode test:
+    // Destroy(gameObject) defers to end-of-frame in Play Mode, which EditMode cannot observe -
+    // Unity rejects the call there outright instead.
     public class TsBehaviourPlayModeTests
     {
         private GameObject _gameObject;
