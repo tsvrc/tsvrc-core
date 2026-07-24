@@ -108,13 +108,12 @@ namespace Tsvrc.Tracking
             base.StartPlayerTracking(GetActiveNonSuspendedPlayerIDs(), false);
         }
 
-        // OnPlayerSuspendChanged only fires on a transition to suspended, so a player already
-        // suspended at this exact moment would otherwise enter _trackedPlayerIds with no event
-        // ever available to remove them - their only remaining transition is waking up, which
-        // PlayerTracker.OnPlayerSuspendChanged deliberately treats as a no-op (it assumes they
-        // were already removed when they suspended). Filtering here keeps the invariant every
-        // other entry point into this tracked set already upholds (PlayerTracker.OnOwnerAbandonedProcess,
-        // ChunkedTransferSession._StartNextReadyCheck): a suspended player never enters the set.
+        // PlayerTracker.OnPlayerSuspendChanged only reacts to a *transition* to suspended, and
+        // treats waking up as a no-op on the assumption a player was already removed on the way
+        // in. A player already suspended before this snapshot runs has no transition left to
+        // produce, so it must never enter _trackedPlayerIds here - the same invariant
+        // PlayerTracker.OnOwnerAbandonedProcess and ChunkedTransferSession._StartNextReadyCheck
+        // already enforce for their own tracked-player scans.
         private static string[] GetActiveNonSuspendedPlayerIDs()
         {
             VRCPlayerApi[] allPlayers = TsPlayer.GetAllPlayers();
