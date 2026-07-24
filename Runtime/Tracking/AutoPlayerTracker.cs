@@ -105,7 +105,33 @@ namespace Tsvrc.Tracking
                 return;
             }
 
-            base.StartPlayerTracking(TsPlayer.GetAllPlayerIDs(), false);
+            base.StartPlayerTracking(GetActiveNonSuspendedPlayerIDs(), false);
+        }
+
+        // OnPlayerSuspendChanged only fires on a transition to suspended, so a player already
+        // suspended at this exact moment would otherwise enter _trackedPlayerIds with no event
+        // ever available to remove them - their only remaining transition is waking up, which
+        // PlayerTracker.OnPlayerSuspendChanged deliberately treats as a no-op (it assumes they
+        // were already removed when they suspended). Filtering here keeps the invariant every
+        // other entry point into this tracked set already upholds (PlayerTracker.OnOwnerAbandonedProcess,
+        // ChunkedTransferSession._StartNextReadyCheck): a suspended player never enters the set.
+        private static string[] GetActiveNonSuspendedPlayerIDs()
+        {
+            VRCPlayerApi[] allPlayers = TsPlayer.GetAllPlayers();
+            string[] activeIds = new string[allPlayers.Length];
+            int activeCount = 0;
+            for (int i = 0; i < allPlayers.Length; i++)
+            {
+                if (!allPlayers[i].isSuspended)
+                    activeIds[activeCount++] = TsPlayer.GetPlayerID(allPlayers[i]);
+            }
+            if (activeCount < allPlayers.Length)
+            {
+                string[] trimmed = new string[activeCount];
+                System.Array.Copy(activeIds, trimmed, activeCount);
+                activeIds = trimmed;
+            }
+            return activeIds;
         }
 
         protected override void OnTrackingStarted(string[] playerIds) => TsEmit(OnAutoTrackingStartedEvent);
