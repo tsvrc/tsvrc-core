@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using Tsvrc.Config;
 using Tsvrc.Editor;
+using Tsvrc.Testing.Framework;
 
 namespace Tsvrc.Tests.EditMode
 {

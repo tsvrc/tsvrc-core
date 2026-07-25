@@ -34,6 +34,12 @@ namespace Tsvrc.Testing.Framework
     /// pass, and long before any [OneTimeSetUp] could matter. Fails silently (logs one warning,
     /// does nothing further) if any of the reflected members can't be found - e.g. after a Unity
     /// Test Framework or VRCSDK update changes their internals.
+    ///
+    /// Applying the patch unconditionally would mean touching VRCSDK internals in every
+    /// project that merely has this assembly compiled, whether or not anything in it is
+    /// ever used. So the static constructor first checks whether the current domain
+    /// contains a TsPlayModeTestBase subclass anywhere - i.e. whether a consuming
+    /// project has actually opted in by writing one - and does nothing at all otherwise.
     /// </summary>
     [InitializeOnLoad]
     public sealed class UnityEventFilterAllowlistFixup : IPlayModeEnvironmentFixup
@@ -55,7 +61,8 @@ namespace Tsvrc.Testing.Framework
         {
             try
             {
-                Allowlist();
+                if (IsOptedIn())
+                    Allowlist();
             }
             catch (Exception e)
             {
@@ -69,6 +76,36 @@ namespace Tsvrc.Testing.Framework
 
         public void OnUnityTearDown()
         {
+        }
+
+        // "Opted in" means: this domain contains at least one class that actually
+        // extends TsPlayModeTestBase. A project that references Tsvrc.Testing.Framework
+        // only for PrivateFieldAccess, or not at all, never triggers this scan finding
+        // anything, so it never touches VRCSDK internals.
+        private static bool IsOptedIn()
+        {
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[] types;
+                try
+                {
+                    types = assembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException e)
+                {
+                    types = e.Types;
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+
+                foreach (Type type in types)
+                    if (type != null && type != typeof(TsPlayModeTestBase) && typeof(TsPlayModeTestBase).IsAssignableFrom(type))
+                        return true;
+            }
+
+            return false;
         }
 
         private static void Allowlist()

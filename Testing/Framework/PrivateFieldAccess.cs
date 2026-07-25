@@ -2,12 +2,14 @@ using System;
 using System.Reflection;
 using NUnit.Framework;
 
-namespace Tsvrc.Tests.EditMode
+namespace Tsvrc.Testing.Framework
 {
     // Shared reflection helpers for poking private fields/methods on production
     // instances and static types from tests, across every test assembly (Edit Mode,
     // Play Mode, and the CodeGen suite's own module-entry helpers build on top of
-    // this in Tests/Editor/CodeGen/TestUtil/CodeGenModuleReflection.cs).
+    // this in Tests/Editor/CodeGen/TestUtil/CodeGenModuleReflection.cs). Has no
+    // dependency on Tsvrc.Runtime or any VRC SDK type - usable against any
+    // UdonSharpBehaviour or plain C# class.
     public static class PrivateFieldAccess
     {
         private const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;

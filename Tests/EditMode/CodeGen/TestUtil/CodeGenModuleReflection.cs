@@ -1,8 +1,9 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
 using NUnit.Framework;
+using System.Collections.Generic;
+using System.Collections;
+using System.Reflection;
+using System;
+using Tsvrc.Testing.Framework;
 
 namespace Tsvrc.Tests.EditMode
 {

@@ -1,7 +1,8 @@
-using System.Reflection;
 using NUnit.Framework;
+using System.Reflection;
 using Tsvrc.Core;
 using Tsvrc.Session;
+using Tsvrc.Testing.Framework;
 
 namespace Tsvrc.Tests.EditMode
 {

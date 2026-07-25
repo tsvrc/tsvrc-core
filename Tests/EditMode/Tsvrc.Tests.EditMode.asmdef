@@ -6,7 +6,6 @@
         "Tsvrc.Runtime",
         "Tsvrc.Editor",
         "Tsvrc.Tests.Doubles",
-        "Tsvrc.Tests.TestUtil",
         "Tsvrc.Testing.Framework",
         "UdonSharp.Runtime",
         "UdonSharp.Editor",
