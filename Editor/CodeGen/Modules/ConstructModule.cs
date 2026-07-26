@@ -9,9 +9,8 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Generates a _construct{Name} field per TsBehaviour listed in TsConfig.Constructs,
-    // and wires each directly from the scene. At runtime, _TsConstructStart() calls
-    // TsConstruct(this) on every wired behaviour in field-name order.
+    // Generates a _construct{Name} field per TsBehaviour in TsConfig.Constructs;
+    // _TsConstructStart() calls TsConstruct(this) on each in field-name order.
     internal class ConstructModule : TsModule
     {
         private List<ConstructEntry> _entries = new List<ConstructEntry>();
@@ -21,7 +20,9 @@ namespace Tsvrc.Editor
         internal override string TabLabel => "Constructs";
         internal override string TabDescription =>
             "Register TsBehaviours that are always active in the scene, not pooled. TsConstruct() is called once on each at startup. Example: add your HudManager here and it is initialized automatically when the world loads.";
-        internal override void DrawTab(SerializedObject so) => ObjectListGUI.DrawObjectList(so, "Constructs");
+        internal override void DrawTab(SerializedObject so) => ObjectListGUI.DrawObjectList(so, "Constructs",
+            "No constructs registered yet. Add a TsBehaviour here to have TsConstruct(this) called on it at startup.",
+            warnDuplicates: true);
 
         internal override void LoadConfig()
         {

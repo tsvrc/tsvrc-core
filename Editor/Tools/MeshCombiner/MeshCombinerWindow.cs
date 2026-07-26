@@ -41,11 +41,11 @@ namespace Tsvrc.Editor
         private string _statusMessage;
         private MessageType _statusType;
 
-        [MenuItem("Tsvrc/Tools/Mesh Combiner")]
+        [MenuItem("Tsvrc/Tools/Mesh Combiner", priority = 41)]
         private static void Open()
         {
             var window = GetWindow<MeshCombinerWindow>("Mesh Combiner");
-            window.minSize = new Vector2(340, 360);
+            window.minSize = new Vector2(440, 420);
             window.Show();
         }
 
@@ -54,7 +54,6 @@ namespace Tsvrc.Editor
             // Reset the path error cache so it recomputes once per repaint.
             _pathErrorDirty = true;
 
-            EditorGUILayout.LabelField("Mesh Combiner", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
                 "Select GameObjects in the scene and click \"Load from Selection\", or add MeshFilter slots manually. " +
                 "Then choose a save path and click Combine.",
@@ -194,16 +193,26 @@ namespace Tsvrc.Editor
         private void DrawCombineButton()
         {
             var valid = GetValid();
-            var canCombine = valid.Count > 0 && GetPathError() == null;
+            var pathError = GetPathError();
+            bool playMode = EditorApplication.isPlayingOrWillChangePlaymode;
+            var disabledReason = DetermineCombineDisabledReason(valid.Count, pathError, playMode);
 
-            using (new EditorGUI.DisabledScope(!canCombine))
-            {
-                if (GUILayout.Button("Combine", GUILayout.Height(28)))
-                    Execute(valid);
-            }
+            if (TsEditorGUI.PrimaryButton("Combine", enabled: disabledReason == null, disabledReason))
+                Execute(valid);
 
             if (valid.Count == 0)
                 EditorGUILayout.HelpBox("Add at least one MeshFilter to combine.", MessageType.Warning);
+        }
+
+        // Pure so it's directly unit-testable (see MeshCombinerWindowLogicTests) without driving OnGUI.
+        internal static string DetermineCombineDisabledReason(int validCount, string pathError, bool isPlayMode)
+        {
+            // Checked first: a combine in Play Mode creates scene objects/assets that vanish on
+            // exit or reference sources never part of the saved scene.
+            if (isPlayMode) return "Exit Play Mode before combining meshes (changes are not saved).";
+            if (validCount == 0) return "Add at least one valid MeshFilter source before combining.";
+            if (pathError != null) return pathError;
+            return null;
         }
 
         private void LoadFromSelection()
@@ -350,8 +359,7 @@ namespace Tsvrc.Editor
                     {
                         if (mf.GetComponent<UdonSharpBehaviour>() != null)
                         {
-                            // Keep the source active so the Udon script and its collider keep running.
-                            // Disabling the MeshRenderer hides rendering without affecting physics or script execution.
+                            // Disabling the MeshRenderer (not the GameObject) keeps the Udon script and collider active.
                             var mr = mf.GetComponent<MeshRenderer>();
                             if (mr != null)
                             {
@@ -394,9 +402,8 @@ namespace Tsvrc.Editor
             }
             catch (System.Exception ex)
             {
-                // Destroy the combined GameObject if it was created before the exception.
-                // DestroyImmediate removes it from the scene immediately; the dangling
-                // RegisterCreatedObjectUndo entry becomes a no-op, which is acceptable.
+                // Destroy the combined GameObject if it was created before the exception; the
+                // dangling RegisterCreatedObjectUndo entry simply becomes a no-op.
                 if (go != null) Object.DestroyImmediate(go);
                 if (visualMesh != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(visualMesh)))
                     Object.DestroyImmediate(visualMesh);

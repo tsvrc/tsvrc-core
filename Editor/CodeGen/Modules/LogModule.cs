@@ -6,10 +6,8 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Generates the _log field and _TsLogStart() on TsGenerated, and wires the scene
-    // TsLogger component into it. Every other system accesses logging through
-    // TsGenerated.Log (or the TsBehaviour.LogInfo/LogWarning/LogError wrappers); this
-    // module ensures that reference is always set. Mirrors MemoryModule.
+    // Generates _log and _TsLogStart() on TsGenerated so every system reaches logging
+    // only through TsGenerated.Log (or TsBehaviour.LogInfo/LogWarning/LogError). Mirrors MemoryModule.
     internal class LogModule : TsModule
     {
         // Package-relative, not a literal - see PackagePaths.
@@ -22,10 +20,8 @@ namespace Tsvrc.Editor
         internal override string TabDescription =>
             "Configure the scene's TsLogger: the optional project tag shown after the always-present [TsVRC] framework tag, and which log levels are shown - independently for Tsvrc's own internal diagnostics and your world's own scripts. All levels are shown by default.";
 
-        // Unlike other tabs, this one's data lives on the scene's TsLogger component itself
-        // (a plain runtime MonoBehaviour field, editable directly in its own Inspector too),
-        // not on TsConfig - so it builds and manages its own SerializedObject rather than
-        // using the TsConfig-bound one TsWindow passes in.
+        // Unlike other tabs, this data lives on the scene's TsLogger component, not TsConfig,
+        // so it builds its own SerializedObject instead of using the TsConfig-bound `so` param.
         internal override void DrawTab(SerializedObject so)
         {
             var logger = (TsLogger)UnityEngine.Object.FindObjectOfType(typeof(TsLogger), true);
@@ -44,13 +40,13 @@ namespace Tsvrc.Editor
                 new GUIContent("World Prefix", "Optional. Shown after the always-present [TsVRC] tag, e.g. \"SomeWorld\" -> \"[TsVRC] [SomeWorld] [ClassName] message\". Leave empty to omit."));
 
             EditorGUILayout.Space(8);
-            EditorGUILayout.LabelField("Tsvrc Internal", EditorStyles.boldLabel);
+            // No manual "Tsvrc Internal" label: _internalInfoEnabled carries [Header("Tsvrc Internal")]
+            // in TsLogger.cs, which PropertyField renders automatically.
             EditorGUILayout.PropertyField(logSo.FindProperty("_internalInfoEnabled"), new GUIContent("Info"));
             EditorGUILayout.PropertyField(logSo.FindProperty("_internalWarningEnabled"), new GUIContent("Warning"));
             EditorGUILayout.PropertyField(logSo.FindProperty("_internalErrorEnabled"), new GUIContent("Error"));
 
-            EditorGUILayout.Space(8);
-            EditorGUILayout.LabelField("Your World", EditorStyles.boldLabel);
+            // Same reasoning: _worldInfoEnabled carries [Header("Your World")].
             EditorGUILayout.PropertyField(logSo.FindProperty("_worldInfoEnabled"), new GUIContent("Info"));
             EditorGUILayout.PropertyField(logSo.FindProperty("_worldWarningEnabled"), new GUIContent("Warning"));
             EditorGUILayout.PropertyField(logSo.FindProperty("_worldErrorEnabled"), new GUIContent("Error"));

@@ -61,8 +61,6 @@ namespace Tsvrc.Tests.EditMode
             return (List<MeshFilter>)GetValidMethod.Invoke(_window, null);
         }
 
-        // ---- ComputePathError ----
-
         [Test]
         public void ComputePathError_EmptyPath_ReturnsEmptyPathError()
         {
@@ -93,8 +91,6 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsNull(ComputePathError("Assets/Foo.asset"));
         }
 
-        // ---- GetValid ----
-
         [Test]
         public void GetValid_EmptySources_ReturnsEmptyList()
         {
@@ -122,6 +118,50 @@ namespace Tsvrc.Tests.EditMode
             List<MeshFilter> valid = GetValid(new List<MeshFilter> { mf1, mf1, mf2 });
 
             Assert.AreEqual(new[] { mf1, mf2 }, valid.ToArray());
+        }
+
+        // DetermineCombineDisabledReason is internal static and pure, called directly (no
+        // reflection needed, unlike ComputePathError/GetValid above).
+
+        [Test]
+        public void DetermineCombineDisabledReason_NoValidSources_ReturnsAddSourceReason()
+        {
+            Assert.AreEqual("Add at least one valid MeshFilter source before combining.",
+                MeshCombinerWindow.DetermineCombineDisabledReason(validCount: 0, pathError: null, isPlayMode: false));
+        }
+
+        [Test]
+        public void DetermineCombineDisabledReason_ValidSourcesButPathError_ReturnsPathError()
+        {
+            Assert.AreEqual("Save path is empty.",
+                MeshCombinerWindow.DetermineCombineDisabledReason(validCount: 1, pathError: "Save path is empty.", isPlayMode: false));
+        }
+
+        [Test]
+        public void DetermineCombineDisabledReason_ValidSourcesAndNoPathError_ReturnsNull()
+        {
+            Assert.IsNull(MeshCombinerWindow.DetermineCombineDisabledReason(validCount: 1, pathError: null, isPlayMode: false));
+        }
+
+        [Test]
+        public void DetermineCombineDisabledReason_NoValidSourcesTakesPrecedenceOverPathError()
+        {
+            Assert.AreEqual("Add at least one valid MeshFilter source before combining.",
+                MeshCombinerWindow.DetermineCombineDisabledReason(validCount: 0, pathError: "Save path is empty.", isPlayMode: false));
+        }
+
+        [Test]
+        public void DetermineCombineDisabledReason_PlayMode_TakesPrecedenceOverEverythingElse()
+        {
+            string reason = MeshCombinerWindow.DetermineCombineDisabledReason(validCount: 1, pathError: null, isPlayMode: true);
+
+            StringAssert.Contains("Play Mode", reason);
+        }
+
+        [Test]
+        public void DetermineCombineDisabledReason_NotPlayModeWithValidSourcesAndPath_ReturnsNull()
+        {
+            Assert.IsNull(MeshCombinerWindow.DetermineCombineDisabledReason(validCount: 1, pathError: null, isPlayMode: false));
         }
     }
 }

@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using UnityEditor;
 using VRC.SDKBase.Editor.BuildPipeline;
 
 namespace Tsvrc.Editor
@@ -17,7 +18,19 @@ namespace Tsvrc.Editor
                 return true;
 
             TsGenerator.AfterDomainReload(skipRefresh: true);
-            return true;
+
+            // HasBootstrapSignal() can still be false here, since the pass above defaults to allowBootstrap: false.
+            if (TsGenerator.HasBootstrapSignal()) return true;
+
+            bool cancelBuild = EditorUtility.DisplayDialog(
+                "Tsvrc Not Initialized",
+                "Tsvrc has never been set up in this scene: no TsConfig, no generated TsGenerated " +
+                "object, and no TsInstance subclass found anywhere in the project. Every TsBehaviour " +
+                "script's root reference will be null at runtime.\n\n" +
+                "Open Tsvrc > Configure and click \"Initialize Tsvrc\" before building, or continue " +
+                "anyway if this is intentional.",
+                "Cancel Build", "Build Anyway");
+            return !cancelBuild;
         }
     }
 }

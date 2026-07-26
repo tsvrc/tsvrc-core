@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
@@ -13,11 +14,16 @@ namespace Tsvrc.Editor
         private static readonly Regex TargetPattern = new Regex(@"^_[^_].*[^_]_$|^_[^_]_$", RegexOptions.Compiled);
         private static readonly Regex KeyRegex = new Regex(@"""key""\s*:\s*""([^""]+)""", RegexOptions.Compiled);
         private static readonly Regex LabelRegex = new Regex(@"""label""\s*:\s*""([^""]+)""", RegexOptions.Compiled);
+        // Matches a quoted, underscore-wrapped JSON key (an "entries" key like "_welcome_"). Not
+        // JSON-aware (same trade-off as KeyRegex/LabelRegex), but the _x_ naming convention keeps
+        // a plain-text scan reliable in practice.
+        private static readonly Regex EntryKeyRegex = new Regex(@"""(_[^""]*_)""\s*:", RegexOptions.Compiled);
 
         private TsTranslationConfig _config;
         private SerializedObject _so;
         private Vector2 _scroll;
         private int _tmpTargetCount = -1; // -1 = stale; invalidated by hierarchy changes
+        private List<string> _missingKeys; // stale whenever _tmpTargetCount is stale
         // Caches PeekKeyLabel results per TextAsset instanceID, avoids re-running two regex
         // matches per entry per repaint. Cleared when the config is reloaded.
         private readonly Dictionary<int, (string key, string label)> _peekCache =
@@ -25,8 +31,13 @@ namespace Tsvrc.Editor
 
         private SerializedProperty LanguageFiles => _so?.FindProperty("LanguageFiles");
 
-        [MenuItem("Tsvrc/Translation")]
-        private static void Open() => GetWindow<TsTranslationWindow>("Tsvrc Translation").Show();
+        [MenuItem("Tsvrc/Translation", priority = 2)]
+        private static void Open()
+        {
+            var window = GetWindow<TsTranslationWindow>("Translation");
+            window.minSize = new Vector2(460, 380);
+            window.Show();
+        }
 
         private void OnEnable()
         {
@@ -58,15 +69,12 @@ namespace Tsvrc.Editor
 
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("Tsvrc Translation", EditorStyles.boldLabel);
-            EditorGUILayout.Space(4);
-
             if (_config == null)
             {
-                EditorGUILayout.HelpBox(
+                TsEditorGUI.DrawStatusBox(
                     $"No translation config found at {TranslationModule.ConfigAssetPath}.\nCreate one to start configuring language files.",
                     MessageType.Info);
-                if (GUILayout.Button("Create Translation Config"))
+                if (TsEditorGUI.PrimaryButton("Create Translation Config"))
                     CreateConfig();
                 return;
             }
@@ -149,7 +157,8 @@ namespace Tsvrc.Editor
             if (GUILayout.Button("+ Add Language"))
                 prop.InsertArrayElementAtIndex(prop.arraySize);
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Create Sample JSON"))
+            if (GUILayout.Button(new GUIContent("Create Sample Language File",
+                "Writes a starter JSON file with the required \"key\"/\"label\"/\"entries\" shape and adds it to the list below.")))
                 ShowCreateSampleDialog();
             EditorGUILayout.EndHorizontal();
         }
@@ -161,12 +170,48 @@ namespace Tsvrc.Editor
 
             if (_tmpTargetCount < 0)
             {
-                _tmpTargetCount = 0;
-                foreach (var t in FindObjectsOfType<TMPro.TextMeshProUGUI>(true))
-                    if (TargetPattern.IsMatch(t.gameObject.name)) _tmpTargetCount++;
+                var sceneKeys = FindObjectsOfType<TMPro.TextMeshProUGUI>(true)
+                    .Select(t => t.gameObject.name)
+                    .Where(name => TargetPattern.IsMatch(name))
+                    .ToList();
+                _tmpTargetCount = sceneKeys.Count;
+
+                var availableKeys = LanguageFiles == null
+                    ? Enumerable.Empty<string>()
+                    : Enumerable.Range(0, LanguageFiles.arraySize)
+                        .Select(i => LanguageFiles.GetArrayElementAtIndex(i).objectReferenceValue as TextAsset)
+                        .Where(ta => ta != null)
+                        .SelectMany(ta => ExtractEntryKeys(ta.text));
+                _missingKeys = FindMissingKeys(sceneKeys, availableKeys);
             }
 
             EditorGUILayout.LabelField($"TextMeshProUGUI (UI):   {_tmpTargetCount}", EditorStyles.miniLabel);
+
+            if (_missingKeys.Count > 0)
+                TsEditorGUI.DrawStatusBox(
+                    $"{_missingKeys.Count} scene target(s) have no matching key in any language file " +
+                    $"(likely a typo in the GameObject name): {string.Join(", ", _missingKeys)}",
+                    MessageType.Warning);
+        }
+
+        // Every "_x_"-style entry key in the file's raw JSON text, regardless of nesting depth.
+        internal static IEnumerable<string> ExtractEntryKeys(string json)
+        {
+            if (string.IsNullOrEmpty(json)) yield break;
+            foreach (Match m in EntryKeyRegex.Matches(json))
+                yield return m.Groups[1].Value;
+        }
+
+        // Scene target names (already filtered to the "_x_" convention) with no matching key in
+        // any configured language file. Pure and internal so it's directly unit-testable.
+        internal static List<string> FindMissingKeys(IEnumerable<string> sceneTargetKeys, IEnumerable<string> availableKeys)
+        {
+            var available = new HashSet<string>(availableKeys);
+            return sceneTargetKeys
+                .Where(k => !available.Contains(k))
+                .Distinct()
+                .OrderBy(k => k, System.StringComparer.Ordinal)
+                .ToList();
         }
 
         private void CreateConfig()

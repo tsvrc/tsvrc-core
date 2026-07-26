@@ -4,12 +4,10 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // Tests TsGenerator.DetectAndExcludeFieldNameCollisions() in isolation from Run().
-    // Among the real 9 modules, only SingletonModule currently overrides
-    // ExposedFieldNames()/ExcludeFieldNames(), and its own Resolve()/Deduplicate() step
-    // already prevents same-module collisions before this ever runs - so the cross-module
-    // path is only reachable through synthetic modules like these, confirming the
-    // mechanism itself still works even though no real module combination currently trips it.
+    // Tests TsGenerator.DetectAndExcludeFieldNameCollisions() in isolation from Run(). Only
+    // SingletonModule overrides ExposedFieldNames()/ExcludeFieldNames() among real modules, and its
+    // own Deduplicate() step prevents same-module collisions - so the cross-module path is only
+    // reachable through synthetic modules like these.
     public class TsGeneratorFieldCollisionTests
     {
         private class RecordingModule : TsModule
@@ -62,6 +60,47 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsTrue(a.ExcludedNames.Contains("Shared"));
             Assert.IsTrue(b.ExcludedNames.Contains("Shared"));
             Assert.IsTrue(c.ExcludedNames.Contains("Shared"));
+        }
+
+        [Test]
+        public void TwoModulesExposeSameName_LastFieldNameCollisionsRecordsIt()
+        {
+            var a = new RecordingModule("Foo");
+            var b = new RecordingModule("Foo");
+
+            TsGenerator.DetectAndExcludeFieldNameCollisions(new List<TsModule> { a, b });
+
+            CollectionAssert.Contains(TsGenerator.LastFieldNameCollisions, "Foo");
+        }
+
+        [Test]
+        public void NoCollision_LastFieldNameCollisionsIsEmpty()
+        {
+            var a = new RecordingModule("Alpha");
+            var b = new RecordingModule("Beta");
+
+            TsGenerator.DetectAndExcludeFieldNameCollisions(new List<TsModule> { a, b });
+
+            Assert.IsEmpty(TsGenerator.LastFieldNameCollisions);
+        }
+
+        [Test]
+        public void PreviousCollisionResolved_LastFieldNameCollisionsClearsOnNextCall()
+        {
+            // A collision fixed by the user (e.g. renamed via __Alias__) must not linger in the
+            // recorded list forever - each call reflects only its own pass.
+            TsGenerator.DetectAndExcludeFieldNameCollisions(new List<TsModule>
+            {
+                new RecordingModule("Foo"), new RecordingModule("Foo"),
+            });
+            Assert.IsNotEmpty(TsGenerator.LastFieldNameCollisions);
+
+            TsGenerator.DetectAndExcludeFieldNameCollisions(new List<TsModule>
+            {
+                new RecordingModule("Alpha"), new RecordingModule("Beta"),
+            });
+
+            Assert.IsEmpty(TsGenerator.LastFieldNameCollisions);
         }
 
         [Test]

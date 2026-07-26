@@ -10,10 +10,8 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Generates a Create{Name}(Transform parent) factory method per configured prefab.
-    // At wire time, instantiates each prefab under a "Factories" child (inactive by
-    // default) so TsGenerated can hand out instances on demand without a Resources
-    // load. Builtin and user factory groups are merged; group names become a name prefix.
+    // Instantiates each prefab under a "Factories" child (inactive by default) at wire
+    // time. Builtin and user factory groups are merged; group names become a name prefix.
     internal class FactoryModule : TsModule
     {
         private List<FactoryEntry> _entries = new List<FactoryEntry>();
@@ -34,6 +32,11 @@ namespace Tsvrc.Editor
         {
             var factoriesProp = so.FindProperty("Factories");
 
+            if (factoriesProp.arraySize == 0)
+                TsEditorGUI.DrawStatusBox(
+                    "No factory groups registered yet. Add a group below to register prefabs for on-demand instantiation.",
+                    MessageType.None);
+
             int toDelete = -1;
             for (int i = 0; i < factoriesProp.arraySize; i++)
             {
@@ -52,8 +55,8 @@ namespace Tsvrc.Editor
                     : $"{groupName}   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})";
 
                 EditorGUILayout.BeginHorizontal();
-                // Foldout is UI-only state, save/restore GUI.changed so toggling it does not
-                // bubble up to TsWindow's EndChangeCheck and mark the config as dirty.
+                // Foldout is UI-only state - save/restore GUI.changed around it so toggling one
+                // never reads back as "the user edited TsConfig" to any future change-check.
                 bool prevChanged = GUI.changed;
                 GUI.changed = false;
                 expanded = EditorGUILayout.Foldout(expanded, foldoutLabel, true);
@@ -66,14 +69,20 @@ namespace Tsvrc.Editor
                 if (expanded)
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(groupNameProp, LabelGroupName);
-                    // Read groupName after PropertyField so the prefix preview reflects the current value.
+                    // DelayedTextField, not PropertyField: the name feeds Sanitize(name) into the
+                    // generated Create{Group}{Name} method, and TsConfig is a watched type -
+                    // PropertyField would write TsGeneratedFactory.cs and refresh on every keystroke.
+                    string committedName = EditorGUILayout.DelayedTextField(LabelGroupName, groupNameProp.stringValue);
+                    if (committedName != groupNameProp.stringValue)
+                        groupNameProp.stringValue = committedName;
+                    // Read groupName after the field so the prefix preview reflects the committed value.
                     string currentName = groupNameProp.stringValue;
                     string preview = string.IsNullOrWhiteSpace(currentName)
                         ? "Create…"
                         : $"Create{Sanitize(currentName)}…";
                     EditorGUILayout.LabelField($"Prefix:  {preview}", EditorStyles.miniLabel);
-                    EditorGUILayout.PropertyField(prefabsProp, LabelPrefabs, true);
+                    EditorGUILayout.LabelField(LabelPrefabs);
+                    ObjectListGUI.DrawObjectList(prefabsProp, assetsOnly: true);
                     EditorGUI.indentLevel--;
                 }
 

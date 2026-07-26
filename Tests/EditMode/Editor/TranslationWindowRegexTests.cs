@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
@@ -26,8 +28,6 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsNotNull(f, "TsTranslationWindow.TargetPattern field changed or was removed.");
             return (Regex)f.GetValue(null);
         }
-
-        // ---- PeekKeyLabel ----
 
         [Test]
         public void PeekKeyLabel_ValidJson_ExtractsKeyAndLabel()
@@ -85,10 +85,8 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void PeekKeyLabel_NestedEntryLabelBeforeTopLevelLabel_IncorrectlyMatchesNestedOne()
         {
-            // Known limitation: the regex isn't JSON-aware and just takes the first
-            // "label" occurrence in the raw text. If a nested per-entry "label" field
-            // happens to appear before the top-level one, PeekKeyLabel silently returns
-            // the wrong value instead of the file's actual display label.
+            // Known limitation: the regex isn't JSON-aware, so a nested per-entry "label"
+            // appearing before the top-level one wins - see assert message below.
             string json =
                 "{\"key\":\"en\"," +
                 "\"entries\":{\"_greeting_\":{\"label\":\"Hello\"}}," +
@@ -103,9 +101,8 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void PeekKeyLabel_WindowsOwnSampleJson_ParsesCorrectly()
         {
-            // Regression guard: the exact sample text ShowCreateSampleDialog() writes to
-            // disk should itself satisfy PeekKeyLabel — if the sample's shape ever drifts
-            // from what the regexes expect, this will catch it here instead of silently
+            // Regression guard: the exact sample text ShowCreateSampleDialog() writes should
+            // itself satisfy PeekKeyLabel, catching sample/regex drift here instead of silently
             // showing "⚠ Invalid File" for a user's freshly created sample.
             string sampleJson =
 @"{
@@ -127,8 +124,6 @@ namespace Tsvrc.Tests.EditMode
             Assert.AreEqual("English", label);
         }
 
-        // ---- TargetPattern ----
-
         [Test]
         public void TargetPattern_SingleUnderscoreWrappedName_Matches()
         {
@@ -145,6 +140,67 @@ namespace Tsvrc.Tests.EditMode
         public void TargetPattern_NoLeadingOrTrailingUnderscore_DoesNotMatch()
         {
             Assert.IsFalse(TargetPattern().IsMatch("a_b_c"));
+        }
+
+        // ExtractEntryKeys/FindMissingKeys are internal static and pure, called directly (no
+        // reflection needed, unlike PeekKeyLabel/TargetPattern above).
+
+        [Test]
+        public void ExtractEntryKeys_SampleJson_ReturnsAllThreeEntryKeys()
+        {
+            string json =
+@"{
+    ""key"": ""en"",
+    ""label"": ""English"",
+    ""entries"": {
+        ""_welcome_"": ""Welcome!"",
+        ""_start_"": {
+            ""label"": ""Start"",
+            ""description"": ""Button label to start the experience.""
+        },
+        ""_exit_"": ""Exit""
+    }
+}";
+            var keys = TsTranslationWindow.ExtractEntryKeys(json).ToList();
+
+            CollectionAssert.AreEquivalent(new[] { "_welcome_", "_start_", "_exit_" }, keys);
+        }
+
+        [Test]
+        public void ExtractEntryKeys_EmptyOrNullJson_ReturnsEmpty()
+        {
+            Assert.IsEmpty(TsTranslationWindow.ExtractEntryKeys(""));
+            Assert.IsEmpty(TsTranslationWindow.ExtractEntryKeys(null));
+        }
+
+        [Test]
+        public void FindMissingKeys_SceneKeyNotInAnyLanguageFile_IsReported()
+        {
+            var missing = TsTranslationWindow.FindMissingKeys(
+                sceneTargetKeys: new[] { "_welcome_", "_typo_key_" },
+                availableKeys: new[] { "_welcome_", "_exit_" });
+
+            CollectionAssert.AreEqual(new[] { "_typo_key_" }, missing);
+        }
+
+        [Test]
+        public void FindMissingKeys_AllSceneKeysCovered_ReturnsEmpty()
+        {
+            var missing = TsTranslationWindow.FindMissingKeys(
+                sceneTargetKeys: new[] { "_welcome_", "_exit_" },
+                availableKeys: new[] { "_welcome_", "_exit_", "_start_" });
+
+            Assert.IsEmpty(missing);
+        }
+
+        [Test]
+        public void FindMissingKeys_DuplicateSceneKeys_ReportedOnce()
+        {
+            var missing = TsTranslationWindow.FindMissingKeys(
+                sceneTargetKeys: new[] { "_typo_", "_typo_" },
+                availableKeys: Enumerable.Empty<string>());
+
+            Assert.AreEqual(new[] { "_typo_" }, missing);
         }
     }
 }

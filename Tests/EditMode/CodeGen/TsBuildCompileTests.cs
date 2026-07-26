@@ -5,18 +5,15 @@ using VRC.SDKBase.Editor.BuildPipeline;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TsBuildCompile ensures generated files/wiring are current before every VRChat
-    // world build. No real build is needed to exercise it - just call OnBuildRequested
-    // directly.
+    // TsBuildCompile ensures generated files/wiring are current before every VRChat world
+    // build; OnBuildRequested can be called directly without a real build.
     //
-    // TsGenerator.Run() is bootstrap-gated (HasBootstrapSignal()) and this project has
-    // no TsInstance subclass of its own yet, so a bare call would silently no-op via
-    // WaitForBootstrapSignal rather than actually running - add a real TsConfig to a
-    // temp scene first to guarantee a deterministic, real bootstrap signal.
+    // TsGenerator.Run() is bootstrap-gated and this project has no TsInstance subclass, so a
+    // bare call would silently no-op via WaitForBootstrapSignal - add a real TsConfig first to
+    // guarantee a deterministic bootstrap signal.
     //
-    // TsGenerator is a static, project-wide singleton - Run() really does write
-    // Assets/TsGenerated/*.cs to disk for real. GeneratedFileBackup makes that
-    // destructive-safe; the TearDown's extra AfterDomainReload() call resets the
+    // TsGenerator is a static, project-wide singleton - Run() writes Assets/TsGenerated/*.cs for
+    // real. GeneratedFileBackup makes that safe; TearDown's extra AfterDomainReload() resets the
     // process-lifetime EditorApplication hooks Run() leaves subscribed.
     public class TsBuildCompileTests
     {
@@ -38,13 +35,10 @@ namespace Tsvrc.Tests.EditMode
             _backup.Dispose();
 
             // Run() leaves EditorApplication.hierarchyChanged/Undo.postprocessModifications
-            // subscribed for the rest of the process once it completes past the bootstrap
-            // gate - harmless in production (that's the whole design), but in a test session
-            // it means those handlers would keep reacting to every subsequent test's temp
-            // scene churn. Since the TsConfig-bearing scope is already disposed above,
-            // this call finds no bootstrap signal, unsubscribes OnHierarchyChanged (Run()
-            // does that unconditionally at its own top) and re-arms only the lightweight
-            // WaitForBootstrapSignal poller, restoring a safe idle state for later tests.
+            // subscribed process-wide once past the bootstrap gate. With the TsConfig-bearing
+            // scope already disposed above, this call finds no bootstrap signal, unsubscribes
+            // OnHierarchyChanged, and re-arms only the WaitForBootstrapSignal poller - restoring
+            // a safe idle state for later tests.
             TsGenerator.AfterDomainReload(skipRefresh: true);
         }
 
@@ -62,10 +56,23 @@ namespace Tsvrc.Tests.EditMode
             bool result = callback.OnBuildRequested(VRCSDKRequestedBuildType.Scene);
 
             Assert.IsTrue(result);
-            // AfterDomainReload(skipRefresh:true) -> Run() populates TsGenerator.WatchedPaths
-            // once the bootstrap gate passes. A non-empty set is the only externally observable
-            // proof the generator pass actually executed.
+            // Run() populates TsGenerator.WatchedPaths once the bootstrap gate passes; a non-empty
+            // set is the only externally observable proof the generator pass actually executed.
             Assert.IsNotEmpty(TsGenerator.WatchedPaths);
+        }
+
+        [Test]
+        public void OnBuildRequested_SceneBuildAlreadyBootstrapped_ReturnsTrueWithoutShowingDialog()
+        {
+            // SetUp's TsConfig guarantees HasBootstrapSignal() is true, so OnBuildRequested returns
+            // true immediately without reaching the confirm dialog - the only branch safe to test
+            // automatedly, since the "never bootstrapped" branch calls EditorUtility.DisplayDialog,
+            // whose behavior under -batchmode isn't reliable.
+            var callback = new TsBuildCompile();
+
+            bool result = callback.OnBuildRequested(VRCSDKRequestedBuildType.Scene);
+
+            Assert.IsTrue(result);
         }
 
         [Test]
@@ -73,11 +80,9 @@ namespace Tsvrc.Tests.EditMode
         {
             var callback = new TsBuildCompile();
 
-            // Establish a known, non-empty baseline first (Scene build above, or any prior
-            // Run()), then clear it via a type we don't have a public reset for - instead,
-            // capture the reference before/after and confirm it is the exact same collection
-            // instance (Run() always assigns a brand-new HashSet to WatchedPaths, so an
-            // unchanged reference proves Run() did not execute).
+            // Establish a known, non-empty baseline (Scene build above), then capture the
+            // WatchedPaths reference before/after: Run() always assigns a brand-new HashSet,
+            // so an unchanged reference proves Run() did not execute.
             callback.OnBuildRequested(VRCSDKRequestedBuildType.Scene);
             var before = TsGenerator.WatchedPaths;
 

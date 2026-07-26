@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using Tsvrc.Config;
 using Tsvrc.Core;
 using UnityEditor;
@@ -19,8 +20,30 @@ namespace Tsvrc.Editor
     internal static class TsGenerator
     {
         private const string GeneratedFolder = "Assets/TsGenerated";
+        private const string PendingBootstrapKey = "Tsvrc.PendingBootstrap";
 
         internal static HashSet<string> WatchedPaths { get; private set; } = new HashSet<string>();
+
+        // True while a deliberate bootstrap (e.g. a "Force Regenerate"/"Initialize Tsvrc" click) has
+        // written files and is waiting for the recompile it triggered to settle. Session-scoped by
+        // design: it only needs to survive the domain reload that follows a write, never a full editor
+        // restart. Consumed (and cleared) by the very next AfterDomainReload() call - see there.
+        internal static bool IsBootstrapPending => SessionState.GetBool(PendingBootstrapKey, false);
+
+        // Fired at the end of every Run() pass, regardless of which branch it exited through, so UI
+        // (editor windows) can react to "something may have changed" instead of polling on OnFocus.
+        internal static event Action StateChanged;
+
+        // Every module logs warnings/errors with a "[ModuleName]"/"[Tsvrc]"/"[TsGenerator]" prefix
+        // (established convention across all modules) - matched here to distinguish Tsvrc's own
+        // diagnostics from unrelated log noise that might occur during the same Run() pass.
+        private static readonly Regex TsLogPrefix = new Regex(@"^\[(Tsvrc|TsGenerator|\w+Module)\]", RegexOptions.Compiled);
+
+        // Warnings/errors logged by the most recent Run() pass, so TsWindow can point at them
+        // instead of a user only finding out by happening to have the Console open. Complements
+        // (does not replace) LastFieldNameCollisions, which gives that one specific, very common
+        // case its own actionable message.
+        internal static IReadOnlyList<string> LastRunWarnings { get; private set; } = Array.Empty<string>();
 
         private static List<TsModule> _activeModules;
         private static HashSet<string> _watchedComponentTypeNames = new HashSet<string>(StringComparer.Ordinal);
@@ -33,22 +56,55 @@ namespace Tsvrc.Editor
         private static bool _isWiring;
         private static bool _justFinishedWiring;
 
-        [MenuItem("Tsvrc/Force Regenerate")]
+        [MenuItem("Tsvrc/Force Regenerate", priority = 21)]
         public static void ManualGenerate()
         {
             Run(allowBootstrap: true);
             Debug.Log("[Tsvrc] Regenerated.");
         }
 
-        internal static void AfterDomainReload(bool skipRefresh = false) => Run(skipRefresh);
+        // Greys the menu item out during play mode instead of letting the click silently no-op
+        // (Run() itself already bails on isPlayingOrWillChangePlaymode - see below).
+        [MenuItem("Tsvrc/Force Regenerate", true)]
+        private static bool ValidateManualGenerate() => !EditorApplication.isPlayingOrWillChangePlaymode;
 
-        // allowBootstrap: false (the default, used by every automatic trigger - domain reload,
-        // asset watcher, hierarchy/undo watcher) means Run() will not create the scaffold from
-        // nothing. It only proceeds if HasBootstrapSignal() finds a reason to believe this
-        // project actually uses Tsvrc; otherwise it waits for one via WaitForBootstrapSignal.
-        // ManualGenerate() (the "Force Regenerate" menu item) passes true, since a deliberate
-        // click is itself the bootstrap signal.
+        // The automatic post-compile trigger (see TsDomainReloadHandler). Consumes the pending-bootstrap
+        // flag set by a prior Run(allowBootstrap: true) that had to stop for a recompile (see Run()
+        // below), carrying it through as allowBootstrap: true so one "Force Regenerate" click completes
+        // the whole scaffold sequence without a second click.
+        internal static void AfterDomainReload(bool skipRefresh = false)
+        {
+            bool pending = SessionState.GetBool(PendingBootstrapKey, false);
+            if (pending) SessionState.SetBool(PendingBootstrapKey, false);
+            Run(skipRefresh, allowBootstrap: pending);
+        }
+
+        // allowBootstrap: false (the default, used by every automatic trigger) waits for
+        // HasBootstrapSignal() via WaitForBootstrapSignal instead of creating the scaffold outright.
+        // ManualGenerate() passes true, since a deliberate click is itself the bootstrap signal.
         internal static void Run(bool skipRefresh = false, bool allowBootstrap = false)
+        {
+            var collectedWarnings = new List<string>();
+            void OnLog(string condition, string stackTrace, LogType type)
+            {
+                if ((type == LogType.Warning || type == LogType.Error) && TsLogPrefix.IsMatch(condition))
+                    collectedWarnings.Add(condition);
+            }
+
+            Application.logMessageReceived += OnLog;
+            try
+            {
+                RunCore(skipRefresh, allowBootstrap);
+            }
+            finally
+            {
+                Application.logMessageReceived -= OnLog;
+                LastRunWarnings = collectedWarnings;
+                StateChanged?.Invoke();
+            }
+        }
+
+        private static void RunCore(bool skipRefresh, bool allowBootstrap)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             EditorApplication.hierarchyChanged -= OnHierarchyChanged;
@@ -82,13 +138,12 @@ namespace Tsvrc.Editor
 
             if (WriteModules(modules))
             {
-                // Even with skipRefresh (build-time — see TsBuildCompile), stop here rather
-                // than falling through to Wire() below: the compiled type on disk is now stale
-                // relative to what was just written, so wiring against it would operate on the
-                // wrong field set. The real recompile that follows (e.g. UdonSharp's own
-                // build-time pass) triggers a fresh domain reload, which calls AfterDomainReload()
-                // again with the now-current compiled type (see TsDomainReloadHandler) — that
-                // pass is what actually wires.
+                // Stop here even with skipRefresh (build-time — see TsBuildCompile): the compiled
+                // type on disk is now stale relative to what was just written, so wiring against it
+                // would target the wrong field set. The recompile this triggers calls
+                // AfterDomainReload() again with the now-current type (see TsDomainReloadHandler),
+                // and that pass is what actually wires.
+                if (allowBootstrap) SessionState.SetBool(PendingBootstrapKey, true);
                 if (!skipRefresh) AssetDatabase.Refresh();
                 return;
             }
@@ -103,6 +158,7 @@ namespace Tsvrc.Editor
             bool filesWritten = WriteModules(modules);
             if (filesWritten || stableChanged)
             {
+                if (allowBootstrap) SessionState.SetBool(PendingBootstrapKey, true);
                 if (!skipRefresh) AssetDatabase.Refresh();
                 return;
             }
@@ -145,13 +201,12 @@ namespace Tsvrc.Editor
             Run(allowBootstrap: true);
         }
 
-        // True if there's a concrete reason to believe this project uses Tsvrc: an existing
-        // TsConfig, an existing scaffold instance in the scene (already bootstrapped, this
-        // is just maintenance), or a user-authored TsInstance subclass anywhere in the
-        // project (declared before ever placing it in a scene). Types marked
-        // [TsCodegenIgnore] (e.g. a test double TsInstance subclass) are excluded from that
-        // last scan - see TsCodegenIgnoreAttribute's own doc comment for why.
-        private static bool HasBootstrapSignal()
+        // Types marked [TsCodegenIgnore] (e.g. a test double TsInstance subclass) are excluded
+        // from the TsInstance scan below - see TsCodegenIgnoreAttribute's own doc comment for why.
+        //
+        // Internal (not private) so TsBuildCompile can ask the same question at build time:
+        // it decides whether skipping bootstrap silently is safe, or the user should be warned.
+        internal static bool HasBootstrapSignal()
         {
             if (UnityEngine.Object.FindObjectOfType<TsConfig>(true) != null) return true;
 
@@ -232,12 +287,10 @@ namespace Tsvrc.Editor
             new ScaffoldModule(),
         };
 
-        // Any field name exposed (via ExposedFieldNames()) by more than one module is
-        // stripped from every module that declared it (via ExcludeFieldNames()), so a name
-        // collision never silently produces two same-named fields on TsGenerated. Only
-        // SingletonModule currently overrides ExposedFieldNames()/ExcludeFieldNames() among
-        // the real modules, so this path is otherwise only exercisable with synthetic test
-        // modules.
+        // Any field name exposed by more than one module is stripped from every module that
+        // declared it, so a collision never silently produces two same-named fields on TsGenerated.
+        // Only SingletonModule currently overrides ExposedFieldNames()/ExcludeFieldNames() among the
+        // real modules, so this path is otherwise only exercisable with synthetic test modules.
         internal static void DetectAndExcludeFieldNameCollisions(List<TsModule> modules)
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -249,7 +302,17 @@ namespace Tsvrc.Editor
             if (duplicates.Count > 0)
                 foreach (var module in modules)
                     module.ExcludeFieldNames(duplicates);
+
+            // Recorded even when empty, so a collision fixed by the user is reflected on the very
+            // next Run() rather than lingering in the UI (see TsWindow's warning box).
+            LastFieldNameCollisions = duplicates.OrderBy(n => n, StringComparer.Ordinal).ToList();
         }
+
+        // Field names dropped by the most recent Run() because more than one module tried to
+        // expose the same name (e.g. a Singleton and a Construct both deriving "GameManager").
+        // Surfaced in TsWindow as a warning instead of only the console Debug.LogError each
+        // affected module already logs - see ExcludeFieldNames() overrides.
+        internal static IReadOnlyList<string> LastFieldNameCollisions { get; private set; } = Array.Empty<string>();
 
         private static bool WriteModules(List<TsModule> modules)
         {

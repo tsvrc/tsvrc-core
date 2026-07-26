@@ -11,12 +11,10 @@ using UnityEngine.SceneManagement;
 
 namespace Tsvrc.Editor
 {
-    // Generates per-type pool slots on TsGenerated and instantiates the configured
-    // prefabs under a "Pool" child object at wire time. Slot counts are derived from
-    // a dependency graph: external scene refs + contributions from parent pool types,
-    // so nested [WirePool] fields inside pool types produce the correct slot totals.
-    // Wiring is two-phase: instantiate first, then collect targets (including the new
-    // instances) and assign [WirePool] fields on all of them.
+    // Generates per-type pool slots on TsGenerated and instantiates prefabs under a "Pool"
+    // child at wire time. Slot counts come from a dependency graph: external scene refs plus
+    // contributions from parent pool types, so nested [WirePool] fields inside pool types
+    // produce the correct slot totals.
     internal class PoolModule : TsModule
     {
         private List<(Component prefab, string typeName)> _poolEntries = new List<(Component, string)>();
@@ -40,7 +38,9 @@ namespace Tsvrc.Editor
             "Register UdonSharpBehaviour prefabs to pool. " +
             "The system automatically instantiates all slots, initializes them, and wires every [WirePool] field across your behaviours at compile time. " +
             "No manual scene placement, no cross-behaviour drag-and-drop, and no broken references when you refactor.";
-        internal override void DrawTab(SerializedObject so) => ObjectListGUI.DrawObjectList(so, "PooledObjects");
+        internal override void DrawTab(SerializedObject so) => ObjectListGUI.DrawObjectList(so, "PooledObjects",
+            "No pooled prefabs registered yet. Add a prefab here to make it available for network-synced spawning.",
+            assetsOnly: true);
 
         internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
 
@@ -392,9 +392,8 @@ namespace Tsvrc.Editor
             return field.IsPublic || attrs.Any(a => a.GetType().Name == "SerializeField");
         }
 
-        // Builtins are processed before user config so builtin types always occupy the
-        // lower slot indices — slot 0 for a given type is always the same prefab regardless
-        // of how many user entries are added.
+        // Builtins are processed before user config so builtin types always occupy the lower
+        // slot indices (e.g. slot 0 stays the same prefab regardless of added user entries).
         private static List<(Component prefab, string typeName)> ResolveConfig(TsConfig userConfig, TsBuiltinConfig builtinConfig)
         {
             var entries = new List<(Component, string)>();
@@ -436,12 +435,9 @@ namespace Tsvrc.Editor
                     for (var t = behaviour.GetType(); t != null && t != typeof(MonoBehaviour) && t != typeof(UdonSharpBehaviour); t = t.BaseType)
                         foreach (var field in t.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
                         {
-                            // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 5: this used to check only
-                            // for the [WirePool] attribute, without the public/[SerializeField]
-                            // requirement that ScanExternalRefs/ScanInternalDeps apply via
-                            // IsWirePoolField - so a non-serialized private [WirePool] field
-                            // contributed nothing to slot counts but still inflated the
-                            // target/slot mismatch warnings by one. Now both scans agree.
+                            // IsWirePoolField excludes non-serialized private [WirePool] fields,
+                            // matching ScanExternalRefs/ScanInternalDeps - otherwise the target/slot
+                            // mismatch warning below would misreport by one.
                             if (!IsWirePoolField(field)) continue;
                             if (field.FieldType.IsArray || field.FieldType.IsGenericType) continue;
 

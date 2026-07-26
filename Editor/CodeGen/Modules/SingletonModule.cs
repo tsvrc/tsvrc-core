@@ -8,15 +8,10 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Generates one public field on TsGenerated per configured singleton, wired by
-    // direct reference. Generates _TsSingletonStart() which calls TsConstruct(this) on
-    // any singleton that is a TsBehaviour.
-    //
-    // Singletons are scene objects by nature, so they're read from TsConfig - a scene
-    // component ScaffoldModule auto-creates/heals under TsGenerated, not an asset (an asset
-    // cannot hold a reference to a scene object: no stable cross-file address for it). Builtin/
-    // library-internal singletons are expected to be asset-type objects, so those still come
-    // from TsBuiltinConfig (which is a genuine asset).
+    // Singletons are scene objects, so they come from TsConfig - a scene component
+    // ScaffoldModule auto-creates/heals under TsGenerated, since an asset can't hold a
+    // reference to a scene object. Builtin singletons are asset-type objects, so those
+    // come from TsBuiltinConfig instead.
     internal class SingletonModule : TsModule
     {
         private List<SingletonEntry> _entries = new List<SingletonEntry>();
@@ -26,7 +21,9 @@ namespace Tsvrc.Editor
         internal override string TabLabel => "Singletons";
         internal override string TabDescription =>
             "Register any scene object or component as a named field on _ts. After compiling, access it from any TsBehaviour via _ts.FieldName. Example: drag your GameManager here, then use _ts.GameManager from any behaviour.";
-        internal override void DrawTab(SerializedObject so) => ObjectListGUI.DrawObjectList(so, "Singletons");
+        internal override void DrawTab(SerializedObject so) => ObjectListGUI.DrawObjectList(so, "Singletons",
+            "No singletons registered yet. Add a scene object here to expose it as a field on TsGenerated.",
+            warnDuplicates: true);
 
         internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
 
