@@ -29,7 +29,7 @@ namespace Tsvrc.Tests.EditMode
         public void NotifyTrackedPlayersProcessStarted_Broadcasting_SetsLastPlayerIdsAndFiresHookAndEvent()
         {
             // TsEmit's actual pub/sub delivery mechanics are already fully covered by
-            // TsBehaviourTests; this only needs to confirm the call completes without
+            // TsvrcBehaviourTests; this only needs to confirm the call completes without
             // throwing (no subscribers registered) and the hook/state side effects land.
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
             SetBroadcasting(tracker, true);

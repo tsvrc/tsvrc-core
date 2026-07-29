@@ -2,7 +2,7 @@ using System.Collections;
 using NUnit.Framework;
 using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
-using Tsvrc.Tests.PlayMode.Core.TsProcess;
+using Tsvrc.Tests.PlayMode.Core.Process;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
@@ -15,7 +15,7 @@ namespace Tsvrc.Tests.PlayMode.UI.TsPlayerPositionOverlay
     // resolve at all. Both ticks are SendCustomEventDelayedSeconds-scheduled (empty method body
     // on the plain C# UdonSharpBehaviour base class in both modes), so they are invoked directly
     // below rather than waited on.
-    public class TsPlayerPositionOverlayPlayModeTests : TsProcessPlayModeTestBase
+    public class TsPlayerPositionOverlayPlayModeTests : ProcessPlayModeTestBase
     {
         private GameObject _imageGameObject;
 

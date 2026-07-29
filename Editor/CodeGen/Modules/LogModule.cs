@@ -7,7 +7,7 @@ using UnityEngine;
 namespace Tsvrc.Editor
 {
     // Generates _log and _TsLogStart() on TsGenerated so every system reaches logging
-    // only through TsGenerated.Log (or TsBehaviour.LogInfo/LogWarning/LogError). Mirrors MemoryModule.
+    // only through TsGenerated.Log (or TsvrcBehaviour.LogInfo/LogWarning/LogError). Mirrors MemoryModule.
     internal class LogModule : TsModule
     {
         // Package-relative, not a literal - see PackagePaths.

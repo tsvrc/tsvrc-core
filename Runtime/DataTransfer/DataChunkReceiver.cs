@@ -62,7 +62,7 @@ namespace Tsvrc.DataTransfer
             // callback (e.g. OnReadyCheckCompleted, which fires inline from BroadcastAddReadyPlayer),
             // CallingPlayer = the remote sender of that outer event, which would cause remote
             // clients to reject the owner's chunks, stalling the transfer indefinitely.
-            // IsProcessOwner() is safe here: TsProcess.StartProcess() sets _ownerId
+            // IsProcessOwner() is safe here: Process.StartProcess() sets _ownerId
             // synchronously before OnProcessStarted() fires, so it is always accurate at this point.
             if (IsProcessOwner())
             {
@@ -213,7 +213,7 @@ namespace Tsvrc.DataTransfer
             // TsArray.Contains crashes on null.Length without this check.
             if (playerIds == null) return;
 
-            // _localPlayerId is cached once in TsProcess.TsStart(); VRChat guarantees
+            // _localPlayerId is cached once in Process.TsStart(); VRChat guarantees
             // displayName and playerId are immutable for the duration of a session.
             var playerId = _localPlayerId;
             if (!TsArray.Contains(playerIds, playerId)) return;

@@ -201,8 +201,8 @@ namespace Tsvrc.Editor
             Run(allowBootstrap: true);
         }
 
-        // Types marked [TsCodegenIgnore] (e.g. a test double TsInstance subclass) are excluded
-        // from the TsInstance scan below - see TsCodegenIgnoreAttribute's own doc comment for why.
+        // Types marked [TsCodegenIgnore] (e.g. a test double Instance subclass) are excluded
+        // from the Instance scan below - see TsCodegenIgnoreAttribute's own doc comment for why.
         //
         // Internal (not private) so TsBuildCompile can ask the same question at build time:
         // it decides whether skipping bootstrap silently is safe, or the user should be warned.
@@ -220,7 +220,7 @@ namespace Tsvrc.Editor
                 catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
 
                 foreach (var type in types)
-                    if (type != typeof(TsInstance) && !type.IsAbstract && typeof(TsInstance).IsAssignableFrom(type)
+                    if (type != typeof(Instance) && !type.IsAbstract && typeof(Instance).IsAssignableFrom(type)
                         && type.GetCustomAttribute<TsCodegenIgnoreAttribute>() == null)
                         return true;
             }

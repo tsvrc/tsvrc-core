@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TsPlayerPositionOverlay IS a PlayerTracker (via TsProcess), so
+    // TsPlayerPositionOverlay IS a PlayerTracker (via Process), so
     // PlayerTrackerTestBase's CreateProcess<T>/SeedAsOwner/SetTrackedPlayerIds apply
     // unchanged. VRCPlayerApi.GetPlayerCount()/Networking.LocalPlayer are safe
     // (non-throwing, returning 0/null) outside Play Mode - established by the

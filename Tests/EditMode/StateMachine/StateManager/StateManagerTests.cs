@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Tsvrc.Tests.EditMode
 {
     // StateManager never touches Networking/VRCPlayerApi, so - same reasoning as
-    // TsBehaviourTests - nothing here needs ClientSim or Play Mode. Play Mode
+    // TsvrcBehaviourTests - nothing here needs ClientSim or Play Mode. Play Mode
     // coverage (Tests/PlayMode/StateMachine/StateManager/) is limited to the one thing
     // Edit Mode structurally can't prove: real deferred GameObject destruction and
     // multi-frame sequencing.

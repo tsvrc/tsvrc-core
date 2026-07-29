@@ -2,9 +2,9 @@ using Tsvrc.Testing.Framework;
 namespace Tsvrc.Tests.EditMode
 {
     // Extends ReadyCheckProcessTestBase (which itself extends PlayerTrackerTestBase /
-    // TsProcessTestBase) to reuse CreateProcess<T>/SeedAsOwner/GetTrackedPlayerIds/
+    // ProcessTestBase) to reuse CreateProcess<T>/SeedAsOwner/GetTrackedPlayerIds/
     // GetReadyPlayerIds/ForceNextTickDueNow/etc. - every class in the DataTransfer chain IS a
-    // ReadyCheckProcess (IS a PlayerTracker, IS a TsProcess), so every helper built for those
+    // ReadyCheckProcess (IS a PlayerTracker, IS a Process), so every helper built for those
     // base classes applies here unchanged. Adds helpers for the DataTransfer-chain-specific
     // private fields, named per class for readability; less-frequently-touched fields are
     // accessed directly via PrivateFieldAccess at the call site, matching the established

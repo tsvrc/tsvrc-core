@@ -95,7 +95,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void IsTsBehaviourType_RealTsBehaviourSubclass_ReturnsTrue()
         {
-            // Tsvrc.StateMachine.StateManager : TsBehaviour - a real production type,
+            // Tsvrc.StateMachine.StateManager : TsvrcBehaviour - a real production type,
             // not a test double, so this exercises the actual inheritance chain in this project.
             Assert.IsTrue(TsModuleTestHarness.CallIsTsBehaviourType("StateManager", "Tsvrc.StateMachine"));
         }
@@ -103,7 +103,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void IsTsBehaviourType_UdonSharpBehaviourNotExtendingTsBehaviour_ReturnsFalse()
         {
-            // TsRoot : UdonSharpBehaviour directly - never TsBehaviour.
+            // TsRoot : UdonSharpBehaviour directly - never TsvrcBehaviour.
             Assert.IsFalse(TsModuleTestHarness.CallIsTsBehaviourType("TsRoot", "Tsvrc.Core.Generated"));
         }
 

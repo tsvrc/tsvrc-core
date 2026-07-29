@@ -100,7 +100,7 @@ namespace Tsvrc.Tests.EditMode
             AssertHasNetworkCallableRateLimit(nameof(TsTimer.RequestResumeTimer), 2);
         }
 
-        // Mirrors TsInstanceTests.TsStart_IsNotOverriddenByTsInstance's own
+        // Mirrors InstanceTests.TsStart_IsNotOverriddenByTsInstance's own
         // reflection-based "prove a non-override, not just assume it" pattern.
         [Test]
         public void DoesNotOverride_OnOwnerAbandonedProcess()
@@ -108,19 +108,19 @@ namespace Tsvrc.Tests.EditMode
             MethodInfo method = typeof(TsTimer).GetMethod("OnOwnerAbandonedProcess",
                 BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.IsNotNull(method);
-            Assert.AreEqual(typeof(Tsvrc.Core.TsProcess), method.DeclaringType,
+            Assert.AreEqual(typeof(Tsvrc.Core.Process), method.DeclaringType,
                 "TsTimer must not override OnOwnerAbandonedProcess - if it ever does, the " +
                 "ownership-handover Play Mode tests' premise (no timer-specific override to break) " +
                 "silently stops holding.");
         }
 
         // OnPlayerLeft/OnOwnershipTransferred/OnPlayerSuspendChanged are each
-        // overloaded (UdonSharpBehaviour's own base declarations plus TsProcess's
+        // overloaded (UdonSharpBehaviour's own base declarations plus Process's
         // override), so plain GetMethod(name) throws AmbiguousMatchException - filtered
         // by parameter count instead of naming VRCPlayerApi as the parameter type
         // directly, since that type isn't resolvable from the Tsvrc.Tests.EditMode
         // asmdef at all (established convention in this suite - see
-        // TsProcessTestBase's own header comment: real VRCPlayerApi usage is
+        // ProcessTestBase's own header comment: real VRCPlayerApi usage is
         // Play-Mode-only).
         private static void AssertDoesNotOverride(string methodName)
         {
@@ -135,7 +135,7 @@ namespace Tsvrc.Tests.EditMode
             }
 
             Assert.IsNotNull(match, methodName + "(1 param) not found on TsTimer. Signature changed?");
-            Assert.AreEqual(typeof(Tsvrc.Core.TsProcess), match.DeclaringType);
+            Assert.AreEqual(typeof(Tsvrc.Core.Process), match.DeclaringType);
         }
 
         [Test]

@@ -10,14 +10,14 @@ namespace Tsvrc.Tests.EditMode
     // InstanceModule.Wire() against a real compiled root. Creating a real child+component
     // (CreateComponent) needs `_detectedType` to be a genuine, already-compiled
     // UdonSharpBehaviour with a real script asset - using an actual production
-    // TsInstance subclass would work, but this project intentionally has none yet, and
+    // Instance subclass would work, but this project intentionally has none yet, and
     // adding one as a permanent test double would change TsGenerator.HasBootstrapSignal()
     // for the whole project, not just tests (InstanceModule doesn't care whether the
-    // "detected" type is actually a TsInstance subclass for the plumbing exercised here,
+    // "detected" type is actually a Instance subclass for the plumbing exercised here,
     // only DetectInstanceType() does - which isn't under test in this file). So
     // InstanceModuleWireTestDouble stands in as a real, already-compiled UdonSharpBehaviour:
     // CreateComponent()'s mechanics (script lookup, program asset creation, component add)
-    // don't care that it isn't a TsInstance.
+    // don't care that it isn't a Instance.
     //
     // InstanceModuleWireTestDouble specifically (rather than a real production class like
     // StateManager) because it has no UdonSharpProgramAsset anywhere else in the project.
@@ -92,9 +92,9 @@ namespace Tsvrc.Tests.EditMode
         private UnityEngine.Object InstanceFieldValue()
             => new SerializedObject(_root).FindProperty("_instance").objectReferenceValue;
 
-        // Note: `_instance` is declared as `TsInstance`, and `InstanceModuleWireTestDouble` (the
+        // Note: `_instance` is declared as `Instance`, and `InstanceModuleWireTestDouble` (the
         // real, already-compiled stand-in type used throughout this file - see the class
-        // comment) does NOT extend TsInstance. Unity's SerializedProperty.objectReferenceValue
+        // comment) does NOT extend Instance. Unity's SerializedProperty.objectReferenceValue
         // setter silently clamps an incompatible-type assignment to null rather than
         // throwing, so the *field value* can't be faithfully asserted against an
         // InstanceModuleWireTestDouble instance here - only the scene-structure half
@@ -106,7 +106,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Wire_Ambiguous_IsCompleteNoOpEvenWithAValidExistingChild()
         {
-            var existingChild = _scope.CreateGameObject("TsInstance");
+            var existingChild = _scope.CreateGameObject("Instance");
             existingChild.transform.SetParent(_root.transform, false);
             existingChild.AddComponent<InstanceModuleWireTestDouble>();
 
@@ -114,20 +114,20 @@ namespace Tsvrc.Tests.EditMode
             module.Wire();
 
             Assert.AreEqual(1, _root.transform.childCount, "Ambiguous must leave the existing child untouched.");
-            Assert.IsNotNull(_root.transform.Find("TsInstance").GetComponent<InstanceModuleWireTestDouble>(), "Ambiguous must leave the existing component untouched.");
+            Assert.IsNotNull(_root.transform.Find("Instance").GetComponent<InstanceModuleWireTestDouble>(), "Ambiguous must leave the existing component untouched.");
         }
 
         [Test]
         public void Wire_NoDetectedType_RemovesExistingChildAndClearsField()
         {
-            var existingChild = _scope.CreateGameObject("TsInstance");
+            var existingChild = _scope.CreateGameObject("Instance");
             existingChild.transform.SetParent(_root.transform, false);
             existingChild.AddComponent<InstanceModuleWireTestDouble>();
 
             var module = ModuleWith(null, ambiguous: false);
             module.Wire();
 
-            Assert.IsNull(_root.transform.Find("TsInstance"));
+            Assert.IsNull(_root.transform.Find("Instance"));
             Assert.IsNull(InstanceFieldValue());
         }
 
@@ -138,7 +138,7 @@ namespace Tsvrc.Tests.EditMode
 
             module.Wire();
 
-            var child = _root.transform.Find("TsInstance");
+            var child = _root.transform.Find("Instance");
             Assert.IsNotNull(child);
             Assert.IsNotNull(child.GetComponent<InstanceModuleWireTestDouble>());
         }
@@ -148,11 +148,11 @@ namespace Tsvrc.Tests.EditMode
         {
             var module = ModuleWith(typeof(InstanceModuleWireTestDouble), ambiguous: false);
             module.Wire();
-            var firstComponent = _root.transform.Find("TsInstance").GetComponent<InstanceModuleWireTestDouble>();
+            var firstComponent = _root.transform.Find("Instance").GetComponent<InstanceModuleWireTestDouble>();
 
             module.Wire();
 
-            var child = _root.transform.Find("TsInstance");
+            var child = _root.transform.Find("Instance");
             Assert.AreEqual(1, _root.transform.childCount);
             Assert.AreEqual(firstComponent, child.GetComponent<InstanceModuleWireTestDouble>(), "Re-wiring an already-correct child must not recreate it.");
         }
@@ -167,7 +167,7 @@ namespace Tsvrc.Tests.EditMode
 
             module.Wire();
 
-            var child = _root.transform.Find("TsInstance");
+            var child = _root.transform.Find("Instance");
             Assert.IsNotNull(child);
             Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<UdonSharp.UdonSharpProgramAsset>(DetectedTypeAssetPath), "Program asset must be recreated.");
             Assert.IsNotNull(child.GetComponent<InstanceModuleWireTestDouble>());

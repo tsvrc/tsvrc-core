@@ -8,7 +8,7 @@ namespace Tsvrc.Tests.EditMode
     // TsBuildCompile ensures generated files/wiring are current before every VRChat world
     // build; OnBuildRequested can be called directly without a real build.
     //
-    // TsGenerator.Run() is bootstrap-gated and this project has no TsInstance subclass, so a
+    // TsGenerator.Run() is bootstrap-gated and this project has no Instance subclass, so a
     // bare call would silently no-op via WaitForBootstrapSignal - add a real TsConfig first to
     // guarantee a deterministic bootstrap signal.
     //

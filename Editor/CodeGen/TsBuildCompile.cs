@@ -25,7 +25,7 @@ namespace Tsvrc.Editor
             bool cancelBuild = EditorUtility.DisplayDialog(
                 "Tsvrc Not Initialized",
                 "Tsvrc has never been set up in this scene: no TsConfig, no generated TsGenerated " +
-                "object, and no TsInstance subclass found anywhere in the project. Every TsBehaviour " +
+                "object, and no Instance subclass found anywhere in the project. Every TsvrcBehaviour " +
                 "script's root reference will be null at runtime.\n\n" +
                 "Open Tsvrc > Configure and click \"Initialize Tsvrc\" before building, or continue " +
                 "anyway if this is intentional.",

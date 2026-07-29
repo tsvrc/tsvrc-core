@@ -6,7 +6,7 @@ using VRC.SDK3.Data;
 namespace Tsvrc.UI
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class TsList : TsBehaviour
+    public class TsList : TsvrcBehaviour
     {
         protected override bool IsTsvrcInternal => true;
 
@@ -19,8 +19,8 @@ namespace Tsvrc.UI
         [Tooltip("Parent transform where item GameObjects are instantiated.\n" +
                  "Typically the Content of a ScrollRect.")]
         [SerializeField] private Transform _itemContainer;
-        [Tooltip("Prefab with a TsListItem component that represents a single list entry.")]
-        [SerializeField] private TsListItem _itemPrefab;
+        [Tooltip("Prefab with a ListItem component that represents a single list entry.")]
+        [SerializeField] private ListItem _itemPrefab;
 
         [Header("Pagination")]
         [Tooltip("Number of items per page. Set to -1 to load all items at once with no pagination.")]
@@ -33,7 +33,7 @@ namespace Tsvrc.UI
         [SerializeField] private GameObject _emptyIndicator;
 
         private DataList _data = null;
-        private TsListItem[] _pool = new TsListItem[0];
+        private ListItem[] _pool = new ListItem[0];
         private int _listState = STATE_LOADING;
         private int _selectedIndex = -1;
         private int _currentPage = 0;
@@ -78,7 +78,7 @@ namespace Tsvrc.UI
             if (HasPreviousPage) SetPage(_currentPage - 1);
         }
 
-        /// <summary>Called by TsListItem when pressed.</summary>
+        /// <summary>Called by ListItem when pressed.</summary>
         public void OnItemSelected(int dataIndex)
         {
             _selectedIndex = dataIndex;
@@ -116,12 +116,12 @@ namespace Tsvrc.UI
             int count = end - start;
             if (count <= 0) return;
 
-            _pool = new TsListItem[count];
+            _pool = new ListItem[count];
             for (int i = 0; i < count; i++)
             {
                 int di = start + i;
                 GameObject go = Instantiate(_itemPrefab.gameObject, _itemContainer);
-                TsListItem item = go.GetComponent<TsListItem>();
+                ListItem item = go.GetComponent<ListItem>();
                 if (item == null) { Destroy(go); continue; }
 
                 DataToken token = _data[di];
@@ -144,7 +144,7 @@ namespace Tsvrc.UI
                 _pool[i].Unbind();
                 Destroy(_pool[i].gameObject);
             }
-            _pool = new TsListItem[0];
+            _pool = new ListItem[0];
         }
     }
 }

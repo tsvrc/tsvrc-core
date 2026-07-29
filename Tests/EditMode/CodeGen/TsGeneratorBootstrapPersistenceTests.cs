@@ -83,7 +83,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void AfterDomainReload_WithNoPendingFlag_DoesNotForceBootstrap()
         {
-            // No TsConfig, no scaffold instance, no TsInstance subclass in this synthetic scene -
+            // No TsConfig, no scaffold instance, no Instance subclass in this synthetic scene -
             // HasBootstrapSignal() is false. Without a pending flag, this must stay gated (no scene
             // object should be created) rather than treating every domain reload as a bootstrap.
             Assert.IsFalse(TsGenerator.IsBootstrapPending);

@@ -14,7 +14,7 @@ namespace Tsvrc.Testing.Framework
     /// Lives in Tsvrc.Tests.Doubles rather than Tsvrc.Testing.Framework itself: that assembly
     /// is Editor-only, and Unity refuses AddComponent for any MonoBehaviour compiled into an
     /// Editor-only assembly regardless of the class's own contents - the same reason
-    /// TsProcessDoubles.cs's [UdonBehaviourSyncMode] doubles live here instead of inline.
+    /// ProcessDoubles.cs's [UdonBehaviourSyncMode] doubles live here instead of inline.
     /// </summary>
     public class FakeOwnershipSyncable : MonoBehaviour, IClientSimSyncable
     {

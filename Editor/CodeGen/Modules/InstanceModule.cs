@@ -12,16 +12,16 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Handles the single TsInstance for the world. There is no manual override: the module
-    // scans loaded assemblies for a TsInstance subclass and fully owns a single child object
-    // named "TsInstance" under TsGenerated, creating/repairing/removing it as needed so the
+    // Handles the single Instance for the world. There is no manual override: the module
+    // scans loaded assemblies for a Instance subclass and fully owns a single child object
+    // named "Instance" under TsGenerated, creating/repairing/removing it as needed so the
     // wiring is self-recovering without any user action.
     //
     // Generates _TsInstanceStart() which calls TsConstruct(this) then OnInstanceStart() on the
     // resolved instance.
     internal class InstanceModule : TsModule
     {
-        private const string ChildName = "TsInstance";
+        private const string ChildName = "Instance";
         private const string FieldName = "_instance";
         private const string GeneratedFolder = "Assets/TsGenerated";
 
@@ -45,9 +45,9 @@ namespace Tsvrc.Editor
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
             using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
-                w.Line("[ReadOnly] [SerializeField] private TsInstance _instance;");
+                w.Line("[ReadOnly] [SerializeField] private Instance _instance;");
                 w.BlankLine();
-                w.Line("public override TsInstance Instance => _instance;");
+                w.Line("public override Instance Instance => _instance;");
                 w.BlankLine();
                 using (w.Method("public void _TsInstanceStart()"))
                 {
@@ -79,7 +79,7 @@ namespace Tsvrc.Editor
         internal override void Wire()
         {
             // Ambiguous: leave whatever is currently wired alone until the project is back down
-            // to at most one TsInstance subclass. Destroying a working setup because a second,
+            // to at most one Instance subclass. Destroying a working setup because a second,
             // possibly transient, subclass appeared would be worse than doing nothing.
             if (_ambiguous) return;
 
@@ -173,7 +173,7 @@ namespace Tsvrc.Editor
         // Deduplicated by full name: Unity's AppDomain can carry stale duplicate copies of the same
         // assembly across successive recompiles, which would otherwise make a single real subclass
         // look "ambiguous" just because it was seen twice. Types marked [TsCodegenIgnore] (e.g. a
-        // test double TsInstance subclass) are excluded from this scan the same way as
+        // test double Instance subclass) are excluded from this scan the same way as
         // TsGenerator.HasBootstrapSignal, so one never gets treated as the one real scaffold to
         // wire, and never falsely trips the "multiple subclasses" ambiguity error against a real one.
         private static (Type, bool) DetectInstanceType()
@@ -187,7 +187,7 @@ namespace Tsvrc.Editor
                 catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray(); }
 
                 foreach (var type in types)
-                    if (type != typeof(TsInstance) && !type.IsAbstract && typeof(TsInstance).IsAssignableFrom(type)
+                    if (type != typeof(Instance) && !type.IsAbstract && typeof(Instance).IsAssignableFrom(type)
                         && type.GetCustomAttribute<TsCodegenIgnoreAttribute>() == null)
                         if (seen.Add(type.FullName))
                             candidates.Add(type);
@@ -195,7 +195,7 @@ namespace Tsvrc.Editor
 
             if (candidates.Count > 1)
             {
-                Debug.LogError($"[InstanceModule] Multiple TsInstance subclasses found ({string.Join(", ", candidates.Select(t => t.Name))}). " +
+                Debug.LogError($"[InstanceModule] Multiple Instance subclasses found ({string.Join(", ", candidates.Select(t => t.Name))}). " +
                     "Exactly one is required; leaving the current wiring untouched until this is resolved.");
                 return (null, true);
             }

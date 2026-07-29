@@ -138,7 +138,7 @@ namespace Tsvrc.Tests.EditMode
             session.SetReady(); // sole tracked player acks -> completes the single-chunk transfer
 
             Assert.IsFalse(session.IsProcessRunning());
-            // TsProcess.InternalCleanup unconditionally zeroes _ownerPlayerIdInt on every
+            // Process.InternalCleanup unconditionally zeroes _ownerPlayerIdInt on every
             // stop/complete, before OnProcessCleanup even runs. In real Play Mode the next
             // StartProcess call harmlessly re-claims ownership via the real Networking.LocalPlayer;
             // in Edit Mode that's null, so a second, non-reentrant start needs re-seeding.

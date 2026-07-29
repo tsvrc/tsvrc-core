@@ -4,7 +4,7 @@ using Tsvrc.Utils;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TestTsRoot (Tests/TestDoubles/Core/TsBehaviour/TsBehaviourDoubles.cs)
+    // TestTsRoot (Tests/TestDoubles/Core/TsvrcBehaviour/TsvrcBehaviourDoubles.cs)
     // already covers the no-override case (both Instance/Memory stay null) and is
     // reused here for that scenario. These three doubles cover every override
     // combination TsRoot's own two independent virtual properties allow: only
@@ -12,9 +12,9 @@ namespace Tsvrc.Tests.EditMode
     // accidentally coupled to the other's.
     public class InstanceOnlyTsRootDouble : TsRoot
     {
-        public TsInstance FakeInstance;
+        public Instance FakeInstance;
 
-        public override TsInstance Instance => FakeInstance;
+        public override Instance Instance => FakeInstance;
     }
 
     public class MemoryOnlyTsRootDouble : TsRoot
@@ -26,10 +26,10 @@ namespace Tsvrc.Tests.EditMode
 
     public class FullTsRootDouble : TsRoot
     {
-        public TsInstance FakeInstance;
+        public Instance FakeInstance;
         public TsMemory FakeMemory;
 
-        public override TsInstance Instance => FakeInstance;
+        public override Instance Instance => FakeInstance;
         public override TsMemory Memory => FakeMemory;
     }
 }

@@ -19,7 +19,7 @@ namespace Tsvrc.Timing
     /// Remaining time: remainingMs = DurationMs - GetElapsedMilliseconds()
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsTimer : TsProcess
+    public class TsTimer : Process
     {
         public const string OnTimerStartedEvent = "OnTimerStarted";
         public const string OnTimerStoppedEvent = "OnTimerStopped";
@@ -196,7 +196,7 @@ namespace Tsvrc.Timing
 
         protected override void OnProcessStopped()
         {
-            // TsProcess.ExecuteStop sets _isRunning to false before calling this hook, so
+            // Process.ExecuteStop sets _isRunning to false before calling this hook, so
             // GetElapsedMilliseconds() would return _elapsedOffsetMs early and miss all elapsed
             // time since the last start. ComputeRawElapsedMs() bypasses that guard.
             // When stopped while paused, _elapsedOffsetMs is already the correct frozen value

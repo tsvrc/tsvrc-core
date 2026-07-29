@@ -249,7 +249,7 @@ namespace Tsvrc.Tests.EditMode
             timer.StopTimer();
             Assert.AreEqual(9000, timer.LastElapsedMilliseconds);
 
-            // StopTimer's cleanup clears the synced owner fields (TsProcess.InternalCleanup),
+            // StopTimer's cleanup clears the synced owner fields (Process.InternalCleanup),
             // same as every other process in this library - a genuinely fresh StartTimer call
             // has to reclaim ownership via Networking.LocalPlayer, which is null outside a real
             // session, so re-seed exactly like starting a brand new instance would need to.

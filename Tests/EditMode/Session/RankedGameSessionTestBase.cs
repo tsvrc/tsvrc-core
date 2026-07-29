@@ -5,13 +5,13 @@ using Tsvrc.Testing.Framework;
 namespace Tsvrc.Tests.EditMode
 {
     // RankedGameSession composes five separate sub-behaviours (three PlayerTrackers, a
-    // ReadyCheckProcess, a TsTimer) rather than inheriting from TsProcess itself,
-    // so this base extends TsProcessTestBase directly for CreateComponent<T>/
+    // ReadyCheckProcess, a TsTimer) rather than inheriting from Process itself,
+    // so this base extends ProcessTestBase directly for CreateComponent<T>/
     // CreateProcess<T>/SeedAsOwner/ForceNextTickDueNow/TearDown, then wires all five
     // sub-components into the session's private fields via reflection - the same
     // hierarchy TsGenerator's InstanceModule would wire at runtime through
     // [WirePool], reproduced here without depending on the generator.
-    public abstract class RankedGameSessionTestBase : TsProcessTestBase
+    public abstract class RankedGameSessionTestBase : ProcessTestBase
     {
         protected class Harness
         {
@@ -26,7 +26,7 @@ namespace Tsvrc.Tests.EditMode
         // Builds a fully-wired session with a TsRoot double that has no overridden
         // Instance, and _masterOnly forced false so _ts.Instance.IsTsMaster is never
         // dereferenced (Instance is null on this root - only tests of the master gate
-        // itself need a real, non-null TsInstance; see CreateWiredSession(TsRoot)).
+        // itself need a real, non-null Instance; see CreateWiredSession(TsRoot)).
         protected Harness CreateWiredSession()
         {
             var h = CreateWiredSession(new TestTsRoot());

@@ -3,11 +3,11 @@ using Tsvrc.Timing;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // Extends TsProcessTestBase (Tests/Editor/Core/TsProcess/TsProcessTestBase.cs)
+    // Extends ProcessTestBase (Tests/Editor/Core/Process/ProcessTestBase.cs)
     // to reuse CreateProcess<T>/SeedAsOwner/ForceNextTickDueNow/TearDown instead of
-    // duplicating them - TsTimer IS a TsProcess, so every dual-authority-bypass
+    // duplicating them - TsTimer IS a Process, so every dual-authority-bypass
     // trick that base provides applies here unchanged.
-    public abstract class TsTimerTestBase : TsProcessTestBase
+    public abstract class TsTimerTestBase : ProcessTestBase
     {
         protected static int GetStartServerTimeMsField(TsTimer timer) =>
             PrivateFieldAccess.GetField<int>(timer, "_startServerTimeMs");
@@ -62,7 +62,7 @@ namespace Tsvrc.Tests.EditMode
 
         // Copies every synced field from one timer instance onto another, simulating a
         // single arrived [UdonSynced] deserialization packet without real networking -
-        // same technique TsProcessTests uses for its two-independent-clients race
+        // same technique ProcessTests uses for its two-independent-clients race
         // simulation. Caller still has to invoke remote.OnDeserialization() themselves.
         protected static void CopySyncedFieldsTo(TsTimer from, TsTimer to)
         {

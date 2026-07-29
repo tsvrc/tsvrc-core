@@ -2,7 +2,7 @@ using System.Collections;
 using NUnit.Framework;
 using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
-using Tsvrc.Tests.PlayMode.Core.TsProcess;
+using Tsvrc.Tests.PlayMode.Core.Process;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
@@ -10,12 +10,12 @@ using VRC.SDKBase;
 namespace Tsvrc.Tests.PlayMode.Session
 {
     // RankedGameSession has no direct real-VRC-API surface of its own beyond composing five
-    // already-covered TsProcess-derived sub-components (three PlayerTrackers, a
+    // already-covered Process-derived sub-components (three PlayerTrackers, a
     // ReadyCheckProcess, a TsTimer). This is an end-to-end integration smoke test with real
     // spawned players flowing through the full lobby -> ready-check -> game -> completed
     // pipeline, wiring the sub-components into the session's private fields via reflection to
     // reproduce what [WirePool] wires at runtime.
-    public class RankedGameSessionPlayModeTests : TsProcessPlayModeTestBase
+    public class RankedGameSessionPlayModeTests : ProcessPlayModeTestBase
     {
         private GameObject _sessionGameObject;
 

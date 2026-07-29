@@ -31,7 +31,7 @@ namespace Tsvrc.Player
     /// Usage: Begin(colliders, count). Call End() to stop.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class HeadClipGuard : TsBehaviour
+    public class HeadClipGuard : TsvrcBehaviour
     {
         protected override bool IsTsvrcInternal => true;
 

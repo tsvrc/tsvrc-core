@@ -73,7 +73,7 @@ namespace Tsvrc.Tests.EditMode
         {
             // StartReadyCheck has no guard of its own; it forwards straight to
             // PlayerTracker.StartPlayerTracking, whose own already-running check
-            // (TsProcess.StartProcess's) must reject a second call untouched.
+            // (Process.StartProcess's) must reject a second call untouched.
             var tracker = CreateProcess<ReadyCheckProcessTestSubclass>();
             SeedAsOwner(tracker);
             tracker.StartReadyCheck(new[] { "A", "B" });

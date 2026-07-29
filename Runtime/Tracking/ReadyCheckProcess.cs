@@ -69,7 +69,7 @@ namespace Tsvrc.Tracking
             if (IsProcessRunning()) return;
 
             _readyPlayerIds = new string[0];
-            // No explicit RequestSerialization here. TsProcess.InternalCleanup always calls
+            // No explicit RequestSerialization here. Process.InternalCleanup always calls
             // it after OnProcessCleanup returns, so _readyPlayerIds=[] is captured by that packet.
 
             // Reset the flag so SetReady() does nothing until the next StartReadyCheck.
@@ -98,7 +98,7 @@ namespace Tsvrc.Tracking
         {
             base.OnOwnerAbandonedProcess();
 
-            // TakeOverAbandonedProcess (TsProcess) has no knowledge of this class's
+            // TakeOverAbandonedProcess (Process) has no knowledge of this class's
             // _readyCheckActive flag and never corrects it. Before taking over, this client
             // was a non-owner whose _readyCheckActive is only ever corrected by
             // OnTrackingDeserialization, on receipt of a sync packet or the started network

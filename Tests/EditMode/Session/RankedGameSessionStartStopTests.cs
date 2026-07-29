@@ -80,13 +80,13 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void StartSession_MasterOnlyTrueWithRealTsInstance_DefaultIsTsMasterTrue_Starts()
         {
-            // A real (non-subclassed) TsInstance's IsTsMaster defaults to
+            // A real (non-subclassed) Instance's IsTsMaster defaults to
             // Networking.IsMaster - confirmed here to be true with no real networking
             // session established, not false as might be assumed from "no one is
             // master yet". Only the master-only ALLOWED path is reachable this way;
             // the denied (not master) path needs a real non-master ClientSim local
             // player and lives in the Play Mode suite.
-            var root = new InstanceOnlyTsRootDouble { FakeInstance = CreateComponent<Tsvrc.Core.TsInstance>() };
+            var root = new InstanceOnlyTsRootDouble { FakeInstance = CreateComponent<Tsvrc.Core.Instance>() };
             var h = CreateWiredSession(root);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });

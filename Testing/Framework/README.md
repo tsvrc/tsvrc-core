@@ -44,7 +44,7 @@ other side effects from it.
 
 ## What's not here
 
-`TsProcessTestBase` (reflection-seeding helpers for `TsProcess` subclasses) lives in this
-repo's own `Tests/EditMode/Core/TsProcess/`, not here. It reflects into `TsProcess`'s
+`ProcessTestBase` (reflection-seeding helpers for `Process` subclasses) lives in this
+repo's own `Tests/EditMode/Core/Process/`, not here. It reflects into `Process`'s
 private fields - tsvrc's own implementation details, not a stable contract - so it stays
 scoped to this repo's own test suite instead of shipping as public API.

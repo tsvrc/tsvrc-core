@@ -214,7 +214,7 @@ namespace Tsvrc.DataTransfer
             //
             // Networking.IsOwner is used instead of IsProcessOwner because the stale packet may
             // have zeroed _ownerPlayerIdInt, making IsProcessOwner return false even though we
-            // hold Unity ownership. TsProcess.OnDeserialization only recovers stale ownership
+            // hold Unity ownership. Process.OnDeserialization only recovers stale ownership
             // when _isRunning=true, so this gap-state case falls through to here.
             //
             // _dataChunks.Length == 0 guards against triggering this on a new transfer that
@@ -233,7 +233,7 @@ namespace Tsvrc.DataTransfer
             //   Packet A (InternalCleanup): _isRunning=false, _pendingNextChunk=true
             //   Packet B (StartReadyCheck): _isRunning=true,  _pendingNextChunk=false
             //
-            // If both arrive after TakeOverAbandonedProcess, TsProcess.OnDeserialization
+            // If both arrive after TakeOverAbandonedProcess, Process.OnDeserialization
             // sees packet B and restores _isRunning=true with us as owner. We now have a zombie
             // process: _isRunning=true but _dataChunks is empty because it is unsynced. The
             // next tick would false-complete and broadcast a spurious OnChunkSequenceCompleted.
@@ -242,7 +242,7 @@ namespace Tsvrc.DataTransfer
             // fires, so it is never empty on a legitimate owner. OnDeserialization never fires
             // for the sender of RequestSerialization (VRChat guarantee), ruling out false positives.
             //
-            // This stop fires twice on all clients intentionally. TsProcess.OnDeserialization
+            // This stop fires twice on all clients intentionally. Process.OnDeserialization
             // re-broadcasts _isRunning=true via RequestSerialization, restoring _readyCheckActive=true
             // on receivers. The second stop clears it again. Duplicate transfer-stopped events are
             // suppressed further down the stack.

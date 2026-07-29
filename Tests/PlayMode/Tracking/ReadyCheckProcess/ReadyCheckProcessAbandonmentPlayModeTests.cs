@@ -3,7 +3,7 @@ using System.Collections;
 using NUnit.Framework;
 using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
-using Tsvrc.Tests.PlayMode.Core.TsProcess;
+using Tsvrc.Tests.PlayMode.Core.Process;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
 
@@ -14,7 +14,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.ReadyCheckProcess
     // (OnTrackingPlayersRemoved trimming _readyPlayerIds, and _readyCheckActive's correction for
     // a real new owner). ClientSim never organically dispatches VRC lifecycle callbacks to a
     // plain UdonSharpBehaviour, so OnOwnerAbandonedProcess is invoked directly via reflection.
-    public class ReadyCheckProcessAbandonmentPlayModeTests : TsProcessPlayModeTestBase
+    public class ReadyCheckProcessAbandonmentPlayModeTests : ProcessPlayModeTestBase
     {
         [UnityTest]
         public IEnumerator OnOwnerAbandonedProcess_RealDepartedReadyPlayer_RemovedFromBothTrackedAndReadySets()

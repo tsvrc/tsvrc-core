@@ -4,13 +4,13 @@ using Tsvrc.Tracking;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // PlayerTracker inherits TsProcess's [UdonBehaviourSyncMode] attribute, so this
-    // double lives in Tsvrc.Tests.Doubles for the same reason TsProcessTestSubclass
+    // PlayerTracker inherits Process's [UdonBehaviourSyncMode] attribute, so this
+    // double lives in Tsvrc.Tests.Doubles for the same reason ProcessTestSubclass
     // does (see that file's header comment) - AddComponent() silently returns null for
     // such a script when it's defined in an Editor-platform-restricted assembly.
     //
     // Records every OnTracking* hook invocation (call count + ordered args) so tests can
-    // assert both "did it fire" and "with what payload", mirroring TsProcessTestSubclass's
+    // assert both "did it fire" and "with what payload", mirroring ProcessTestSubclass's
     // CallLog/counter style.
     public class PlayerTrackerTestSubclass : PlayerTracker
     {
@@ -32,7 +32,7 @@ namespace Tsvrc.Tests.EditMode
         // Captures LastPlayerIds as observed from *inside* each hook, for ordering-guarantee
         // assertions (e.g. "LastPlayerIds already reflects the final pre-cleanup value by the
         // time OnTrackingStopped fires, not just by the time the call returns") - mirrors
-        // TsProcessTestSubclass's RunningStateInsideOnProcessStopped/Completed pattern.
+        // ProcessTestSubclass's RunningStateInsideOnProcessStopped/Completed pattern.
         public string[] LastPlayerIdsInsideOnTrackingStarted;
         public string[] LastPlayerIdsInsideOnTrackingStopped;
         public string[] LastPlayerIdsInsideOnTrackingCompleted;
@@ -40,7 +40,7 @@ namespace Tsvrc.Tests.EditMode
         // Lets a test inject synchronous reentrant behavior (e.g. calling AddTrackedPlayers
         // from inside OnProcessStopped, to reach the documented _isRunning=false-but-not-yet-
         // cleaned-up window) without needing a fresh subclass per scenario, mirroring
-        // TsProcessTestSubclass's *Action hooks. Both fire after base.OnProcessStopped/
+        // ProcessTestSubclass's *Action hooks. Both fire after base.OnProcessStopped/
         // Completed's own synchronous self-broadcast has already run, but before ExecuteStop/
         // ExecuteComplete's subsequent InternalCleanup call.
         public Action OnProcessStoppedAction;

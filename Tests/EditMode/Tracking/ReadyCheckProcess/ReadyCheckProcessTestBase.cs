@@ -5,7 +5,7 @@ namespace Tsvrc.Tests.EditMode
 {
     // Extends PlayerTrackerTestBase (Tests/Editor/Tracking/PlayerTracker/PlayerTrackerTestBase.cs)
     // to reuse CreateProcess<T>/SeedAsOwner/GetTrackedPlayerIds/SetTrackedPlayerIds/TearDown
-    // instead of duplicating them - ReadyCheckProcess IS a PlayerTracker (IS a TsProcess),
+    // instead of duplicating them - ReadyCheckProcess IS a PlayerTracker (IS a Process),
     // so every helper built for the base classes applies here unchanged.
     public abstract class ReadyCheckProcessTestBase : PlayerTrackerTestBase
     {

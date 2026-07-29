@@ -53,7 +53,7 @@ namespace Tsvrc.UI
     public class TsPlayerPositionOverlay : PlayerTracker
     {
         /// <summary>
-        /// Emitted via <see cref="TsBehaviour.TsEmit"/> after every draw cycle completes,
+        /// Emitted via <see cref="TsvrcBehaviour.TsEmit"/> after every draw cycle completes,
         /// including when the overlay is cleared. Read <see cref="OverlayImage"/> in your callback.
         /// </summary>
         public const string OnOverlayUpdatedEvent = "OnOverlayUpdated";

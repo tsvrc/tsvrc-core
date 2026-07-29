@@ -5,11 +5,11 @@ using Tsvrc.DataTransfer;
 namespace Tsvrc.Tests.EditMode
 {
     // One test subclass per layer of the DataTransferer chain (DataChunker : ReadyCheckProcess :
-    // PlayerTracker : TsProcess): lower classes get focused tests through their own type,
+    // PlayerTracker : Process): lower classes get focused tests through their own type,
     // rather than always through the leaf DataTransferer, so a lower layer's tests observe only
     // that layer's own overrides, not behavior a higher layer might add on top.
     //
-    // All of these carry TsProcess's [UdonBehaviourSyncMode] attribute (inherited through
+    // All of these carry Process's [UdonBehaviourSyncMode] attribute (inherited through
     // PlayerTracker), so - same reason as every other test double in this project - they live in
     // Tsvrc.Tests.Doubles, not Tests/Editor: AddComponent() silently returns null for such a
     // script defined in an Editor-platform-restricted assembly.

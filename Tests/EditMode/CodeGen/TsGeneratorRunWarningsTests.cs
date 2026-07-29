@@ -36,7 +36,7 @@ namespace Tsvrc.Tests.EditMode
             // minimal way to exercise the capture mechanism itself.
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
-            config.Constructs = new Tsvrc.Core.TsBehaviour[] { null };
+            config.Constructs = new Tsvrc.Core.TsvrcBehaviour[] { null };
 
             LogAssert.Expect(UnityEngine.LogType.Warning,
                 "[ConstructModule] Null entry in Constructs config, remove the missing-script slot.");
@@ -63,14 +63,14 @@ namespace Tsvrc.Tests.EditMode
         {
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
-            config.Constructs = new Tsvrc.Core.TsBehaviour[] { null };
+            config.Constructs = new Tsvrc.Core.TsvrcBehaviour[] { null };
 
             LogAssert.Expect(UnityEngine.LogType.Warning,
                 "[ConstructModule] Null entry in Constructs config, remove the missing-script slot.");
             TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
             Assert.IsNotEmpty(TsGenerator.LastRunWarnings);
 
-            config.Constructs = new Tsvrc.Core.TsBehaviour[0];
+            config.Constructs = new Tsvrc.Core.TsvrcBehaviour[0];
             TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
 
             Assert.IsEmpty(TsGenerator.LastRunWarnings);

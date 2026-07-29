@@ -10,7 +10,7 @@ using UnityEngine;
 namespace Tsvrc.Tests.EditMode
 {
     // ConstructModule.Resolve() via reflection with real (but scene-only, throwaway)
-    // TsBehaviour components. No builtin source exists for Constructs - scene-only,
+    // TsvrcBehaviour components. No builtin source exists for Constructs - scene-only,
     // unlike Singleton/Pool/Factory.
     public class ConstructModuleResolveTests
     {
@@ -22,7 +22,7 @@ namespace Tsvrc.Tests.EditMode
         [TearDown]
         public void TearDown() => _scope.Dispose();
 
-        private static IList Resolve(TsBehaviour[] constructs)
+        private static IList Resolve(TsvrcBehaviour[] constructs)
             => (IList)PrivateFieldAccess.InvokeStatic(typeof(ConstructModule), "Resolve", (object)constructs);
 
         private static string NameOf(object entry) => PrivateFieldAccess.GetField<string>(entry, "Name");
@@ -38,7 +38,7 @@ namespace Tsvrc.Tests.EditMode
         {
             LogAssert.Expect(LogType.Warning, "[ConstructModule] Null entry in Constructs config, remove the missing-script slot.");
 
-            var result = Resolve(new TsBehaviour[] { null });
+            var result = Resolve(new TsvrcBehaviour[] { null });
 
             Assert.AreEqual(0, result.Count);
         }
@@ -50,7 +50,7 @@ namespace Tsvrc.Tests.EditMode
 
             LogAssert.Expect(LogType.Warning, "[ConstructModule] Duplicate construct 'Hud' in config, remove the duplicate.");
 
-            var result = Resolve(new TsBehaviour[] { behaviour, behaviour });
+            var result = Resolve(new TsvrcBehaviour[] { behaviour, behaviour });
 
             Assert.AreEqual(1, result.Count);
         }
@@ -60,7 +60,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var behaviour = _scope.CreateGameObject("AnyName").AddComponent<StateManager>();
 
-            var result = Resolve(new TsBehaviour[] { behaviour });
+            var result = Resolve(new TsvrcBehaviour[] { behaviour });
 
             Assert.AreEqual("StateManager", NameOf(result[0]));
         }
@@ -70,7 +70,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var behaviour = _scope.CreateGameObject("__Hud__").AddComponent<StateManager>();
 
-            var result = Resolve(new TsBehaviour[] { behaviour });
+            var result = Resolve(new TsvrcBehaviour[] { behaviour });
 
             Assert.AreEqual("Hud", NameOf(result[0]));
         }
@@ -81,7 +81,7 @@ namespace Tsvrc.Tests.EditMode
             var a = _scope.CreateGameObject("__Dup__").AddComponent<StateManager>();
             var b = _scope.CreateGameObject("__Dup__").AddComponent<StateManager>();
 
-            var result = Resolve(new TsBehaviour[] { a, b });
+            var result = Resolve(new TsvrcBehaviour[] { a, b });
 
             Assert.AreEqual("Dup", NameOf(result[0]));
             Assert.AreEqual("Dup2", NameOf(result[1]));

@@ -19,7 +19,7 @@ namespace Tsvrc.Session
     /// when a condition is met. Subscribe to the On... event constants to react to each state change.
     /// Call <see cref="StartLobbyTracking"/> before adding players with <see cref="AddLobbyPlayer"/>.</summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class RankedGameSession : TsBehaviour
+    public class RankedGameSession : TsvrcBehaviour
     {
         protected override bool IsTsvrcInternal => true;
 

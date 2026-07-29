@@ -4,19 +4,19 @@ using Tsvrc.Session;
 namespace Tsvrc.Tests.EditMode
 {
     // EditMode migration of Tests/PlayMode/Session/RankedGameSessionPlayModeTests.cs.
-    // TsInstance.IsTsMaster was already virtual (no Runtime change
-    // needed here) - TsInstanceTestSubclass overrides it directly, so the master-gate's DENIED
+    // Instance.IsTsMaster was already virtual (no Runtime change
+    // needed here) - InstanceTestSubclass overrides it directly, so the master-gate's DENIED
     // branch (a real, non-master ClientSim local player in the original) is reachable here via
-    // a simulated non-master TsInstance instead. The existing EditMode suite
+    // a simulated non-master Instance instead. The existing EditMode suite
     // (RankedGameSessionStartStopTests.StartSession_MasterOnlyTrueWithRealTsInstance_DefaultIsTsMasterTrue_Starts)
-    // already covered the ALLOWED branch with a real, unsubclassed TsInstance defaulting to
+    // already covered the ALLOWED branch with a real, unsubclassed Instance defaulting to
     // master with no session at all; this file adds the DENIED branch alongside it.
     public class RankedGameSessionMasterGateTests : RankedGameSessionTestBase
     {
         [Test]
         public void StartSession_MasterOnlyTrueNonMasterInstance_WarnsAndDoesNotStart()
         {
-            var instance = CreateComponent<TsInstanceTestSubclass>();
+            var instance = CreateComponent<InstanceTestSubclass>();
             instance.SimulatedIsTsMaster = false;
             var root = new InstanceOnlyTsRootDouble { FakeInstance = instance };
             // _masterOnly defaults to true (RankedGameSession's own [SerializeField] default);

@@ -20,7 +20,7 @@ namespace Tsvrc.Editor
 
         internal override string TabLabel => "Singletons";
         internal override string TabDescription =>
-            "Register any scene object or component as a named field on _ts. After compiling, access it from any TsBehaviour via _ts.FieldName. Example: drag your GameManager here, then use _ts.GameManager from any behaviour.";
+            "Register any scene object or component as a named field on _ts. After compiling, access it from any TsvrcBehaviour via _ts.FieldName. Example: drag your GameManager here, then use _ts.GameManager from any behaviour.";
         internal override void DrawTab(SerializedObject so) => ObjectListGUI.DrawObjectList(so, "Singletons",
             "No singletons registered yet. Add a scene object here to expose it as a field on TsGenerated.",
             warnDuplicates: true);

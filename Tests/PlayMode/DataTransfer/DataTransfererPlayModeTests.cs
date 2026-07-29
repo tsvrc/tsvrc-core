@@ -2,7 +2,7 @@ using System.Collections;
 using NUnit.Framework;
 using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
-using Tsvrc.Tests.PlayMode.Core.TsProcess;
+using Tsvrc.Tests.PlayMode.Core.Process;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
 
@@ -16,7 +16,7 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
     // base class, so every deferred step this chain schedules with it (_StartNextReadyCheck,
     // _EmitDataReceptionCompleted, _EmitDataReceptionStopped) is invoked directly below rather
     // than waited on.
-    public class DataTransfererPlayModeTests : TsProcessPlayModeTestBase
+    public class DataTransfererPlayModeTests : ProcessPlayModeTestBase
     {
         private static string PlayerId(VRCPlayerApi player) => player.displayName + "#" + player.playerId;
 

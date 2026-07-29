@@ -72,7 +72,7 @@ namespace Tsvrc.Testing.Framework
         // members are only reflectively visible via GetMethod on the exact type that
         // declares them. Walk the hierarchy explicitly, same as FindField above, so
         // InvokeInstance works through test-double subclasses of a production type
-        // (e.g. calling a private TsProcess method through a TsProcessTestSubclass
+        // (e.g. calling a private Process method through a ProcessTestSubclass
         // instance).
         private static MethodInfo FindMethod(Type type, string name)
         {

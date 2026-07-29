@@ -6,7 +6,7 @@ namespace Tsvrc.Utils
 {
     /// <summary>
     /// Centralized logging sink. Access via <c>_ts.Log</c>, or prefer the
-    /// <see cref="TsBehaviour.LogInfo"/>/<see cref="TsBehaviour.LogWarning"/>/<see cref="TsBehaviour.LogError"/>
+    /// <see cref="TsvrcBehaviour.LogInfo"/>/<see cref="TsvrcBehaviour.LogWarning"/>/<see cref="TsvrcBehaviour.LogError"/>
     /// wrappers, which supply the tag and context automatically.
     /// </summary>
     /// <remarks>
@@ -14,22 +14,22 @@ namespace Tsvrc.Utils
     /// fixed and internal-only, never configurable; <c>prefix</c> is each world's own optional
     /// <see cref="Prefix"/> (omitted when empty); <c>tag</c> is the logging class's name.
     /// Info/Warning/Error are each independently toggleable for Tsvrc Internal vs Your World
-    /// (<see cref="TsBehaviour.IsTsvrcInternal"/>), all six defaulting to <c>true</c> - configure
+    /// (<see cref="TsvrcBehaviour.IsTsvrcInternal"/>), all six defaulting to <c>true</c> - configure
     /// via Tsvrc &gt; Configure &gt; Logging or directly on this component.
     /// </remarks>
-    public class TsLogger : TsBehaviour
+    public class TsLogger : TsvrcBehaviour
     {
         protected override bool IsTsvrcInternal => true;
 
         // Fixed, internal-only - identifies Tsvrc itself in every message. Also used directly
-        // by TsBehaviour's fallback path and TsJson, which have no Prefix to read.
+        // by TsvrcBehaviour's fallback path and TsJson, which have no Prefix to read.
         internal const string FrameworkTag = "TsVRC";
 
         [Tooltip("Optional project-specific tag shown after [TsVRC], e.g. \"SomeWorld\" -> \"[TsVRC] [SomeWorld] [ClassName] message\". Leave empty to omit.")]
         [SerializeField] private string _prefix = "";
 
         [Header("Tsvrc Internal")]
-        [Tooltip("Shows/hides Info-level logs from the Tsvrc framework's own classes (TsMemory, TsProcess, etc.).")]
+        [Tooltip("Shows/hides Info-level logs from the Tsvrc framework's own classes (TsMemory, Process, etc.).")]
         [SerializeField] private bool _internalInfoEnabled = true;
         [Tooltip("Shows/hides Warning-level logs from the Tsvrc framework's own classes.")]
         [SerializeField] private bool _internalWarningEnabled = true;
@@ -71,7 +71,7 @@ namespace Tsvrc.Utils
         /// <summary>
         /// Logs an informational message. <paramref name="isInternal"/> selects which of
         /// <see cref="InternalInfoEnabled"/>/<see cref="WorldInfoEnabled"/> gates it; defaults to
-        /// <c>false</c> (world) for direct calls not routed through a <see cref="TsBehaviour"/>.
+        /// <c>false</c> (world) for direct calls not routed through a <see cref="TsvrcBehaviour"/>.
         /// </summary>
         public void Info(string tag, string message, bool isInternal = false, UdonSharpBehaviour context = null)
         {
@@ -82,7 +82,7 @@ namespace Tsvrc.Utils
         /// <summary>
         /// Logs a warning. <paramref name="isInternal"/> selects which of
         /// <see cref="InternalWarningEnabled"/>/<see cref="WorldWarningEnabled"/> gates it;
-        /// defaults to <c>false</c> (world) for direct calls not routed through a <see cref="TsBehaviour"/>.
+        /// defaults to <c>false</c> (world) for direct calls not routed through a <see cref="TsvrcBehaviour"/>.
         /// </summary>
         public void Warning(string tag, string message, bool isInternal = false, UdonSharpBehaviour context = null)
         {
@@ -93,7 +93,7 @@ namespace Tsvrc.Utils
         /// <summary>
         /// Logs an error. <paramref name="isInternal"/> selects which of
         /// <see cref="InternalErrorEnabled"/>/<see cref="WorldErrorEnabled"/> gates it; defaults
-        /// to <c>false</c> (world) for direct calls not routed through a <see cref="TsBehaviour"/>.
+        /// to <c>false</c> (world) for direct calls not routed through a <see cref="TsvrcBehaviour"/>.
         /// </summary>
         public void Error(string tag, string message, bool isInternal = false, UdonSharpBehaviour context = null)
         {
@@ -101,7 +101,7 @@ namespace Tsvrc.Utils
             Debug.LogError(Format(_prefix, tag, message), context);
         }
 
-        // Internal so TsBehaviour's fallback path can format identically without duplicating the format string.
+        // Internal so TsvrcBehaviour's fallback path can format identically without duplicating the format string.
         // prefix may be null/empty - the optional project tag is simply omitted in that case.
         internal static string Format(string prefix, string tag, string message) =>
             string.IsNullOrEmpty(prefix)

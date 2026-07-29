@@ -47,7 +47,7 @@ namespace Tsvrc.Tests.EditMode
 
             var prefabGO = new GameObject("ItemPrefab");
             _spawned.Add(prefabGO);
-            var prefabItem = prefabGO.AddComponent<TsListItemTestSubclass>();
+            var prefabItem = prefabGO.AddComponent<ListItemTestSubclass>();
 
             PrivateFieldAccess.SetField(list, "_itemContainer", containerGO.transform);
             PrivateFieldAccess.SetField(list, "_itemPrefab", prefabItem);
@@ -77,7 +77,7 @@ namespace Tsvrc.Tests.EditMode
             return data;
         }
 
-        private static TsListItem[] GetPool(TsList list) => PrivateFieldAccess.GetField<TsListItem[]>(list, "_pool");
+        private static ListItem[] GetPool(TsList list) => PrivateFieldAccess.GetField<ListItem[]>(list, "_pool");
 
         [Test]
         public void InitialState_BeforeAnySetData_IsLoadingWithNoSelectionOrPage()
@@ -148,11 +148,11 @@ namespace Tsvrc.Tests.EditMode
             list.SetData(MakeData(3));
 
             Assert.AreEqual(STATE_POPULATED, list.ListState);
-            TsListItem[] pool = GetPool(list);
+            ListItem[] pool = GetPool(list);
             Assert.AreEqual(3, pool.Length);
             for (int i = 0; i < 3; i++)
             {
-                var item = (TsListItemTestSubclass)pool[i];
+                var item = (ListItemTestSubclass)pool[i];
                 Assert.AreEqual(1, item.OnBindCallCount);
                 Assert.AreEqual(i, item.DataIndexAtLastBind);
                 Assert.AreEqual((double)i, item.DataAtLastBind["index"].Double);
@@ -180,8 +180,8 @@ namespace Tsvrc.Tests.EditMode
         {
             TsList list = CreateList();
             list.SetData(MakeData(2));
-            var oldItems = new List<TsListItemTestSubclass>();
-            foreach (var item in GetPool(list)) oldItems.Add((TsListItemTestSubclass)item);
+            var oldItems = new List<ListItemTestSubclass>();
+            foreach (var item in GetPool(list)) oldItems.Add((ListItemTestSubclass)item);
 
             ExpectDestroyErrors(2);
             list.SetData(MakeData(3));
@@ -219,7 +219,7 @@ namespace Tsvrc.Tests.EditMode
 
             list.SetData(data);
 
-            var item = (TsListItemTestSubclass)GetPool(list)[0];
+            var item = (ListItemTestSubclass)GetPool(list)[0];
             Assert.AreEqual(1, item.OnBindCallCount);
             Assert.IsNotNull(item.DataAtLastBind);
             Assert.AreEqual(0, item.DataAtLastBind.Count);
@@ -335,10 +335,10 @@ namespace Tsvrc.Tests.EditMode
             ExpectDestroyErrors(2);
             list.SetPage(1);
 
-            TsListItem[] pool = GetPool(list);
+            ListItem[] pool = GetPool(list);
             Assert.AreEqual(2, pool.Length);
-            Assert.AreEqual(2, ((TsListItemTestSubclass)pool[0]).DataIndexAtLastBind);
-            Assert.AreEqual(3, ((TsListItemTestSubclass)pool[1]).DataIndexAtLastBind);
+            Assert.AreEqual(2, ((ListItemTestSubclass)pool[0]).DataIndexAtLastBind);
+            Assert.AreEqual(3, ((ListItemTestSubclass)pool[1]).DataIndexAtLastBind);
         }
 
         [Test]
@@ -355,10 +355,10 @@ namespace Tsvrc.Tests.EditMode
             ExpectDestroyErrors(2);
             list.SetPage(1);
 
-            TsListItem[] pool = GetPool(list);
+            ListItem[] pool = GetPool(list);
             Assert.AreEqual(2, pool.Length);
-            Assert.AreEqual(2, ((TsListItemTestSubclass)pool[0]).DataIndexAtLastBind);
-            Assert.AreEqual(3, ((TsListItemTestSubclass)pool[1]).DataIndexAtLastBind);
+            Assert.AreEqual(2, ((ListItemTestSubclass)pool[0]).DataIndexAtLastBind);
+            Assert.AreEqual(3, ((ListItemTestSubclass)pool[1]).DataIndexAtLastBind);
             Assert.IsFalse(list.HasNextPage);
         }
 
@@ -371,9 +371,9 @@ namespace Tsvrc.Tests.EditMode
             ExpectDestroyErrors(2);
             list.SetPage(2);
 
-            TsListItem[] pool = GetPool(list);
+            ListItem[] pool = GetPool(list);
             Assert.AreEqual(1, pool.Length);
-            Assert.AreEqual(4, ((TsListItemTestSubclass)pool[0]).DataIndexAtLastBind);
+            Assert.AreEqual(4, ((ListItemTestSubclass)pool[0]).DataIndexAtLastBind);
         }
 
         [Test]

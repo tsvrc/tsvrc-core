@@ -25,7 +25,7 @@ namespace Tsvrc.Tests.EditMode
             // false, but IsProcessOwner() still true - the same window PlayerTracker's own
             // Broadcast* methods explicitly guard against reentering) is possible in principle.
             // This test pins that it's still safe: CheckAllPlayersReady()'s resulting
-            // CompleteReadyCheck() call is rejected by TsProcess.CompleteProcess()'s own
+            // CompleteReadyCheck() call is rejected by Process.CompleteProcess()'s own
             // _isRunning guard (a warning log, not an incorrect completion).
             var tracker = CreateProcess<ReadyCheckProcessTestSubclass>();
             SeedAsOwner(tracker);

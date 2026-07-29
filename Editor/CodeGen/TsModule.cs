@@ -64,7 +64,7 @@ namespace Tsvrc.Editor
                 var type = assembly.GetType(fullName);
                 if (type == null) continue;
                 for (var t = type.BaseType; t != null; t = t.BaseType)
-                    if (t.Name == "TsBehaviour") return true;
+                    if (t.Name == "TsvrcBehaviour") return true;
                 return false;
             }
             return false;

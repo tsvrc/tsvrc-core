@@ -27,7 +27,7 @@ namespace Tsvrc.DataTransfer
         /// </summary>
         public const string OnTransferChunkEvent = "OnTransferChunk";
 
-        #region TsProcess Callbacks
+        #region Process Callbacks
 
         protected override void OnOwnerAbandonedProcess()
         {
@@ -35,7 +35,7 @@ namespace Tsvrc.DataTransfer
             // which executes ExecuteStop() → broadcasts NotifyTrackedPlayersDataTransferStopped
             // and clears all process/transfer state via InternalCleanup. A second CancelDataTransfer()
             // here would call StopReadyCheck() with _isRunning=false, producing a spurious
-            // "[TsProcess] Process is not running" warning on every ownership transfer.
+            // "[Process] Process is not running" warning on every ownership transfer.
             base.OnOwnerAbandonedProcess();
         }
 

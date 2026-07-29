@@ -26,7 +26,7 @@ namespace Tsvrc.Utils
     /// <b>Reference:</b> <see href="https://creators.vrchat.com/worlds/udon/persistence/">VRChat Persistence docs</see>
     /// </remarks>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class TsMemory : TsBehaviour
+    public class TsMemory : TsvrcBehaviour
     {
         protected override bool IsTsvrcInternal => true;
 

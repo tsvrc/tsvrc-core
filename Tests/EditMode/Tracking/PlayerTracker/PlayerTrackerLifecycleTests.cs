@@ -161,7 +161,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void OnProcessCleanup_ReentrantRestartFromOnProcessStopped_SkipsClearingTrackedState()
         {
-            // Mirrors TsProcessCleanupTests's reentrant-restart test: a subscriber reacting
+            // Mirrors ProcessCleanupTests's reentrant-restart test: a subscriber reacting
             // to OnProcessStopped by immediately starting a new run must not have its brand-new
             // _trackedPlayerIds wiped by the old run's cleanup.
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
@@ -199,7 +199,7 @@ namespace Tsvrc.Tests.EditMode
 
         // LastPlayerIds is assigned before the OnTracking* hook is called in every Notify*
         // method - the following three tests pin that ordering directly, mirroring
-        // TsProcessLifecycleTests' RunningStateInsideOnProcessStopped-style pattern.
+        // ProcessLifecycleTests' RunningStateInsideOnProcessStopped-style pattern.
 
         [Test]
         public void StartPlayerTracking_LastPlayerIdsAlreadyCurrentInsideOnTrackingStartedHook()

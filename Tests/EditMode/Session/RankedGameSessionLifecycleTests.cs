@@ -182,7 +182,7 @@ namespace Tsvrc.Tests.EditMode
                 h.Session.AddCompletedPlayer("B"); // all completed -> ends naturally
 
                 // Every sub-process's own cleanup clears its synced owner fields on a
-                // natural stop (TsProcess.InternalCleanup, shared by every process
+                // natural stop (Process.InternalCleanup, shared by every process
                 // in this library), so a genuine restart needs re-seeding ownership
                 // for every one of them, exactly like starting fresh would.
                 SeedAsOwner(h.ReadyCheck);

@@ -3,7 +3,7 @@ using System.Collections;
 using NUnit.Framework;
 using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
-using Tsvrc.Tests.PlayMode.Core.TsProcess;
+using Tsvrc.Tests.PlayMode.Core.Process;
 using UnityEngine.TestTools;
 using VRC.SDK3.ClientSim;
 using VRC.SDKBase;
@@ -14,7 +14,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
     // non-empty-tracked-list scan needs a live player list. ClientSim never organically dispatches
     // VRC lifecycle callbacks to a plain UdonSharpBehaviour, so these tests call the overrides
     // directly instead.
-    public class PlayerTrackerAbandonmentPlayModeTests : TsProcessPlayModeTestBase
+    public class PlayerTrackerAbandonmentPlayModeTests : ProcessPlayModeTestBase
     {
         [UnityTest]
         public IEnumerator OnPlayerLeft_RealTrackedRemotePlayerLeaves_BroadcastsRemoval()

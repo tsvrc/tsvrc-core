@@ -3,7 +3,7 @@ using System.Collections;
 using NUnit.Framework;
 using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
-using Tsvrc.Tests.PlayMode.Core.TsProcess;
+using Tsvrc.Tests.PlayMode.Core.Process;
 using UnityEngine.TestTools;
 using VRC.SDK3.ClientSim;
 using VRC.SDKBase;
@@ -16,7 +16,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.AutoPlayerTracker
     // OnPlayerJoined is invoked directly below. AutoPlayerTracker has no dedicated test double -
     // the concrete class is used directly - so tracked-set state is read via
     // PrivateFieldAccess.InvokeInstance("GetTrackedPlayerIds").
-    public class AutoPlayerTrackerPlayModeTests : TsProcessPlayModeTestBase
+    public class AutoPlayerTrackerPlayModeTests : ProcessPlayModeTestBase
     {
         private static string[] GetTrackedPlayerIds(Tsvrc.Tracking.PlayerTracker tracker)
         {

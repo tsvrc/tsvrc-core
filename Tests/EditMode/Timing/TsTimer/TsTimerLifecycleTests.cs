@@ -31,7 +31,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void StartTimer_Parameterless_AlreadyRunning_SilentlyNoOps()
         {
-            // Unlike TsProcess.StartProcess's own "already running" guard (which logs
+            // Unlike Process.StartProcess's own "already running" guard (which logs
             // a warning), TsTimer.StartTimer()'s own outer IsProcessRunning() guard
             // returns before ever reaching StartProcess - so a redundant call while
             // running is a silent no-op here, not a warning.
@@ -311,7 +311,7 @@ namespace Tsvrc.Tests.EditMode
         public void ReentrantStopFromOnTimerStarted_UnwindsCleanlyAndSkipsTheBaseClassPostStartTickSchedule()
         {
             // This is the earliest possible reentrancy window: OnProcessStarted (base
-            // TsProcess.StartProcess's own callback) calls TsTimer.OnTimerStarted()
+            // Process.StartProcess's own callback) calls TsTimer.OnTimerStarted()
             // as its literal last statement, which itself runs BEFORE control returns to
             // StartProcess()'s own post-callback `if (_useProcessUpdate && !_updateLoopActive)`
             // tick-scheduling check - so a full stop+cleanup can complete entirely
@@ -412,7 +412,7 @@ namespace Tsvrc.Tests.EditMode
                 timer.StopTimer();
 
                 // StopTimer's cleanup clears the synced owner fields (same
-                // TsProcess.InternalCleanup behavior the elapsed-math tests in
+                // Process.InternalCleanup behavior the elapsed-math tests in
                 // TsTimerElapsedAndRemainingTests.cs rely on), so a genuinely fresh
                 // restart needs re-seeding.
                 SeedAsOwner(timer);

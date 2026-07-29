@@ -10,7 +10,7 @@ using VRC.SDK3.Data;
 
 namespace Tsvrc.Tests.PlayMode.UI.TsList
 {
-    // Destroy() does not actually run in Edit Mode, so real pooled TsListItem GameObjects are
+    // Destroy() does not actually run in Edit Mode, so real pooled ListItem GameObjects are
     // never actually destroyed there. This covers the real, deferred Instantiate/Destroy
     // pool-churn lifecycle a page change or data reset triggers.
     public class TsListPlayModeTests : TsPlayModeTestBase
@@ -38,7 +38,7 @@ namespace Tsvrc.Tests.PlayMode.UI.TsList
 
             var prefabGO = new GameObject("ItemPrefab");
             _spawned.Add(prefabGO);
-            var prefabItem = prefabGO.AddComponent<TsListItemTestSubclass>();
+            var prefabItem = prefabGO.AddComponent<ListItemTestSubclass>();
 
             PrivateFieldAccess.SetField(list, "_itemContainer", containerGO.transform);
             PrivateFieldAccess.SetField(list, "_itemPrefab", prefabItem);
@@ -59,8 +59,8 @@ namespace Tsvrc.Tests.PlayMode.UI.TsList
             return data;
         }
 
-        private static TsListItem[] GetPool(Tsvrc.UI.TsList list) =>
-            PrivateFieldAccess.GetField<TsListItem[]>(list, "_pool");
+        private static ListItem[] GetPool(Tsvrc.UI.TsList list) =>
+            PrivateFieldAccess.GetField<ListItem[]>(list, "_pool");
 
         [UnityTest]
         public IEnumerator SetPage_RealPageChange_ActuallyDestroysOldPooledItemsByEndOfFrame()
@@ -68,7 +68,7 @@ namespace Tsvrc.Tests.PlayMode.UI.TsList
             var list = CreateList(pageSize: 2);
             list.SetData(MakeData(4));
 
-            TsListItem[] firstPagePool = GetPool(list);
+            ListItem[] firstPagePool = GetPool(list);
             Assert.AreEqual(2, firstPagePool.Length);
             var oldItemGameObjects = new GameObject[firstPagePool.Length];
             for (int i = 0; i < firstPagePool.Length; i++)
@@ -87,7 +87,7 @@ namespace Tsvrc.Tests.PlayMode.UI.TsList
         {
             var list = CreateList();
             list.SetData(MakeData(3));
-            TsListItem[] pool = GetPool(list);
+            ListItem[] pool = GetPool(list);
             var oldItemGameObjects = new GameObject[pool.Length];
             for (int i = 0; i < pool.Length; i++)
                 oldItemGameObjects[i] = pool[i].gameObject;

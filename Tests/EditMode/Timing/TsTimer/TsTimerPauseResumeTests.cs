@@ -8,7 +8,7 @@ namespace Tsvrc.Tests.EditMode
     // network-callable counterparts, on the owner-direct path (SeedAsOwner makes
     // IsProcessOwner() true, short-circuiting the non-owner SendCustomNetworkEvent
     // forward before Networking.IsOwner is ever evaluated - same rationale as every
-    // other class in this suite, see TsProcessTestBase's header comment), plus the
+    // other class in this suite, see ProcessTestBase's header comment), plus the
     // dual-authority fallback path (IsProcessOwner() false but Networking.IsOwner(
     // gameObject) true) near the bottom of this file. The pure non-owner-forwarding
     // branch (both false) needs a real second networked client and cannot be
@@ -249,7 +249,7 @@ namespace Tsvrc.Tests.EditMode
         // Networking.IsOwner(gameObject) is true here, the dual-authority fallback
         // (`... || Networking.IsOwner(gameObject)`, the same "we accept authority if
         // we are either the process owner by ID or the Unity owner" fallback
-        // documented on TsProcess.StopProcess) executes locally even when
+        // documented on Process.StopProcess) executes locally even when
         // _ownerPlayerIdInt names someone else.
         [Test]
         public void PauseTimer_OwnerIdMismatchButLocalHoldsUnityOwnership_ExecutesViaDualAuthorityFallback()

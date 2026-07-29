@@ -2,7 +2,7 @@ using System.Collections;
 using NUnit.Framework;
 using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
-using Tsvrc.Tests.PlayMode.Core.TsProcess;
+using Tsvrc.Tests.PlayMode.Core.Process;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
@@ -13,7 +13,7 @@ namespace Tsvrc.Tests.PlayMode.Timing.TsTimer
     // ClientSim session - a platform fact, not tsvrc logic, proven with a real WaitForSeconds
     // coroutine. PauseTimer/ResumeTimer's non-owner-forwarding branch needs a GameObject that
     // genuinely isn't Unity-owned by the local player - FakeOwnershipSyncable produces that for real.
-    public class TsTimerPlayModeTests : TsProcessPlayModeTestBase
+    public class TsTimerPlayModeTests : ProcessPlayModeTestBase
     {
         [UnityTest]
         public IEnumerator GetElapsedMilliseconds_RealRunningTimer_GrowsWithRealWallClockTime()

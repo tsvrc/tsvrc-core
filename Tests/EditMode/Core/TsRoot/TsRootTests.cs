@@ -11,7 +11,7 @@ namespace Tsvrc.Tests.EditMode
     // (Instance, Memory), both defaulting to null. Tests here pin the default-null
     // value, that the two properties' overrides are independent of each other, and
     // the abstract/UdonSharpBehaviour shape the rest of the library
-    // (TsBehaviour._ts, ScaffoldModule.FindCompiledType()) depends on.
+    // (TsvrcBehaviour._ts, ScaffoldModule.FindCompiledType()) depends on.
     public class TsRootTests
     {
         private readonly List<GameObject> _spawned = new List<GameObject>();
@@ -53,7 +53,7 @@ namespace Tsvrc.Tests.EditMode
         public void Instance_OverriddenAlone_MemoryStaysNull()
         {
             var root = Create<InstanceOnlyTsRootDouble>();
-            root.FakeInstance = Create<TsInstance>();
+            root.FakeInstance = Create<Instance>();
 
             Assert.AreSame(root.FakeInstance, root.Instance);
             Assert.IsNull(root.Memory);
@@ -73,7 +73,7 @@ namespace Tsvrc.Tests.EditMode
         public void Instance_And_Memory_BothOverridden_ReturnIndependentValues()
         {
             var root = Create<FullTsRootDouble>();
-            root.FakeInstance = Create<TsInstance>();
+            root.FakeInstance = Create<Instance>();
             root.FakeMemory = Create<TsMemory>();
 
             Assert.AreSame(root.FakeInstance, root.Instance);
@@ -85,7 +85,7 @@ namespace Tsvrc.Tests.EditMode
         public void TsRoot_IsAbstract()
         {
             Assert.IsTrue(typeof(TsRoot).IsAbstract,
-                "TsRoot must stay abstract - every TsBehaviour reaches it only through " +
+                "TsRoot must stay abstract - every TsvrcBehaviour reaches it only through " +
                 "_ts, never through the generated TsGenerated type directly, per the class's " +
                 "own header comment.");
         }
@@ -100,8 +100,8 @@ namespace Tsvrc.Tests.EditMode
         public void ConcreteDouble_UsableAsTsConstructArgument_EndToEnd()
         {
             var root = Create<FullTsRootDouble>();
-            root.FakeInstance = Create<TsInstance>();
-            var behaviour = Create<TsBehaviourTestSubclass>();
+            root.FakeInstance = Create<Instance>();
+            var behaviour = Create<TsvrcBehaviourTestSubclass>();
 
             behaviour.TsConstruct((TsRoot)root);
 

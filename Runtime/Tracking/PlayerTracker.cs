@@ -9,12 +9,12 @@ using VRC.Udon.Common.Interfaces;
 namespace Tsvrc.Tracking
 {
     /// <summary>
-    /// A <see cref="TsProcess"/> that tracks a set of players by ID.
+    /// A <see cref="Process"/> that tracks a set of players by ID.
     /// The owner manages the list; all clients receive network events when the set changes.
     /// Subscribe via the <c>OnTracking*Event</c> string constants and read the <c>Last*</c> properties in your callback.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class PlayerTracker : TsProcess
+    public class PlayerTracker : Process
     {
         /// <summary>
         /// Emitted when tracking starts.
@@ -141,7 +141,7 @@ namespace Tsvrc.Tracking
         {
             base.OnProcessCleanup(isCompleted);
 
-            // If a new process was started from an inline callback (see TsProcess.InternalCleanup
+            // If a new process was started from an inline callback (see Process.InternalCleanup
             // for the full explanation), it will have already written the correct _trackedPlayerIds
             // in PlayerTracker.OnProcessStarted. Clearing them here would overwrite that state before
             // InternalCleanup's RequestSerialization serializes it, which would send an empty list

@@ -28,8 +28,8 @@ namespace Tsvrc.Config
         public Object[] Singletons;
         [Tooltip("UdonSharpBehaviour prefabs to pool. Must be prefab assets, not scene objects.")]
         public UdonSharpBehaviour[] PooledObjects;
-        [Tooltip("TsBehaviours that are always active in the scene, not pooled. Constructed at startup.")]
-        public TsBehaviour[] Constructs;
+        [Tooltip("TsvrcBehaviours that are always active in the scene, not pooled. Constructed at startup.")]
+        public TsvrcBehaviour[] Constructs;
         [Tooltip("Factory groups for runtime-instantiated (non-networked) prefabs.")]
         public TsFactoryGroup[] Factories;
     }

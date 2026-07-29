@@ -107,7 +107,7 @@ namespace Tsvrc.Tests.EditMode
             TsConfig config = CreateConfig();
             var behaviourGo = new GameObject("ConstructEntry");
             _spawned.Add(behaviourGo);
-            var behaviour = behaviourGo.AddComponent<TsBehaviour>();
+            var behaviour = behaviourGo.AddComponent<TsvrcBehaviour>();
             var value = new[] { behaviour };
 
             config.Constructs = value;

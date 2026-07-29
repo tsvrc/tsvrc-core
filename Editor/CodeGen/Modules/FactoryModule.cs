@@ -273,7 +273,7 @@ namespace Tsvrc.Editor
                     string name = Deduplicate(prefix + Sanitize(prefab.name), usedNames);
                     usedNames.Add(name);
 
-                    var behaviour = prefab.GetComponent<TsBehaviour>();
+                    var behaviour = prefab.GetComponent<TsvrcBehaviour>();
                     string typeName = behaviour != null ? behaviour.GetType().Name : "GameObject";
                     string typeNamespace = behaviour != null ? (behaviour.GetType().Namespace ?? string.Empty) : string.Empty;
 

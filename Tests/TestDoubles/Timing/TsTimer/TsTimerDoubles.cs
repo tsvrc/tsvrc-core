@@ -4,15 +4,15 @@ using Tsvrc.Timing;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TsTimer carries TsProcess's [UdonBehaviourSyncMode] attribute, so this double
+    // TsTimer carries Process's [UdonBehaviourSyncMode] attribute, so this double
     // lives in Tsvrc.Tests.Doubles for the same reason PlayerTrackerTestSubclass/
-    // TsProcessTestSubclass do (see those files' header comments) - AddComponent()
+    // ProcessTestSubclass do (see those files' header comments) - AddComponent()
     // silently returns null for such a script when it's defined in an Editor-platform-
     // restricted assembly.
     //
     // Records every OnTimer* hook invocation (call count + ordered CallLog) so tests can
     // assert both "did it fire" and "in what order relative to other hooks/OnTimerUpdated
-    // change-detection", mirroring TsProcessTestSubclass/PlayerTrackerTestSubclass's
+    // change-detection", mirroring ProcessTestSubclass/PlayerTrackerTestSubclass's
     // established style. The *Action hooks let a test inject synchronous reentrant
     // behavior (e.g. calling StartTimer() again from inside OnTimerStopped/OnTimerCompleted)
     // without needing a fresh subclass per scenario.

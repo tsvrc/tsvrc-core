@@ -6,7 +6,7 @@ using VRC.SDK3.Data;
 namespace Tsvrc.StateMachine
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class StateManager : TsBehaviour
+    public class StateManager : TsvrcBehaviour
     {
         protected override bool IsTsvrcInternal => true;
 

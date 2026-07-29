@@ -24,9 +24,9 @@ namespace {ScaffoldModule.CompiledNamespace}
 {{
     public partial class {ScaffoldModule.CompiledClassName}
     {{
-        [ReadOnly] [SerializeField] private TsInstance _instance;
+        [ReadOnly] [SerializeField] private Instance _instance;
 
-        public override TsInstance Instance => _instance;
+        public override Instance Instance => _instance;
 
         public void _TsInstanceStart()
         {{
@@ -47,7 +47,7 @@ namespace {ScaffoldModule.CompiledNamespace}
         public void GenerateCode_WithDetectedTypeSet_IsIdenticalToNoDetectedType()
         {
             var module = new InstanceModule();
-            PrivateFieldAccess.SetField(module, "_detectedType", typeof(TsInstanceStandIn));
+            PrivateFieldAccess.SetField(module, "_detectedType", typeof(InstanceStandIn));
             PrivateFieldAccess.SetField(module, "_ambiguous", false);
 
             GeneratedCodeAssert.AreEqual(Expected, module.GenerateCode());
@@ -55,7 +55,7 @@ namespace {ScaffoldModule.CompiledNamespace}
 
         // Only used as a non-null Type value for the reflection test above - never
         // constructed or added to a scene.
-        private class TsInstanceStandIn
+        private class InstanceStandIn
         {
         }
     }
