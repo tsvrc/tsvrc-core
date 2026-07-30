@@ -8,8 +8,8 @@ using Tsvrc.Testing.Framework;
 namespace Tsvrc.Tests.EditMode
 {
     // Tests feed PoolModule.GenerateCode() a synthetic _poolTypeInfos dictionary via
-    // reflection, bypassing ScanExternalRefs/ScanInternalDeps/ComputeTotalSlots entirely -
-    // those are covered separately by PoolModuleSlotMathTests.
+    // reflection, bypassing ScanExternalRefs, ScanInternalDeps, and ComputeTotalSlots entirely,
+    // since those are covered separately by PoolModuleSlotMathTests.
     public class PoolModuleGenerateCodeTests
     {
         private static readonly Type InfoType = CodeGenModuleReflection.NestedType(typeof(PoolModule), "PoolTypeInfo");
@@ -81,7 +81,7 @@ namespace {ScaffoldModule.CompiledNamespace}
         }
 
         [Test]
-        public void GenerateCode_TsBehaviourType_GetsTsConstructCallsPerSlot()
+        public void GenerateCode_TsvrcBehaviourType_GetsTsConstructCallsPerSlot()
         {
             var module = BuildModule(("StateManager", "Tsvrc.StateMachine", 2));
 
@@ -92,7 +92,7 @@ namespace {ScaffoldModule.CompiledNamespace}
         }
 
         [Test]
-        public void GenerateCode_NonTsBehaviourType_SkipsConstructCallsEntirely()
+        public void GenerateCode_NonTsvrcBehaviourType_SkipsConstructCallsEntirely()
         {
             var module = BuildModule(("Rigidbody", "UnityEngine", 2));
 

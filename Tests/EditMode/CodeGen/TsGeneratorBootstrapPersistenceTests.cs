@@ -11,27 +11,18 @@ namespace Tsvrc.Tests.EditMode
     // AfterDomainReload() carries it through instead of gating on HasBootstrapSignal().
     public class TsGeneratorBootstrapPersistenceTests
     {
-        private const string PendingBootstrapKey = "Tsvrc.PendingBootstrap";
-
+        private TsGeneratorTestHarness _harness;
         private TempSceneScope _scope;
-        private GeneratedFileBackup _backup;
 
         [SetUp]
         public void SetUp()
         {
-            SessionState.EraseBool(PendingBootstrapKey);
-            _backup = new GeneratedFileBackup();
-            _scope = new TempSceneScope();
+            _harness = new TsGeneratorTestHarness();
+            _scope = _harness.Scope;
         }
 
         [TearDown]
-        public void TearDown()
-        {
-            _scope.Dispose();
-            _backup.Dispose();
-            SessionState.EraseBool(PendingBootstrapKey);
-            TsGenerator.AfterDomainReload(skipRefresh: true); // reset hooks, see TsBuildCompileTests
-        }
+        public void TearDown() => _harness.Dispose();
 
         [Test]
         public void Run_AllowBootstrapTrueWithPendingFileChanges_SetsIsBootstrapPending()
@@ -71,21 +62,31 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void AfterDomainReload_WithPendingFlag_ConsumesAndClearsItBeforeRunning()
         {
-            SessionState.SetBool(PendingBootstrapKey, true);
+            // Prime the scratch folder first (same two-pass settle pattern
+            // Run_ReachesWireWithoutFurtherWrites_LeavesIsBootstrapPendingFalse uses): a totally
+            // empty scratch folder always has a write on its very first pass (nothing on disk
+            // yet to compare against), which would legitimately re-arm the flag regardless of
+            // what's under test here. Settling first isolates "was the incoming flag consumed"
+            // from "did this exact pass also need to write something."
+            TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
+            TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
+            SessionState.SetBool("Tsvrc.PendingBootstrap", true);
 
             TsGenerator.AfterDomainReload(skipRefresh: true);
 
             Assert.IsFalse(TsGenerator.IsBootstrapPending,
-                "The flag must be consumed by the very next AfterDomainReload() call, whether or not " +
-                "that pass itself needs to re-arm it (e.g. because it hits another write-then-stop).");
+                "The flag must be consumed by the very next AfterDomainReload() call, and this pass " +
+                "(against an already-settled scratch folder) has nothing left to write that would " +
+                "legitimately re-arm it.");
         }
 
         [Test]
         public void AfterDomainReload_WithNoPendingFlag_DoesNotForceBootstrap()
         {
-            // No TsConfig, no scaffold instance, no Instance subclass in this synthetic scene -
-            // HasBootstrapSignal() is false. Without a pending flag, this must stay gated (no scene
-            // object should be created) rather than treating every domain reload as a bootstrap.
+            // No TsConfig, no scaffold instance, and no Instance subclass in this synthetic
+            // scene, so HasBootstrapSignal() is false. Without a pending flag, this must stay
+            // gated, with no scene object created, rather than treating every domain reload as
+            // a bootstrap.
             Assert.IsFalse(TsGenerator.IsBootstrapPending);
 
             Assert.DoesNotThrow(() => TsGenerator.AfterDomainReload(skipRefresh: true));
@@ -96,16 +97,21 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Run_ReachesWireWithoutFurtherWrites_LeavesIsBootstrapPendingFalse()
         {
-            // Once a pass completes without needing another write (the "fully settled" case), no
-            // pending flag should be left behind for a future reload to misinterpret as a bootstrap
-            // request.
+            // Once a pass completes without needing another write, the fully settled case, no
+            // pending flag should be left behind for a future reload to misinterpret as a
+            // bootstrap request. This calls Run() twice: the first pass writes GenerateCode()'s
+            // output for this test's empty-config scene to the scratch folder and stops there,
+            // since WriteModules() returned true. The second pass sees that same content
+            // already on disk, so there is no diff, and it proceeds past the write-then-stop
+            // branches into Wire(). This mirrors the same two-pass settle pattern
+            // TsGeneratorWiringSuppressionTests uses, for the same reason: there is no other way
+            // to reach Wire() deterministically without a real domain reload in between.
             var root = CompiledRootFixture.AddTo(_scope);
-            if (root == null) return; // Assert.Ignore already raised inside the fixture.
-
             var configGo = _scope.CreateGameObject("TsConfig");
             configGo.transform.SetParent(root.transform);
             configGo.AddComponent<TsConfig>();
 
+            TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
             TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
 
             Assert.IsFalse(TsGenerator.IsBootstrapPending,

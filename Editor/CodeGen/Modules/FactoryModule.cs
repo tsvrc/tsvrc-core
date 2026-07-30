@@ -14,6 +14,8 @@ namespace Tsvrc.Editor
     // time. Builtin and user factory groups are merged; group names become a name prefix.
     internal class FactoryModule : TsModule
     {
+        private const string SnapshotKey = "FactoryModule";
+
         private List<FactoryEntry> _entries = new List<FactoryEntry>();
 
         // Tab-only UI state, keyed by array index (not group name) so the key is stable while
@@ -55,8 +57,8 @@ namespace Tsvrc.Editor
                     : $"{groupName}   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})";
 
                 EditorGUILayout.BeginHorizontal();
-                // Foldout is UI-only state - save/restore GUI.changed around it so toggling one
-                // never reads back as "the user edited TsConfig" to any future change-check.
+                // Foldout is UI-only state. Save and restore GUI.changed around it so toggling
+                // one never reads back as "the user edited TsConfig" to any future change check.
                 bool prevChanged = GUI.changed;
                 GUI.changed = false;
                 expanded = EditorGUILayout.Foldout(expanded, foldoutLabel, true);
@@ -70,7 +72,7 @@ namespace Tsvrc.Editor
                 {
                     EditorGUI.indentLevel++;
                     // DelayedTextField, not PropertyField: the name feeds Sanitize(name) into the
-                    // generated Create{Group}{Name} method, and TsConfig is a watched type -
+                    // generated Create{Group}{Name} method, and TsConfig is a watched type, so
                     // PropertyField would write TsGeneratedFactory.cs and refresh on every keystroke.
                     string committedName = EditorGUILayout.DelayedTextField(LabelGroupName, groupNameProp.stringValue);
                     if (committedName != groupNameProp.stringValue)
@@ -132,7 +134,17 @@ namespace Tsvrc.Editor
         {
             var userConfig = UnityEngine.Object.FindObjectOfType<TsConfig>(true);
             var builtinConfig = AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(BuiltinConfigPath);
-            _entries = BuildEntries(userConfig, builtinConfig);
+            var resolved = BuildEntries(userConfig, builtinConfig);
+            _entries = ApplySnapshotFallback(SnapshotKey, resolved,
+                e => new ModuleEntrySnapshot.Entry { Name = e.Name, TypeName = e.TypeName, Namespace = e.TypeNamespace },
+                s => new FactoryEntry
+                {
+                    Name = s.Name,
+                    TypeName = s.TypeName,
+                    TypeNamespace = s.Namespace,
+                    IsTsvrcBehaviour = IsTsvrcBehaviourType(s.TypeName, s.Namespace),
+                    PrefabAsset = null,
+                });
         }
 
         internal override string GenerateCode()
@@ -167,7 +179,7 @@ namespace Tsvrc.Editor
                         {
                             w.Line("return go;");
                         }
-                        else if (entry.IsTsBehaviour)
+                        else if (entry.IsTsvrcBehaviour)
                         {
                             w.Line($"var instance = go.GetComponent<{entry.TypeName}>();");
                             w.Line("if (instance != null) instance.TsConstruct(this);");
@@ -228,6 +240,16 @@ namespace Tsvrc.Editor
 
             foreach (var entry in _entries)
             {
+                // A snapshot-restored entry (see TsModule.ApplySnapshotFallback) has no prefab
+                // reference to instantiate from, and PrefabUtility.InstantiatePrefab throws on a
+                // literal null target, so this must be skipped explicitly rather than falling
+                // through into that call.
+                if (entry.PrefabAsset == null)
+                {
+                    Debug.LogWarning($"[FactoryModule] Factory '{entry.Name}' prefab asset is null. Remove the missing entry from TsConfig.");
+                    continue;
+                }
+
                 var prop = so.FindProperty(FieldName(entry.Name));
                 if (prop == null)
                 {
@@ -282,7 +304,7 @@ namespace Tsvrc.Editor
                         Name = name,
                         TypeName = typeName,
                         TypeNamespace = typeNamespace,
-                        IsTsBehaviour = behaviour != null,
+                        IsTsvrcBehaviour = behaviour != null,
                         PrefabAsset = prefab,
                     });
                 }
@@ -291,8 +313,8 @@ namespace Tsvrc.Editor
             return entries;
         }
 
-        // Testable in isolation via reflection against any SerializedProperty/parent
-        // Transform - not tied to the real compiled root.
+        // Testable in isolation via reflection against any SerializedProperty and parent
+        // Transform, not tied to the real compiled root.
         private static (GameObject container, GameObject instance) CreateAndAssignInstance(
             SerializedProperty prop, UnityEngine.Object prefabAsset, string entryName, GameObject existingContainer, Transform rootTransform)
         {
@@ -375,7 +397,7 @@ namespace Tsvrc.Editor
             public string Name;
             public string TypeName;
             public string TypeNamespace;
-            public bool IsTsBehaviour;
+            public bool IsTsvrcBehaviour;
             public GameObject PrefabAsset;
         }
     }

@@ -13,6 +13,8 @@ namespace Tsvrc.Editor
     // _TsConstructStart() calls TsConstruct(this) on each in field-name order.
     internal class ConstructModule : TsModule
     {
+        private const string SnapshotKey = "ConstructModule";
+
         private List<ConstructEntry> _entries = new List<ConstructEntry>();
 
         internal override string FileName => "TsGeneratedConstruct.cs";
@@ -27,13 +29,25 @@ namespace Tsvrc.Editor
         internal override void LoadConfig()
         {
             var sceneConfig = UnityEngine.Object.FindObjectOfType<TsConfig>(true);
-            if (sceneConfig == null) { _entries = new List<ConstructEntry>(); return; }
-            var so = new SerializedObject(sceneConfig);
-            var prop = so.FindProperty("Constructs");
-            var constructs = new TsvrcBehaviour[prop.arraySize];
-            for (int i = 0; i < prop.arraySize; i++)
-                constructs[i] = prop.GetArrayElementAtIndex(i).objectReferenceValue as TsvrcBehaviour;
-            _entries = Resolve(constructs);
+
+            // Deliberately does NOT early-return an empty result when sceneConfig is null: that
+            // would bypass ApplySnapshotFallback below, meaning a compile-broken pass on a scene
+            // that hasn't loaded TsConfig yet (or ever) would collapse a real snapshot to empty
+            // when it should fall back to it, same as SingletonModule's handling of the same case.
+            var constructs = Array.Empty<TsvrcBehaviour>();
+            if (sceneConfig != null)
+            {
+                var so = new SerializedObject(sceneConfig);
+                var prop = so.FindProperty("Constructs");
+                constructs = new TsvrcBehaviour[prop.arraySize];
+                for (int i = 0; i < prop.arraySize; i++)
+                    constructs[i] = prop.GetArrayElementAtIndex(i).objectReferenceValue as TsvrcBehaviour;
+            }
+
+            var resolved = Resolve(constructs);
+            _entries = ApplySnapshotFallback(SnapshotKey, resolved,
+                e => new ModuleEntrySnapshot.Entry { Name = e.Name, TypeName = e.TypeName, Namespace = e.Namespace },
+                s => new ConstructEntry { Name = s.Name, TypeName = s.TypeName, Namespace = s.Namespace, SourceObject = null });
         }
 
         internal override string GenerateCode()

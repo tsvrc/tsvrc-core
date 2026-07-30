@@ -17,9 +17,18 @@ namespace Tsvrc.Editor
     // produce the correct slot totals.
     internal class PoolModule : TsModule
     {
+        private const string SnapshotKey = "PoolModule";
+
         private List<(Component prefab, string typeName)> _poolEntries = new List<(Component, string)>();
         private Dictionary<string, PoolTypeInfo> _poolTypeInfos = new Dictionary<string, PoolTypeInfo>(StringComparer.Ordinal);
         private HashSet<string> _watchedTypeNames = new HashSet<string>(StringComparer.Ordinal);
+
+        // Set when LoadConfig() had to fall back to the snapshot this pass. Wire() checks this
+        // to avoid its own destructive behavior, tearing down the real "Pool" container when
+        // _poolEntries looks empty, based on a currently unreliable, compile broken live scan.
+        // See Wire()'s own guard for why this matters more here than for Singleton, Factory, and
+        // Construct, none of which destroy existing scene state on empty input.
+        private bool _usedSnapshotFallback;
 
         private class PoolTypeInfo
         {
@@ -53,8 +62,9 @@ namespace Tsvrc.Editor
 
             _poolEntries = ResolveConfig(userConfig, builtinConfig);
 
-            // Same type may appear in both builtinConfig and userConfig; keep first occurrence
-            // (builtins come first in ResolveConfig, so builtin slots always have lower indices).
+            // Same type may appear in both builtinConfig and userConfig, so keep the first
+            // occurrence. Builtins come first in ResolveConfig, so builtin slots always have
+            // lower indices.
             var seenEntryTypes = new HashSet<string>(StringComparer.Ordinal);
             _poolEntries = _poolEntries.Where(e => seenEntryTypes.Add(e.typeName)).ToList();
 
@@ -74,6 +84,27 @@ namespace Tsvrc.Editor
             ScanExternalRefs();
             ScanInternalDeps();
             ComputeTotalSlots();
+
+            // Protects the type list and per-type slot counts GenerateCode() emits, not Wire()'s
+            // scene wiring. A type that only survives via the snapshot has no live Prefab
+            // reference here, since fromSnapshot leaves it null, so Wire() can't instantiate it.
+            // See TsModule.ApplySnapshotFallback's doc comment for the same accepted contract
+            // Singleton, Factory, and Construct already have. TotalSlots is itself derived from
+            // a live, scene-wide [WirePool] reflection scan, ScanExternalRefs and
+            // ScanInternalDeps, just as fragile to a broken compile as the entry list, so it is
+            // snapshotted here too via Entry.SlotCount rather than recomputed for restored
+            // entries.
+            var liveInfos = _poolTypeInfos.Values.ToList();
+            var effectiveInfos = ApplySnapshotFallback(SnapshotKey, liveInfos,
+                i => new ModuleEntrySnapshot.Entry { Name = i.TypeName, TypeName = i.TypeName, Namespace = i.TypeNamespace, SlotCount = i.TotalSlots },
+                e => new PoolTypeInfo { Prefab = null, TypeName = e.TypeName, TypeNamespace = e.Namespace, TotalSlots = e.SlotCount });
+
+            _usedSnapshotFallback = !ReferenceEquals(effectiveInfos, liveInfos);
+            if (_usedSnapshotFallback)
+            {
+                _poolTypeInfos = effectiveInfos.ToDictionary(i => i.TypeName, StringComparer.Ordinal);
+                _poolEntries = _poolEntries.Where(e => _poolTypeInfos.ContainsKey(e.typeName)).ToList();
+            }
         }
 
         // Count [WirePool] fields on non-pool scene behaviour instances; each field-per-instance
@@ -84,6 +115,10 @@ namespace Tsvrc.Editor
             foreach (var rootGo in scene.GetRootGameObjects())
                 foreach (var behaviour in rootGo.GetComponentsInChildren<MonoBehaviour>(true))
                 {
+                    // GetComponentsInChildren<MonoBehaviour> includes a null entry for any
+                    // "missing script" component whose type can't be resolved. Skip those
+                    // rather than crashing the whole generator pass on one broken reference.
+                    if (behaviour == null) continue;
                     if (_poolTypeInfos.ContainsKey(behaviour.GetType().Name)) continue;
                     for (var t = behaviour.GetType(); t != null && t != typeof(MonoBehaviour) && t != typeof(UdonSharpBehaviour); t = t.BaseType)
                         foreach (var field in t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
@@ -189,7 +224,7 @@ namespace Tsvrc.Editor
                 {
                     foreach (var info in eligible)
                     {
-                        if (!IsTsBehaviourType(info.TypeName, info.TypeNamespace)) continue;
+                        if (!IsTsvrcBehaviourType(info.TypeName, info.TypeNamespace)) continue;
                         for (int i = 0; i < info.TotalSlots; i++)
                             w.Line($"{SlotFieldName(info.TypeName, i)}.TsConstruct(this);");
                     }
@@ -225,6 +260,12 @@ namespace Tsvrc.Editor
 
         internal override void Wire()
         {
+            // A fallback pass means the live scan this run is unreliable, typically because
+            // compilation is currently broken. Leave whatever is already wired in the scene
+            // completely alone rather than risk destroying a real, working "Pool" container
+            // based on _poolEntries looking emptier than it really is right now.
+            if (_usedSnapshotFallback) return;
+
             var root = FindRoot();
             if (root == null) return;
 
@@ -237,8 +278,9 @@ namespace Tsvrc.Editor
                 return;
             }
 
-            // Pool instances from a prior run are already in the scene, so CollectWireTargetsByType
-            // discovers their internal [WirePool] fields too — IsPoolAlreadyWired can validate them.
+            // Pool instances from a prior run are already in the scene, so
+            // CollectWireTargetsByType discovers their internal [WirePool] fields too, letting
+            // IsPoolAlreadyWired validate them.
             var wireTargetsByType = CollectWireTargetsByType(root.gameObject.scene);
 
             if (IsPoolAlreadyWired(root, existingContainer, wireTargetsByType)) return;
@@ -393,7 +435,8 @@ namespace Tsvrc.Editor
         }
 
         // Builtins are processed before user config so builtin types always occupy the lower
-        // slot indices (e.g. slot 0 stays the same prefab regardless of added user entries).
+        // slot indices. For example, slot 0 stays the same prefab regardless of added user
+        // entries.
         private static List<(Component prefab, string typeName)> ResolveConfig(TsConfig userConfig, TsBuiltinConfig builtinConfig)
         {
             var entries = new List<(Component, string)>();
@@ -436,8 +479,8 @@ namespace Tsvrc.Editor
                         foreach (var field in t.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
                         {
                             // IsWirePoolField excludes non-serialized private [WirePool] fields,
-                            // matching ScanExternalRefs/ScanInternalDeps - otherwise the target/slot
-                            // mismatch warning below would misreport by one.
+                            // matching ScanExternalRefs and ScanInternalDeps. Otherwise the
+                            // target and slot mismatch warning below would misreport by one.
                             if (!IsWirePoolField(field)) continue;
                             if (field.FieldType.IsArray || field.FieldType.IsGenericType) continue;
 

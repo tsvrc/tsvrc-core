@@ -24,7 +24,7 @@ namespace Tsvrc.Tests.EditMode
             for (int i = 0; i < count; i++)
                 entries[i] = CodeGenModuleReflection.BuildEntry(EntryType,
                     ("Name", "E" + i), ("TypeName", "GameObject"), ("TypeNamespace", ""),
-                    ("IsTsBehaviour", false), ("PrefabAsset", null));
+                    ("IsTsvrcBehaviour", false), ("PrefabAsset", null));
 
             var module = new FactoryModule();
             PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, entries));

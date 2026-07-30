@@ -45,7 +45,7 @@ namespace {ScaffoldModule.CompiledNamespace}
         }
 
         [Test]
-        public void GenerateCode_NonTsBehaviourEntry_DeclaresFieldButNoConstructCall()
+        public void GenerateCode_NonTsvrcBehaviourEntry_DeclaresFieldButNoConstructCall()
         {
             // Transform is a real, resolvable type but never extends TsvrcBehaviour.
             var module = BuildModule(Entry("Player", "Transform", "UnityEngine"));
@@ -57,9 +57,9 @@ namespace {ScaffoldModule.CompiledNamespace}
         }
 
         [Test]
-        public void GenerateCode_TsBehaviourEntry_DeclaresFieldAndConstructCall()
+        public void GenerateCode_TsvrcBehaviourEntry_DeclaresFieldAndConstructCall()
         {
-            // Tsvrc.StateMachine.StateManager : TsvrcBehaviour - a real production type.
+            // Tsvrc.StateMachine.StateManager : TsvrcBehaviour, a real production type.
             var module = BuildModule(Entry("Manager", "StateManager", "Tsvrc.StateMachine"));
 
             string code = module.GenerateCode();

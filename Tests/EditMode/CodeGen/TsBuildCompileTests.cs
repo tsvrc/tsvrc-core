@@ -5,42 +5,32 @@ using VRC.SDKBase.Editor.BuildPipeline;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TsBuildCompile ensures generated files/wiring are current before every VRChat world
-    // build; OnBuildRequested can be called directly without a real build.
+    // TsBuildCompile ensures generated files and wiring are current before every VRChat world
+    // build. OnBuildRequested can be called directly without a real build.
     //
-    // TsGenerator.Run() is bootstrap-gated and this project has no Instance subclass, so a
-    // bare call would silently no-op via WaitForBootstrapSignal - add a real TsConfig first to
+    // TsGenerator.Run() is bootstrap gated and this project has no Instance subclass, so a bare
+    // call would silently no-op via WaitForBootstrapSignal. This adds a real TsConfig first to
     // guarantee a deterministic bootstrap signal.
     //
-    // TsGenerator is a static, project-wide singleton - Run() writes Assets/TsGenerated/*.cs for
-    // real. GeneratedFileBackup makes that safe; TearDown's extra AfterDomainReload() resets the
+    // TsGenerator is a static, project-wide singleton, and Run() writes real files. Wrapping it
+    // in a TsGeneratorTestHarness redirects those writes to a scratch folder instead of a
+    // consuming project's real Assets/TsGenerated. TearDown's harness Dispose() resets the
     // process-lifetime EditorApplication hooks Run() leaves subscribed.
     public class TsBuildCompileTests
     {
+        private TsGeneratorTestHarness _harness;
         private TempSceneScope _scope;
-        private GeneratedFileBackup _backup;
 
         [SetUp]
         public void SetUp()
         {
-            _backup = new GeneratedFileBackup();
-            _scope = new TempSceneScope();
+            _harness = new TsGeneratorTestHarness();
+            _scope = _harness.Scope;
             _scope.CreateGameObject("TsConfig").AddComponent<TsConfig>();
         }
 
         [TearDown]
-        public void TearDown()
-        {
-            _scope.Dispose();
-            _backup.Dispose();
-
-            // Run() leaves EditorApplication.hierarchyChanged/Undo.postprocessModifications
-            // subscribed process-wide once past the bootstrap gate. With the TsConfig-bearing
-            // scope already disposed above, this call finds no bootstrap signal, unsubscribes
-            // OnHierarchyChanged, and re-arms only the WaitForBootstrapSignal poller - restoring
-            // a safe idle state for later tests.
-            TsGenerator.AfterDomainReload(skipRefresh: true);
-        }
+        public void TearDown() => _harness.Dispose(); // also resets the hierarchyChanged/postprocessModifications hooks, see TsGeneratorTestHarness
 
         [Test]
         public void CallbackOrder_IsMinus99_SoItSettlesBeforeUdonSharpsOwnBuildPass()
@@ -64,10 +54,10 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void OnBuildRequested_SceneBuildAlreadyBootstrapped_ReturnsTrueWithoutShowingDialog()
         {
-            // SetUp's TsConfig guarantees HasBootstrapSignal() is true, so OnBuildRequested returns
-            // true immediately without reaching the confirm dialog - the only branch safe to test
-            // automatedly, since the "never bootstrapped" branch calls EditorUtility.DisplayDialog,
-            // whose behavior under -batchmode isn't reliable.
+            // SetUp's TsConfig guarantees HasBootstrapSignal() is true, so OnBuildRequested
+            // returns true immediately without reaching the confirm dialog. This is the only
+            // branch safe to test automatically, since the "never bootstrapped" branch calls
+            // EditorUtility.DisplayDialog, whose behavior under batchmode isn't reliable.
             var callback = new TsBuildCompile();
 
             bool result = callback.OnBuildRequested(VRCSDKRequestedBuildType.Scene);

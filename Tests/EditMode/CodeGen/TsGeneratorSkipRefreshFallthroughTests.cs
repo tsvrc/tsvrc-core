@@ -6,31 +6,26 @@ using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TsGenerator.Run(skipRefresh: true)'s control-flow subtlety: both write-check
-    // branches return immediately whenever files were written/stable changed, regardless
-    // of skipRefresh - only the AssetDatabase.Refresh() call itself is skipped. This
+    // TsGenerator.Run(skipRefresh: true) has a control flow subtlety: both write-check
+    // branches return immediately whenever files were written or something stable changed,
+    // regardless of skipRefresh. Only the AssetDatabase.Refresh() call itself is skipped. This
     // avoids wiring against a stale compiled type that hasn't been recompiled from the
-    // just-written source yet. Wiring is deferred to the next domain-reload-triggered
-    // Run() (see TsDomainReloadHandler), which runs with the now-current compiled type.
+    // just-written source yet. Wiring is deferred to the next domain-reload-triggered Run(),
+    // called from TsDomainReloadHandler, which runs with the now current compiled type.
     public class TsGeneratorSkipRefreshFallthroughTests
     {
+        private TsGeneratorTestHarness _harness;
         private TempSceneScope _scope;
-        private GeneratedFileBackup _backup;
 
         [SetUp]
         public void SetUp()
         {
-            _backup = new GeneratedFileBackup();
-            _scope = new TempSceneScope();
+            _harness = new TsGeneratorTestHarness();
+            _scope = _harness.Scope;
         }
 
         [TearDown]
-        public void TearDown()
-        {
-            _scope.Dispose();
-            _backup.Dispose();
-            TsGenerator.AfterDomainReload(skipRefresh: true); // reset hooks, see TsBuildCompileTests
-        }
+        public void TearDown() => _harness.Dispose();
 
         [Test]
         public void Run_SkipRefreshTrueWithPendingFileChanges_StopsAfterWritingWithoutWiringOrThrowing()
@@ -45,7 +40,7 @@ namespace Tsvrc.Tests.EditMode
 
             var root = CompiledRootFixture.AddTo(_scope);
 
-            // Wire() must NOT run this pass - if it did, it would warn about the new
+            // Wire() must not run this pass. If it did, it would warn about the new
             // Singleton entry's field missing on the stale compiled type. No such warning
             // should appear, since Run() stops before ever reaching Wire().
             LogAssert.NoUnexpectedReceived();
@@ -54,7 +49,7 @@ namespace Tsvrc.Tests.EditMode
 
             LogAssert.NoUnexpectedReceived();
 
-            // Scene must still be exactly as constructed - stopping early must not have
+            // Scene must still be exactly as constructed. Stopping early must not have
             // touched the root or the config.
             Assert.IsNotNull(root, "Root must survive the write-then-stop pass.");
             Assert.IsNotNull(configGo, "Config GameObject must survive the write-then-stop pass.");

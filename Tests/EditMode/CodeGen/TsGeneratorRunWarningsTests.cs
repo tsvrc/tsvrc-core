@@ -5,35 +5,31 @@ using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TsGenerator.LastRunWarnings - captures [ModuleName]/[Tsvrc]/[TsGenerator]-prefixed
-    // Warning/Error log messages emitted during the most recent Run() pass, so TsWindow can point
-    // at them instead of a user only finding out by happening to have the Console open.
+    // TsGenerator.LastRunWarnings captures Warning and Error log messages prefixed with
+    // "[ModuleName]", "[Tsvrc]", or "[TsGenerator]" emitted during the most recent Run() pass,
+    // so TsWindow can point at them instead of a user only finding out by happening to have the
+    // Console open.
     public class TsGeneratorRunWarningsTests
     {
+        private TsGeneratorTestHarness _harness;
         private TempSceneScope _scope;
-        private GeneratedFileBackup _backup;
 
         [SetUp]
         public void SetUp()
         {
-            _backup = new GeneratedFileBackup();
-            _scope = new TempSceneScope();
+            _harness = new TsGeneratorTestHarness();
+            _scope = _harness.Scope;
         }
 
         [TearDown]
-        public void TearDown()
-        {
-            _scope.Dispose();
-            _backup.Dispose();
-            TsGenerator.AfterDomainReload(skipRefresh: true); // reset hooks, see TsBuildCompileTests
-        }
+        public void TearDown() => _harness.Dispose();
 
         [Test]
         public void Run_ConstructsHasNullEntry_LastRunWarningsCapturesTheLoggedWarning()
         {
-            // ConstructModule.Resolve() logs this unconditionally during LoadConfig(), which runs
-            // on every pass regardless of which branch Run() ultimately takes - a reliable,
-            // minimal way to exercise the capture mechanism itself.
+            // ConstructModule.Resolve() logs this unconditionally during LoadConfig(), which
+            // runs on every pass regardless of which branch Run() ultimately takes, giving a
+            // reliable, minimal way to exercise the capture mechanism itself.
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
             config.Constructs = new Tsvrc.Core.TsvrcBehaviour[] { null };

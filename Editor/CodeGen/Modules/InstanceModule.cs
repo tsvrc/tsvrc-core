@@ -23,17 +23,30 @@ namespace Tsvrc.Editor
     {
         private const string ChildName = "Instance";
         private const string FieldName = "_instance";
-        private const string GeneratedFolder = "Assets/TsGenerated";
 
         private Type _detectedType;
         private bool _ambiguous;
+
+        // True when the live AppDomain scan found zero candidates, but ScriptIndex, which works
+        // from source text and is independent of whether anything actually compiled, confirms
+        // exactly one real Instance subclass still exists somewhere in the project. This
+        // typically means Assembly-CSharp is currently broken and that real subclass, for
+        // example a world's MolInstance, failed to compile along with it. GenerateCode()'s
+        // output never depends on the detected type at all, since the field and override are
+        // always declared as the plain "Instance" base type, so the only thing this protects is
+        // Wire(). Without it, a transient broken compile would make Wire() destroy the real,
+        // working "Instance" child and null the scene field, the same kind of "real content
+        // wiped by a transient failure" bug this fallback mechanism exists to prevent elsewhere.
+        // There is no live Type to re-wire it with either way, so Wire() simply leaves the
+        // existing scene state untouched in this case rather than fabricating a fix.
+        private bool _knownViaScriptIndexOnly;
 
         internal override string FileName => "TsGeneratedInstance.cs";
 
         internal override IEnumerable<string> WatchedAssets()
         {
             if (_detectedType != null)
-                yield return $"{GeneratedFolder}/{_detectedType.Name}.asset";
+                yield return $"{TsPaths.GeneratedFolder}/{_detectedType.Name}.asset";
         }
 
         internal override string GenerateCode()
@@ -61,11 +74,38 @@ namespace Tsvrc.Editor
         internal override void LoadConfig()
         {
             (_detectedType, _ambiguous) = DetectInstanceType();
+
+            _knownViaScriptIndexOnly = ComputeKnownViaScriptIndexOnly(_detectedType, _ambiguous);
         }
 
-        // Only relevant when a single candidate type is resolved: if the child we created/repaired
-        // last Wire() pass was deleted by hand, trigger a rerun so it gets recreated. Ambiguous or
-        // empty detection results never had a child they're entitled to recreate.
+        // Split out from LoadConfig() so tests can exercise this decision directly with
+        // controlled inputs, the same way IsTsvrcBehaviourType and ApplySnapshotFallback are
+        // tested. Driving the real live AppDomain scan can't reliably produce zero candidates in
+        // an environment where a real, un-ignored Instance subclass, for example a world's
+        // MolInstance, actually is currently loaded and compiling fine.
+        internal static bool ComputeKnownViaScriptIndexOnly(Type detectedType, bool ambiguous)
+            => detectedType == null && !ambiguous && ExistsExactlyOneInstanceSubclassInScriptIndex();
+
+        // [TsCodegenIgnore] filtering, as used in DetectInstanceType, only applies to the live
+        // loaded path, since ScriptIndex carries no attribute info at all. In practice this
+        // never matters: the only [TsCodegenIgnore] Instance subclasses are test doubles living
+        // in a separate assembly from whatever real world assembly is currently failing to
+        // compile.
+        private static bool ExistsExactlyOneInstanceSubclassInScriptIndex()
+        {
+            int count = 0;
+            foreach (var (name, ns) in ScriptIndex.FindAllDerivedFrom("Instance"))
+            {
+                if (name == "Instance" && ns == "Tsvrc.Core") continue; // this is the framework base itself
+                if (++count > 1) return false; // ambiguous via ScriptIndex too, so do not guess
+            }
+            return count == 1;
+        }
+
+        // Only relevant when a single candidate type is resolved. If the child we created or
+        // repaired on the last Wire() pass was deleted by hand, this triggers a rerun so it gets
+        // recreated. Ambiguous or empty detection results never had a child they are entitled to
+        // recreate.
         internal override bool OnSceneHierarchyChanged()
         {
             if (_ambiguous || _detectedType == null) return false;
@@ -90,6 +130,8 @@ namespace Tsvrc.Editor
 
             if (_detectedType == null)
             {
+                if (_knownViaScriptIndexOnly) return; // see _knownViaScriptIndexOnly's doc comment above
+
                 if (existingChild != null)
                     Undo.DestroyObjectImmediate(existingChild.gameObject);
                 SetInstanceField(root, null);
@@ -111,14 +153,15 @@ namespace Tsvrc.Editor
                 childGo = existingChild.gameObject;
                 component = childGo.GetComponent(_detectedType) as UdonSharpBehaviour;
 
-                string programAssetPath = $"{GeneratedFolder}/{_detectedType.Name}.asset";
+                string programAssetPath = $"{TsPaths.GeneratedFolder}/{_detectedType.Name}.asset";
                 bool programAssetMissing = AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>(programAssetPath) == null;
 
-                // Recreate when: wrong/stale component type (renamed or manually replaced),
-                // OR the program asset was deleted — in that case the backing UdonBehaviour's
-                // programSource is null and UdonSharp's sanitize pass will error on next compile.
-                // UdonSharpUndo.DestroyImmediate is required (not plain Undo) because UdonSharp
-                // components carry a hidden backing UdonBehaviour that a plain destroy would orphan.
+                // Recreate when the component type is wrong or stale, for example renamed or
+                // manually replaced, or when the program asset was deleted. In the latter case
+                // the backing UdonBehaviour's programSource is null and UdonSharp's sanitize
+                // pass will error on the next compile. UdonSharpUndo.DestroyImmediate is
+                // required instead of plain Undo because UdonSharp components carry a hidden
+                // backing UdonBehaviour that a plain destroy would orphan.
                 if (component == null || programAssetMissing)
                 {
                     foreach (var stale in childGo.GetComponents<UdonSharpBehaviour>())
@@ -157,7 +200,7 @@ namespace Tsvrc.Editor
                 return null;
             }
 
-            string programAssetPath = $"{GeneratedFolder}/{type.Name}.asset";
+            string programAssetPath = $"{TsPaths.GeneratedFolder}/{type.Name}.asset";
             if (!ScaffoldModule.EnsureUdonSharpProgramAsset(scriptAssetPath, programAssetPath))
             {
                 Debug.LogWarning($"[InstanceModule] Could not create program asset for '{type.Name}'.");
@@ -167,15 +210,17 @@ namespace Tsvrc.Editor
             return UdonSharpUndo.AddComponent(go, type);
         }
 
-        // Returns (type, ambiguous). type is null when there are zero or more than one candidates;
-        // ambiguous distinguishes "nothing to wire" from "leave the current wiring alone".
+        // Returns (type, ambiguous). type is null when there are zero or more than one
+        // candidates. ambiguous distinguishes "nothing to wire" from "leave the current wiring
+        // alone".
         //
-        // Deduplicated by full name: Unity's AppDomain can carry stale duplicate copies of the same
-        // assembly across successive recompiles, which would otherwise make a single real subclass
-        // look "ambiguous" just because it was seen twice. Types marked [TsCodegenIgnore] (e.g. a
-        // test double Instance subclass) are excluded from this scan the same way as
-        // TsGenerator.HasBootstrapSignal, so one never gets treated as the one real scaffold to
-        // wire, and never falsely trips the "multiple subclasses" ambiguity error against a real one.
+        // Deduplicated by full name, because Unity's AppDomain can carry stale duplicate copies
+        // of the same assembly across successive recompiles, which would otherwise make a
+        // single real subclass look ambiguous just because it was seen twice. Types marked
+        // [TsCodegenIgnore], such as a test double Instance subclass, are excluded from this
+        // scan the same way as TsGenerator.HasBootstrapSignal, so one never gets treated as the
+        // one real scaffold to wire, and never falsely trips the "multiple subclasses" ambiguity
+        // error against a real one.
         private static (Type, bool) DetectInstanceType()
         {
             var candidates = new List<Type>();

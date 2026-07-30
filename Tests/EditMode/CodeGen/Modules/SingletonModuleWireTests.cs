@@ -13,10 +13,10 @@ namespace Tsvrc.Tests.EditMode
     // synthetic entries via reflection (bypassing LoadConfig()).
     //
     // This project ships with no real configured Singleton entries, so the mechanism here is
-    // exercised against "_memory" - a field that unconditionally exists on the compiled type
+    // exercised against "_memory", a field that unconditionally exists on the compiled type
     // regardless of config (MemoryModule's own field). SingletonModule.Wire() only cares that
     // FindProperty(entry.Name) resolves and that the source object's type matches the field's
-    // declared type - it has no idea which module "owns" the field name, so this is a
+    // declared type. It has no idea which module "owns" the field name, so this is a
     // faithful, if borrowed, test of the exact same mechanical assignment path a real
     // Singleton field goes through.
     public class SingletonModuleWireTests
@@ -85,6 +85,23 @@ namespace Tsvrc.Tests.EditMode
             module.Wire();
 
             Assert.AreEqual(memory, FieldValue(RealFieldName), "The missing-field entry must not abort wiring of the remaining valid entries.");
+        }
+
+        [Test]
+        public void Wire_RestoredEntryWithNullSourceObject_FieldBecomesNullWithoutThrowing()
+        {
+            // Mirrors exactly what ApplySnapshotFallback's fromSnapshot delegate produces for a
+            // restored entry, see its own doc comment. GenerateCode() is protected across a
+            // transient broken compile, but Wire() has no name-only way to recover a real scene
+            // reference, so it (harmlessly) writes null into the field instead of throwing.
+            var memory = _scope.CreateGameObject("SomeMemory").AddComponent<TsMemory>();
+            ModuleWith(Entry(RealFieldName, memory)).Wire();
+            Assert.AreEqual(memory, FieldValue(RealFieldName), "Sanity check: the field really was wired before simulating the restore.");
+
+            var module = ModuleWith(Entry(RealFieldName, null));
+
+            Assert.DoesNotThrow(() => module.Wire());
+            Assert.IsNull(FieldValue(RealFieldName));
         }
 
         [Test]

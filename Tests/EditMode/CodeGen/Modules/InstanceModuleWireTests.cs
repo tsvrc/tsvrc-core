@@ -7,78 +7,49 @@ using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // InstanceModule.Wire() against a real compiled root. Creating a real child+component
-    // (CreateComponent) needs `_detectedType` to be a genuine, already-compiled
-    // UdonSharpBehaviour with a real script asset - using an actual production
+    // Tests InstanceModule.Wire() against a real compiled root. Creating a real child and
+    // component (CreateComponent) needs `_detectedType` to be a genuine, already-compiled
+    // UdonSharpBehaviour with a real script asset. Using an actual production
     // Instance subclass would work, but this project intentionally has none yet, and
     // adding one as a permanent test double would change TsGenerator.HasBootstrapSignal()
     // for the whole project, not just tests (InstanceModule doesn't care whether the
-    // "detected" type is actually a Instance subclass for the plumbing exercised here,
-    // only DetectInstanceType() does - which isn't under test in this file). So
+    // "detected" type is actually an Instance subclass for the plumbing exercised here,
+    // only DetectInstanceType() does, and that isn't under test in this file). So
     // InstanceModuleWireTestDouble stands in as a real, already-compiled UdonSharpBehaviour:
     // CreateComponent()'s mechanics (script lookup, program asset creation, component add)
-    // don't care that it isn't a Instance.
+    // don't care that it isn't an Instance.
     //
-    // InstanceModuleWireTestDouble specifically (rather than a real production class like
-    // StateManager) because it has no UdonSharpProgramAsset anywhere else in the project.
-    // Any production class does, and CreateComponent() creating a second, transient program
-    // asset at "Assets/TsGenerated/{TypeName}.asset" for a script that already has one
-    // elsewhere makes UdonSharp's own editor log a duplicate-reference Error the moment it
-    // scans the project - an accepted-noisy-but-harmless outcome that's nonetheless awkward
-    // to assert on reliably, since exactly when that scan re-runs isn't under this test's
-    // control. Using a class with no other program asset avoids the collision entirely.
-    // Its transient program asset is still backed up/restored like every other real-file
-    // side effect in this suite, in case a developer happens to have one on disk already.
+    // The program asset CreateComponent() creates lives under TsPaths.GeneratedFolder,
+    // redirected to a scratch folder here (same seam every other Wire()-level test uses) rather
+    // than the real Assets/TsGenerated, so there is no manual byte backup/restore of a real
+    // project file, and no crash-corruption risk if a test run is interrupted mid-test.
     public class InstanceModuleWireTests
     {
-        private static readonly string DetectedTypeAssetPath = $"Assets/TsGenerated/{nameof(InstanceModuleWireTestDouble)}.asset";
+        private static string DetectedTypeAssetPath => $"{TsPaths.GeneratedFolder}/{nameof(InstanceModuleWireTestDouble)}.asset";
 
         private TempSceneScope _scope;
         private Component _root;
-        private bool _assetExistedBefore;
-        private byte[] _assetBackup;
-        private byte[] _assetMetaBackup;
 
         [SetUp]
         public void SetUp()
         {
             _scope = new TempSceneScope();
+            ScratchAssets.EnsureFolder();
+            // AssetDatabase.CreateAsset (used by EnsureUdonSharpProgramAsset below, via
+            // InstanceModule.CreateComponent) requires its target folder to already be a
+            // recognized Unity asset folder, unlike TsGenerator's own file writes, which go
+            // through a plain File.WriteAllText + Refresh that can discover a brand-new
+            // subfolder in one pass. Pointing straight at ScratchAssets.Folder (already ensured
+            // above) avoids introducing an unrecognized nested subfolder.
+            TsPaths.GeneratedFolder = ScratchAssets.Folder;
             _root = CompiledRootFixture.AddTo(_scope);
-
-            string fullPath = ToFullPath(DetectedTypeAssetPath);
-            string metaPath = fullPath + ".meta";
-            _assetExistedBefore = System.IO.File.Exists(fullPath);
-            if (_assetExistedBefore)
-            {
-                _assetBackup = System.IO.File.ReadAllBytes(fullPath);
-                _assetMetaBackup = System.IO.File.Exists(metaPath) ? System.IO.File.ReadAllBytes(metaPath) : null;
-            }
         }
 
         [TearDown]
         public void TearDown()
         {
-            _scope.Dispose();
-
-            string fullPath = ToFullPath(DetectedTypeAssetPath);
-            string metaPath = fullPath + ".meta";
-            if (_assetExistedBefore)
-            {
-                System.IO.File.WriteAllBytes(fullPath, _assetBackup);
-                if (_assetMetaBackup != null) System.IO.File.WriteAllBytes(metaPath, _assetMetaBackup);
-            }
-            else
-            {
-                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(DetectedTypeAssetPath) != null)
-                    AssetDatabase.DeleteAsset(DetectedTypeAssetPath);
-            }
-            AssetDatabase.Refresh();
-        }
-
-        private static string ToFullPath(string assetPath)
-        {
-            string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
-            return System.IO.Path.Combine(projectRoot, assetPath.Replace('/', System.IO.Path.DirectorySeparatorChar));
+            _scope.Dispose(); // also resets TsPaths.GeneratedFolder
+            ScratchAssets.DeleteAll();
         }
 
         private static InstanceModule ModuleWith(Type detectedType, bool ambiguous)
@@ -93,11 +64,11 @@ namespace Tsvrc.Tests.EditMode
             => new SerializedObject(_root).FindProperty("_instance").objectReferenceValue;
 
         // Note: `_instance` is declared as `Instance`, and `InstanceModuleWireTestDouble` (the
-        // real, already-compiled stand-in type used throughout this file - see the class
-        // comment) does NOT extend Instance. Unity's SerializedProperty.objectReferenceValue
+        // real, already-compiled stand-in type used throughout this file, see the class
+        // comment) does not extend Instance. Unity's SerializedProperty.objectReferenceValue
         // setter silently clamps an incompatible-type assignment to null rather than
-        // throwing, so the *field value* can't be faithfully asserted against an
-        // InstanceModuleWireTestDouble instance here - only the scene-structure half
+        // throwing, so the field value can't be faithfully asserted against an
+        // InstanceModuleWireTestDouble instance here. Only the scene-structure half
         // (child/component creation) can be. Confirming the field-assignment *mechanism* itself (a
         // compatible-type value really does get assigned) is exactly what
         // MemoryModuleWireTests/SingletonModuleWireTests already do against `_memory`, a

@@ -18,10 +18,10 @@ namespace Tsvrc.Tests.EditMode
             return module;
         }
 
-        private static object Entry(string name, string typeName, string ns, bool isTsBehaviour)
+        private static object Entry(string name, string typeName, string ns, bool isTsvrcBehaviour)
             => CodeGenModuleReflection.BuildEntry(EntryType,
                 ("Name", name), ("TypeName", typeName), ("TypeNamespace", ns),
-                ("IsTsBehaviour", isTsBehaviour), ("PrefabAsset", null));
+                ("IsTsvrcBehaviour", isTsvrcBehaviour), ("PrefabAsset", null));
 
         [Test]
         public void GenerateCode_EmptyEntries_ReturnsStubWithNoMethods()
@@ -48,7 +48,7 @@ namespace {ScaffoldModule.CompiledNamespace}
         [Test]
         public void GenerateCode_BareGameObjectEntry_ReturnsGoDirectly()
         {
-            var module = BuildModule(Entry("Bullet", "GameObject", "", isTsBehaviour: false));
+            var module = BuildModule(Entry("Bullet", "GameObject", "", isTsvrcBehaviour: false));
 
             string code = module.GenerateCode();
 
@@ -59,9 +59,9 @@ namespace {ScaffoldModule.CompiledNamespace}
         }
 
         [Test]
-        public void GenerateCode_TsBehaviourEntry_GetsComponentAndConditionallyConstructs()
+        public void GenerateCode_TsvrcBehaviourEntry_GetsComponentAndConditionallyConstructs()
         {
-            var module = BuildModule(Entry("Manager", "StateManager", "Tsvrc.StateMachine", isTsBehaviour: true));
+            var module = BuildModule(Entry("Manager", "StateManager", "Tsvrc.StateMachine", isTsvrcBehaviour: true));
 
             string code = module.GenerateCode();
 
@@ -74,7 +74,7 @@ namespace {ScaffoldModule.CompiledNamespace}
         [Test]
         public void GenerateCode_OtherComponentEntry_GetsComponentAndReturnsDirectlyNoConstruct()
         {
-            var module = BuildModule(Entry("Body", "Rigidbody", "UnityEngine", isTsBehaviour: false));
+            var module = BuildModule(Entry("Body", "Rigidbody", "UnityEngine", isTsvrcBehaviour: false));
 
             string code = module.GenerateCode();
 

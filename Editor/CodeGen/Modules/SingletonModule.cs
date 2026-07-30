@@ -8,12 +8,14 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Singletons are scene objects, so they come from TsConfig - a scene component
-    // ScaffoldModule auto-creates/heals under TsGenerated, since an asset can't hold a
-    // reference to a scene object. Builtin singletons are asset-type objects, so those
+    // Singletons are scene objects, so they come from TsConfig, a scene component
+    // ScaffoldModule automatically creates and heals under TsGenerated, since an asset can't
+    // hold a reference to a scene object. Builtin singletons are asset type objects, so those
     // come from TsBuiltinConfig instead.
     internal class SingletonModule : TsModule
     {
+        private const string SnapshotKey = "SingletonModule";
+
         private List<SingletonEntry> _entries = new List<SingletonEntry>();
 
         internal override string FileName => "TsGeneratedSingleton.cs";
@@ -58,7 +60,10 @@ namespace Tsvrc.Editor
             var combined = sceneSingletons
                 .Concat(builtinConfig?.Singletons ?? Array.Empty<UnityEngine.Object>());
 
-            _entries = Resolve(combined);
+            var resolved = Resolve(combined);
+            _entries = ApplySnapshotFallback(SnapshotKey, resolved,
+                e => new ModuleEntrySnapshot.Entry { Name = e.Name, TypeName = e.TypeName, Namespace = e.Namespace },
+                s => new SingletonEntry { Name = s.Name, TypeName = s.TypeName, Namespace = s.Namespace, SourceObject = null });
         }
 
         internal override string GenerateCode()
@@ -89,7 +94,7 @@ namespace Tsvrc.Editor
                 {
                     foreach (var entry in _entries.OrderBy(e => e.Name))
                     {
-                        if (!IsTsBehaviourType(entry.TypeName, entry.Namespace)) continue;
+                        if (!IsTsvrcBehaviourType(entry.TypeName, entry.Namespace)) continue;
                         w.Line($"{entry.Name}.TsConstruct(this);");
                     }
                 }

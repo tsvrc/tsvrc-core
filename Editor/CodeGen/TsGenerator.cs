@@ -13,30 +13,30 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Orchestrates all generator modules: loads their config, writes generated files,
-    // refreshes/recompiles as needed, wires scene references, then watches for changes to
+    // Orchestrates all generator modules. Loads their config, writes generated files,
+    // refreshes and recompiles as needed, wires scene references, then watches for changes to
     // rerun. Automatic triggers only proceed once HasBootstrapSignal() finds a reason this
     // project actually uses Tsvrc.
     internal static class TsGenerator
     {
-        private const string GeneratedFolder = "Assets/TsGenerated";
         private const string PendingBootstrapKey = "Tsvrc.PendingBootstrap";
 
         internal static HashSet<string> WatchedPaths { get; private set; } = new HashSet<string>();
 
-        // True while a deliberate bootstrap (e.g. a "Force Regenerate"/"Initialize Tsvrc" click) has
-        // written files and is waiting for the recompile it triggered to settle. Session-scoped by
-        // design: it only needs to survive the domain reload that follows a write, never a full editor
-        // restart. Consumed (and cleared) by the very next AfterDomainReload() call - see there.
+        // True while a deliberate bootstrap (a "Force Regenerate" or "Initialize Tsvrc" click) has
+        // written files and is waiting for the recompile it triggered to settle. This is session
+        // scoped by design: it only needs to survive the domain reload that follows a write, never
+        // a full editor restart. Consumed and cleared by the very next AfterDomainReload() call.
         internal static bool IsBootstrapPending => SessionState.GetBool(PendingBootstrapKey, false);
 
-        // Fired at the end of every Run() pass, regardless of which branch it exited through, so UI
-        // (editor windows) can react to "something may have changed" instead of polling on OnFocus.
+        // Fired at the end of every Run() pass, regardless of which branch it exited through, so
+        // editor windows can react to "something may have changed" instead of polling on OnFocus.
         internal static event Action StateChanged;
 
-        // Every module logs warnings/errors with a "[ModuleName]"/"[Tsvrc]"/"[TsGenerator]" prefix
-        // (established convention across all modules) - matched here to distinguish Tsvrc's own
-        // diagnostics from unrelated log noise that might occur during the same Run() pass.
+        // Every module logs warnings and errors with a "[ModuleName]", "[Tsvrc]" or
+        // "[TsGenerator]" prefix, an established convention across all modules. Matched here to
+        // distinguish Tsvrc's own diagnostics from unrelated log noise that might occur during
+        // the same Run() pass.
         private static readonly Regex TsLogPrefix = new Regex(@"^\[(Tsvrc|TsGenerator|\w+Module)\]", RegexOptions.Compiled);
 
         // Warnings/errors logged by the most recent Run() pass, so TsWindow can point at them
@@ -48,12 +48,12 @@ namespace Tsvrc.Editor
         private static List<TsModule> _activeModules;
         private static HashSet<string> _watchedComponentTypeNames = new HashSet<string>(StringComparer.Ordinal);
         private static bool _rerunPending;
-        // Wire() assigns SerializedObject properties, which fires OnPostprocessModifications.
-        // _isWiring suppresses the rerun during the Wire pass itself.
-        // _justFinishedWiring suppresses it for one editor frame after Wire() returns,
-        // because Unity commits serialized changes asynchronously and the modification
-        // event can arrive after _isWiring is already cleared.
+        // Suppresses the rerun during the Wire pass itself, since Wire() assigns SerializedObject
+        // properties, which fires OnPostprocessModifications.
         private static bool _isWiring;
+        // Suppresses the rerun for one editor frame after Wire() returns, because Unity commits
+        // serialized changes asynchronously and the modification event can arrive after
+        // _isWiring is already cleared.
         private static bool _justFinishedWiring;
 
         [MenuItem("Tsvrc/Force Regenerate", priority = 21)]
@@ -63,15 +63,16 @@ namespace Tsvrc.Editor
             Debug.Log("[Tsvrc] Regenerated.");
         }
 
-        // Greys the menu item out during play mode instead of letting the click silently no-op
-        // (Run() itself already bails on isPlayingOrWillChangePlaymode - see below).
+        // Greys the menu item out during play mode instead of letting the click silently no-op.
+        // Run() itself already bails on isPlayingOrWillChangePlaymode, so this is purely a UX
+        // improvement, not a correctness guard.
         [MenuItem("Tsvrc/Force Regenerate", true)]
         private static bool ValidateManualGenerate() => !EditorApplication.isPlayingOrWillChangePlaymode;
 
-        // The automatic post-compile trigger (see TsDomainReloadHandler). Consumes the pending-bootstrap
-        // flag set by a prior Run(allowBootstrap: true) that had to stop for a recompile (see Run()
-        // below), carrying it through as allowBootstrap: true so one "Force Regenerate" click completes
-        // the whole scaffold sequence without a second click.
+        // The automatic post-compile trigger, called by TsDomainReloadHandler. Consumes the
+        // pending bootstrap flag set by a prior Run(allowBootstrap: true) that had to stop for a
+        // recompile, carrying it through as allowBootstrap: true so one "Force Regenerate" click
+        // completes the whole scaffold sequence without a second click.
         internal static void AfterDomainReload(bool skipRefresh = false)
         {
             bool pending = SessionState.GetBool(PendingBootstrapKey, false);
@@ -79,9 +80,10 @@ namespace Tsvrc.Editor
             Run(skipRefresh, allowBootstrap: pending);
         }
 
-        // allowBootstrap: false (the default, used by every automatic trigger) waits for
-        // HasBootstrapSignal() via WaitForBootstrapSignal instead of creating the scaffold outright.
-        // ManualGenerate() passes true, since a deliberate click is itself the bootstrap signal.
+        // allowBootstrap false, the default used by every automatic trigger, waits for
+        // HasBootstrapSignal() via WaitForBootstrapSignal instead of creating the scaffold
+        // outright. ManualGenerate() passes true, since a deliberate click is itself the
+        // bootstrap signal.
         internal static void Run(bool skipRefresh = false, bool allowBootstrap = false)
         {
             var collectedWarnings = new List<string>();
@@ -111,6 +113,11 @@ namespace Tsvrc.Editor
             Undo.postprocessModifications -= OnPostprocessModifications;
             _activeModules = null;
 
+            // Rebuilt fresh every pass and shared by every module's IsTsvrcBehaviourType lookups
+            // within this pass. Never cached across passes, since a script may have just been
+            // added, renamed, or removed since the last one.
+            ScriptIndex.Rebuild();
+
             if (!allowBootstrap && !HasBootstrapSignal())
             {
                 EditorApplication.hierarchyChanged -= WaitForBootstrapSignal;
@@ -133,16 +140,16 @@ namespace Tsvrc.Editor
             // Generated files are always watched so deleting any of them triggers a rerun.
             foreach (var module in modules)
                 if (module.FileName != null)
-                    paths.Add($"{GeneratedFolder}/{module.FileName}");
+                    paths.Add($"{TsPaths.GeneratedFolder}/{module.FileName}");
             WatchedPaths = paths;
 
             if (WriteModules(modules))
             {
-                // Stop here even with skipRefresh (build-time — see TsBuildCompile): the compiled
-                // type on disk is now stale relative to what was just written, so wiring against it
-                // would target the wrong field set. The recompile this triggers calls
-                // AfterDomainReload() again with the now-current type (see TsDomainReloadHandler),
-                // and that pass is what actually wires.
+                // Stop here even with skipRefresh, which TsBuildCompile passes at build time: the
+                // compiled type on disk is now stale relative to what was just written, so wiring
+                // against it would target the wrong field set. The recompile this triggers calls
+                // AfterDomainReload() again with the now current type, and that pass is what
+                // actually wires.
                 if (allowBootstrap) SessionState.SetBool(PendingBootstrapKey, true);
                 if (!skipRefresh) AssetDatabase.Refresh();
                 return;
@@ -152,8 +159,8 @@ namespace Tsvrc.Editor
             foreach (var module in modules)
                 stableChanged |= module.AfterFilesStable();
 
-            // stableChanged alone (e.g. a program asset was recreated) is enough to need a
-            // Refresh even if no .cs file changed — UdonSharp won't re-link the backing
+            // stableChanged alone (for example, a program asset was recreated) is enough to need
+            // a Refresh even if no .cs file changed, since UdonSharp won't re-link the backing
             // UdonBehaviour until it processes the new asset.
             bool filesWritten = WriteModules(modules);
             if (filesWritten || stableChanged)
@@ -191,8 +198,8 @@ namespace Tsvrc.Editor
             Undo.postprocessModifications += OnPostprocessModifications;
         }
 
-        // Checked once per hierarchyChanged event while gated (see Run()). Stops watching and
-        // runs for real the moment a reason to bootstrap appears.
+        // Checked once per hierarchyChanged event while Run() is gated waiting for a bootstrap
+        // reason. Stops watching and runs for real the moment one appears.
         private static void WaitForBootstrapSignal()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
@@ -201,11 +208,12 @@ namespace Tsvrc.Editor
             Run(allowBootstrap: true);
         }
 
-        // Types marked [TsCodegenIgnore] (e.g. a test double Instance subclass) are excluded
-        // from the Instance scan below - see TsCodegenIgnoreAttribute's own doc comment for why.
+        // Types marked [TsCodegenIgnore], such as a test double Instance subclass, are excluded
+        // from the Instance scan below. See TsCodegenIgnoreAttribute's own doc comment for why.
         //
-        // Internal (not private) so TsBuildCompile can ask the same question at build time:
-        // it decides whether skipping bootstrap silently is safe, or the user should be warned.
+        // Internal rather than private so TsBuildCompile can ask the same question at build
+        // time, deciding whether skipping bootstrap silently is safe or the user should be
+        // warned.
         internal static bool HasBootstrapSignal()
         {
             if (UnityEngine.Object.FindObjectOfType<TsConfig>(true) != null) return true;
@@ -271,8 +279,8 @@ namespace Tsvrc.Editor
             return modifications;
         }
 
-        // Module order within a Run() pass does not affect correctness — each module reads
-        // from independent scene/asset sources and writes to independent serialized fields.
+        // Module order within a Run() pass does not affect correctness: each module reads from
+        // independent scene and asset sources and writes to independent serialized fields.
         // Also used by TsWindow to build its tab list.
         internal static List<TsModule> CreateModules() => new List<TsModule>
         {
@@ -288,9 +296,10 @@ namespace Tsvrc.Editor
         };
 
         // Any field name exposed by more than one module is stripped from every module that
-        // declared it, so a collision never silently produces two same-named fields on TsGenerated.
-        // Only SingletonModule currently overrides ExposedFieldNames()/ExcludeFieldNames() among the
-        // real modules, so this path is otherwise only exercisable with synthetic test modules.
+        // declared it, so a collision never silently produces two same named fields on
+        // TsGenerated. Only SingletonModule currently overrides ExposedFieldNames() and
+        // ExcludeFieldNames() among the real modules, so this path is otherwise only
+        // exercisable with synthetic test modules.
         internal static void DetectAndExcludeFieldNameCollisions(List<TsModule> modules)
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -304,14 +313,14 @@ namespace Tsvrc.Editor
                     module.ExcludeFieldNames(duplicates);
 
             // Recorded even when empty, so a collision fixed by the user is reflected on the very
-            // next Run() rather than lingering in the UI (see TsWindow's warning box).
+            // next Run() rather than lingering in TsWindow's warning box.
             LastFieldNameCollisions = duplicates.OrderBy(n => n, StringComparer.Ordinal).ToList();
         }
 
         // Field names dropped by the most recent Run() because more than one module tried to
-        // expose the same name (e.g. a Singleton and a Construct both deriving "GameManager").
-        // Surfaced in TsWindow as a warning instead of only the console Debug.LogError each
-        // affected module already logs - see ExcludeFieldNames() overrides.
+        // expose the same name, for example a Singleton and a Construct both deriving
+        // "GameManager". Surfaced in TsWindow as a warning instead of only the console
+        // Debug.LogError each affected module already logs in its ExcludeFieldNames() override.
         internal static IReadOnlyList<string> LastFieldNameCollisions { get; private set; } = Array.Empty<string>();
 
         private static bool WriteModules(List<TsModule> modules)
@@ -320,7 +329,7 @@ namespace Tsvrc.Editor
             foreach (var module in modules)
             {
                 if (module.FileName == null) continue;
-                written |= WriteIfChanged($"{GeneratedFolder}/{module.FileName}", module.GenerateCode());
+                written |= WriteIfChanged($"{TsPaths.GeneratedFolder}/{module.FileName}", module.GenerateCode());
             }
             return written;
         }

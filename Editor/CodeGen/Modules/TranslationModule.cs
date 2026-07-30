@@ -16,7 +16,7 @@ namespace Tsvrc.Editor
     // _key_ pattern and appears in at least one language file.
     internal class TranslationModule : TsModule
     {
-        internal const string ConfigAssetPath = "Assets/TsGenerated/TsTranslationConfig.asset";
+        internal static string ConfigAssetPath => TsPaths.GeneratedFolder + "/TsTranslationConfig.asset";
         private const int BatchSize = 20;
 
         // Matches TMP GameObjects named with a single underscore on each side, e.g. "_greeting_".
@@ -96,10 +96,10 @@ namespace Tsvrc.Editor
                             string prefix = i == 0 ? "if" : "else if";
                             w.Line($"{prefix} (_tsIdx == {i}) {{ _tsCurrentKeys = _tsKeys_{id}; _tsCurrentVals = _tsVals_{id}; }}");
                         }
-                        // Fixed CODEGEN_TESTING_PLAN.md Part 4 item 6: this used to escape
-                        // `_tsIdx` one interpolation layer too deep ({{{{_tsIdx}}}}), producing
-                        // a literal, non-interpolating "{_tsIdx}" in the generated code's own
-                        // interpolated string instead of substituting the real invalid index.
+                        // _tsIdx must only be escaped one interpolation layer, not two
+                        // ({{{{_tsIdx}}}}), or the generated code's own interpolated string ends
+                        // up with a literal, non-interpolating "{_tsIdx}" instead of substituting
+                        // the real invalid index.
                         w.Line($"else {{ Debug.LogError($\"[TsGenerated] Language index {{_tsIdx}} is not available.\"); return; }}");
                         w.Line("_tsCurrentLang = _tsIdx;");
                         w.Line("_tsBatchIndex = 0;");
@@ -209,7 +209,7 @@ namespace Tsvrc.Editor
             ApplyAndMarkDirty(so, root);
         }
 
-        // Testable in isolation via reflection against any array-typed SerializedProperty -
+        // Testable in isolation via reflection against any array typed SerializedProperty,
         // not tied to the real compiled root's "_translationTargets".
         private static void AssignTargets(SerializedProperty prop, List<TMPro.TextMeshProUGUI> targets)
         {

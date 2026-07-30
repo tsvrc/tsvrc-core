@@ -1,50 +1,31 @@
-using NUnit.Framework;
+using Tsvrc.Core.Generated;
 using Tsvrc.Editor;
-using UdonSharpEditor;
 using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // Adds a real, compiled TsGenerated instance (there is only ever one such type in
-    // the AppDomain) to a fresh GameObject inside a TempSceneScope. Module Wire()/
-    // GenerateCode() tests then call through real production code against this synthetic
-    // root, never the developer's actual scaffolded scene object.
+    // Adds the permanent TestGenerated double (Tests/TestDoubles/CodeGen/TestGenerated.cs) to
+    // a fresh GameObject inside a TempSceneScope, and redirects TsPaths.CompiledClassName so
+    // ScaffoldModule.FindCompiledType() and FindRoot() resolve to it. Module Wire() tests then
+    // call through real production code against this synthetic root, never a consuming
+    // project's real scaffolded scene object, and never conditional on whether that project has
+    // been generated yet, since TestGenerated is compiled unconditionally as part of this test
+    // assembly.
+    //
+    // Uses a plain AddComponent rather than UdonSharpUndo.AddComponent, since that call exists
+    // to also set up the hidden backing UdonBehaviour a real UdonSharpProgramAsset provides,
+    // which none of the Wire()-level, SerializedObject-based tests this fixture serves actually
+    // need. They only read and write C# level fields. Tests that exercise ScaffoldModule's own
+    // AddComponent and program asset creation code directly, see ScaffoldModuleWireTests,
+    // redirect TsPaths.ScaffoldScriptPath at TestGenerated.cs's real location instead, so that
+    // production code path gets a real MonoScript to work with.
     internal static class CompiledRootFixture
     {
-        // Mirrors ScaffoldModule's own (private) GeneratedFolder/ScaffoldFilePath/
-        // GeneratedAssetPath constants - always project-Assets-rooted, never package-relative.
-        private const string ScriptPath = "Assets/TsGenerated/" + ScaffoldModule.CompiledClassName + ".cs";
-        private const string AssetPath = "Assets/TsGenerated/" + ScaffoldModule.CompiledClassName + ".asset";
-
-        internal static Component AddTo(TempSceneScope scope, string name = "TestRoot_TsGenerated")
+        internal static Component AddTo(TempSceneScope scope, string name = "TestRoot_TestGenerated")
         {
-            var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType == null)
-            {
-                Assert.Ignore("Compiled TsGenerated type not found in the AppDomain - " +
-                    "run Tsvrc > Force Regenerate once (or wait for a domain reload) before " +
-                    "running CodeGen wiring tests.");
-                return null;
-            }
-
-            // UdonSharpUndo.AddComponent needs a real UdonSharpProgramAsset linking the
-            // compiled script before it will validate/add the behaviour. In a project that
-            // hasn't been bootstrapped through the Editor yet (generated .cs files present,
-            // but ScaffoldModule.AfterFilesStable() never ran to create the .asset), this is
-            // missing - so self-heal it here exactly the way production code does, rather
-            // than requiring a manual step.
-            if (!ScaffoldModule.EnsureUdonSharpProgramAsset(ScriptPath, AssetPath))
-            {
-                Assert.Ignore($"Could not create/find the UdonSharpProgramAsset for {ScaffoldModule.CompiledClassName} " +
-                    $"at '{AssetPath}' (script at '{ScriptPath}'). Open the project in the Unity Editor once and run " +
-                    "Tsvrc > Force Regenerate to bootstrap it.");
-                return null;
-            }
-
+            TsPaths.CompiledClassName = nameof(TestGenerated);
             var go = scope.CreateGameObject(name);
-            var component = UdonSharpUndo.AddComponent(go, compiledType) as Component;
-            Assert.IsNotNull(component, "Failed to add compiled TsGenerated component to the test fixture GameObject.");
-            return component;
+            return go.AddComponent<TestGenerated>();
         }
     }
 }

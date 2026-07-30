@@ -8,9 +8,9 @@ using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // FactoryModule.Wire() against a real compiled root. Unlike PoolModule, Factory's
-    // slot-field-not-found path `continue`s BEFORE creating the "Factories" container or
-    // instantiating anything - so the empty-entries branches and the "field missing -> zero
+    // Tests FactoryModule.Wire() against a real compiled root. Unlike PoolModule, Factory's
+    // slot-field-not-found path `continue`s before creating the "Factories" container or
+    // instantiating anything, so the empty-entries branches and the "field missing means zero
     // mutation" case are always testable against this project's real (unbootstrapped)
     // compiled root. The "field found -> instantiated and assigned" sequence lives in
     // FactoryModule.CreateAndAssignInstance(), a private static method reachable via
@@ -22,7 +22,7 @@ namespace Tsvrc.Tests.EditMode
         private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(FactoryModule), "FactoryEntry");
 
         // A stand-in for the compiled root exposing only the one literal field name
-        // CreateAndAssignInstance/IsFactoriesAlreadyWired need to find a match against - both
+        // CreateAndAssignInstance and IsFactoriesAlreadyWired need to find a match against. Both
         // take their target as an explicit parameter rather than looking up the real compiled
         // type themselves, so any Component with the right field works.
         private class FactoryFieldDouble : MonoBehaviour
@@ -78,7 +78,7 @@ namespace Tsvrc.Tests.EditMode
             var prefab = CreateScratchPrefab("Widget");
             var entry = CodeGenModuleReflection.BuildEntry(EntryType,
                 ("Name", "DefinitelyNotReal"), ("TypeName", "GameObject"), ("TypeNamespace", ""),
-                ("IsTsBehaviour", false), ("PrefabAsset", prefab));
+                ("IsTsvrcBehaviour", false), ("PrefabAsset", prefab));
             var module = new FactoryModule();
             PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, new object[] { entry }));
 
@@ -89,8 +89,28 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsNull(_root.transform.Find("Factories"), "Unlike PoolModule, Factory must not create the container at all when the field is missing.");
         }
 
-        // IsFactoriesAlreadyWired() is `private` (instance) - reachable via reflection,
-        // passing whatever root/existing container the test constructs.
+        [Test]
+        public void Wire_RestoredEntryWithNullPrefabAsset_WarnsAndSkipsWithoutThrowing()
+        {
+            // Mirrors exactly what ApplySnapshotFallback's fromSnapshot delegate produces for a
+            // restored Factory entry (see TsModule.ApplySnapshotFallback's doc comment):
+            // GenerateCode() is protected across a transient broken compile, but Wire() has no
+            // name-only way to recover a real prefab reference. PrefabUtility.InstantiatePrefab
+            // throws on a literal null target, so this must be skipped explicitly rather than
+            // crash the whole Wire() pass over one restored entry.
+            var entry = CodeGenModuleReflection.BuildEntry(EntryType,
+                ("Name", "Restored"), ("TypeName", "GameObject"), ("TypeNamespace", ""),
+                ("IsTsvrcBehaviour", false), ("PrefabAsset", null));
+            var module = new FactoryModule();
+            PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, new object[] { entry }));
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*Factory 'Restored' prefab asset is null.*"));
+
+            Assert.DoesNotThrow(() => module.Wire());
+        }
+
+        // IsFactoriesAlreadyWired() is a private instance method, reachable via reflection,
+        // passing whatever root or existing container the test constructs.
         private static bool IsAlreadyWired(FactoryModule module, Component root, Transform existing)
             => (bool)PrivateFieldAccess.InvokeInstance(module, "IsFactoriesAlreadyWired", root, existing);
 
@@ -98,7 +118,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var entry = CodeGenModuleReflection.BuildEntry(EntryType,
                 ("Name", name), ("TypeName", "GameObject"), ("TypeNamespace", ""),
-                ("IsTsBehaviour", false), ("PrefabAsset", prefab));
+                ("IsTsvrcBehaviour", false), ("PrefabAsset", prefab));
             var module = new FactoryModule();
             PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, new object[] { entry }));
             return module;
