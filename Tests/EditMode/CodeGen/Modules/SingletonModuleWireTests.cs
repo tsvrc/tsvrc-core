@@ -53,7 +53,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Wire_FieldFound_DirectReferenceIsAssigned()
         {
-            var memory = _scope.CreateGameObject("SomeMemory").AddComponent<TsMemory>();
+            var memory = _scope.CreateGameObject("SomeMemory").AddComponent<TsvrcMemory>();
             var module = ModuleWith(Entry(RealFieldName, memory));
 
             module.Wire();
@@ -75,7 +75,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Wire_OneEntryMissingFieldAmongMultiple_OtherEntryStillWired()
         {
-            var memory = _scope.CreateGameObject("SomeMemory").AddComponent<TsMemory>();
+            var memory = _scope.CreateGameObject("SomeMemory").AddComponent<TsvrcMemory>();
             var module = ModuleWith(
                 Entry("DefinitelyNotARealField", memory),
                 Entry(RealFieldName, memory));
@@ -94,7 +94,7 @@ namespace Tsvrc.Tests.EditMode
             // restored entry, see its own doc comment. GenerateCode() is protected across a
             // transient broken compile, but Wire() has no name-only way to recover a real scene
             // reference, so it (harmlessly) writes null into the field instead of throwing.
-            var memory = _scope.CreateGameObject("SomeMemory").AddComponent<TsMemory>();
+            var memory = _scope.CreateGameObject("SomeMemory").AddComponent<TsvrcMemory>();
             ModuleWith(Entry(RealFieldName, memory)).Wire();
             Assert.AreEqual(memory, FieldValue(RealFieldName), "Sanity check: the field really was wired before simulating the restore.");
 

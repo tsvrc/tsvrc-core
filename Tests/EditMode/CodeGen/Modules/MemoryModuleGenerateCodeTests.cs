@@ -23,9 +23,9 @@ namespace {ScaffoldModule.CompiledNamespace}
 {{
     public partial class {ScaffoldModule.CompiledClassName}
     {{
-        [ReadOnly] [SerializeField] private TsMemory _memory;
+        [ReadOnly] [SerializeField] private TsvrcMemory _memory;
 
-        public override TsMemory Memory => _memory;
+        public override TsvrcMemory Memory => _memory;
 
         public void _TsMemoryStart()
         {{

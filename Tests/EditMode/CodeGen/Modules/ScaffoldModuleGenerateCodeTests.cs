@@ -4,7 +4,7 @@ using Tsvrc.Editor;
 namespace Tsvrc.Tests.EditMode
 {
     // ScaffoldModule.GenerateCode() is the one truly parameter-free golden file in the
-    // whole generator - it never varies with config.
+    // whole generator, since it never varies with config.
     public class ScaffoldModuleGenerateCodeTests
     {
         [Test]
@@ -33,6 +33,86 @@ namespace {ScaffoldModule.CompiledNamespace}
             _TsInstanceStart();
         }}
     }}
+
+    public abstract class TsAutoPlayerTracker : global::Tsvrc.Tracking.AutoPlayerTracker
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsBehaviour : global::Tsvrc.Core.TsvrcBehaviour
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsDataTransferer : global::Tsvrc.DataTransfer.DataTransferer
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsHeadClipGuard : global::Tsvrc.Player.HeadClipGuard
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsInstance : global::Tsvrc.Core.Instance
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsList : global::Tsvrc.UI.TsvrcList
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsListItem : global::Tsvrc.UI.ListItem
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsLogger : global::Tsvrc.Utils.TsvrcLogger
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsMemory : global::Tsvrc.Utils.TsvrcMemory
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsPlayerPositionOverlay : global::Tsvrc.UI.PlayerPositionOverlay
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsPlayerTracker : global::Tsvrc.Tracking.PlayerTracker
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsProcess : global::Tsvrc.Core.Process
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsRankedGameSession : global::Tsvrc.Session.RankedGameSession
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsReadyCheckProcess : global::Tsvrc.Tracking.ReadyCheckProcess
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsStateManager : global::Tsvrc.StateMachine.StateManager
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
+
+    public abstract class TsTimer : global::Tsvrc.Timing.TsvrcTimer
+    {{
+        protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;
+    }}
 }}";
 
             Assert.AreEqual(expected, new ScaffoldModule().GenerateCode());
@@ -45,6 +125,30 @@ namespace {ScaffoldModule.CompiledNamespace}
             var module = new ScaffoldModule();
 
             Assert.AreEqual(module.GenerateCode(), module.GenerateCode());
+        }
+
+        [Test]
+        public void GenerateCode_EveryWorldBaseClass_HidesTsWithSameNamedPropertyCastToCompiledType()
+        {
+            // The whole mechanism this refactor depends on: `_ts` inside any generated shadow
+            // subclass must resolve to the concrete generated root type, not the framework's
+            // TsRoot, via a same-named property hiding the inherited field, never a cast at
+            // call sites.
+            string code = new ScaffoldModule().GenerateCode();
+
+            foreach (var name in new[]
+                     {
+                         "TsAutoPlayerTracker", "TsBehaviour", "TsDataTransferer", "TsHeadClipGuard",
+                         "TsInstance", "TsList", "TsListItem", "TsLogger", "TsMemory",
+                         "TsPlayerPositionOverlay", "TsPlayerTracker", "TsProcess", "TsRankedGameSession",
+                         "TsReadyCheckProcess", "TsStateManager", "TsTimer",
+                     })
+            {
+                StringAssert.Contains(
+                    $"protected new {ScaffoldModule.CompiledClassName} _ts => ({ScaffoldModule.CompiledClassName})base._ts;",
+                    code, $"{name} must shadow _ts via the standard pattern.");
+                StringAssert.Contains($"public abstract class {name} : ", code);
+            }
         }
     }
 }

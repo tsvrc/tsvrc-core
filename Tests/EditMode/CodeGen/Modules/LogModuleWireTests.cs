@@ -30,7 +30,7 @@ namespace Tsvrc.Tests.EditMode
         public void Wire_TsLoggerPresentInScene_FieldAssigned()
         {
             var logGo = _scope.CreateGameObject("TsLogger");
-            var log = logGo.AddComponent<TsLogger>();
+            var log = logGo.AddComponent<TsvrcLogger>();
 
             new LogModule().Wire();
 
@@ -49,7 +49,7 @@ namespace Tsvrc.Tests.EditMode
         public void Wire_CalledTwiceWithSameLogger_SecondCallLeavesFieldUnchanged()
         {
             var logGo = _scope.CreateGameObject("TsLogger");
-            var log = logGo.AddComponent<TsLogger>();
+            var log = logGo.AddComponent<TsvrcLogger>();
             var module = new LogModule();
             module.Wire();
 
@@ -64,8 +64,8 @@ namespace Tsvrc.Tests.EditMode
             bool programAssetMissing = new LogModule().AfterFilesStable();
 
             Assert.IsNotNull(_root.transform.Find("TsLogger"));
-            Assert.IsNotNull(_root.transform.Find("TsLogger").GetComponent<TsLogger>());
-            Assert.IsFalse(programAssetMissing, "TsLogger.asset already exists in this project.");
+            Assert.IsNotNull(_root.transform.Find("TsLogger").GetComponent<TsvrcLogger>());
+            Assert.IsFalse(programAssetMissing, "TsvrcLogger.asset already exists in this project.");
         }
 
         [Test]
@@ -73,7 +73,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var existing = _scope.CreateGameObject("TsLogger");
             existing.transform.SetParent(_root.transform, false);
-            existing.AddComponent<TsLogger>();
+            existing.AddComponent<TsvrcLogger>();
 
             new LogModule().AfterFilesStable();
 

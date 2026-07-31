@@ -11,7 +11,7 @@ namespace Tsvrc.Tests.PlayMode.Session
 {
     // RankedGameSession has no direct real-VRC-API surface of its own beyond composing five
     // already-covered Process-derived sub-components (three PlayerTrackers, a
-    // ReadyCheckProcess, a TsTimer). This is an end-to-end integration smoke test with real
+    // ReadyCheckProcess, a TsvrcTimer). This is an end-to-end integration smoke test with real
     // spawned players flowing through the full lobby -> ready-check -> game -> completed
     // pipeline, wiring the sub-components into the session's private fields via reflection to
     // reproduce what [WirePool] wires at runtime.

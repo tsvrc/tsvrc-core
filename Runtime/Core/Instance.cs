@@ -2,6 +2,7 @@
 
 namespace Tsvrc.Core
 {
+    [TsWorldExtensionPoint("TsInstance")]
     public class Instance : TsvrcBehaviour
     {
         // TODO: implement custom master logic (override who is considered master per-instance)

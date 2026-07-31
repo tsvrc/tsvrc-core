@@ -39,16 +39,19 @@ namespace Tsvrc.Tests.EditMode
 
         public void Dispose()
         {
-            Scope.Dispose(); // also resets TsPaths (GeneratedFolder, CompiledClassName, ...) to defaults
-            ScratchAssets.DeleteAll();
-            SessionState.EraseBool(PendingBootstrapKey);
             // Resets the hierarchyChanged and Undo.postprocessModifications subscriptions
             // RunCore installs on a successful pass, along with _activeModules and
             // _watchedComponentTypeNames. Otherwise a later, unrelated test's scene edits could
-            // spuriously schedule a rerun left over from this test. skipRefresh is true because
-            // HasBootstrapSignal() is very likely false here, since the temp scene is already
-            // disposed, and even if it weren't, this call must never touch the real project.
+            // spuriously schedule a rerun left over from this test. Must run before Scope.Dispose()
+            // resets TsPaths back to real values: HasBootstrapSignal() reacts to a loaded Instance
+            // subclass anywhere in the AppDomain, not scene content, so in a consuming project
+            // that has one (a real world's Instance subclass, always loaded regardless of scene)
+            // this never short-circuits, and calling it after the redirect is gone would run a
+            // real pass against the actual project's Assets/TsGenerated.
             TsGenerator.AfterDomainReload(skipRefresh: true);
+            Scope.Dispose(); // also resets TsPaths (GeneratedFolder, CompiledClassName, ...) to defaults
+            ScratchAssets.DeleteAll();
+            SessionState.EraseBool(PendingBootstrapKey);
         }
     }
 }

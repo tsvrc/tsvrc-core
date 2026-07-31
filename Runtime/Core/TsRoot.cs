@@ -10,7 +10,7 @@ namespace Tsvrc.Core.Generated
     public abstract class TsRoot : UdonSharpBehaviour
     {
         public virtual Instance Instance => null;
-        public virtual TsMemory Memory => null;
-        public virtual TsLogger Log => null;
+        public virtual TsvrcMemory Memory => null;
+        public virtual TsvrcLogger Log => null;
     }
 }

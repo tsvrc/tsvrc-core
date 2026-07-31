@@ -26,11 +26,11 @@ namespace Tsvrc.Tests.EditMode
             return go.AddComponent<ListItemTestSubclass>();
         }
 
-        private TsList CreateListDouble()
+        private TsvrcList CreateListDouble()
         {
-            var go = new GameObject(nameof(TsList));
+            var go = new GameObject(nameof(TsvrcList));
             _spawned.Add(go);
-            return go.AddComponent<TsList>();
+            return go.AddComponent<TsvrcList>();
         }
 
         private static DataDictionary MakeDict(string key, string value)
@@ -44,7 +44,7 @@ namespace Tsvrc.Tests.EditMode
         public void Bind_SetsBoundStateAndDataIndex()
         {
             ListItemTestSubclass item = CreateItem();
-            TsList list = CreateListDouble();
+            TsvrcList list = CreateListDouble();
             DataDictionary data = MakeDict("k", "v");
 
             item.Bind(list, 3, data);
@@ -58,7 +58,7 @@ namespace Tsvrc.Tests.EditMode
         public void Bind_InvokesOnBindExactlyOnceWithCorrectData()
         {
             ListItemTestSubclass item = CreateItem();
-            TsList list = CreateListDouble();
+            TsvrcList list = CreateListDouble();
             DataDictionary data = MakeDict("k", "v");
 
             item.Bind(list, 3, data);
@@ -72,7 +72,7 @@ namespace Tsvrc.Tests.EditMode
         public void Bind_WithNullData_DoesNotThrowAndStoresNullData()
         {
             ListItemTestSubclass item = CreateItem();
-            TsList list = CreateListDouble();
+            TsvrcList list = CreateListDouble();
 
             Assert.DoesNotThrow(() => item.Bind(list, 0, null));
 
@@ -84,10 +84,10 @@ namespace Tsvrc.Tests.EditMode
         public void Bind_CalledTwiceWithoutUnbind_OverwritesStateAndInvokesOnBindTwiceWithoutOnUnbind()
         {
             // Documents current behavior: Bind does not guard against being called again
-            // while already bound (production usage never hits this — TsList always
+            // while already bound (production usage never hits this, since TsvrcList always
             // destroys and re-instantiates items rather than re-binding one in place).
             ListItemTestSubclass item = CreateItem();
-            TsList list = CreateListDouble();
+            TsvrcList list = CreateListDouble();
             item.Bind(list, 1, MakeDict("k", "first"));
 
             item.Bind(list, 2, MakeDict("k", "second"));
@@ -102,7 +102,7 @@ namespace Tsvrc.Tests.EditMode
         public void Unbind_ClearsBoundStateAndDataIndex()
         {
             ListItemTestSubclass item = CreateItem();
-            TsList list = CreateListDouble();
+            TsvrcList list = CreateListDouble();
             item.Bind(list, 3, MakeDict("k", "v"));
 
             item.Unbind();
@@ -115,7 +115,7 @@ namespace Tsvrc.Tests.EditMode
         public void Unbind_InvokesOnUnbindExactlyOnce()
         {
             ListItemTestSubclass item = CreateItem();
-            TsList list = CreateListDouble();
+            TsvrcList list = CreateListDouble();
             item.Bind(list, 3, MakeDict("k", "v"));
 
             item.Unbind();
@@ -136,7 +136,7 @@ namespace Tsvrc.Tests.EditMode
         public void OnItemPressed_WhenBound_NotifiesOwningListWithDataIndex()
         {
             ListItemTestSubclass item = CreateItem();
-            TsList list = CreateListDouble();
+            TsvrcList list = CreateListDouble();
             list.SetData(MakeList(3));
             item.Bind(list, 2, MakeDict("k", "v"));
 
@@ -149,7 +149,7 @@ namespace Tsvrc.Tests.EditMode
         public void OnItemPressed_WhenNotBound_DoesNotThrowAndDoesNotNotifyList()
         {
             ListItemTestSubclass item = CreateItem();
-            TsList list = CreateListDouble();
+            TsvrcList list = CreateListDouble();
             list.SetData(MakeList(3));
             item.Bind(list, 2, MakeDict("k", "v"));
             item.Unbind();

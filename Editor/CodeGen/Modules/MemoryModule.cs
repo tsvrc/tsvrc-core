@@ -7,13 +7,13 @@ using UnityEngine;
 namespace Tsvrc.Editor
 {
     // Generates the _memory field and _TsMemoryStart() on TsGenerated, and wires
-    // the scene TsMemory component into it. Every other system accesses shared memory
+    // the scene TsvrcMemory component into it. Every other system accesses shared memory
     // through TsGenerated.Memory; this module ensures that reference is always set.
     internal class MemoryModule : TsModule
     {
-        // Package-relative, not a literal - see PackagePaths.
-        private static string MemoryScriptPath => $"{PackagePaths.Root}/Runtime/Utils/TsMemory.cs";
-        private static string MemoryAssetPath => $"{PackagePaths.Root}/Runtime/Utils/TsMemory.asset";
+        // Package-relative, not a literal, see PackagePaths.
+        private static string MemoryScriptPath => $"{PackagePaths.Root}/Runtime/Utils/TsvrcMemory.cs";
+        private static string MemoryAssetPath => $"{PackagePaths.Root}/Runtime/Utils/TsvrcMemory.asset";
 
         internal override string FileName => "TsGeneratedMemory.cs";
 
@@ -30,9 +30,9 @@ namespace Tsvrc.Editor
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
             using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
-                w.Line("[ReadOnly] [SerializeField] private TsMemory _memory;");
+                w.Line("[ReadOnly] [SerializeField] private TsvrcMemory _memory;");
                 w.BlankLine();
-                w.Line("public override TsMemory Memory => _memory;");
+                w.Line("public override TsvrcMemory Memory => _memory;");
                 w.BlankLine();
                 using (w.Method("public void _TsMemoryStart()"))
                     w.Line("_memory.TsConstruct(this);");
@@ -48,7 +48,7 @@ namespace Tsvrc.Editor
             var root = FindRoot();
             if (root == null) return programAssetMissing;
 
-            ScaffoldModule.EnsureChildSceneObject("TsMemory", typeof(TsMemory), root);
+            ScaffoldModule.EnsureChildSceneObject("TsMemory", typeof(TsvrcMemory), root);
             return programAssetMissing;
         }
 
@@ -57,7 +57,7 @@ namespace Tsvrc.Editor
             var root = FindRoot();
             if (root == null) return;
 
-            var memory = (Component)UnityEngine.Object.FindObjectOfType(typeof(TsMemory), true);
+            var memory = (Component)UnityEngine.Object.FindObjectOfType(typeof(TsvrcMemory), true);
 
             var so = new SerializedObject(root);
             var prop = so.FindProperty("_memory");

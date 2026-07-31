@@ -1,3 +1,4 @@
+using Tsvrc.Core;
 using Tsvrc.Player;
 using Tsvrc.Utils;
 using UdonSharp;
@@ -13,6 +14,7 @@ namespace Tsvrc.Tracking
     /// Subscribe via the <c>OnReadyCheck*Event</c> string constants and read
     /// <see cref="PlayerTracker.LastPlayerIds"/> in your callback.
     /// </summary>
+    [TsWorldExtensionPoint("TsReadyCheckProcess")]
     public class ReadyCheckProcess : PlayerTracker
     {
         /// <summary>

@@ -35,7 +35,7 @@ namespace Tsvrc.Tests.EditMode
             var root = CompiledRootFixture.AddTo(_scope);
             var child = _scope.CreateGameObject("TsLogger");
             child.transform.SetParent(root.transform, false);
-            child.AddComponent<TsLogger>();
+            child.AddComponent<TsvrcLogger>();
 
             Assert.IsFalse(new LogModule().OnSceneHierarchyChanged());
         }

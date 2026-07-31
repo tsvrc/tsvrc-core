@@ -7,8 +7,8 @@ using UnityEngine.TestTools;
 namespace Tsvrc.Tests.EditMode
 {
     // Covers TsvrcBehaviour's LogInfo/LogWarning/LogError wrappers: the tag is always the
-    // concrete runtime type name (via GetUdonTypeName()), always led by TsLogger.FrameworkTag
-    // ("TsVRC") with no project-specific Prefix (the fallback path has no TsLogger instance to
+    // concrete runtime type name (via GetUdonTypeName()), always led by TsvrcLogger.FrameworkTag
+    // ("TsVRC") with no project-specific Prefix (the fallback path has no TsvrcLogger instance to
     // read one from), and the message routes through _ts.Log when it's wired up, falling back
     // to Debug.Log directly (same tag/format) when _ts or _ts.Log is not yet set - e.g. before
     // TsConstruct.
@@ -66,7 +66,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var behaviour = CreateBehaviour<TsvrcBehaviourTestSubclass>();
             var root = CreateBehaviour<TestTsRootWithLogger>();
-            root.LogOverride = CreateBehaviour<TsLogger>();
+            root.LogOverride = CreateBehaviour<TsvrcLogger>();
             behaviour.TsConstruct(root);
 
             LogAssert.Expect(LogType.Warning, "[TsVRC] [TsvrcBehaviourTestSubclass] delegated");
@@ -78,7 +78,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var behaviour = CreateBehaviour<TsvrcBehaviourTestSubclass>();
             var root = CreateBehaviour<TestTsRootWithLogger>();
-            root.LogOverride = CreateBehaviour<TsLogger>();
+            root.LogOverride = CreateBehaviour<TsvrcLogger>();
             // TsvrcBehaviourTestSubclass does not override IsTsvrcInternal, so it reports false
             // (world) - disabling WorldInfoEnabled (not InternalInfoEnabled) must suppress it.
             root.LogOverride.WorldInfoEnabled = false;
@@ -104,7 +104,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var behaviour = CreateBehaviour<TsvrcBehaviourTestSubclass>();
             var root = CreateBehaviour<TestTsRootWithLogger>();
-            root.LogOverride = CreateBehaviour<TsLogger>();
+            root.LogOverride = CreateBehaviour<TsvrcLogger>();
             root.LogOverride.InternalWarningEnabled = false;
             behaviour.TsConstruct(root);
 
@@ -119,7 +119,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var behaviour = CreateBehaviour<TsInternalBehaviourTestSubclass>();
             var root = CreateBehaviour<TestTsRootWithLogger>();
-            root.LogOverride = CreateBehaviour<TsLogger>();
+            root.LogOverride = CreateBehaviour<TsvrcLogger>();
             root.LogOverride.WorldWarningEnabled = false;
             behaviour.TsConstruct(root);
 
@@ -134,7 +134,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var behaviour = CreateBehaviour<TsInternalBehaviourTestSubclass>();
             var root = CreateBehaviour<TestTsRootWithLogger>();
-            root.LogOverride = CreateBehaviour<TsLogger>();
+            root.LogOverride = CreateBehaviour<TsvrcLogger>();
             root.LogOverride.InternalWarningEnabled = false;
             behaviour.TsConstruct(root);
 

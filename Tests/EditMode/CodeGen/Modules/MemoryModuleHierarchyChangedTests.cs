@@ -35,7 +35,7 @@ namespace Tsvrc.Tests.EditMode
             var root = CompiledRootFixture.AddTo(_scope);
             var child = _scope.CreateGameObject("TsMemory");
             child.transform.SetParent(root.transform, false);
-            child.AddComponent<TsMemory>();
+            child.AddComponent<TsvrcMemory>();
 
             Assert.IsFalse(new MemoryModule().OnSceneHierarchyChanged());
         }

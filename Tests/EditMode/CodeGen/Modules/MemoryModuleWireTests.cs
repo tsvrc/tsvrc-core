@@ -30,7 +30,7 @@ namespace Tsvrc.Tests.EditMode
         public void Wire_TsMemoryPresentInScene_FieldAssigned()
         {
             var memoryGo = _scope.CreateGameObject("TsMemory");
-            var memory = memoryGo.AddComponent<TsMemory>();
+            var memory = memoryGo.AddComponent<TsvrcMemory>();
 
             new MemoryModule().Wire();
 
@@ -49,7 +49,7 @@ namespace Tsvrc.Tests.EditMode
         public void Wire_CalledTwiceWithSameMemory_SecondCallLeavesFieldUnchanged()
         {
             var memoryGo = _scope.CreateGameObject("TsMemory");
-            var memory = memoryGo.AddComponent<TsMemory>();
+            var memory = memoryGo.AddComponent<TsvrcMemory>();
             var module = new MemoryModule();
             module.Wire();
 
@@ -67,8 +67,8 @@ namespace Tsvrc.Tests.EditMode
             bool programAssetMissing = new MemoryModule().AfterFilesStable();
 
             Assert.IsNotNull(_root.transform.Find("TsMemory"));
-            Assert.IsNotNull(_root.transform.Find("TsMemory").GetComponent<TsMemory>());
-            Assert.IsFalse(programAssetMissing, "TsMemory.asset already exists in this project.");
+            Assert.IsNotNull(_root.transform.Find("TsMemory").GetComponent<TsvrcMemory>());
+            Assert.IsFalse(programAssetMissing, "TsvrcMemory.asset already exists in this project.");
         }
 
         [Test]
@@ -76,7 +76,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var existing = _scope.CreateGameObject("TsMemory");
             existing.transform.SetParent(_root.transform, false);
-            existing.AddComponent<TsMemory>();
+            existing.AddComponent<TsvrcMemory>();
 
             new MemoryModule().AfterFilesStable();
 

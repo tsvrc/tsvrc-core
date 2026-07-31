@@ -5,7 +5,7 @@ using Tsvrc.Testing.Framework;
 namespace Tsvrc.Tests.EditMode
 {
     // RankedGameSession composes five separate sub-behaviours (three PlayerTrackers, a
-    // ReadyCheckProcess, a TsTimer) rather than inheriting from Process itself,
+    // ReadyCheckProcess, a TsvrcTimer) rather than inheriting from Process itself,
     // so this base extends ProcessTestBase directly for CreateComponent<T>/
     // CreateProcess<T>/SeedAsOwner/ForceNextTickDueNow/TearDown, then wires all five
     // sub-components into the session's private fields via reflection - the same

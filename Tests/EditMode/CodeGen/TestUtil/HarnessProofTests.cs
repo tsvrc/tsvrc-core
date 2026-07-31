@@ -21,7 +21,7 @@ namespace Tsvrc.Tests.EditMode
 
             Assert.DoesNotThrow(() => new MemoryModule().Wire());
 
-            Assert.AreEqual(1, scope.Scene.rootCount, "Wire() with no TsMemory in scene must not create or destroy any scene objects.");
+            Assert.AreEqual(1, scope.Scene.rootCount, "Wire() with no TsvrcMemory in scene must not create or destroy any scene objects.");
         }
 
         [Test]

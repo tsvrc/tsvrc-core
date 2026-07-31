@@ -63,7 +63,7 @@ namespace Tsvrc.Tests.EditMode
         public void Memory_OverriddenAlone_InstanceStaysNull()
         {
             var root = Create<MemoryOnlyTsRootDouble>();
-            root.FakeMemory = Create<TsMemory>();
+            root.FakeMemory = Create<TsvrcMemory>();
 
             Assert.AreSame(root.FakeMemory, root.Memory);
             Assert.IsNull(root.Instance);
@@ -74,7 +74,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var root = Create<FullTsRootDouble>();
             root.FakeInstance = Create<Instance>();
-            root.FakeMemory = Create<TsMemory>();
+            root.FakeMemory = Create<TsvrcMemory>();
 
             Assert.AreSame(root.FakeInstance, root.Instance);
             Assert.AreSame(root.FakeMemory, root.Memory);

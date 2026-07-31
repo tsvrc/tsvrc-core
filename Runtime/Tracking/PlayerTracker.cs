@@ -14,6 +14,7 @@ namespace Tsvrc.Tracking
     /// Subscribe via the <c>OnTracking*Event</c> string constants and read the <c>Last*</c> properties in your callback.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
+    [TsWorldExtensionPoint("TsPlayerTracker")]
     public class PlayerTracker : Process
     {
         /// <summary>

@@ -22,6 +22,6 @@ namespace Tsvrc.Tests.EditMode
             OnUnbindCallCount++;
         }
 
-        public TsList ListField => _list;
+        public TsvrcList ListField => _list;
     }
 }

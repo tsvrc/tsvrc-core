@@ -18,8 +18,8 @@ namespace Tsvrc.Tests.EditMode
     // delegation path (as opposed to TestTsRoot's fallback-to-Debug.Log path).
     public class TestTsRootWithLogger : TsRoot
     {
-        public TsLogger LogOverride;
-        public override TsLogger Log => LogOverride;
+        public TsvrcLogger LogOverride;
+        public override TsvrcLogger Log => LogOverride;
     }
 
     public class TsvrcBehaviourTestSubclass : TsvrcBehaviour
@@ -40,8 +40,8 @@ namespace Tsvrc.Tests.EditMode
         public void InvokeLogError(string message) => LogError(message);
     }
 
-    // Simulates a Tsvrc framework class (e.g. Process, TsMemory) for tests that need to
-    // verify the Internal side of TsLogger's Internal/World level filtering without pulling
+    // Simulates a Tsvrc framework class (e.g. Process, TsvrcMemory) for tests that need to
+    // verify the Internal side of TsvrcLogger's Internal/World level filtering without pulling
     // in a real framework class.
     public class TsInternalBehaviourTestSubclass : TsvrcBehaviour
     {

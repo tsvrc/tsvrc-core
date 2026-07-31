@@ -6,15 +6,16 @@ using VRC.SDK3.Data;
 namespace Tsvrc.UI
 {
     /// <summary>
-    /// Base item for <see cref="TsList"/>.
+    /// Base item for <see cref="TsvrcList"/>.
     /// Receives a <see cref="DataDictionary"/> on bind; override <see cref="_OnBind"/> to populate UI.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
+    [TsWorldExtensionPoint("TsListItem")]
     public class ListItem : TsvrcBehaviour
     {
         protected override bool IsTsvrcInternal => true;
 
-        protected TsList _list = null;
+        protected TsvrcList _list = null;
         protected DataDictionary _itemData = null;
         protected int _dataIndex = -1;
         private bool _isBound = false;
@@ -22,8 +23,8 @@ namespace Tsvrc.UI
         public int DataIndex => _dataIndex;
         public bool IsBound => _isBound;
 
-        /// <summary>Called by <see cref="TsList"/> when this item enters the viewport.</summary>
-        public void Bind(TsList list, int dataIndex, DataDictionary data)
+        /// <summary>Called by <see cref="TsvrcList"/> when this item enters the viewport.</summary>
+        public void Bind(TsvrcList list, int dataIndex, DataDictionary data)
         {
             _list = list;
             _dataIndex = dataIndex;
@@ -32,7 +33,7 @@ namespace Tsvrc.UI
             _OnBind();
         }
 
-        /// <summary>Called by <see cref="TsList"/> when this item is destroyed from the viewport.</summary>
+        /// <summary>Called by <see cref="TsvrcList"/> when this item is destroyed from the viewport.</summary>
         public void Unbind()
         {
             _isBound = false;

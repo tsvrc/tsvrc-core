@@ -1,3 +1,4 @@
+using Tsvrc.Core;
 using Tsvrc.Player;
 using UdonSharp;
 using VRC.SDKBase;
@@ -11,6 +12,7 @@ namespace Tsvrc.Tracking
     /// properties in your callback. Call <see cref="StartAutoTracking"/> to begin.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
+    [TsWorldExtensionPoint("TsAutoPlayerTracker")]
     public class AutoPlayerTracker : PlayerTracker
     {
         /// <summary>

@@ -27,15 +27,15 @@ namespace Tsvrc.Core.Generated
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class TestGenerated : TsRoot
     {
-        [SerializeField] private TsMemory _memory;
-        [SerializeField] private TsLogger _log;
+        [SerializeField] private TsvrcMemory _memory;
+        [SerializeField] private TsvrcLogger _log;
         [SerializeField] private Instance _instance;
         [SerializeField] public UdonSharpBehaviour GenericSlotA;
         [SerializeField] public UdonSharpBehaviour GenericSlotB;
         [SerializeField] public GameObject FactorySlotA;
 
-        public override TsMemory Memory => _memory;
-        public override TsLogger Log => _log;
+        public override TsvrcMemory Memory => _memory;
+        public override TsvrcLogger Log => _log;
         public override Instance Instance => _instance;
     }
 }

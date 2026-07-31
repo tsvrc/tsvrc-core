@@ -13,10 +13,11 @@ namespace Tsvrc.Core
     /// and optional periodic update ticks, all scoped to the process owner.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
+    [TsWorldExtensionPoint("TsProcess")]
     public class Process : TsvrcBehaviour
     {
         // Covers the entire Process subtree (PlayerTracker, ReadyCheckProcess,
-        // etc) with a single override - none of them need their own.
+        // and so on) with a single override, so none of them need their own.
         protected override bool IsTsvrcInternal => true;
 
         [UdonSynced] private bool _isRunning = false;
@@ -394,14 +395,14 @@ namespace Tsvrc.Core
         // Deliberately still SendCustomEventDelayedSeconds-based, not Update()-based: this loop
         // must keep ticking while its GameObject is inactive (e.g. a hidden UI representation of
         // a still-running process), and Unity's automatic Update() message is never delivered to
-        // an inactive GameObject or disabled component — a hard engine constraint, not something
+        // an inactive GameObject or disabled component, a hard engine constraint, not something
         // any C#/UdonSharp-level design can opt out of. SendCustomEventDelayedSeconds is tracked
         // by Udon's own scheduler instead of Unity's native per-frame component dispatch, so it
         // keeps firing regardless of GameObject activity.
         public void _TickProcessUpdate()
         {
             // If InternalCleanup set _updateLoopActive to false, this call belongs to a loop that
-            // was fully stopped with no restart — discard it here without touching the flag so a
+            // was fully stopped with no restart. Discard it here without touching the flag so a
             // subsequent StartProcess can safely schedule a new loop.
             if (!_updateLoopActive) return;
 
@@ -413,7 +414,7 @@ namespace Tsvrc.Core
             // _nextTickDueAtRealTime is advanced on every legitimate tick and on every activation
             // to reflect the CURRENT generation's expected cadence; a call that fires before that
             // real-time deadline belongs to an earlier, already-superseded generation and is
-            // discarded here — deliberately without rescheduling, so a stale chain dies on its own
+            // discarded here, deliberately without rescheduling, so a stale chain dies on its own
             // instead of retrying indefinitely.
             if (Time.realtimeSinceStartup < _nextTickDueAtRealTime) return;
 

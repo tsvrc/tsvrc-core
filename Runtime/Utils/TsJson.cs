@@ -16,7 +16,7 @@ namespace Tsvrc.Utils
             if (VRCJson.TrySerializeToJson(dict, JsonExportType.Minify, out DataToken result))
                 return result.String;
 
-            Debug.LogError(TsLogger.Format(string.Empty, "TsJson", "Failed to serialize DataDictionary to JSON."));
+            Debug.LogError(TsvrcLogger.Format(string.Empty, "TsJson", "Failed to serialize DataDictionary to JSON."));
             return string.Empty;
         }
 
@@ -26,7 +26,7 @@ namespace Tsvrc.Utils
         {
             if (string.IsNullOrEmpty(json))
             {
-                Debug.LogError(TsLogger.Format(string.Empty, "TsJson", "Cannot deserialize null or empty JSON string."));
+                Debug.LogError(TsvrcLogger.Format(string.Empty, "TsJson", "Cannot deserialize null or empty JSON string."));
                 return null;
             }
 
@@ -35,11 +35,11 @@ namespace Tsvrc.Utils
                 if (result.TokenType == TokenType.DataDictionary)
                     return result.DataDictionary;
 
-                Debug.LogError(TsLogger.Format(string.Empty, "TsJson", "Deserialized JSON is not a DataDictionary."));
+                Debug.LogError(TsvrcLogger.Format(string.Empty, "TsJson", "Deserialized JSON is not a DataDictionary."));
                 return null;
             }
 
-            Debug.LogError(TsLogger.Format(string.Empty, "TsJson", "Failed to deserialize JSON string to DataDictionary."));
+            Debug.LogError(TsvrcLogger.Format(string.Empty, "TsJson", "Failed to deserialize JSON string to DataDictionary."));
             return null;
         }
 
@@ -50,7 +50,7 @@ namespace Tsvrc.Utils
             if (VRCJson.TrySerializeToJson(token, JsonExportType.Minify, out DataToken result))
                 return result.String;
 
-            Debug.LogError(TsLogger.Format(string.Empty, "TsJson", "Failed to serialize DataToken to JSON."));
+            Debug.LogError(TsvrcLogger.Format(string.Empty, "TsJson", "Failed to serialize DataToken to JSON."));
             return string.Empty;
         }
 
@@ -60,14 +60,14 @@ namespace Tsvrc.Utils
         {
             if (string.IsNullOrEmpty(json))
             {
-                Debug.LogError(TsLogger.Format(string.Empty, "TsJson", "Cannot deserialize null or empty JSON string."));
+                Debug.LogError(TsvrcLogger.Format(string.Empty, "TsJson", "Cannot deserialize null or empty JSON string."));
                 return default;
             }
 
             if (VRCJson.TryDeserializeFromJson(json, out DataToken result))
                 return result;
 
-            Debug.LogError(TsLogger.Format(string.Empty, "TsJson", "Failed to deserialize JSON string."));
+            Debug.LogError(TsvrcLogger.Format(string.Empty, "TsJson", "Failed to deserialize JSON string."));
             return default;
         }
 

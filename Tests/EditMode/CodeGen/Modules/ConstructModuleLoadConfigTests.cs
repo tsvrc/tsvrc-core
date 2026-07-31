@@ -40,7 +40,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
-            var target = _scope.CreateGameObject(goName).AddComponent<TsMemory>();
+            var target = _scope.CreateGameObject(goName).AddComponent<TsvrcMemory>();
             config.Constructs = new TsvrcBehaviour[] { target };
             return config;
         }
@@ -56,7 +56,7 @@ namespace Tsvrc.Tests.EditMode
             var snapshot = ModuleEntrySnapshot.Load(SnapshotKey);
             Assert.IsNotNull(snapshot);
             Assert.AreEqual(1, snapshot.Count);
-            Assert.AreEqual("TsMemory", snapshot[0].Name);
+            Assert.AreEqual("TsvrcMemory", snapshot[0].Name);
         }
 
         [Test]
@@ -108,7 +108,7 @@ namespace Tsvrc.Tests.EditMode
             module.LoadConfig();
             string generated = module.GenerateCode();
 
-            StringAssert.Contains("TsMemory", generated);
+            StringAssert.Contains("TsvrcMemory", generated);
             StringAssert.DoesNotContain("OldEntry", generated);
         }
 

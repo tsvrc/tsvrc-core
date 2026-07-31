@@ -23,9 +23,9 @@ namespace {ScaffoldModule.CompiledNamespace}
 {{
     public partial class {ScaffoldModule.CompiledClassName}
     {{
-        [ReadOnly] [SerializeField] private TsLogger _log;
+        [ReadOnly] [SerializeField] private TsvrcLogger _log;
 
-        public override TsLogger Log => _log;
+        public override TsvrcLogger Log => _log;
 
         public void _TsLogStart()
         {{

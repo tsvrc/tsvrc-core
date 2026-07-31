@@ -1,29 +1,41 @@
 using NUnit.Framework;
 using Tsvrc.Config;
+using Tsvrc.Core.Generated;
 using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // ScaffoldModule.OnSceneHierarchyChanged() - the self-healing signal that decides
+    // Tests ScaffoldModule.OnSceneHierarchyChanged(), the self-healing signal that decides
     // whether a rerun should be scheduled after any hierarchy edit.
+    //
+    // Redirects TsPaths.CompiledClassName to TestGenerated (permanent, always compiled as
+    // part of this test assembly) in SetUp, so every test here is deterministic regardless of
+    // whether a consuming project's own TsGenerated happens to be compiled.
     public class ScaffoldModuleHierarchyChangedTests
     {
         private TempSceneScope _scope;
 
         [SetUp]
-        public void SetUp() => _scope = new TempSceneScope();
+        public void SetUp()
+        {
+            _scope = new TempSceneScope();
+            TsPaths.CompiledClassName = nameof(TestGenerated);
+        }
 
         [TearDown]
-        public void TearDown() => _scope.Dispose();
+        public void TearDown() => _scope.Dispose(); // also resets TsPaths to defaults
 
         [Test]
-        public void OnSceneHierarchyChanged_CompiledTypeNotFoundCase_IsUnreachableInThisProject_DocumentedNotTested()
+        public void OnSceneHierarchyChanged_CompiledTypeNotFound_ReturnsFalse()
         {
-            // FindCompiledType() always succeeds in this project (the real TsGenerated
-            // class is always compiled and loaded), so the `compiledType == null` branch
-            // cannot be reached from an Edit Mode test here - it would only apply to a
-            // project where the generator has never produced its first .cs file at all.
-            Assert.Pass("Unreachable in this project: FindCompiledType() never returns null here.");
+            // A name guaranteed not to match any compiled type, genuinely exercising the
+            // `compiledType == null` branch. Previously untestable: every test in this file
+            // could only ever run against whichever real type happened to already be
+            // compiled in the AppDomain, and that's never null once a project has generated
+            // anything at all.
+            TsPaths.CompiledClassName = "ThisTypeDefinitelyDoesNotExist_Guard12345";
+
+            Assert.IsFalse(new ScaffoldModule().OnSceneHierarchyChanged());
         }
 
         [Test]

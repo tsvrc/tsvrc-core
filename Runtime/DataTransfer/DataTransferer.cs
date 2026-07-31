@@ -1,8 +1,10 @@
+using Tsvrc.Core;
 using UdonSharp;
 
 namespace Tsvrc.DataTransfer
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
+    [TsWorldExtensionPoint("TsDataTransferer")]
     public class DataTransferer : DataSenderReceiver
     {
         /// <summary>
@@ -27,8 +29,6 @@ namespace Tsvrc.DataTransfer
         /// </summary>
         public const string OnTransferChunkEvent = "OnTransferChunk";
 
-        #region Process Callbacks
-
         protected override void OnOwnerAbandonedProcess()
         {
             // DataSender.OnOwnerAbandonedProcess (called via base) already calls StopReadyCheck(),
@@ -39,15 +39,9 @@ namespace Tsvrc.DataTransfer
             base.OnOwnerAbandonedProcess();
         }
 
-        #endregion
-
-        #region DataSenderReceiver Overrides
-
         protected override void OnDataReceptionStarted() => TsEmit(OnTransferStartedEvent);
         protected override void OnDataReceptionStopped() => TsEmit(OnTransferStoppedEvent);
         protected override void OnDataReceptionCompleted() => TsEmit(OnTransferCompletedEvent);
         protected override void OnDataChunkReceived() => TsEmit(OnTransferChunkEvent);
-
-        #endregion
     }
 }

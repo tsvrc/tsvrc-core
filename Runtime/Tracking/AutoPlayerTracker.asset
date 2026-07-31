@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: AutoPlayerTracker
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: b504d72699628e14489768ad48c64bea,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: 32728d21cbbda7d4b848af252fdb2853,
     type: 2}
   udonAssembly: 
   assemblyError: 

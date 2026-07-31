@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using Tsvrc.Config;
+using Tsvrc.Core.Generated;
 using Tsvrc.Editor;
 using UdonSharp;
 using UdonSharpEditor;
@@ -8,18 +9,40 @@ using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // ScaffoldModule.AfterFilesStable() - the internal entry point that owns
+    // Tests ScaffoldModule.AfterFilesStable(), the internal entry point that owns
     // EnsureRootSceneObject()/EnsureChildSceneObject()/NormalizeProgramAsset(), none of
     // which are individually public.
+    //
+    // Redirects TsPaths so AfterFilesStable()'s own EnsureUdonSharpProgramAsset/
+    // FindCompiledType calls resolve against TestGenerated (a permanent, already-compiled
+    // double, see TestGenerated.cs) instead of a consuming project's real TsGenerated. The
+    // script path points at TestGenerated.cs's real, permanent location (so a real MonoScript
+    // is found), while the program asset itself is created fresh under ScratchAssets.Folder
+    // each test and deleted afterward, never the real project's Assets/TsGenerated.
     public class ScaffoldModuleWireTests
     {
+        private const string TestGeneratedScriptPath = "Assets/Tsvrc/Tests/TestDoubles/CodeGen/TestGenerated.cs";
+
         private TempSceneScope _scope;
 
         [SetUp]
-        public void SetUp() => _scope = new TempSceneScope();
+        public void SetUp()
+        {
+            _scope = new TempSceneScope();
+            ScratchAssets.EnsureFolder();
+            TsPaths.CompiledClassName = nameof(TestGenerated);
+            TsPaths.GeneratedFolder = ScratchAssets.Folder;
+            TsPaths.ScaffoldScriptPath = TestGeneratedScriptPath;
+            // ScaffoldAssetPath stays derived (null): GeneratedFolder + CompiledClassName + ".asset",
+            // meaning under the scratch folder, see ScaffoldModule.GeneratedAssetPath.
+        }
 
         [TearDown]
-        public void TearDown() => _scope.Dispose();
+        public void TearDown()
+        {
+            _scope.Dispose(); // also resets TsPaths to defaults
+            ScratchAssets.DeleteAll();
+        }
 
         private static System.Type CompiledType => ScaffoldModule.FindCompiledType();
 
@@ -61,8 +84,8 @@ namespace Tsvrc.Tests.EditMode
 
             var instances = Object.FindObjectsOfType(CompiledType, true);
             // FindObjectsOfType's element order isn't documented as creation order, so this
-            // only pins "exactly one survives, and it's genuinely one of the two originals"
-            // - not specifically which one. EnsureRootSceneObject keeps whichever the engine
+            // only pins "exactly one survives, and it's genuinely one of the two originals",
+            // not specifically which one. EnsureRootSceneObject keeps whichever the engine
             // reports at index 0 and destroys the rest.
             Assert.AreEqual(1, instances.Length);
             var survivor = ((Component)instances[0]).gameObject;
@@ -120,8 +143,12 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void NormalizeProgramAsset_CalledTwiceOnRealAsset_SecondCallIsNoOp()
         {
-            var asset = AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>("Assets/TsGenerated/TsGenerated.asset");
-            Assert.IsNotNull(asset, "This project's own bootstrap TsGenerated.asset must already exist (see CompiledRootFixture).");
+            // "Real" here means a genuine UdonSharpProgramAsset created through production
+            // code (EnsureUdonSharpProgramAsset), not a hand-built ScriptableObject, just one
+            // created fresh under the scratch folder for this test, never the actual project's.
+            Assert.IsTrue(ScaffoldModule.EnsureUdonSharpProgramAsset(TestGeneratedScriptPath, ScratchAssets.Folder + "/Normalize.asset"));
+            var asset = AssetDatabase.LoadAssetAtPath<UdonSharpProgramAsset>(ScratchAssets.Folder + "/Normalize.asset");
+            Assert.IsNotNull(asset);
 
             ScaffoldModule.NormalizeProgramAsset(asset); // settle into sorted order first
             bool secondCall = ScaffoldModule.NormalizeProgramAsset(asset);

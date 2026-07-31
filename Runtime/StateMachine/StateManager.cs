@@ -6,6 +6,7 @@ using VRC.SDK3.Data;
 namespace Tsvrc.StateMachine
 {
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
+    [TsWorldExtensionPoint("TsStateManager")]
     public class StateManager : TsvrcBehaviour
     {
         protected override bool IsTsvrcInternal => true;
@@ -112,7 +113,7 @@ namespace Tsvrc.StateMachine
 
         // Skips silently if no method name was registered, or if the registered
         // target's GameObject was destroyed since RegisterState (the target itself is
-        // never truly C#-null - RegisterState always defaults it to `this` - so the
+        // never truly C#-null, since RegisterState always defaults it to `this`, so the
         // cast-then-compare below is specifically checking Unity's overridden equality
         // for a destroyed object, not a real null reference).
         private void Dispatch(DataDictionary entry, string methodKey)

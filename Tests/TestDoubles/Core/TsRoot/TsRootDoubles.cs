@@ -19,17 +19,17 @@ namespace Tsvrc.Tests.EditMode
 
     public class MemoryOnlyTsRootDouble : TsRoot
     {
-        public TsMemory FakeMemory;
+        public TsvrcMemory FakeMemory;
 
-        public override TsMemory Memory => FakeMemory;
+        public override TsvrcMemory Memory => FakeMemory;
     }
 
     public class FullTsRootDouble : TsRoot
     {
         public Instance FakeInstance;
-        public TsMemory FakeMemory;
+        public TsvrcMemory FakeMemory;
 
         public override Instance Instance => FakeInstance;
-        public override TsMemory Memory => FakeMemory;
+        public override TsvrcMemory Memory => FakeMemory;
     }
 }

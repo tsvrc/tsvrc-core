@@ -10,25 +10,25 @@ namespace Tsvrc.Editor
     // only through TsGenerated.Log (or TsvrcBehaviour.LogInfo/LogWarning/LogError). Mirrors MemoryModule.
     internal class LogModule : TsModule
     {
-        // Package-relative, not a literal - see PackagePaths.
-        private static string LogScriptPath => $"{PackagePaths.Root}/Runtime/Utils/TsLogger.cs";
-        private static string LogAssetPath => $"{PackagePaths.Root}/Runtime/Utils/TsLogger.asset";
+        // Package-relative, not a literal, see PackagePaths.
+        private static string LogScriptPath => $"{PackagePaths.Root}/Runtime/Utils/TsvrcLogger.cs";
+        private static string LogAssetPath => $"{PackagePaths.Root}/Runtime/Utils/TsvrcLogger.asset";
 
         internal override string FileName => "TsGeneratedLog.cs";
 
         internal override string TabLabel => "Logging";
         internal override string TabDescription =>
-            "Configure the scene's TsLogger: the optional project tag shown after the always-present [TsVRC] framework tag, and which log levels are shown - independently for Tsvrc's own internal diagnostics and your world's own scripts. All levels are shown by default.";
+            "Configure the scene's TsvrcLogger: the optional project tag shown after the always-present [TsVRC] framework tag, and which log levels are shown, independently for Tsvrc's own internal diagnostics and your world's own scripts. All levels are shown by default.";
 
-        // Unlike other tabs, this data lives on the scene's TsLogger component, not TsConfig,
+        // Unlike other tabs, this data lives on the scene's TsvrcLogger component, not TsConfig,
         // so it builds its own SerializedObject instead of using the TsConfig-bound `so` param.
         internal override void DrawTab(SerializedObject so)
         {
-            var logger = (TsLogger)UnityEngine.Object.FindObjectOfType(typeof(TsLogger), true);
+            var logger = (TsvrcLogger)UnityEngine.Object.FindObjectOfType(typeof(TsvrcLogger), true);
             if (logger == null)
             {
                 EditorGUILayout.HelpBox(
-                    "No TsLogger found in the scene yet. Press Force Regenerate below to create it.",
+                    "No TsvrcLogger found in the scene yet. Press Force Regenerate below to create it.",
                     MessageType.Info);
                 return;
             }
@@ -41,7 +41,7 @@ namespace Tsvrc.Editor
 
             EditorGUILayout.Space(8);
             // No manual "Tsvrc Internal" label: _internalInfoEnabled carries [Header("Tsvrc Internal")]
-            // in TsLogger.cs, which PropertyField renders automatically.
+            // in TsvrcLogger.cs, which PropertyField renders automatically.
             EditorGUILayout.PropertyField(logSo.FindProperty("_internalInfoEnabled"), new GUIContent("Info"));
             EditorGUILayout.PropertyField(logSo.FindProperty("_internalWarningEnabled"), new GUIContent("Warning"));
             EditorGUILayout.PropertyField(logSo.FindProperty("_internalErrorEnabled"), new GUIContent("Error"));
@@ -67,9 +67,9 @@ namespace Tsvrc.Editor
             using (w.Namespace(ScaffoldModule.CompiledNamespace))
             using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
-                w.Line("[ReadOnly] [SerializeField] private TsLogger _log;");
+                w.Line("[ReadOnly] [SerializeField] private TsvrcLogger _log;");
                 w.BlankLine();
-                w.Line("public override TsLogger Log => _log;");
+                w.Line("public override TsvrcLogger Log => _log;");
                 w.BlankLine();
                 using (w.Method("public void _TsLogStart()"))
                     w.Line("_log.TsConstruct(this);");
@@ -85,7 +85,7 @@ namespace Tsvrc.Editor
             var root = FindRoot();
             if (root == null) return programAssetMissing;
 
-            ScaffoldModule.EnsureChildSceneObject("TsLogger", typeof(TsLogger), root);
+            ScaffoldModule.EnsureChildSceneObject("TsLogger", typeof(TsvrcLogger), root);
             return programAssetMissing;
         }
 
@@ -94,7 +94,7 @@ namespace Tsvrc.Editor
             var root = FindRoot();
             if (root == null) return;
 
-            var log = (Component)UnityEngine.Object.FindObjectOfType(typeof(TsLogger), true);
+            var log = (Component)UnityEngine.Object.FindObjectOfType(typeof(TsvrcLogger), true);
 
             var so = new SerializedObject(root);
             var prop = so.FindProperty("_log");

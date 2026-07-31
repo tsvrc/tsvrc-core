@@ -9,6 +9,7 @@ namespace Tsvrc.Core
     /// An enhanced <see cref="UdonSharpBehaviour"/> with structured initialization
     /// and dependency injection.
     /// </summary>
+    [TsWorldExtensionPoint("TsBehaviour")]
     public class TsvrcBehaviour : UdonSharpBehaviour
     {
         protected TsRoot _ts;
@@ -97,9 +98,9 @@ namespace Tsvrc.Core
             string[] keys = _subKeys;
             string[] callbacks = _subCallbacks;
             // Snapshotting _subCount here (a value type) means a reentrant TsSubscribe
-            // during this loop's iteration — which either writes into unused trailing
+            // during this loop's iteration, which either writes into unused trailing
             // capacity in the same array or, on grow, replaces the fields with new
-            // array instances — can never become visible within this TsEmit call.
+            // array instances, can never become visible within this TsEmit call.
             int len = _subCount;
             for (int i = 0; i < len; i++)
             {
@@ -107,7 +108,7 @@ namespace Tsvrc.Core
 
                 UdonSharpBehaviour listener = listeners[i];
 
-                // A listener that's truly null throws below — a bad subscription is a
+                // A listener that's truly null throws below. A bad subscription is a
                 // programmer error that should fail loudly. A listener whose GameObject
                 // was destroyed after subscribing is different: it was valid at
                 // subscribe time, so it's skipped instead of invoking a callback on a
@@ -131,7 +132,7 @@ namespace Tsvrc.Core
         /// <summary>
         /// <c>true</c> if this class belongs to the Tsvrc framework itself, <c>false</c> for a
         /// world's own scripts. Overridden to <c>true</c> once per framework base class (e.g.
-        /// <see cref="Process"/>, <see cref="TsMemory"/>) so every subclass inherits the
+        /// <see cref="Process"/>, <see cref="TsvrcMemory"/>) so every subclass inherits the
         /// correct classification automatically. Drives the Log*() methods below, which pass
         /// this to <c>_ts.Log</c> so the "Tsvrc Internal" and "Your World" log levels configured
         /// in Tsvrc &gt; Configure &gt; Logging can be shown/hidden independently.
@@ -148,9 +149,9 @@ namespace Tsvrc.Core
         /// </summary>
         protected void LogInfo(string message)
         {
-            TsLogger log = _ts != null ? _ts.Log : null;
+            TsvrcLogger log = _ts != null ? _ts.Log : null;
             if (log != null) { log.Info(GetUdonTypeName(), message, IsTsvrcInternal, this); return; }
-            Debug.Log(TsLogger.Format(string.Empty, GetUdonTypeName(), message), this);
+            Debug.Log(TsvrcLogger.Format(string.Empty, GetUdonTypeName(), message), this);
         }
 
         /// <summary>
@@ -163,9 +164,9 @@ namespace Tsvrc.Core
         /// </summary>
         protected void LogWarning(string message)
         {
-            TsLogger log = _ts != null ? _ts.Log : null;
+            TsvrcLogger log = _ts != null ? _ts.Log : null;
             if (log != null) { log.Warning(GetUdonTypeName(), message, IsTsvrcInternal, this); return; }
-            Debug.LogWarning(TsLogger.Format(string.Empty, GetUdonTypeName(), message), this);
+            Debug.LogWarning(TsvrcLogger.Format(string.Empty, GetUdonTypeName(), message), this);
         }
 
         /// <summary>
@@ -178,9 +179,9 @@ namespace Tsvrc.Core
         /// </summary>
         protected void LogError(string message)
         {
-            TsLogger log = _ts != null ? _ts.Log : null;
+            TsvrcLogger log = _ts != null ? _ts.Log : null;
             if (log != null) { log.Error(GetUdonTypeName(), message, IsTsvrcInternal, this); return; }
-            Debug.LogError(TsLogger.Format(string.Empty, GetUdonTypeName(), message), this);
+            Debug.LogError(TsvrcLogger.Format(string.Empty, GetUdonTypeName(), message), this);
         }
 
         protected virtual void TsStart() { }

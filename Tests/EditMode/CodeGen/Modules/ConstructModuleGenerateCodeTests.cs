@@ -76,7 +76,7 @@ namespace {ScaffoldModule.CompiledNamespace}
             var module = BuildModule(
                 Entry("A", "StateManager", "Tsvrc.StateMachine"),
                 Entry("B", "StateManager", "Tsvrc.StateMachine"),
-                Entry("C", "TsMemory", "Tsvrc.Utils"));
+                Entry("C", "TsvrcMemory", "Tsvrc.Utils"));
 
             string code = module.GenerateCode();
 

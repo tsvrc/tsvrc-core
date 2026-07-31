@@ -11,6 +11,14 @@ namespace Tsvrc.Tests.EditMode
     // AfterDomainReload() carries it through instead of gating on HasBootstrapSignal().
     public class TsGeneratorBootstrapPersistenceTests
     {
+        // Same real, permanent script location ScaffoldModuleWireTests points at, needed
+        // wherever a test must reach a genuinely settled AfterFilesStable() pass: without a
+        // real MonoScript on disk at ScaffoldFilePath, EnsureUdonSharpProgramAsset can never
+        // create the program asset, so ScaffoldModule.AfterFilesStable() reports
+        // programAssetMissing == true forever, which alone forces every Run() pass to take the
+        // write-then-stop branch and never actually reach Wire().
+        private const string TestGeneratedScriptPath = "Assets/Tsvrc/Tests/TestDoubles/CodeGen/TestGenerated.cs";
+
         private TsGeneratorTestHarness _harness;
         private TempSceneScope _scope;
 
@@ -62,6 +70,13 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void AfterDomainReload_WithPendingFlag_ConsumesAndClearsItBeforeRunning()
         {
+            // A real compiled root and a real MonoScript at ScaffoldFilePath are both required
+            // to actually reach a settled state (see TestGeneratedScriptPath's own doc comment);
+            // otherwise the program asset can never be created and every pass keeps re-arming
+            // the flag via the write-then-stop branch, regardless of what's under test here.
+            CompiledRootFixture.AddTo(_scope);
+            TsPaths.ScaffoldScriptPath = TestGeneratedScriptPath;
+
             // Prime the scratch folder first (same two-pass settle pattern
             // Run_ReachesWireWithoutFurtherWrites_LeavesIsBootstrapPendingFalse uses): a totally
             // empty scratch folder always has a write on its very first pass (nothing on disk
@@ -99,20 +114,28 @@ namespace Tsvrc.Tests.EditMode
         {
             // Once a pass completes without needing another write, the fully settled case, no
             // pending flag should be left behind for a future reload to misinterpret as a
-            // bootstrap request. This calls Run() twice: the first pass writes GenerateCode()'s
-            // output for this test's empty-config scene to the scratch folder and stops there,
-            // since WriteModules() returned true. The second pass sees that same content
-            // already on disk, so there is no diff, and it proceeds past the write-then-stop
-            // branches into Wire(). This mirrors the same two-pass settle pattern
-            // TsGeneratorWiringSuppressionTests uses, for the same reason: there is no other way
-            // to reach Wire() deterministically without a real domain reload in between.
+            // bootstrap request. Reaching that state from a cold scratch folder takes two Run()
+            // passes: the first writes GenerateCode()'s output for this test's empty-config scene
+            // and stops there, since WriteModules() returned true. The second sees that same
+            // content already on disk, so WriteModules() returns false, but AfterFilesStable()
+            // still has real, one-time scene setup left to do (LogModule and MemoryModule
+            // creating their TsLogger/TsMemory children, ScaffoldModule creating its program
+            // asset), which itself counts as a change and stops the pass again, re-arming the
+            // flag. Plain Run() never clears the flag on its own, only AfterDomainReload() does
+            // (it reads and clears it, then calls Run() with that value), so the actual pass
+            // under test here must go through AfterDomainReload(), exactly like a real automatic
+            // trigger would, not another direct Run() call.
             var root = CompiledRootFixture.AddTo(_scope);
+            TsPaths.ScaffoldScriptPath = TestGeneratedScriptPath;
             var configGo = _scope.CreateGameObject("TsConfig");
             configGo.transform.SetParent(root.transform);
             configGo.AddComponent<TsConfig>();
 
             TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
             TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
+            SessionState.SetBool("Tsvrc.PendingBootstrap", true);
+
+            TsGenerator.AfterDomainReload(skipRefresh: true);
 
             Assert.IsFalse(TsGenerator.IsBootstrapPending,
                 "A pass that reaches Wire() without writing anything new must not leave a stale pending flag.");
