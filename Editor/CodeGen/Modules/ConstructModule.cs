@@ -34,14 +34,20 @@ namespace Tsvrc.Editor
             // would bypass ApplySnapshotFallback below, meaning a compile-broken pass on a scene
             // that hasn't loaded TsConfig yet (or ever) would collapse a real snapshot to empty
             // when it should fall back to it, same as SingletonModule's handling of the same case.
-            var constructs = Array.Empty<TsvrcBehaviour>();
+            //
+            // Read as plain Object, not `as TsvrcBehaviour`: that cast silently drops any entry
+            // whose script currently has no compiled type (a "Missing (Mono Script)" component,
+            // typically because Assembly-CSharp is broken precisely because it's missing a field
+            // this module is responsible for generating), before Resolve() ever gets a chance to
+            // fall back to ScriptIndex for it. See TryResolveObjectType.
+            var constructs = Array.Empty<UnityEngine.Object>();
             if (sceneConfig != null)
             {
                 var so = new SerializedObject(sceneConfig);
                 var prop = so.FindProperty("Constructs");
-                constructs = new TsvrcBehaviour[prop.arraySize];
+                constructs = new UnityEngine.Object[prop.arraySize];
                 for (int i = 0; i < prop.arraySize; i++)
-                    constructs[i] = prop.GetArrayElementAtIndex(i).objectReferenceValue as TsvrcBehaviour;
+                    constructs[i] = prop.GetArrayElementAtIndex(i).objectReferenceValue;
             }
 
             var resolved = Resolve(constructs);
@@ -120,7 +126,7 @@ namespace Tsvrc.Editor
             ApplyAndMarkDirty(so, root);
         }
 
-        private static List<ConstructEntry> Resolve(TsvrcBehaviour[] constructs)
+        private static List<ConstructEntry> Resolve(UnityEngine.Object[] constructs)
         {
             if (constructs == null) return new List<ConstructEntry>();
 
@@ -128,31 +134,48 @@ namespace Tsvrc.Editor
             var usedNames = new HashSet<string>(StringComparer.Ordinal);
             var seen = new HashSet<UnityEngine.Object>();
 
-            foreach (var behaviour in constructs)
+            foreach (var obj in constructs)
             {
-                if (behaviour == null)
+                if (obj == null)
                 {
                     Debug.LogWarning("[ConstructModule] Null entry in Constructs config, remove the missing-script slot.");
                     continue;
                 }
-                if (!seen.Add(behaviour))
+                if (!seen.Add(obj))
                 {
-                    Debug.LogWarning($"[ConstructModule] Duplicate construct '{behaviour.name}' in config, remove the duplicate.");
+                    Debug.LogWarning($"[ConstructModule] Duplicate construct '{obj.name}' in config, remove the duplicate.");
                     continue;
                 }
 
-                var type = behaviour.GetType();
-                string goName = behaviour.gameObject.name;
-                string baseName = AliasName(goName) ?? type.Name;
+                if (!(obj is Component component))
+                {
+                    Debug.LogWarning($"[ConstructModule] '{obj.name}' is not a component. Constructs must be TsvrcBehaviours on a scene object.");
+                    continue;
+                }
+
+                if (!TryResolveObjectType(obj, out string typeName, out string ns))
+                {
+                    Debug.LogWarning($"[ConstructModule] Could not resolve a type for '{obj.name}'; its script may be missing. Skipping.");
+                    continue;
+                }
+
+                if (!IsTsvrcBehaviourType(typeName, ns))
+                {
+                    Debug.LogWarning($"[ConstructModule] '{obj.name}' ({typeName}) is not a TsvrcBehaviour. Skipping.");
+                    continue;
+                }
+
+                string goName = component.gameObject.name;
+                string baseName = AliasName(goName) ?? typeName;
                 string name = Deduplicate(baseName, usedNames);
                 usedNames.Add(name);
 
                 entries.Add(new ConstructEntry
                 {
                     Name = name,
-                    TypeName = type.Name,
-                    Namespace = type.Namespace ?? string.Empty,
-                    SourceObject = behaviour,
+                    TypeName = typeName,
+                    Namespace = ns,
+                    SourceObject = obj,
                 });
             }
 

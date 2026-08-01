@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using Tsvrc.Editor;
 using Tsvrc.Testing.Framework;
+using UnityEditor;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -317,6 +318,114 @@ namespace Tsvrc.Tests.EditMode
 
             Assert.IsTrue(ScriptIndex.DerivesFrom("TsvrcBehaviour", "TsvrcBehaviour"));
             Assert.IsTrue(ScriptIndex.DerivesFrom("Instance", "TsvrcBehaviour", "Tsvrc.Core"));
+        }
+
+        // TryResolveDeclaredType(string, string, ...): the pure logic half, used by
+        // TsModule.TryResolveViaScript to answer "what class/namespace does this script declare"
+        // independent of live reflection - the mechanism that makes SingletonModule and
+        // ConstructModule resilient to a currently-broken Assembly-CSharp compile.
+        [Test]
+        public void TryResolveDeclaredType_NullOrEmptyScriptName_ReturnsFalse()
+        {
+            Assert.IsFalse(ScriptIndex.TryResolveDeclaredType((string)null, "irrelevant", out _, out _));
+            Assert.IsFalse(ScriptIndex.TryResolveDeclaredType("", "irrelevant", out _, out _));
+        }
+
+        [Test]
+        public void TryResolveDeclaredType_UnambiguousNameAlreadyIndexed_ResolvesFromIndexWithoutParsingText()
+        {
+            Seed(new Dictionary<string, List<ScriptIndex.ClassInfo>>(System.StringComparer.Ordinal)
+            {
+                ["GameManager"] = new List<ScriptIndex.ClassInfo> { new ScriptIndex.ClassInfo("MoL.Game", "TsBehaviour") },
+            });
+
+            // Deliberately passes text that would parse to a *different* namespace, proving the
+            // already-unambiguous index entry is trusted rather than re-parsing this text.
+            bool result = ScriptIndex.TryResolveDeclaredType(
+                "GameManager", "namespace Other.Namespace { public class GameManager : TsBehaviour { } }",
+                out string typeName, out string ns);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual("GameManager", typeName);
+            Assert.AreEqual("MoL.Game", ns);
+        }
+
+        [Test]
+        public void TryResolveDeclaredType_NameNotYetIndexed_ParsesGivenTextDirectly()
+        {
+            Seed(new Dictionary<string, List<ScriptIndex.ClassInfo>>(System.StringComparer.Ordinal));
+
+            bool result = ScriptIndex.TryResolveDeclaredType(
+                "Foo", "namespace N { public class Foo : Bar { } }", out string typeName, out string ns);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual("Foo", typeName);
+            Assert.AreEqual("N", ns);
+        }
+
+        [Test]
+        public void TryResolveDeclaredType_AmbiguousNameInIndex_ParsesGivenTextToDisambiguate()
+        {
+            Seed(new Dictionary<string, List<ScriptIndex.ClassInfo>>(System.StringComparer.Ordinal)
+            {
+                ["Foo"] = new List<ScriptIndex.ClassInfo>
+                {
+                    new ScriptIndex.ClassInfo("A", "Bar"),
+                    new ScriptIndex.ClassInfo("B", "Baz"),
+                },
+            });
+
+            bool result = ScriptIndex.TryResolveDeclaredType(
+                "Foo", "namespace B { public class Foo : Baz { } }", out string typeName, out string ns);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual("Foo", typeName);
+            Assert.AreEqual("B", ns);
+        }
+
+        [Test]
+        public void TryResolveDeclaredType_NameNotFoundAnywhereIncludingGivenText_ReturnsFalse()
+        {
+            Seed(new Dictionary<string, List<ScriptIndex.ClassInfo>>(System.StringComparer.Ordinal));
+
+            bool result = ScriptIndex.TryResolveDeclaredType(
+                "Foo", "namespace N { public class SomethingElse { } }", out string typeName, out string ns);
+
+            Assert.IsFalse(result);
+        }
+
+        [Test]
+        public void TryResolveDeclaredType_MonoScriptOverload_NullScript_ReturnsFalse()
+        {
+            Assert.IsFalse(ScriptIndex.TryResolveDeclaredType((MonoScript)null, out _, out _));
+        }
+
+        [Test]
+        public void TryResolveDeclaredType_MonoScriptOverload_RealFrameworkScript_ResolvesRealNamespace()
+        {
+            // Exercised against Tsvrc's own real, stable MonoScript asset (StateManager),
+            // proving the MonoScript.name/.text -> string overload coupling works end to end,
+            // the same real-asset integration style as Rebuild_ScansRealProjectMonoScripts.
+            PrivateFieldAccess.SetField(typeof(ScriptIndex), "_baseByClass", null);
+            MonoScript script = FindRealMonoScript("StateManager");
+            Assert.IsNotNull(script, "Expected to find Tsvrc.StateMachine.StateManager's MonoScript in the project.");
+
+            bool result = ScriptIndex.TryResolveDeclaredType(script, out string typeName, out string ns);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual("StateManager", typeName);
+            Assert.AreEqual("Tsvrc.StateMachine", ns);
+        }
+
+        private static MonoScript FindRealMonoScript(string className)
+        {
+            foreach (var guid in UnityEditor.AssetDatabase.FindAssets($"t:MonoScript {className}"))
+            {
+                var path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                if (System.IO.Path.GetFileNameWithoutExtension(path) == className)
+                    return UnityEditor.AssetDatabase.LoadAssetAtPath<MonoScript>(path);
+            }
+            return null;
         }
     }
 }

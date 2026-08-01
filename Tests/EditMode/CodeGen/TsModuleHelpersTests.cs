@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using Tsvrc.Editor;
+using Tsvrc.StateMachine;
 using Tsvrc.Testing.Framework;
+using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -20,6 +22,12 @@ namespace Tsvrc.Tests.EditMode
 
         internal static bool CallIsTsvrcBehaviourType(string shortName, string ns)
             => IsTsvrcBehaviourType(shortName, ns);
+
+        internal static bool CallTryResolveObjectType(UnityEngine.Object obj, out string typeName, out string ns)
+            => TryResolveObjectType(obj, out typeName, out ns);
+
+        internal static bool CallTryResolveViaScript(Component component, out string typeName, out string ns)
+            => TryResolveViaScript(component, out typeName, out ns);
 
         // Uses a plain string as TEntry, since the fallback logic itself doesn't care about
         // entry shape, only about counts and the two conversion delegates, so a string keeps
@@ -289,6 +297,76 @@ namespace Tsvrc.Tests.EditMode
             // Confirms the fallback path is read only with respect to the snapshot file itself.
             // A broken compile pass must never persist its own, untrustworthy, reduced result.
             Assert.AreEqual(2, ModuleEntrySnapshot.Load(FallbackKey).Count);
+        }
+
+        // TryResolveObjectType/TryResolveViaScript: resolving a live Object's type name +
+        // namespace, falling back to ScriptIndex (via the component's own MonoScript) when
+        // reflection can't produce a real answer. See ScriptIndexTests for TryResolveDeclaredType's
+        // own ambiguous-name and fallback-parsing coverage.
+        //
+        // Deliberately reuses _fallbackScope (already created per-test by SetUpFallbackScope)
+        // instead of its own TempSceneScope: a second scope's Dispose() would call
+        // TsPaths.ResetToDefaults() unconditionally too, and depending on [TearDown] ordering
+        // that can fire before TearDownFallbackScope's own ModuleEntrySnapshot.Clear(), making it
+        // clear the wrong (already-reset-to-default) folder and leak snapshot state into a later
+        // ApplySnapshotFallback test - exactly the kind of cross-test leak these scopes exist to
+        // prevent.
+        [Test]
+        public void TryResolveObjectType_Null_ReturnsFalse()
+        {
+            Assert.IsFalse(TsModuleTestHarness.CallTryResolveObjectType(null, out _, out _));
+        }
+
+        [Test]
+        public void TryResolveObjectType_GameObject_ResolvesAsGameObjectViaFastPath()
+        {
+            var go = _fallbackScope.CreateGameObject("Anything");
+
+            bool result = TsModuleTestHarness.CallTryResolveObjectType(go, out string typeName, out string ns);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual("GameObject", typeName);
+            Assert.AreEqual("UnityEngine", ns);
+        }
+
+        [Test]
+        public void TryResolveObjectType_LiveCompiledComponent_ResolvesViaReflectionFastPath()
+        {
+            // StateManager is a real, always-compiled library type, so this exercises the fast
+            // path (obj.GetType() already gives a real concrete type) without needing the
+            // ScriptIndex fallback at all.
+            var go = _fallbackScope.CreateGameObject("Anything");
+            var behaviour = go.AddComponent<StateManager>();
+
+            bool result = TsModuleTestHarness.CallTryResolveObjectType(behaviour, out string typeName, out string ns);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual("StateManager", typeName);
+            Assert.AreEqual("Tsvrc.StateMachine", ns);
+        }
+
+        [Test]
+        public void TryResolveViaScript_NullComponent_ReturnsFalse()
+        {
+            Assert.IsFalse(TsModuleTestHarness.CallTryResolveViaScript(null, out _, out _));
+        }
+
+        [Test]
+        public void TryResolveViaScript_RealComponent_ResolvesItsOwnMonoScriptViaScriptIndex()
+        {
+            // Exercises the m_Script -> MonoScript -> ScriptIndex coupling directly against a
+            // real component's real backing script, independent of whether GetType() itself
+            // would have needed the fallback: Unity provides no supported way to construct an
+            // actual "Missing (Mono Script)" component from editor script to drive this
+            // end-to-end (AddComponent<MonoBehaviour> is rejected as abstract-for-attachment).
+            var go = _fallbackScope.CreateGameObject("Anything");
+            var behaviour = go.AddComponent<StateManager>();
+
+            bool result = TsModuleTestHarness.CallTryResolveViaScript(behaviour, out string typeName, out string ns);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual("StateManager", typeName);
+            Assert.AreEqual("Tsvrc.StateMachine", ns);
         }
     }
 }

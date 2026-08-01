@@ -124,6 +124,53 @@ namespace Tsvrc.Editor
                         yield return (kv.Key, info.Namespace);
         }
 
+        // Resolves the (simple class name, namespace) that a MonoScript's own source file
+        // declares, independent of whether that class currently compiles. Used when a live
+        // UnityEngine.Object reference's GetType() can't produce a real type - typically a
+        // "Missing (Mono Script)" component, because Assembly-CSharp currently has a compile
+        // error and this particular class has never yet been part of a successfully compiled
+        // assembly in this session (see TsModule.TryResolveObjectType). MonoScript.name always
+        // matches the declared class's simple name, a requirement Unity itself enforces for a
+        // script to be attachable as a component.
+        internal static bool TryResolveDeclaredType(MonoScript script, out string typeName, out string ns)
+        {
+            typeName = null;
+            ns = null;
+            if (script == null) return false;
+            return TryResolveDeclaredType(script.name, script.text, out typeName, out ns);
+        }
+
+        // Pure logic half of TryResolveDeclaredType, directly testable with synthetic inputs -
+        // no real MonoScript asset required. scriptName is the file's (and therefore the
+        // class's) simple name; scriptText is that file's full source.
+        internal static bool TryResolveDeclaredType(string scriptName, string scriptText, out string typeName, out string ns)
+        {
+            typeName = null;
+            ns = null;
+            if (string.IsNullOrEmpty(scriptName)) return false;
+
+            if (_baseByClass == null) Rebuild();
+
+            typeName = scriptName;
+            if (_baseByClass.TryGetValue(typeName, out var candidates) && candidates.Count == 1)
+            {
+                ns = candidates[0].Namespace;
+                return true;
+            }
+
+            // Zero or ambiguous (more than one) candidates in the project-wide index: parse
+            // this specific file's own text directly, so the answer is always this file's own
+            // declaration, never an unrelated same-named class elsewhere in the project.
+            var local = new Dictionary<string, List<ClassInfo>>(System.StringComparer.Ordinal);
+            ParseInto(scriptText, local);
+            if (local.TryGetValue(typeName, out var localMatches) && localMatches.Count > 0)
+            {
+                ns = localMatches[0].Namespace;
+                return true;
+            }
+            return false;
+        }
+
         // Internal (not private) so tests can exercise the parsing rules directly against
         // arbitrary source snippets without needing real MonoScript assets on disk.
         internal static void ParseInto(string source, Dictionary<string, List<ClassInfo>> target)

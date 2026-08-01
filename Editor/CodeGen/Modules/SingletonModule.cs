@@ -154,17 +154,22 @@ namespace Tsvrc.Editor
                     continue;
                 }
 
-                var type = obj.GetType();
+                if (!TryResolveObjectType(obj, out string typeName, out string ns))
+                {
+                    Debug.LogWarning($"[SingletonModule] Could not resolve a type for '{obj.name}'; its script may be missing. Skipping.");
+                    continue;
+                }
+
                 string goName = obj is Component c ? c.gameObject.name : (obj is GameObject go ? go.name : string.Empty);
-                string baseName = DeriveName(type, goName);
+                string baseName = DeriveName(typeName, goName);
                 string name = Deduplicate(baseName, usedNames);
                 usedNames.Add(name);
 
                 entries.Add(new SingletonEntry
                 {
                     Name = name,
-                    TypeName = type.Name,
-                    Namespace = type.Namespace ?? string.Empty,
+                    TypeName = typeName,
+                    Namespace = ns,
                     SourceObject = obj,
                 });
             }
@@ -172,11 +177,11 @@ namespace Tsvrc.Editor
             return entries;
         }
 
-        private static string DeriveName(Type type, string goName)
+        private static string DeriveName(string typeName, string goName)
         {
-            if (type == typeof(Animator))
+            if (typeName == "Animator")
                 return (AliasName(goName) ?? goName) + "Animator";
-            return AliasName(goName) ?? type.Name;
+            return AliasName(goName) ?? typeName;
         }
 
         private struct SingletonEntry

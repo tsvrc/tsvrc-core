@@ -82,6 +82,51 @@ namespace Tsvrc.Editor
             return ScriptIndex.DerivesFrom(shortName, "TsvrcBehaviour", ns);
         }
 
+        // Resolves the type name + namespace backing a live scene Object reference, preferring
+        // fast live reflection but falling back to ScriptIndex - source text scanning,
+        // independent of compile state - when reflection can't produce a real answer. A
+        // "Missing (Mono Script)" component, typically a world script that has never yet been
+        // part of a successfully compiled assembly because it needs a field this very generator
+        // pass is responsible for producing, always reports GetType() as exactly
+        // typeof(MonoBehaviour), never a concrete subclass, so that exact check is what signals
+        // "hand off to the fallback" rather than a null check. A GameObject or any other Object
+        // type always reflects normally and never needs the fallback. Mirrors
+        // IsTsvrcBehaviourType's identical two-tier shape, applied to resolving a type's
+        // identity instead of testing its base-class membership.
+        protected static bool TryResolveObjectType(UnityEngine.Object obj, out string typeName, out string ns)
+        {
+            typeName = null;
+            ns = null;
+            if (obj == null) return false;
+
+            var type = obj.GetType();
+            if (!(obj is Component) || type != typeof(MonoBehaviour))
+            {
+                typeName = type.Name;
+                ns = type.Namespace ?? string.Empty;
+                return true;
+            }
+
+            return TryResolveViaScript((Component)obj, out typeName, out ns);
+        }
+
+        // Split out from TryResolveObjectType so tests can exercise the ScriptIndex-backed
+        // fallback directly against a real component's real MonoScript, without needing to
+        // construct an actual "Missing (Mono Script)" component - Unity provides no supported
+        // way to do that from editor script (AddComponent<MonoBehaviour> is rejected as
+        // abstract-for-attachment).
+        protected static bool TryResolveViaScript(Component component, out string typeName, out string ns)
+        {
+            typeName = null;
+            ns = null;
+            if (component == null) return false;
+
+            var so = new SerializedObject(component);
+            var scriptProp = so.FindProperty("m_Script");
+            var script = scriptProp?.objectReferenceValue as MonoScript;
+            return ScriptIndex.TryResolveDeclaredType(script, out typeName, out ns);
+        }
+
         // If the current pass resolved fewer live entries than the last known good snapshot
         // while the project's compile is currently broken, the live result is untrustworthy: a
         // broken Assembly-CSharp nulls out every scene reference to a component declared in it.
