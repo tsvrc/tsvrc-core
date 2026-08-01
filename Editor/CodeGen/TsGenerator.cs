@@ -111,15 +111,26 @@ namespace Tsvrc.Editor
         [MenuItem("Tsvrc/Force Regenerate", priority = 21)]
         public static void ManualGenerate()
         {
+            // RunCore's own IsConfiguredButNotLoaded guard already makes Run() a real no-op here,
+            // but without this check "Regenerated." would still log unconditionally below,
+            // falsely implying it acted on the scene that's actually open. ValidateManualGenerate
+            // already greys the menu item out for this same reason; this covers the Configure
+            // window's button, which calls this directly rather than going through the menu.
+            if (TsLinkedScene.IsConfiguredButNotLoaded)
+            {
+                Debug.LogWarning($"[Tsvrc] Linked scene '{TsLinkedScene.ScenePath}' is not open - nothing to regenerate. Open it first.");
+                return;
+            }
             Run(allowBootstrap: true);
             Debug.Log("[Tsvrc] Regenerated.");
         }
 
-        // Greys the menu item out during play mode instead of letting the click silently no-op.
-        // Run() itself already bails on isPlayingOrWillChangePlaymode, so this is purely a UX
-        // improvement, not a correctness guard.
+        // Greys the menu item out during play mode or while the linked scene isn't open, instead
+        // of letting the click silently no-op (play mode) or misleadingly log success against the
+        // wrong scene (ManualGenerate's own IsConfiguredButNotLoaded check otherwise catches this
+        // too, but graying the menu item out is friendlier than letting the click happen at all).
         [MenuItem("Tsvrc/Force Regenerate", true)]
-        private static bool ValidateManualGenerate() => !EditorApplication.isPlayingOrWillChangePlaymode;
+        private static bool ValidateManualGenerate() => !EditorApplication.isPlayingOrWillChangePlaymode && !TsLinkedScene.IsConfiguredButNotLoaded;
 
         // The automatic post-compile trigger, called by TsDomainReloadHandler. Consumes the
         // pending bootstrap flag set by a prior Run(allowBootstrap: true) that had to stop for a
@@ -186,6 +197,20 @@ namespace Tsvrc.Editor
 
             var modules = CreateModules();
 
+            // Checked once here, not once per module, even though Singleton/Pool/Factory each
+            // independently read TsBuiltinConfig.
+            if (TsModule.IsBuiltinConfigMissing())
+                Debug.LogWarning($"[Tsvrc] Builtin config asset is missing at '{TsModule.BuiltinConfigPath}' - " +
+                    "library-provided singletons/pool prefabs/factories will not be included until it's restored.");
+
+            // TsLinkedScene.Find<TsConfig>() itself now silently returns null on an ambiguous
+            // match; this is the one place that turns that into a specific diagnostic naming
+            // every duplicate's Hierarchy path, mirroring InstanceModule's own "multiple
+            // subclasses found" pattern instead of leaving it a silent, arbitrary pick.
+            var configWarning = DetermineAmbiguousConfigWarning(TsLinkedScene.FindAll<TsConfig>());
+            if (configWarning != null)
+                Debug.LogError(configWarning);
+
             foreach (var module in modules)
                 module.LoadConfig();
 
@@ -228,8 +253,10 @@ namespace Tsvrc.Editor
                 return;
             }
 
+            // Scoped to the linked scene: an unrelated compiled-type instance in an additively-
+            // loaded scene must never gate Wire() open or shut for the scene actually being edited.
             var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType != null && UnityEngine.Object.FindObjectOfType(compiledType, true) != null)
+            if (compiledType != null && TsLinkedScene.FindType(compiledType) != null)
             {
                 _isWiring = true;
                 try { foreach (var module in modules) module.Wire(); }
@@ -355,6 +382,16 @@ namespace Tsvrc.Editor
             new ScaffoldModule(),
         };
 
+        // Pure so it's directly unit-testable without a real scene. Returns null when there's
+        // nothing to warn about (0 or 1 TsConfig found).
+        internal static string DetermineAmbiguousConfigWarning(List<TsConfig> found)
+        {
+            if (found == null || found.Count <= 1) return null;
+            var paths = found.Select(c => ScaffoldModule.GameObjectPath(c.gameObject));
+            return $"[Tsvrc] Multiple TsConfig components found in the linked scene ({string.Join(", ", paths)}). " +
+                "Exactly one is required; leaving the current wiring untouched until the duplicate is removed.";
+        }
+
         // Any field name exposed by more than one module is stripped from every module that
         // declared it, so a collision never silently produces two same named fields on
         // TsGenerated. Only SingletonModule currently overrides ExposedFieldNames() and
@@ -389,7 +426,23 @@ namespace Tsvrc.Editor
             foreach (var module in modules)
             {
                 if (module.FileName == null) continue;
-                written |= WriteIfChanged($"{TsPaths.GeneratedFolder}/{module.FileName}", module.GenerateCode());
+                // A locked file, a full disk, or a read-only checkout degrades to "this pass
+                // didn't complete, try again next time" instead of an uncaught exception aborting
+                // the loop mid-pass. Stops attempting further modules rather than compounding the
+                // uncertainty; whichever modules already succeeded remain individually complete
+                // and valid (see WriteIfChanged's atomic write below), and the normal
+                // hierarchyChanged/domain-reload triggers retry a future pass on their own.
+                try
+                {
+                    written |= WriteIfChanged($"{TsPaths.GeneratedFolder}/{module.FileName}", module.GenerateCode());
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[Tsvrc] Failed to write '{module.FileName}': {e.Message}. Fix the underlying " +
+                        "issue (e.g. a locked file, a full disk, a read-only checkout) - this will retry " +
+                        "automatically on the next change, or via Tsvrc > Force Regenerate.");
+                    return written;
+                }
             }
             return written;
         }
@@ -399,18 +452,23 @@ namespace Tsvrc.Editor
         // on every Run() even when nothing changed.
         private static bool WriteIfChanged(string assetPath, string content)
         {
-            string fullPath = ToFullPath(assetPath);
+            string fullPath = TsPaths.ToFullPath(assetPath);
             if (File.Exists(fullPath) && File.ReadAllText(fullPath, Encoding.UTF8) == content)
                 return false;
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
-            File.WriteAllText(fullPath, content, Encoding.UTF8);
-            return true;
-        }
 
-        private static string ToFullPath(string assetPath)
-        {
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            return Path.Combine(projectRoot, assetPath.Replace('/', Path.DirectorySeparatorChar));
+            // Written to a temp file first, then atomically swapped into place, so a crash or
+            // power loss exactly mid-write can never leave a truncated file behind: fullPath is
+            // always either the complete previous version or the complete new one. The .tmp file
+            // itself isn't written atomically, but nothing ever reads it directly, so a crash in
+            // the narrow window before the swap only leaves a harmless stray .tmp on disk.
+            string tempPath = fullPath + ".tmp";
+            File.WriteAllText(tempPath, content, Encoding.UTF8);
+            if (File.Exists(fullPath))
+                File.Replace(tempPath, fullPath, null);
+            else
+                File.Move(tempPath, fullPath);
+            return true;
         }
     }
 }

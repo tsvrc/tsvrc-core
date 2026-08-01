@@ -1,7 +1,10 @@
 using System.IO;
+using System.Reflection;
 using NUnit.Framework;
 using Tsvrc.Editor;
 using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -19,17 +22,25 @@ namespace Tsvrc.Tests.EditMode
         [TearDown]
         public void TearDown() => _harness.Dispose();
 
+        // ScenePath persists as the linked scene's GUID (see TsLinkedSceneConfig), which requires
+        // a real SceneAsset to resolve from - saves the harness's scene to scratch, links it,
+        // then swaps the active scene away so it's genuinely unloaded rather than merely unsaved.
+        // Shared by every test below that needs the "configured but not loaded" state, so the
+        // real-scene setup dance lives in exactly one place.
+        private string LinkRealSceneButLeaveItUnloaded([System.Runtime.CompilerServices.CallerMemberName] string callerName = "")
+        {
+            TsLinkedScene.ClearOverride();
+            string linkedPath = $"{ScratchAssets.Folder}/{callerName}Linked.unity";
+            EditorSceneManager.SaveScene(_harness.Scope.Scene, linkedPath);
+            TsLinkedScene.ScenePath = linkedPath;
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            return linkedPath;
+        }
+
         [Test]
         public void Run_LinkedSceneConfiguredButNotLoaded_WritesNothingAndDoesNotThrow()
         {
-            // TempSceneScope's own override (see its constructor) would otherwise make
-            // TsLinkedScene.IsConfigured false regardless of what's set below - cleared here
-            // since this test is specifically about the real, non-override ScenePath path.
-            TsLinkedScene.ClearOverride();
-            // Setting ScenePath itself creates GeneratedFolder, to hold TsLinkedSceneConfig.asset
-            // - that's not what's under test here, so the assertion below checks for generated
-            // .cs files specifically, not the folder's mere existence.
-            TsLinkedScene.ScenePath = "Assets/DoesNotExist/Nowhere.unity";
+            LinkRealSceneButLeaveItUnloaded();
             Assert.IsTrue(TsLinkedScene.IsConfiguredButNotLoaded, "Precondition for this test.");
 
             // allowBootstrap: true, matching how every other CodeGen test drives Run() directly,
@@ -60,5 +71,32 @@ namespace Tsvrc.Tests.EditMode
 
         private static string[] GeneratedCsFiles() =>
             Directory.Exists(TsPaths.GeneratedFolder) ? Directory.GetFiles(TsPaths.GeneratedFolder, "*.cs") : new string[0];
+
+        [Test]
+        public void ManualGenerate_LinkedSceneConfiguredButNotLoaded_LogsWarningAndWritesNothing()
+        {
+            LinkRealSceneButLeaveItUnloaded();
+
+            LogAssert.Expect(LogType.Warning,
+                $"[Tsvrc] Linked scene '{TsLinkedScene.ScenePath}' is not open - nothing to regenerate. Open it first.");
+            TsGenerator.ManualGenerate();
+
+            CollectionAssert.IsEmpty(GeneratedCsFiles(),
+                "ManualGenerate() must not write anything when the linked scene isn't loaded.");
+        }
+
+        // ValidateManualGenerate is private (it's a MenuItem validate function, never called
+        // directly by production code), so reached via reflection here - the same pattern used
+        // elsewhere in this suite for other MenuItem validate functions.
+        [Test]
+        public void ValidateManualGenerate_LinkedSceneConfiguredButNotLoaded_ReturnsFalse()
+        {
+            LinkRealSceneButLeaveItUnloaded();
+
+            var method = typeof(TsGenerator).GetMethod("ValidateManualGenerate", BindingFlags.NonPublic | BindingFlags.Static);
+            bool result = (bool)method.Invoke(null, null);
+
+            Assert.IsFalse(result, "The menu item must be greyed out while the linked scene isn't open.");
+        }
     }
 }

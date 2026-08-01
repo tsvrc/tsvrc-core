@@ -11,9 +11,9 @@ using UnityEngine;
 namespace Tsvrc.Editor
 {
     // Generates the Language enum, SetLanguage(), Translate(), and _TsApplyTranslationBatch()
-    // on TsGenerated from JSON language files. Translation targets are discovered by
-    // scanning the scene for TextMeshProUGUI components whose GameObject name matches the
-    // _key_ pattern and appears in at least one language file.
+    // on TsGenerated from JSON language files. Translation targets are discovered by scanning
+    // the linked scene (see TsLinkedScene) for TextMeshProUGUI components whose GameObject name
+    // matches the _key_ pattern and appears in at least one language file.
     internal class TranslationModule : TsModule
     {
         internal static string ConfigAssetPath => TsPaths.GeneratedFolder + "/TsTranslationConfig.asset";
@@ -221,7 +221,7 @@ namespace Tsvrc.Editor
         private List<TMPro.TextMeshProUGUI> FindTmpTargets()
         {
             var result = new List<TMPro.TextMeshProUGUI>();
-            foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TextMeshProUGUI>(true))
+            foreach (var tmp in TsLinkedScene.FindAll<TMPro.TextMeshProUGUI>())
                 if (TmpTargetPattern.IsMatch(tmp.gameObject.name) && _translationKeys.Contains(tmp.gameObject.name))
                     result.Add(tmp);
             return result;
@@ -247,7 +247,9 @@ namespace Tsvrc.Editor
             return result;
         }
 
-        private static LanguageEntry? ParseLanguageJson(string assetName, string json)
+        // internal, not private: shared with TsTranslationWindow's own file-list preview, so
+        // what's previewed in the Configure window always matches what a real regenerate parses.
+        internal static LanguageEntry? ParseLanguageJson(string assetName, string json)
         {
             try
             {
@@ -332,7 +334,7 @@ namespace Tsvrc.Editor
                 .Replace("\r", "\\r")
                 .Replace("\t", "\\t");
 
-        private struct LanguageEntry
+        internal struct LanguageEntry
         {
             public string Key;
             public string Label;

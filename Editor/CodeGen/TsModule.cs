@@ -18,7 +18,15 @@ namespace Tsvrc.Editor
     // state, read through FindRoot or FindObjectOfType, is safe to read across modules.
     internal abstract class TsModule
     {
-        protected static string BuiltinConfigPath => $"{PackagePaths.Root}/Runtime/Config/TsBuiltinConfig.asset";
+        // internal, not protected: TsGenerator and TsWindow also need this (see
+        // IsBuiltinConfigMissing below), not just the modules that read builtin entries from it.
+        internal static string BuiltinConfigPath => $"{PackagePaths.Root}/Runtime/Config/TsBuiltinConfig.asset";
+
+        // Singleton/Pool/Factory each treat a missing TsBuiltinConfig as "no builtins" with no
+        // warning. Checking it once here lets RunCore log a single shared warning instead of
+        // three identical ones, and lets TsWindow surface it as a persistent status.
+        internal static bool IsBuiltinConfigMissing() =>
+            AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(BuiltinConfigPath) == null;
 
         // Null when a module contributes no generated file of its own, for example when it only
         // wires data into another module's class. WriteModules() skips writing in that case.
@@ -166,9 +174,36 @@ namespace Tsvrc.Editor
                 return resolved;
             }
 
+            WarnIfBelowLastKnownGood(moduleKey, resolved.Count);
             ModuleEntrySnapshot.Save(moduleKey, resolved.Select(toSnapshot).ToList());
             return resolved;
         }
+
+        // A clean compile with fewer entries than last time is treated as the user genuinely
+        // wanting them gone (see the compile-broken branch above, which this doesn't touch), but
+        // that also makes an accidental deletion (e.g. the TsConfig GameObject removed from the
+        // Hierarchy) invisible, since the pass that loses the data looks like an ordinary
+        // regenerate. This can't block the pass outright, since a deliberate deletion via
+        // Configure's own delete button must stay fast, so it warns instead: a rolling "last
+        // known good" count, tracked separately from the compile-broken snapshot above, that only
+        // ever rises. A drop below it is always a real regression relative to the true high-water
+        // mark, never a target that quietly moves down to match whatever just happened.
+        private static void WarnIfBelowLastKnownGood(string moduleKey, int resolvedCount)
+        {
+            string lastKnownGoodKey = LastKnownGoodSnapshotKey(moduleKey);
+            int? lastKnownGood = ModuleEntrySnapshot.LoadCount(lastKnownGoodKey);
+
+            if (lastKnownGood.HasValue && lastKnownGood.Value > resolvedCount)
+                Debug.LogWarning($"[{moduleKey}] This regenerate resolved fewer entries ({resolvedCount}) than the " +
+                    $"last known-good count ({lastKnownGood.Value}), on an otherwise clean compile. If this wasn't " +
+                    "intentional (for example the TsConfig object was accidentally deleted from the Hierarchy), " +
+                    "check Tsvrc > Configure and Undo before this state is overwritten again.");
+
+            if (!lastKnownGood.HasValue || resolvedCount >= lastKnownGood.Value)
+                ModuleEntrySnapshot.SaveCount(lastKnownGoodKey, resolvedCount);
+        }
+
+        private static string LastKnownGoodSnapshotKey(string moduleKey) => $"{moduleKey}.LastKnownGood";
 
         // Extracts the alias text from a __Alias__ GameObject name convention.
         // Returns null if the name does not follow the convention.

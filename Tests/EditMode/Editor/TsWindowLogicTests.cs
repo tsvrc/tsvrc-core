@@ -61,16 +61,78 @@ namespace Tsvrc.Tests.EditMode
             StringAssert.DoesNotContain("not yet", message);
         }
 
+        // DrawLinkedScene's own warning box, drawn directly above this one, already explains the
+        // "configured but not loaded" state in full, so this shows nothing at all for that state
+        // rather than a second, contradictory box ("click to get started" next to "open it").
+        [Test]
+        public void DetermineStatus_ConfiguredButNotLoaded_ReturnsNoMessage()
+        {
+            var (message, type) = TsWindow.DetermineStatus(
+                hasConfig: false, isBootstrapPending: false, isPlayMode: false, isConfiguredButNotLoaded: true);
+
+            Assert.IsNull(message);
+        }
+
+        [Test]
+        public void DetermineStatus_ConfiguredButNotLoaded_TakesPrecedenceOverHasConfig()
+        {
+            var (message, type) = TsWindow.DetermineStatus(
+                hasConfig: true, isBootstrapPending: false, isPlayMode: false, isConfiguredButNotLoaded: true);
+
+            Assert.IsNull(message,
+                "Even a config resolved via the legacy fallback must not produce a second, contradictory box.");
+        }
+
+        // A working setup (hasConfig true, e.g. via the legacy "search whatever scene is open"
+        // fallback) that was never actually linked leaves the entire corruption-safety net
+        // silently off, with nothing in the window telling the user to link it.
+        [Test]
+        public void DetermineStatus_HasConfigButNotLinked_WarnsToLinkThisScene()
+        {
+            var (message, type) = TsWindow.DetermineStatus(
+                hasConfig: true, isBootstrapPending: false, isPlayMode: false, isLinked: false);
+
+            Assert.AreEqual(MessageType.Warning, type);
+            StringAssert.Contains("no scene is linked yet", message);
+        }
+
+        [Test]
+        public void DetermineStatus_HasConfigAndIsLinked_ReturnsPlainReadyMessage()
+        {
+            var (message, type) = TsWindow.DetermineStatus(
+                hasConfig: true, isBootstrapPending: false, isPlayMode: false, isLinked: true);
+
+            Assert.AreEqual("Tsvrc is set up.", message);
+        }
+
         [Test]
         public void DetermineActionLabel_NoConfig_ReturnsInitialize()
         {
-            Assert.AreEqual("Initialize Tsvrc", TsWindow.DetermineActionLabel(hasConfig: false));
+            Assert.AreEqual("Initialize Tsvrc", TsWindow.DetermineActionLabel(hasConfig: false, isConfiguredButNotLoaded: false));
         }
 
         [Test]
         public void DetermineActionLabel_HasConfig_ReturnsForceRegenerate()
         {
-            Assert.AreEqual("Force Regenerate", TsWindow.DetermineActionLabel(hasConfig: true));
+            Assert.AreEqual("Force Regenerate", TsWindow.DetermineActionLabel(hasConfig: true, isConfiguredButNotLoaded: false));
+        }
+
+        [Test]
+        public void DetermineActionLabel_ConfiguredButNotLoaded_ReturnsOpenLinkedSceneRegardlessOfConfig()
+        {
+            Assert.AreEqual("Open Linked Scene", TsWindow.DetermineActionLabel(hasConfig: false, isConfiguredButNotLoaded: true));
+            Assert.AreEqual("Open Linked Scene", TsWindow.DetermineActionLabel(hasConfig: true, isConfiguredButNotLoaded: true));
+        }
+
+        // Once the linked scene asset is confirmed gone (not merely unloaded), "open it" is a
+        // dead-end action; this must win over "not loaded" (a genuinely missing asset also
+        // satisfies isConfiguredButNotLoaded, since IsConfiguredButMissing is a strict subset).
+        [Test]
+        public void DetermineActionLabel_ConfiguredButMissing_ReturnsLinkedSceneMissingNotOpenLinkedScene()
+        {
+            string label = TsWindow.DetermineActionLabel(hasConfig: false, isConfiguredButNotLoaded: true, isConfiguredButMissing: true);
+
+            Assert.AreEqual("Linked Scene Missing", label);
         }
 
         [Test]
@@ -86,7 +148,13 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void IsActionEnabled_WhenNeitherPendingNorPlayMode_ReturnsTrue()
+        public void IsActionEnabled_WhenConfiguredButMissing_ReturnsFalse()
+        {
+            Assert.IsFalse(TsWindow.IsActionEnabled(isBootstrapPending: false, isPlayMode: false, isConfiguredButMissing: true));
+        }
+
+        [Test]
+        public void IsActionEnabled_WhenNeitherPendingNorPlayModeNorMissing_ReturnsTrue()
         {
             Assert.IsTrue(TsWindow.IsActionEnabled(isBootstrapPending: false, isPlayMode: false));
         }
@@ -108,6 +176,14 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
+        public void DetermineActionDisabledReason_ConfiguredButMissing_MentionsPickingANewScene()
+        {
+            string reason = TsWindow.DetermineActionDisabledReason(isBootstrapPending: false, isPlayMode: false, isConfiguredButMissing: true);
+
+            StringAssert.Contains("no longer exists", reason);
+        }
+
+        [Test]
         public void DetermineActionDisabledReason_NeitherFlag_ReturnsNull()
         {
             Assert.IsNull(TsWindow.DetermineActionDisabledReason(isBootstrapPending: false, isPlayMode: false));
@@ -119,15 +195,69 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void DetermineLinkedSceneWarning_NotConfiguredButNotLoaded_ReturnsNull()
         {
-            Assert.IsNull(TsWindow.DetermineLinkedSceneWarning("Assets/Foo.unity", isConfiguredButNotLoaded: false));
+            Assert.IsNull(TsWindow.DetermineLinkedSceneWarning("Assets/Foo.unity", isConfiguredButNotLoaded: false, isConfiguredButMissing: false));
         }
 
         [Test]
         public void DetermineLinkedSceneWarning_ConfiguredButNotLoaded_MentionsScenePath()
         {
-            string message = TsWindow.DetermineLinkedSceneWarning("Assets/MoL/Scenes/MoL.unity", isConfiguredButNotLoaded: true);
+            string message = TsWindow.DetermineLinkedSceneWarning("Assets/MoL/Scenes/MoL.unity", isConfiguredButNotLoaded: true, isConfiguredButMissing: false);
 
             StringAssert.Contains("Assets/MoL/Scenes/MoL.unity", message);
+        }
+
+        // A genuinely deleted linked scene asset gets its own message: "open it" isn't a real
+        // recovery action once the asset itself is gone, so this must win over the generic "not
+        // currently open" wording even though IsConfiguredButMissing implies NotLoaded too.
+        [Test]
+        public void DetermineLinkedSceneWarning_ConfiguredButMissing_ReturnsDistinctMessageNotTheNotLoadedOne()
+        {
+            string message = TsWindow.DetermineLinkedSceneWarning("Assets/Gone.unity", isConfiguredButNotLoaded: true, isConfiguredButMissing: true);
+
+            StringAssert.Contains("no longer exists", message);
+            StringAssert.DoesNotContain("not currently open", message);
+        }
+
+        // TsLinkedSceneConfig.asset lost (a bad clone, an accidental delete) while real generated
+        // content still sits on disk proves a link used to exist and is now gone, which needs a
+        // loud warning instead of silently reverting to legacy unscoped behavior with no symptom
+        // at all.
+        [Test]
+        public void DetermineMissingLinkWarning_NotConfiguredButGeneratedContentExists_WarnsLoudly()
+        {
+            string message = TsWindow.DetermineMissingLinkWarning(isConfigured: false, generatedScaffoldFileExists: true);
+
+            StringAssert.Contains("TsLinkedSceneConfig.asset", message);
+        }
+
+        [Test]
+        public void DetermineMissingLinkWarning_NotConfiguredAndNoGeneratedContent_ReturnsNull()
+        {
+            // The ordinary first-run case: nothing to warn about, this is the expected default.
+            Assert.IsNull(TsWindow.DetermineMissingLinkWarning(isConfigured: false, generatedScaffoldFileExists: false));
+        }
+
+        [Test]
+        public void DetermineMissingLinkWarning_Configured_ReturnsNullRegardlessOfGeneratedContent()
+        {
+            Assert.IsNull(TsWindow.DetermineMissingLinkWarning(isConfigured: true, generatedScaffoldFileExists: true));
+        }
+
+        // A missing TsBuiltinConfig.asset (package-shipped, so a bad submodule update or merge
+        // can lose it for the whole team at once) silently drops every library-provided
+        // Singleton/pool prefab/Factory group with no other symptom.
+        [Test]
+        public void DetermineBuiltinConfigWarning_Missing_MentionsTheAssetPath()
+        {
+            string message = TsWindow.DetermineBuiltinConfigWarning(isBuiltinConfigMissing: true);
+
+            StringAssert.Contains(TsModule.BuiltinConfigPath, message);
+        }
+
+        [Test]
+        public void DetermineBuiltinConfigWarning_NotMissing_ReturnsNull()
+        {
+            Assert.IsNull(TsWindow.DetermineBuiltinConfigWarning(isBuiltinConfigMissing: false));
         }
 
         [Test]

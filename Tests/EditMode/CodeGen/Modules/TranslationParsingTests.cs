@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -10,13 +9,13 @@ using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TranslationModule's parsing/formatting helpers are all private (static methods,
-    // an instance method, and a private nested LanguageEntry struct), none reachable via
-    // InternalsVisibleTo — everything here goes through reflection.
+    // SanitizeIdentifier/EscapeString/_languages/BuildEnumNames are private (static/instance
+    // members), unreachable via InternalsVisibleTo, so those go through reflection.
+    // ParseLanguageJson and LanguageEntry are internal (shared with TsTranslationWindow's own
+    // preview - see TranslationWindowRegexTests), so those are called directly.
     public class TranslationParsingTests
     {
         private static readonly Type ModuleType = typeof(TranslationModule);
-        private static readonly Type LanguageEntryType = ModuleType.GetNestedType("LanguageEntry", BindingFlags.NonPublic);
 
         private static string SanitizeIdentifier(string s)
         {
@@ -32,35 +31,13 @@ namespace Tsvrc.Tests.EditMode
             return (string)m.Invoke(null, new object[] { s });
         }
 
-        // Returns null if parsing failed (LanguageEntry? was empty), otherwise the boxed
-        // private LanguageEntry struct — read its Key/Label/Entries fields via reflection.
-        private static object ParseLanguageJson(string assetName, string json)
-        {
-            MethodInfo m = ModuleType.GetMethod("ParseLanguageJson", BindingFlags.NonPublic | BindingFlags.Static);
-            Assert.IsNotNull(m, "TranslationModule.ParseLanguageJson method changed or was removed.");
-            return m.Invoke(null, new object[] { assetName, json });
-        }
-
-        private static string EntryField(object entry, string field) => (string)LanguageEntryType.GetField(field).GetValue(entry);
-
-        private static Dictionary<string, string> EntryEntries(object entry)
-            => (Dictionary<string, string>)LanguageEntryType.GetField("Entries").GetValue(entry);
-
         // Builds the private List<LanguageEntry> _languages state and invokes the private
         // instance method BuildEnumNames(), returning the resulting names in order.
         private static List<string> BuildEnumNames(params (string key, string label)[] languages)
         {
-            Type listType = typeof(List<>).MakeGenericType(LanguageEntryType);
-            var typedList = (IList)Activator.CreateInstance(listType);
-
+            var typedList = new List<TranslationModule.LanguageEntry>();
             foreach (var (key, label) in languages)
-            {
-                object entry = Activator.CreateInstance(LanguageEntryType);
-                LanguageEntryType.GetField("Key").SetValue(entry, key);
-                LanguageEntryType.GetField("Label").SetValue(entry, label);
-                LanguageEntryType.GetField("Entries").SetValue(entry, new Dictionary<string, string>());
-                typedList.Add(entry);
-            }
+                typedList.Add(new TranslationModule.LanguageEntry { Key = key, Label = label, Entries = new Dictionary<string, string>() });
 
             object moduleInstance = new TranslationModule();
             FieldInfo languagesField = ModuleType.GetField("_languages", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -146,7 +123,7 @@ namespace Tsvrc.Tests.EditMode
         {
             LogAssert.Expect(LogType.Error, new Regex(@"^\[TranslationModule\] Failed to parse 'broken': .*"));
 
-            Assert.IsNull(ParseLanguageJson("broken", "not json{"));
+            Assert.IsNull(TranslationModule.ParseLanguageJson("broken", "not json{"));
         }
 
         [Test]
@@ -155,7 +132,7 @@ namespace Tsvrc.Tests.EditMode
             LogAssert.Expect(LogType.Error, "[TranslationModule] 'nokey' is missing the 'key' field.");
 
             string json = "{\"label\":\"English\",\"entries\":{}}";
-            Assert.IsNull(ParseLanguageJson("nokey", json));
+            Assert.IsNull(TranslationModule.ParseLanguageJson("nokey", json));
         }
 
         [Test]
@@ -164,7 +141,7 @@ namespace Tsvrc.Tests.EditMode
             LogAssert.Expect(LogType.Error, "[TranslationModule] 'nolabel' is missing the 'label' field.");
 
             string json = "{\"key\":\"en\",\"entries\":{}}";
-            Assert.IsNull(ParseLanguageJson("nolabel", json));
+            Assert.IsNull(TranslationModule.ParseLanguageJson("nolabel", json));
         }
 
         [Test]
@@ -173,7 +150,7 @@ namespace Tsvrc.Tests.EditMode
             LogAssert.Expect(LogType.Error, "[TranslationModule] 'noentries' is missing the 'entries' object.");
 
             string json = "{\"key\":\"en\",\"label\":\"English\"}";
-            Assert.IsNull(ParseLanguageJson("noentries", json));
+            Assert.IsNull(TranslationModule.ParseLanguageJson("noentries", json));
         }
 
         [Test]
@@ -182,7 +159,7 @@ namespace Tsvrc.Tests.EditMode
             LogAssert.Expect(LogType.Error, "[TranslationModule] 'wrongtype' is missing the 'entries' object.");
 
             string json = "{\"key\":\"en\",\"label\":\"English\",\"entries\":[]}";
-            Assert.IsNull(ParseLanguageJson("wrongtype", json));
+            Assert.IsNull(TranslationModule.ParseLanguageJson("wrongtype", json));
         }
 
         [Test]
@@ -190,12 +167,12 @@ namespace Tsvrc.Tests.EditMode
         {
             string json = "{\"key\":\"en\",\"label\":\"English\",\"entries\":{\"greeting\":\"Hello\"}}";
 
-            object entry = ParseLanguageJson("valid", json);
+            var entry = TranslationModule.ParseLanguageJson("valid", json);
 
-            Assert.IsNotNull(entry);
-            Assert.AreEqual("en", EntryField(entry, "Key"));
-            Assert.AreEqual("English", EntryField(entry, "Label"));
-            Assert.AreEqual("Hello", EntryEntries(entry)["greeting"]);
+            Assert.IsTrue(entry.HasValue);
+            Assert.AreEqual("en", entry.Value.Key);
+            Assert.AreEqual("English", entry.Value.Label);
+            Assert.AreEqual("Hello", entry.Value.Entries["greeting"]);
         }
 
         [Test]
@@ -203,9 +180,9 @@ namespace Tsvrc.Tests.EditMode
         {
             string json = "{\"key\":\"en\",\"label\":\"English\",\"entries\":{\"greeting\":{\"label\":\"Hi there\"}}}";
 
-            object entry = ParseLanguageJson("nested", json);
+            var entry = TranslationModule.ParseLanguageJson("nested", json);
 
-            Assert.AreEqual("Hi there", EntryEntries(entry)["greeting"]);
+            Assert.AreEqual("Hi there", entry.Value.Entries["greeting"]);
         }
 
         [Test]
@@ -213,9 +190,9 @@ namespace Tsvrc.Tests.EditMode
         {
             string json = "{\"key\":\"en\",\"label\":\"English\",\"entries\":{\"greeting\":{}}}";
 
-            object entry = ParseLanguageJson("nestedmissing", json);
+            var entry = TranslationModule.ParseLanguageJson("nestedmissing", json);
 
-            Assert.AreEqual("", EntryEntries(entry)["greeting"]);
+            Assert.AreEqual("", entry.Value.Entries["greeting"]);
         }
 
         // ---- BuildEnumNames ----

@@ -128,6 +128,47 @@ namespace Tsvrc.Tests.EditMode
             Assert.AreEqual(firstComponent, child.GetComponent<InstanceModuleWireTestDouble>(), "Re-wiring an already-correct child must not recreate it.");
         }
 
+        // When the detected type changes (a retype/rename), only a stale Instance subclass is
+        // destroyed. A genuinely unrelated, hand-attached UdonSharpBehaviour sharing the same
+        // child GameObject must survive untouched.
+        [Test]
+        public void Wire_ForeignNonInstanceComponentOnChild_SurvivesADetectedTypeChange()
+        {
+            var existingChild = _scope.CreateGameObject("Instance");
+            existingChild.transform.SetParent(_root.transform, false);
+            var foreign = existingChild.AddComponent<InstanceModuleWireTestDouble>();
+
+            // _detectedType is InstanceModuleWireStaleTestDouble, a real Instance subclass -
+            // distinct from the foreign component's own type, so component == null (no matching
+            // component yet) and Wire() enters its recreate branch.
+            var module = ModuleWith(typeof(InstanceModuleWireStaleTestDouble), ambiguous: false);
+            module.Wire();
+
+            Assert.AreSame(foreign, existingChild.GetComponent<InstanceModuleWireTestDouble>(),
+                "The foreign, non-Instance component must survive exactly as it was - not destroyed, not replaced.");
+            Assert.IsNotNull(existingChild.GetComponent<InstanceModuleWireStaleTestDouble>(),
+                "The newly detected type must still be created alongside it.");
+        }
+
+        [Test]
+        public void Wire_StaleInstanceSubclassOnChild_IsDestroyedOnDetectedTypeChange()
+        {
+            var firstPass = ModuleWith(typeof(InstanceModuleWireStaleTestDouble), ambiguous: false);
+            firstPass.Wire();
+            var staleChild = _root.transform.Find("Instance");
+            var stale = staleChild.GetComponent<InstanceModuleWireStaleTestDouble>();
+            Assert.IsNotNull(stale, "Precondition: the old Instance subclass must exist before the retype.");
+
+            // Simulates a rename/retype: the detected type is now InstanceModuleWireTestDouble
+            // instead - stale, an Instance subclass, must be destroyed, unlike the foreign case above.
+            var retyped = ModuleWith(typeof(InstanceModuleWireTestDouble), ambiguous: false);
+            retyped.Wire();
+
+            var child = _root.transform.Find("Instance");
+            Assert.IsNull(child.GetComponent<InstanceModuleWireStaleTestDouble>(), "The stale Instance subclass must be destroyed.");
+            Assert.IsNotNull(child.GetComponent<InstanceModuleWireTestDouble>(), "The newly detected type must be created.");
+        }
+
         [Test]
         public void Wire_ProgramAssetDeletedWhileComponentPresent_StillRecreates()
         {

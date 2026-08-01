@@ -39,6 +39,13 @@ namespace Tsvrc.Editor
                     "No factory groups registered yet. Add a group below to register prefabs for on-demand instantiation.",
                     MessageType.None);
 
+            // Mirrors BuildEntries' own Sanitize+Deduplicate, shared across every group rendered
+            // this pass so an earlier group's names affect a later group's collision check, the
+            // same as Deduplicate's real contract. Only covers this TsConfig's own groups, not
+            // TsBuiltinConfig's (never rendered here), so a collision against a builtin group's
+            // prefab isn't caught by this preview, only by the real regenerate pass.
+            var usedNames = new HashSet<string>(StringComparer.Ordinal);
+
             int toDelete = -1;
             for (int i = 0; i < factoriesProp.arraySize; i++)
             {
@@ -68,6 +75,9 @@ namespace Tsvrc.Editor
                     toDelete = i;
                 EditorGUILayout.EndHorizontal();
 
+                string prefix = string.IsNullOrWhiteSpace(groupName) ? string.Empty : Sanitize(groupName);
+                var collisions = ComputeNameCollisions(prefabsProp, prefix, usedNames);
+
                 if (expanded)
                 {
                     EditorGUI.indentLevel++;
@@ -85,6 +95,12 @@ namespace Tsvrc.Editor
                     EditorGUILayout.LabelField($"Prefix:  {preview}", EditorStyles.miniLabel);
                     EditorGUILayout.LabelField(LabelPrefabs);
                     ObjectListGUI.DrawObjectList(prefabsProp, assetsOnly: true);
+
+                    if (collisions.Count > 0)
+                        TsEditorGUI.DrawStatusBox(
+                            $"Name collision(s) in this group, renamed automatically in generated code: {string.Join(", ", collisions)}.",
+                            MessageType.Info);
+
                     EditorGUI.indentLevel--;
                 }
 
@@ -109,6 +125,29 @@ namespace Tsvrc.Editor
                 // Auto-expand the new group so the user can immediately name it.
                 _foldouts[newIndex] = true;
             }
+        }
+
+        // Walks this one group's Prefabs array applying the same naive-name-then-Deduplicate
+        // step BuildEntries performs, updating the shared usedNames set as a side effect so a
+        // later group's collisions are checked against every name assigned so far. Returns only
+        // the entries that actually needed a suffix; an already-unique name needs no mention.
+        private static List<string> ComputeNameCollisions(SerializedProperty prefabsProp, string prefix, HashSet<string> usedNames)
+        {
+            var collisions = new List<string>();
+            for (int i = 0; i < prefabsProp.arraySize; i++)
+            {
+                var obj = prefabsProp.GetArrayElementAtIndex(i).objectReferenceValue;
+                if (obj == null) continue;
+                var prefab = obj is Component c ? c.gameObject : obj as GameObject;
+                if (prefab == null || !EditorUtility.IsPersistent(prefab)) continue;
+
+                string naive = prefix + Sanitize(prefab.name);
+                string actual = Deduplicate(naive, usedNames);
+                usedNames.Add(actual);
+                if (actual != naive)
+                    collisions.Add($"{naive} → {actual}");
+            }
+            return collisions;
         }
 
         private void ShiftFoldoutsAfterDelete(int deletedIndex)
@@ -266,7 +305,17 @@ namespace Tsvrc.Editor
 
                 foreach (var obj in group.Prefabs)
                 {
-                    if (obj == null) continue;
+                    // A deleted prefab reference (a null slot) logs, matching Singleton/Construct/
+                    // Pool's wording. Deliberately does not route through the shared
+                    // TryAcceptEntry helper the way Pool does: the same prefab registered twice
+                    // here (once per differently-named group, e.g. "Maze" and "Boss" both
+                    // spawning the same bullet prefab) is a legitimate use case, not a mistake, so
+                    // duplicate-reference detection would be a false positive.
+                    if (obj == null)
+                    {
+                        Debug.LogWarning("[FactoryModule] Null entry in config, remove the missing-script slot.");
+                        continue;
+                    }
 
                     var prefab = obj is Component c ? c.gameObject : obj as GameObject;
                     if (prefab == null) continue;

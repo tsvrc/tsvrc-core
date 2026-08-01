@@ -5,7 +5,9 @@ using Tsvrc.Editor;
 using UdonSharp;
 using UdonSharpEditor;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -88,6 +90,10 @@ namespace Tsvrc.Tests.EditMode
             var second = _scope.CreateGameObject("Second");
             UdonSharpUndo.AddComponent(second, CompiledType);
 
+            // Now logged before destroying; see the dedicated test below for the message's exact
+            // content. This only needs to not fail on the now-expected warning (Unity's test
+            // framework fails a test on any unhandled Warning/Error log by default).
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*Multiple.*instances found.*"));
             new ScaffoldModule().AfterFilesStable();
 
             var instances = Object.FindObjectsOfType(CompiledType, true);
@@ -98,6 +104,22 @@ namespace Tsvrc.Tests.EditMode
             Assert.AreEqual(1, instances.Length);
             var survivor = ((Component)instances[0]).gameObject;
             Assert.That(survivor == first || survivor == second, "The surviving instance must be one of the two originals, not a new one.");
+        }
+
+        [Test]
+        public void AfterFilesStable_MultipleExistingInstances_LogsWhichSurvivesAndWhichAreDestroyed()
+        {
+            Assert.IsTrue(ScaffoldModule.EnsureUdonSharpProgramAsset(TestGeneratedScriptPath, ScratchAssets.Folder + "/TestGenerated.asset"));
+
+            var first = _scope.CreateGameObject("First");
+            UdonSharpUndo.AddComponent(first, CompiledType);
+            var second = _scope.CreateGameObject("Second");
+            UdonSharpUndo.AddComponent(second, CompiledType);
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(
+                $@"\[TsGenerator\] Multiple {ScaffoldModule.CompiledClassName} instances found\. Keeping '(First|Second)', destroying '(First|Second)'\."));
+
+            new ScaffoldModule().AfterFilesStable();
         }
 
         [Test]
@@ -126,6 +148,40 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsNotNull(root.transform.Find("TsConfig").GetComponent<TsConfig>());
         }
 
+        // A TsConfig dragged out from under the root (still in the same scene, just no longer a
+        // direct child) must be found and moved back, preserving its existing data, rather than
+        // creating a second, empty, orphaned duplicate.
+        [Test]
+        public void AfterFilesStable_TsConfigExistsElsewhereInScene_ReparentsExistingInstanceRatherThanCreatingNew()
+        {
+            var root = CompiledRootFixture.AddTo(_scope);
+            var elsewhere = _scope.CreateGameObject("MovedOut");
+            var existingConfig = elsewhere.AddComponent<TsConfig>();
+
+            new ScaffoldModule().AfterFilesStable();
+
+            Assert.AreEqual(1, root.transform.childCount, "Must not create a second, empty TsConfig.");
+            var child = root.transform.Find("TsConfig");
+            Assert.IsNotNull(child, "The reparented object must also be renamed so the next pass finds it directly.");
+            Assert.AreSame(existingConfig, child.GetComponent<TsConfig>(),
+                "Must be the exact same TsConfig instance, not a freshly created one - this is what preserves its data.");
+        }
+
+        [Test]
+        public void AfterFilesStable_TsConfigChildAlreadyUnderRootButMisnamed_RenamesInPlace()
+        {
+            var root = CompiledRootFixture.AddTo(_scope);
+            var misnamed = _scope.CreateGameObject("NotTsConfigYet");
+            misnamed.transform.SetParent(root.transform, false);
+            var existingConfig = misnamed.AddComponent<TsConfig>();
+
+            new ScaffoldModule().AfterFilesStable();
+
+            Assert.AreEqual(1, root.transform.childCount);
+            Assert.AreEqual("TsConfig", misnamed.name);
+            Assert.AreSame(existingConfig, root.transform.Find("TsConfig").GetComponent<TsConfig>());
+        }
+
         [Test]
         public void AfterFilesStable_TsConfigChildWithWrongTag_TagSelfHeals()
         {
@@ -138,6 +194,50 @@ namespace Tsvrc.Tests.EditMode
             new ScaffoldModule().AfterFilesStable();
 
             Assert.AreEqual("EditorOnly", root.transform.Find("TsConfig").gameObject.tag);
+        }
+
+        // The first successful bootstrap in a scene should auto-link it, so the corruption-safety
+        // net TsLinkedScene provides isn't silently opt-in forever. AutoLinkSceneIfUnconfigured
+        // isn't itself public, so this drives it through the same real entry point
+        // (AfterFilesStable) every other test in this class already uses.
+        [Test]
+        public void AfterFilesStable_RootCreatedInUnconfiguredButSavedScene_AutoLinksToThatScene()
+        {
+            TsLinkedScene.ClearOverride();
+            string scenePath = ScratchAssets.Folder + "/AutoLinkTest.unity";
+            EditorSceneManager.SaveScene(_scope.Scene, scenePath);
+            Assert.IsFalse(TsLinkedScene.IsConfigured, "Precondition: nothing linked yet.");
+
+            new ScaffoldModule().AfterFilesStable();
+
+            Assert.IsTrue(TsLinkedScene.IsConfigured);
+            Assert.AreEqual(scenePath, TsLinkedScene.ScenePath);
+        }
+
+        [Test]
+        public void AfterFilesStable_RootCreatedInUnsavedScene_DoesNotAutoLink()
+        {
+            TsLinkedScene.ClearOverride();
+            // _scope.Scene is unsaved by default (path == ""), so there's no real scene asset to
+            // link to yet - auto-linking must wait for a genuine, saved scene.
+
+            new ScaffoldModule().AfterFilesStable();
+
+            Assert.IsFalse(TsLinkedScene.IsConfigured);
+        }
+
+        [Test]
+        public void AfterFilesStable_AlreadyLinkedElsewhere_DoesNotOverwriteExistingLink()
+        {
+            TsLinkedScene.ClearOverride();
+            string alreadyLinkedPath = ScratchAssets.Folder + "/AlreadyLinked.unity";
+            EditorSceneManager.SaveScene(_scope.Scene, alreadyLinkedPath);
+            TsLinkedScene.ScenePath = alreadyLinkedPath;
+
+            new ScaffoldModule().AfterFilesStable();
+
+            Assert.AreEqual(alreadyLinkedPath, TsLinkedScene.ScenePath,
+                "An existing link must never be silently replaced by a later bootstrap pass.");
         }
 
         [Test]

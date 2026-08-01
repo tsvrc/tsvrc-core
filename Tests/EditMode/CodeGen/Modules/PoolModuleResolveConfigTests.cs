@@ -77,6 +77,58 @@ namespace Tsvrc.Tests.EditMode
             Assert.AreEqual(0, result.Count);
         }
 
+        // A deleted prefab reference (a null slot) and a prefab dragged in twice both route
+        // through TsModule.TryAcceptEntry, exactly like SingletonModule/ConstructModule.
+        [Test]
+        public void ResolveConfig_UserNullEntry_LogsWarningAndSkips()
+        {
+            _userConfig.PooledObjects = new UdonSharp.UdonSharpBehaviour[] { null };
+
+            LogAssert.Expect(LogType.Warning, "[PoolModule] Null entry in config, remove the missing-script slot.");
+            var result = ResolveConfig(_userConfig, null);
+
+            Assert.AreEqual(0, result.Count);
+        }
+
+        [Test]
+        public void ResolveConfig_BuiltinNullEntry_LogsWarningAndSkips()
+        {
+            _builtinConfig.PoolPrefabs = new UdonSharp.UdonSharpBehaviour[] { null };
+
+            LogAssert.Expect(LogType.Warning, "[PoolModule] Null entry in config, remove the missing-script slot.");
+            var result = ResolveConfig(null, _builtinConfig);
+
+            Assert.AreEqual(0, result.Count);
+        }
+
+        [Test]
+        public void ResolveConfig_SamePrefabRegisteredTwiceInUserList_LogsDuplicateWarningAndSkipsSecondOccurrence()
+        {
+            var prefab = CreateScratchPrefab("DupUser");
+            _userConfig.PooledObjects = new UdonSharp.UdonSharpBehaviour[] { prefab, prefab };
+
+            LogAssert.Expect(LogType.Warning, $"[PoolModule] Duplicate pool prefab '{prefab.name}' in config, remove the duplicate.");
+            var result = ResolveConfig(_userConfig, null);
+
+            Assert.AreEqual(1, result.Count);
+        }
+
+        [Test]
+        public void ResolveConfig_SamePrefabInBothBuiltinAndUser_LogsDuplicateWarning()
+        {
+            // Duplicate detection is reference-based and spans both lists (a shared `seen` set),
+            // not just within one - registering the exact same prefab asset as both a builtin and
+            // a user entry is exactly as much a mistake as registering it twice in one list.
+            var prefab = CreateScratchPrefab("DupAcrossBoth");
+            _builtinConfig.PoolPrefabs = new UdonSharp.UdonSharpBehaviour[] { prefab };
+            _userConfig.PooledObjects = new UdonSharp.UdonSharpBehaviour[] { prefab };
+
+            LogAssert.Expect(LogType.Warning, $"[PoolModule] Duplicate pool prefab '{prefab.name}' in config, remove the duplicate.");
+            var result = ResolveConfig(_userConfig, _builtinConfig);
+
+            Assert.AreEqual(1, result.Count);
+        }
+
         [Test]
         public void ResolveConfig_BuiltinEntriesPrecedeUserEntries()
         {

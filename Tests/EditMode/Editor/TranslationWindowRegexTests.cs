@@ -1,25 +1,34 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Tsvrc.Editor;
+using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TsTranslationWindow.PeekKeyLabel and its backing regexes are all private —
-    // reflection is the only way in (InternalsVisibleTo only reaches internal members,
-    // and this class/its members are all private).
+    // TsTranslationWindow.PeekKeyLabel is private - reflection is the only way in
+    // (InternalsVisibleTo only reaches internal members). It's a thin wrapper over
+    // TranslationModule.ParseLanguageJson (internal, shared with the real regenerate pass), so a
+    // file that fails real parsing can never show a plausible-looking preview here, and vice versa.
     public class TranslationWindowRegexTests
     {
         private static readonly Type WindowType = typeof(TsTranslationWindow);
 
-        private static (string key, string label) PeekKeyLabel(string json)
+        private static (string key, string label) PeekKeyLabel(string assetName, string json)
         {
+            var asset = new TextAsset(json) { name = assetName };
             MethodInfo m = WindowType.GetMethod("PeekKeyLabel", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.IsNotNull(m, "TsTranslationWindow.PeekKeyLabel method changed or was removed.");
-            return ((string, string))m.Invoke(null, new object[] { json });
+            try
+            {
+                return ((string, string))m.Invoke(null, new object[] { asset });
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(asset);
+            }
         }
 
         private static Regex TargetPattern()
@@ -34,75 +43,21 @@ namespace Tsvrc.Tests.EditMode
         {
             string json = "{\"key\":\"en\",\"label\":\"English\",\"entries\":{}}";
 
-            var (key, label) = PeekKeyLabel(json);
+            var (key, label) = PeekKeyLabel("lang", json);
 
             Assert.AreEqual("en", key);
             Assert.AreEqual("English", label);
         }
 
-        [Test]
-        public void PeekKeyLabel_TolerantOfWhitespaceAroundColon()
-        {
-            string json = "{ \"key\"   :   \"en\" , \"label\"  :  \"English\" }";
-
-            var (key, label) = PeekKeyLabel(json);
-
-            Assert.AreEqual("en", key);
-            Assert.AreEqual("English", label);
-        }
-
-        [Test]
-        public void PeekKeyLabel_MissingLabel_ReturnsNullForBoth()
-        {
-            string json = "{\"key\":\"en\",\"entries\":{}}";
-
-            var (key, label) = PeekKeyLabel(json);
-
-            Assert.IsNull(key);
-            Assert.IsNull(label);
-        }
-
-        [Test]
-        public void PeekKeyLabel_MissingKey_ReturnsNullForBoth()
-        {
-            string json = "{\"label\":\"English\",\"entries\":{}}";
-
-            var (key, label) = PeekKeyLabel(json);
-
-            Assert.IsNull(key);
-            Assert.IsNull(label);
-        }
-
-        [Test]
-        public void PeekKeyLabel_MalformedNonJsonText_ReturnsNullForBoth()
-        {
-            var (key, label) = PeekKeyLabel("this is not json at all");
-
-            Assert.IsNull(key);
-            Assert.IsNull(label);
-        }
-
-        [Test]
-        public void PeekKeyLabel_NestedEntryLabelBeforeTopLevelLabel_IncorrectlyMatchesNestedOne()
-        {
-            // Known limitation: the regex isn't JSON-aware, so a nested per-entry "label"
-            // appearing before the top-level one wins - see assert message below.
-            string json =
-                "{\"key\":\"en\"," +
-                "\"entries\":{\"_greeting_\":{\"label\":\"Hello\"}}," +
-                "\"label\":\"English\"}";
-
-            var (key, label) = PeekKeyLabel(json);
-
-            Assert.AreEqual("en", key);
-            Assert.AreEqual("Hello", label, "Documents the current (incorrect) behavior: the nested entry's label wins because it appears first in the text.");
-        }
+        // Missing-field/malformed-JSON error paths are TranslationModule.ParseLanguageJson's own
+        // behavior, already covered by TranslationParsingTests' ParseLanguageJson_* tests -
+        // PeekKeyLabel just forwards to it, so re-testing that matrix here would be redundant.
 
         [Test]
         public void PeekKeyLabel_WindowsOwnSampleJson_ParsesCorrectly()
         {
             // Regression guard: the exact sample text ShowCreateSampleDialog() writes should
-            // itself satisfy PeekKeyLabel, catching sample/regex drift here instead of silently
+            // itself satisfy PeekKeyLabel, catching sample/parser drift here instead of silently
             // showing "⚠ Invalid File" for a user's freshly created sample.
             string sampleJson =
 @"{
@@ -118,7 +73,7 @@ namespace Tsvrc.Tests.EditMode
     }
 }";
 
-            var (key, label) = PeekKeyLabel(sampleJson);
+            var (key, label) = PeekKeyLabel("lang", sampleJson);
 
             Assert.AreEqual("en", key);
             Assert.AreEqual("English", label);

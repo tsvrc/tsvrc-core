@@ -1,4 +1,7 @@
 #if UNITY_EDITOR
+using System.IO;
+using UnityEngine;
+
 namespace Tsvrc.Editor
 {
     // Single source of truth for every path and identity TsGenerator writes into or looks up:
@@ -45,6 +48,16 @@ namespace Tsvrc.Editor
             ScaffoldScriptPath = null;
             ScaffoldAssetPath = null;
             ScriptCompilationFailedOverride = null;
+        }
+
+        // Turns a project-relative asset path ("Assets/TsGenerated/Foo.cs") into an absolute
+        // filesystem path, for the handful of call sites that need raw File I/O rather than
+        // AssetDatabase (TsGenerator's writes, ModuleEntrySnapshot's cache, TsWindow's file
+        // existence checks). Single source of truth instead of each duplicating this logic.
+        internal static string ToFullPath(string assetPath)
+        {
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            return Path.Combine(projectRoot, assetPath.Replace('/', Path.DirectorySeparatorChar));
         }
     }
 }

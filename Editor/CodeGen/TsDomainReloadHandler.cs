@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using UnityEditor;
+using UnityEngine;
 
 namespace Tsvrc.Editor
 {
@@ -9,6 +10,20 @@ namespace Tsvrc.Editor
     {
         static TsDomainReloadHandler() => EditorApplication.delayCall += () =>
         {
+            // Checked eagerly, before anything else below, and deliberately not gated by
+            // AutomaticTriggersSuppressed: a totally missing scaffold file looks like any other
+            // compile break to the compiler, so a project that lost Assets/TsGenerated entirely
+            // (a bad .gitignore on a fresh clone, an accidental folder delete) just sees a wall of
+            // unrelated CS1061s with no hint that the fix is Force Regenerate. This assembly never
+            // depends on Assembly-CSharp, so it can still run and explain the problem even while
+            // the rest of the project won't compile at all.
+            if (TsLinkedScene.IsConfigured && !ScaffoldModule.ScaffoldFileExists())
+                Debug.LogError("[Tsvrc] The generated scaffold file " +
+                    $"('{TsPaths.GeneratedFolder}/{TsPaths.CompiledClassName}.cs') is missing even though a " +
+                    $"scene is linked. If the project is failing to compile with errors mentioning " +
+                    $"'{TsPaths.CompiledClassName}', this is almost certainly why - open Tsvrc > Configure " +
+                    "and click \"Force Regenerate\" to restore it.");
+
             // TsGenerator.AutomaticTriggersSuppressed's -runTests check is the only signal
             // available at this exact moment: right after the first domain reload, before Unity
             // Test Framework has discovered or started running anything, so no test-side

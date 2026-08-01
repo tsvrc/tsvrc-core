@@ -162,10 +162,19 @@ namespace Tsvrc.Editor
                 // pass will error on the next compile. UdonSharpUndo.DestroyImmediate is
                 // required instead of plain Undo because UdonSharp components carry a hidden
                 // backing UdonBehaviour that a plain destroy would orphan.
+                //
+                // Only ever destroys a component that is either exactly the current
+                // _detectedType (the tracked instance itself, needing recreation because its
+                // program asset was deleted) or some other Instance subclass (a stale one left
+                // over from a rename/retype), never every UdonSharpBehaviour on the child
+                // indiscriminately. Nothing prevents a developer from hand-attaching an unrelated,
+                // non-Instance UdonSharpBehaviour to this same GameObject, and that must survive
+                // an Instance retype/rename instead of being collateral damage.
                 if (component == null || programAssetMissing)
                 {
                     foreach (var stale in childGo.GetComponents<UdonSharpBehaviour>())
-                        UdonSharpUndo.DestroyImmediate(stale);
+                        if (stale.GetType() == _detectedType || stale is Instance)
+                            UdonSharpUndo.DestroyImmediate(stale);
                     component = CreateComponent(childGo, _detectedType);
                 }
             }

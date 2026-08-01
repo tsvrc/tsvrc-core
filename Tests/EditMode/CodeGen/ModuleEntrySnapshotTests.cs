@@ -130,6 +130,58 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsNull(ModuleEntrySnapshot.Load(Key), "A failed save must not leave a partial/corrupt snapshot behind.");
         }
 
+        // SaveCount/LoadCount: the dedicated count-only store TsModule's "last known good"
+        // high-water mark (WarnIfBelowLastKnownGood) uses, kept separate from Save/Load(List of
+        // Entry) above since it only ever needs one integer, not a full entry list.
+        private const string CountKey = "TestModuleEntrySnapshotCount";
+
+        [TearDown]
+        public void TearDownCount() => ModuleEntrySnapshot.Clear(CountKey);
+
+        [Test]
+        public void LoadCount_NeverSaved_ReturnsNull()
+        {
+            Assert.IsNull(ModuleEntrySnapshot.LoadCount(CountKey));
+        }
+
+        [Test]
+        public void SaveCount_ThenLoadCount_RoundTrips()
+        {
+            ModuleEntrySnapshot.SaveCount(CountKey, 5);
+
+            Assert.AreEqual(5, ModuleEntrySnapshot.LoadCount(CountKey));
+        }
+
+        [Test]
+        public void SaveCount_Zero_RoundTripsAsZero_NotNull()
+        {
+            ModuleEntrySnapshot.SaveCount(CountKey, 0);
+
+            Assert.AreEqual(0, ModuleEntrySnapshot.LoadCount(CountKey));
+        }
+
+        [Test]
+        public void SaveCount_CalledTwice_SecondSaveOverwritesTheFirst()
+        {
+            ModuleEntrySnapshot.SaveCount(CountKey, 5);
+            ModuleEntrySnapshot.SaveCount(CountKey, 2);
+
+            Assert.AreEqual(2, ModuleEntrySnapshot.LoadCount(CountKey));
+        }
+
+        [Test]
+        public void SaveCount_AndSave_UseIndependentKeysEvenWhenSharingAModuleKey()
+        {
+            // Both persist under the same {moduleKey}.json path convention, so this pins that a
+            // count-only key and a full-entry-list key never collide as long as callers (as
+            // TsModule.LastKnownGoodSnapshotKey does) suffix the count key distinctly.
+            ModuleEntrySnapshot.Save(Key, Sample());
+            ModuleEntrySnapshot.SaveCount(CountKey, 7);
+
+            Assert.AreEqual(2, ModuleEntrySnapshot.Load(Key).Count);
+            Assert.AreEqual(7, ModuleEntrySnapshot.LoadCount(CountKey));
+        }
+
         [Test]
         public void Load_CorruptedFile_DoesNotThrow()
         {

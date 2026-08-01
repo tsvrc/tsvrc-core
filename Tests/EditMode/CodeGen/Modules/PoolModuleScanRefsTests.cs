@@ -2,8 +2,11 @@ using NUnit.Framework;
 using System.Collections.Generic;
 using System.Collections;
 using System;
+using System.Text.RegularExpressions;
 using Tsvrc.Editor;
 using Tsvrc.Testing.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -112,6 +115,46 @@ namespace Tsvrc.Tests.EditMode
             PrivateFieldAccess.InvokeInstance(module, "ScanExternalRefs");
 
             Assert.AreEqual(0, ExternalCountOf(module), "Fields on a scene instance of a configured pool type must not be counted as external refs.");
+        }
+
+        private static PoolModule BuildModuleWithNoPoolTypesRegistered()
+        {
+            var dictType = typeof(Dictionary<,>).MakeGenericType(typeof(string), InfoType);
+            var dict = (IDictionary)Activator.CreateInstance(dictType, StringComparer.Ordinal);
+            var module = new PoolModule();
+            PrivateFieldAccess.SetField(module, "_poolTypeInfos", dict);
+            return module;
+        }
+
+        // A [WirePool] field whose type was never registered logs a warning naming the field and
+        // type, so the root cause (a forgotten Configure-window registration) is diagnosable
+        // immediately rather than surfacing later as a runtime NullReferenceException.
+        [Test]
+        public void ScanExternalRefs_FieldTypeNotRegistered_LogsWarningNamingTheFieldAndType()
+        {
+            var module = BuildModuleWithNoPoolTypesRegistered();
+            _scope.CreateGameObject("Target").AddComponent<PoolWireTargetDoubleDerived>();
+
+            LogAssert.Expect(LogType.Warning, new Regex(
+                @"\[PoolModule\] 'PoolWireTargetDoubleBase\.BaseClassField' is marked \[WirePool\] for type 'StateManager', but no pool prefab of that type is registered.*"));
+
+            PrivateFieldAccess.InvokeInstance(module, "ScanExternalRefs");
+        }
+
+        [Test]
+        public void ScanExternalRefs_FieldTypeNotRegistered_MultipleSceneInstances_WarnsOnlyOnce()
+        {
+            // Deduplicated by declaring-type+field name, so a scene with several instances of the
+            // same behaviour logs this once per pass, not once per instance - LogAssert.Expect
+            // registers exactly one expected occurrence, so a second, unexpected one would fail
+            // this test via Unity's default unhandled-log-message behavior.
+            var module = BuildModuleWithNoPoolTypesRegistered();
+            _scope.CreateGameObject("A").AddComponent<PoolWireTargetDoubleDerived>();
+            _scope.CreateGameObject("B").AddComponent<PoolWireTargetDoubleDerived>();
+
+            LogAssert.Expect(LogType.Warning, new Regex(@"\[PoolModule\] 'PoolWireTargetDoubleBase\.BaseClassField'.*"));
+
+            PrivateFieldAccess.InvokeInstance(module, "ScanExternalRefs");
         }
     }
 }

@@ -33,7 +33,9 @@ namespace Tsvrc.Editor
         // so it builds its own SerializedObject instead of using the TsConfig-bound `so` param.
         internal override void DrawTab(SerializedObject so)
         {
-            var logger = (TsvrcLogger)UnityEngine.Object.FindObjectOfType(typeof(TsvrcLogger), true);
+            // Scoped to the linked scene, same as Wire(), so this preview can't show a
+            // TsvrcLogger from an unrelated additively-loaded scene.
+            var logger = (TsvrcLogger)TsLinkedScene.FindType(typeof(TsvrcLogger));
             if (logger == null)
             {
                 EditorGUILayout.HelpBox(

@@ -312,6 +312,67 @@ namespace Tsvrc.Tests.EditMode
             Assert.AreEqual(2, ModuleEntrySnapshot.Load(FallbackKey).Count);
         }
 
+        // A clean compile with fewer entries than last time is, by design (see the tests above),
+        // still respected as the live, correct result. This group covers the loud warning
+        // layered on top, for the dangerous case: an accidental out-of-band deletion (TsConfig
+        // removed from the Hierarchy) that also compiles clean and looks like an ordinary
+        // regenerate.
+        [Test]
+        public void ApplySnapshotFallback_CleanCompileReducedBelowLastKnownGood_WarnsButStillReturnsLiveResult()
+        {
+            TsPaths.ScriptCompilationFailedOverride = false;
+            TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "A", "B", "C" });
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(
+                $@"\[{FallbackKey}\] This regenerate resolved fewer entries \(1\) than the last known-good count \(3\)"));
+            var result = TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "X" });
+
+            CollectionAssert.AreEqual(new[] { "X" }, result,
+                "The warning must not block the pass - a real, deliberate deletion via Configure's own " +
+                "\"-\" button must stay fast, with no confirmation dialog blocking generation.");
+        }
+
+        [Test]
+        public void ApplySnapshotFallback_CleanCompileCountStaysTheSameOrGrows_NoWarning()
+        {
+            TsPaths.ScriptCompilationFailedOverride = false;
+            TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "A", "B" });
+
+            // LogAssert has nothing to Expect here - any unexpected warning would fail the test
+            // on its own via Unity's default "unhandled log message" test failure behavior.
+            var result = TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "A", "B", "C" });
+
+            CollectionAssert.AreEqual(new[] { "A", "B", "C" }, result);
+        }
+
+        [Test]
+        public void ApplySnapshotFallback_FirstEverCleanPass_NoWarningEvenIfEmpty()
+        {
+            TsPaths.ScriptCompilationFailedOverride = false;
+
+            // No prior last-known-good on record: an empty first pass on a fresh project is the
+            // ordinary, harmless default state, not a regression from anything.
+            var result = TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string>());
+
+            Assert.IsEmpty(result);
+        }
+
+        [Test]
+        public void ApplySnapshotFallback_LastKnownGoodIsAHighWaterMark_DoesNotDropAfterARegression()
+        {
+            TsPaths.ScriptCompilationFailedOverride = false;
+            TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "A", "B", "C" }); // peak: 3
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*"));
+            TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "X" }); // regression to 1, warns once
+
+            // A second, later pass at 2 entries must still warn relative to the original peak of
+            // 3, not silently accept 1 as the new baseline just because the last pass reported it.
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(
+                $@"\[{FallbackKey}\] This regenerate resolved fewer entries \(2\) than the last known-good count \(3\)"));
+            TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "Y", "Z" });
+        }
+
         // TryResolveObjectType/TryResolveViaScript: resolving a live Object's type name +
         // namespace, falling back to ScriptIndex (via the component's own MonoScript) when
         // reflection can't produce a real answer. See ScriptIndexTests for TryResolveDeclaredType's

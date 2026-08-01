@@ -195,7 +195,8 @@ namespace Tsvrc.Editor
             var valid = GetValid();
             var pathError = GetPathError();
             bool playMode = EditorApplication.isPlayingOrWillChangePlaymode;
-            var disabledReason = DetermineCombineDisabledReason(valid.Count, pathError, playMode);
+            var rootOverlapError = DetermineRootOverlapError(_root, valid, _colliderOnlySources);
+            var disabledReason = DetermineCombineDisabledReason(valid.Count, pathError, rootOverlapError, playMode);
 
             if (TsEditorGUI.PrimaryButton("Combine", enabled: disabledReason == null, disabledReason))
                 Execute(valid);
@@ -205,13 +206,40 @@ namespace Tsvrc.Editor
         }
 
         // Pure so it's directly unit-testable (see MeshCombinerWindowLogicTests) without driving OnGUI.
-        internal static string DetermineCombineDisabledReason(int validCount, string pathError, bool isPlayMode)
+        internal static string DetermineCombineDisabledReason(int validCount, string pathError, string rootOverlapError, bool isPlayMode)
         {
             // Checked first: a combine in Play Mode creates scene objects/assets that vanish on
             // exit or reference sources never part of the saved scene.
             if (isPlayMode) return "Exit Play Mode before combining meshes (changes are not saved).";
             if (validCount == 0) return "Add at least one valid MeshFilter source before combining.";
             if (pathError != null) return pathError;
+            if (rootOverlapError != null) return rootOverlapError;
+            return null;
+        }
+
+        // If Root Transform is, or is a descendant of, one of the sources being combined,
+        // Execute()'s deactivate-sources pass (the default) disables the very hierarchy the newly
+        // combined output was just reparented under. activeInHierarchy cascades to children, so
+        // the combine "succeeds" but the result silently vanishes from the Scene view with no
+        // error. Checked here, before Execute() runs, rather than reordering its deactivate and
+        // reparent steps: a root that is itself one of the deactivated sources can't be fixed by
+        // reordering alone.
+        internal static string DetermineRootOverlapError(Transform root, List<MeshFilter> sources, List<GameObject> colliderOnlySources)
+        {
+            if (root == null) return null;
+            foreach (var mf in sources)
+            {
+                if (mf == null) continue;
+                if (root == mf.transform || root.IsChildOf(mf.transform))
+                    return $"Root Transform ('{root.name}') is, or is inside, one of the selected sources ('{mf.name}'). Pick a root outside the sources being combined.";
+            }
+            if (colliderOnlySources != null)
+                foreach (var go in colliderOnlySources)
+                {
+                    if (go == null) continue;
+                    if (root == go.transform || root.IsChildOf(go.transform))
+                        return $"Root Transform ('{root.name}') is, or is inside, one of the selected collider-only sources ('{go.name}'). Pick a root outside the sources being combined.";
+                }
             return null;
         }
 

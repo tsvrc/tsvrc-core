@@ -113,6 +113,7 @@ namespace Tsvrc.Editor
         {
             var scene = TsLinkedScene.SceneToScan;
             if (scene == null) return;
+            var warnedFields = new HashSet<string>(StringComparer.Ordinal);
             foreach (var rootGo in scene.Value.GetRootGameObjects())
                 foreach (var behaviour in rootGo.GetComponentsInChildren<MonoBehaviour>(true))
                 {
@@ -126,7 +127,11 @@ namespace Tsvrc.Editor
                         {
                             if (!IsWirePoolField(field)) continue;
                             if (field.FieldType.IsArray || field.FieldType.IsGenericType) continue;
-                            if (!_poolTypeInfos.TryGetValue(field.FieldType.Name, out var info)) continue;
+                            if (!_poolTypeInfos.TryGetValue(field.FieldType.Name, out var info))
+                            {
+                                WarnIfNotAlreadyWarned(warnedFields, t, field);
+                                continue;
+                            }
                             info.ExternalCount++;
                             _watchedTypeNames.Add(t.Name);
                         }
@@ -137,6 +142,7 @@ namespace Tsvrc.Editor
         // other pool types; these become InternalDeps entries driving the slot count formula.
         private void ScanInternalDeps()
         {
+            var warnedFields = new HashSet<string>(StringComparer.Ordinal);
             foreach (var info in _poolTypeInfos.Values)
             {
                 for (var t = info.Prefab.GetType(); t != null && t != typeof(MonoBehaviour) && t != typeof(UdonSharpBehaviour); t = t.BaseType)
@@ -145,12 +151,29 @@ namespace Tsvrc.Editor
                         if (!IsWirePoolField(field)) continue;
                         if (field.FieldType.IsArray || field.FieldType.IsGenericType) continue;
                         var depName = field.FieldType.Name;
-                        if (!_poolTypeInfos.ContainsKey(depName)) continue;
+                        if (!_poolTypeInfos.ContainsKey(depName))
+                        {
+                            WarnIfNotAlreadyWarned(warnedFields, t, field);
+                            continue;
+                        }
                         info.InternalDeps.TryGetValue(depName, out var count);
                         info.InternalDeps[depName] = count + 1;
                         _watchedTypeNames.Add(t.Name);
                     }
             }
+        }
+
+        // A [WirePool] field whose type was never registered stays null forever with no warning,
+        // surfacing later as a runtime NullReferenceException whose root cause (a forgotten
+        // registration) is disconnected from the symptom. Deduplicated by declaring-type+field
+        // name so a scene with several instances of the same behaviour, or ScanExternalRefs and
+        // ScanInternalDeps both reaching the same declaration, only logs once per pass.
+        private static void WarnIfNotAlreadyWarned(HashSet<string> warnedFields, Type declaringType, FieldInfo field)
+        {
+            if (!warnedFields.Add($"{declaringType.Name}.{field.Name}")) return;
+            Debug.LogWarning($"[PoolModule] '{declaringType.Name}.{field.Name}' is marked [WirePool] for type " +
+                $"'{field.FieldType.Name}', but no pool prefab of that type is registered in Tsvrc > Configure > " +
+                "Pool - this field will stay null at runtime.");
         }
 
         // Topological DFS: totalSlots(T) = externalCount(T) + Σ_P wiresFromP(T) × totalSlots(P)
@@ -424,14 +447,22 @@ namespace Tsvrc.Editor
         // Builtins are processed before user config so builtin types always occupy the lower
         // slot indices. For example, slot 0 stays the same prefab regardless of added user
         // entries.
+        //
+        // A deleted prefab reference (a null slot) and the same prefab dragged in twice both
+        // route through the shared TryAcceptEntry helper, exactly like SingletonModule/
+        // ConstructModule already do, instead of a silent `if (obj == null) continue;` with no
+        // warning and no duplicate detection. seen is shared across both loops so a prefab
+        // registered as both a builtin and a user entry is also caught, not just a duplicate
+        // within one list.
         private static List<(Component prefab, string typeName)> ResolveConfig(TsConfig userConfig, TsBuiltinConfig builtinConfig)
         {
             var entries = new List<(Component, string)>();
+            var seen = new HashSet<UnityEngine.Object>();
 
             if (builtinConfig?.PoolPrefabs != null)
                 foreach (var proc in builtinConfig.PoolPrefabs)
                 {
-                    if (proc == null) continue;
+                    if (!TryAcceptEntry(proc, "PoolModule", "config", "pool prefab", seen)) continue;
                     if (!EditorUtility.IsPersistent(proc))
                     {
                         Debug.LogWarning($"[PoolModule] Builtin '{proc.name}' is a scene object. Pool entries must be prefab assets. Skipping.");
@@ -443,7 +474,7 @@ namespace Tsvrc.Editor
             if (userConfig?.PooledObjects != null)
                 foreach (var obj in userConfig.PooledObjects)
                 {
-                    if (obj == null) continue;
+                    if (!TryAcceptEntry(obj, "PoolModule", "config", "pool prefab", seen)) continue;
                     if (!EditorUtility.IsPersistent(obj))
                     {
                         Debug.LogWarning($"[PoolModule] '{obj.name}' is a scene object. Pool entries must be prefab assets. Skipping.");

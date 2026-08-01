@@ -12,8 +12,6 @@ namespace Tsvrc.Editor
     internal class TsTranslationWindow : EditorWindow
     {
         private static readonly Regex TargetPattern = new Regex(@"^_[^_].*[^_]_$|^_[^_]_$", RegexOptions.Compiled);
-        private static readonly Regex KeyRegex = new Regex(@"""key""\s*:\s*""([^""]+)""", RegexOptions.Compiled);
-        private static readonly Regex LabelRegex = new Regex(@"""label""\s*:\s*""([^""]+)""", RegexOptions.Compiled);
         // Matches a quoted, underscore-wrapped JSON key (an "entries" key like "_welcome_"). Not
         // JSON-aware (same trade-off as KeyRegex/LabelRegex), but the _x_ naming convention keeps
         // a plain-text scan reliable in practice.
@@ -126,7 +124,7 @@ namespace Tsvrc.Editor
                     int id = newAsset.GetInstanceID();
                     if (!_peekCache.TryGetValue(id, out var peek))
                     {
-                        peek = PeekKeyLabel(newAsset.text);
+                        peek = PeekKeyLabel(newAsset);
                         _peekCache[id] = peek;
                     }
                     EditorGUILayout.LabelField(peek.key != null ? $"{peek.key}  –  {peek.label}" : "⚠ Invalid File",
@@ -155,7 +153,15 @@ namespace Tsvrc.Editor
             EditorGUILayout.Space(4);
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("+ Add Language"))
-                prop.InsertArrayElementAtIndex(prop.arraySize);
+            {
+                // InsertArrayElementAtIndex on a TextAsset[] array copies the last element's
+                // reference into the new slot instead of leaving it empty (a well known
+                // SerializedProperty quirk for reference-type arrays) - cleared explicitly so
+                // "+ Add Language" always adds a genuinely empty slot.
+                int newIndex = prop.arraySize;
+                prop.InsertArrayElementAtIndex(newIndex);
+                prop.GetArrayElementAtIndex(newIndex).objectReferenceValue = null;
+            }
             GUILayout.FlexibleSpace();
             if (GUILayout.Button(new GUIContent("Create Sample Language File",
                 "Writes a starter JSON file with the required \"key\"/\"label\"/\"entries\" shape and adds it to the list below.")))
@@ -168,9 +174,20 @@ namespace Tsvrc.Editor
             EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("Detected TMP Targets in Scene", EditorStyles.boldLabel);
 
+            // Scoped to the linked scene (TsLinkedScene), the same scene TranslationModule's own
+            // FindTmpTargets() reads from at generate time - otherwise this preview could show
+            // counts from whatever scene happens to be open, not the one Wire() actually acts on.
+            if (TsLinkedScene.IsConfiguredButNotLoaded)
+            {
+                TsEditorGUI.DrawStatusBox(
+                    $"Linked scene '{TsLinkedScene.ScenePath}' is not open, so there's nothing to detect right now.",
+                    MessageType.Info);
+                return;
+            }
+
             if (_tmpTargetCount < 0)
             {
-                var sceneKeys = FindObjectsOfType<TMPro.TextMeshProUGUI>(true)
+                var sceneKeys = TsLinkedScene.FindAll<TMPro.TextMeshProUGUI>()
                     .Select(t => t.gameObject.name)
                     .Where(name => TargetPattern.IsMatch(name))
                     .ToList();
@@ -257,11 +274,13 @@ namespace Tsvrc.Editor
             _so.ApplyModifiedProperties();
         }
 
-        private static (string key, string label) PeekKeyLabel(string json)
+        // Uses the same parser TranslationModule.LoadConfig() uses for the real regenerate pass,
+        // so a file that will fail real parsing never shows a plausible-looking preview here, and
+        // vice versa.
+        private static (string key, string label) PeekKeyLabel(TextAsset asset)
         {
-            var k = KeyRegex.Match(json);
-            var l = LabelRegex.Match(json);
-            return k.Success && l.Success ? (k.Groups[1].Value, l.Groups[1].Value) : (null, null);
+            var entry = TranslationModule.ParseLanguageJson(asset.name, asset.text);
+            return entry.HasValue ? (entry.Value.Key, entry.Value.Label) : (null, null);
         }
     }
 }

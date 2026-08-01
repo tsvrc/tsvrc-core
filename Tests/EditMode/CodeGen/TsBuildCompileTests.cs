@@ -81,5 +81,26 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsTrue(result);
             Assert.AreSame(before, TsGenerator.WatchedPaths, "A non-Scene build type must short-circuit before ever calling Run().");
         }
+
+        // DetermineWrongSceneBuildWarning is the pure decision behind the "Tsvrc Linked Scene Not
+        // Open" build-time dialog. Only this pure half is tested directly; the dialog-driving
+        // branch itself isn't reliably testable under batchmode (see
+        // OnBuildRequested_SceneBuildAlreadyBootstrapped_ReturnsTrueWithoutShowingDialog's own
+        // comment above for why that constraint applies here too).
+        [Test]
+        public void DetermineWrongSceneBuildWarning_NotConfiguredButNotLoaded_ReturnsNull()
+        {
+            Assert.IsNull(TsBuildCompile.DetermineWrongSceneBuildWarning(isConfiguredButNotLoaded: false, linkedScenePath: "Assets/Foo.unity"));
+        }
+
+        [Test]
+        public void DetermineWrongSceneBuildWarning_ConfiguredButNotLoaded_MentionsScenePathAndBuildRisk()
+        {
+            string message = TsBuildCompile.DetermineWrongSceneBuildWarning(
+                isConfiguredButNotLoaded: true, linkedScenePath: "Assets/MoL/Scenes/MoL.unity");
+
+            StringAssert.Contains("Assets/MoL/Scenes/MoL.unity", message);
+            StringAssert.Contains("stale", message);
+        }
     }
 }

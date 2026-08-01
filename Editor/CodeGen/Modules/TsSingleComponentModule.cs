@@ -62,7 +62,10 @@ namespace Tsvrc.Editor
             var root = FindRoot();
             if (root == null) return;
 
-            var component = (Component)UnityEngine.Object.FindObjectOfType(ComponentType, true);
+            // Scoped to the linked scene, same as FindRoot() above, so an unrelated
+            // TsvrcLogger/TsvrcMemory instance in an additively-loaded scene never gets wired
+            // into this scene's TsGenerated field.
+            var component = TsLinkedScene.FindType(ComponentType);
 
             var so = new SerializedObject(root);
             if (!TryFindField(so, FieldName, ModuleTag, out var prop)) return;

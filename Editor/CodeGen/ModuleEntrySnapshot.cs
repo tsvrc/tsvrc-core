@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using UnityEditor;
 using UnityEngine;
 
 namespace Tsvrc.Editor
@@ -89,14 +88,49 @@ namespace Tsvrc.Editor
             if (File.Exists(path)) File.Delete(path);
         }
 
-        private static string PathFor(string moduleKey) =>
-            ToFullPath($"{TsPaths.GeneratedFolder}/.cache/{moduleKey}.json");
-
-        private static string ToFullPath(string assetPath)
+        [Serializable]
+        private class CountOnly
         {
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            return Path.Combine(projectRoot, assetPath.Replace('/', Path.DirectorySeparatorChar));
+            public int Count;
         }
+
+        // A separate, dedicated count-only file rather than a reuse of Save/Load(List of Entry)
+        // with placeholder entries: callers that only need a "last known good" high-water mark
+        // (a single integer) shouldn't have to allocate throwaway Entry objects, or persist a
+        // schema that claims to carry names/types it doesn't actually have.
+        internal static void SaveCount(string moduleKey, int count)
+        {
+            string path = PathFor(moduleKey);
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllText(path, JsonUtility.ToJson(new CountOnly { Count = count }));
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[ModuleEntrySnapshot] Could not save count for '{moduleKey}': {e.Message}");
+            }
+        }
+
+        // Null when there is no count on record yet, or it can't be read/parsed - same "null
+        // means nothing to compare against" contract as Load(string) above.
+        internal static int? LoadCount(string moduleKey)
+        {
+            string path = PathFor(moduleKey);
+            if (!File.Exists(path)) return null;
+            try
+            {
+                return JsonUtility.FromJson<CountOnly>(File.ReadAllText(path))?.Count;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[ModuleEntrySnapshot] Could not read count for '{moduleKey}': {e.Message}");
+                return null;
+            }
+        }
+
+        private static string PathFor(string moduleKey) =>
+            TsPaths.ToFullPath($"{TsPaths.GeneratedFolder}/.cache/{moduleKey}.json");
     }
 }
 #endif

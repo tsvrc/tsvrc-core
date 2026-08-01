@@ -62,14 +62,34 @@ namespace Tsvrc.Tests.EditMode
             Assert.AreEqual(0, result.Count);
         }
 
+        // A deleted prefab reference logs a warning, matching Singleton/Construct/Pool's wording.
         [Test]
-        public void BuildEntries_NullEntryInPrefabsArray_SilentlySkipped()
+        public void BuildEntries_NullEntryInPrefabsArray_LogsWarningAndSkips()
         {
             _userConfig.Factories = new[] { new TsFactoryGroup { GroupName = "", Prefabs = new Object[] { null } } };
 
+            LogAssert.Expect(LogType.Warning, "[FactoryModule] Null entry in config, remove the missing-script slot.");
             var result = BuildEntries(_userConfig, null);
 
             Assert.AreEqual(0, result.Count);
+        }
+
+        [Test]
+        public void BuildEntries_SamePrefabRegisteredInTwoDifferentGroups_BothProduceEntries()
+        {
+            // Unlike Pool, a duplicate prefab reference here is legitimate (e.g. the same bullet
+            // prefab spawned by two differently-named factory groups), so this must never warn or
+            // drop the second occurrence the way PoolModule.ResolveConfig now does.
+            var prefab = CreateScratchPrefab("SharedAcrossGroups");
+            _userConfig.Factories = new[]
+            {
+                new TsFactoryGroup { GroupName = "Maze", Prefabs = new Object[] { prefab } },
+                new TsFactoryGroup { GroupName = "Boss", Prefabs = new Object[] { prefab } },
+            };
+
+            var result = BuildEntries(_userConfig, null);
+
+            Assert.AreEqual(2, result.Count);
         }
 
         [Test]

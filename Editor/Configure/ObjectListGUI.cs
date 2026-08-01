@@ -37,6 +37,20 @@ namespace Tsvrc.Editor
             EditorGUILayout.LabelField("   ↳ " + hint, EditorStyles.miniLabel);
         }
 
+        // A null slot renders as a bare, empty ObjectField with no other signal. Nothing
+        // distinguishes "never filled in" from "used to point at something that was deleted",
+        // since SerializedProperty carries no history either way, so this can only flag that the
+        // slot needs attention, not which case it is. The Console already logs a specific
+        // "Null entry..." warning at regenerate time (TsModule.TryAcceptEntry); this surfaces the
+        // same fact inline, while the user is already looking at the list.
+        private static void DrawNullSlotHint(Object obj)
+        {
+            if (obj != null) return;
+            EditorGUILayout.LabelField(
+                "   ↳ empty - nothing assigned here (if this used to point at something, it may have been deleted)",
+                EditorStyles.miniLabel);
+        }
+
         // Convenience overload for a top-level Object[] property (Singletons, Pool, Constructs).
         internal static void DrawObjectList(SerializedObject so, string propertyName, string emptyHint = null,
             bool assetsOnly = false, bool warnDuplicates = false)
@@ -66,6 +80,7 @@ namespace Tsvrc.Editor
                 EditorGUILayout.EndHorizontal();
 
                 DrawResolvedTypeHint(element.objectReferenceValue);
+                DrawNullSlotHint(element.objectReferenceValue);
 
                 if (assetsOnly && IsSceneInstance(element.objectReferenceValue))
                     TsEditorGUI.DrawStatusBox(
@@ -88,7 +103,16 @@ namespace Tsvrc.Editor
 
             EditorGUILayout.Space(4);
             if (GUILayout.Button("+ Add"))
-                prop.InsertArrayElementAtIndex(prop.arraySize);
+            {
+                // InsertArrayElementAtIndex on an Object[] array copies the last element's
+                // reference into the new slot instead of leaving it empty (a well known
+                // SerializedProperty quirk for reference-type arrays) - cleared explicitly so
+                // "+ Add" always adds a genuinely empty slot, matching what FactoryModule's own
+                // "+ Add Factory Group" button already does for its own array.
+                int newIndex = prop.arraySize;
+                prop.InsertArrayElementAtIndex(newIndex);
+                prop.GetArrayElementAtIndex(newIndex).objectReferenceValue = null;
+            }
         }
     }
 }

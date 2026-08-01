@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Tsvrc.Config;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Tsvrc.Editor
@@ -73,6 +74,7 @@ namespace Tsvrc.Editor
         {
             DrawLinkedScene();
             DrawStatus();
+            DrawBuiltinConfigWarning();
             DrawCollisionWarning();
             DrawRunWarnings();
 
@@ -124,7 +126,9 @@ namespace Tsvrc.Editor
                 ReloadConfig();
             }
 
-            var message = DetermineLinkedSceneWarning(currentPath, TsLinkedScene.IsConfiguredButNotLoaded);
+            var message = DetermineLinkedSceneWarning(currentPath, TsLinkedScene.IsConfiguredButNotLoaded, TsLinkedScene.IsConfiguredButMissing);
+            if (message == null)
+                message = DetermineMissingLinkWarning(TsLinkedScene.IsConfigured, ScaffoldModule.ScaffoldFileExists());
             if (message != null)
                 TsEditorGUI.DrawStatusBox(message, MessageType.Warning);
 
@@ -133,19 +137,54 @@ namespace Tsvrc.Editor
 
         // Pure so it's directly unit-testable without driving OnGUI/EditorWindow. Returns null
         // when there's nothing to warn about (no scene linked yet, or the linked one is loaded).
-        internal static string DetermineLinkedSceneWarning(string linkedScenePath, bool isConfiguredButNotLoaded)
+        // isConfiguredButMissing (the scene asset was deleted, not just renamed/moved) gets its
+        // own message, since "open it" isn't a real recovery action once the asset is gone.
+        internal static string DetermineLinkedSceneWarning(string linkedScenePath, bool isConfiguredButNotLoaded, bool isConfiguredButMissing)
         {
+            if (isConfiguredButMissing)
+                return "The previously linked scene no longer exists on disk. Pick a new one above.";
             if (!isConfiguredButNotLoaded) return null;
             return $"'{linkedScenePath}' is linked but not currently open. Tsvrc will not read or write " +
                 "anything until it's open, so it's never affected by any other scene - including a test run's.";
+        }
+
+        // If TsLinkedSceneConfig.asset itself was deleted (or never survived a fresh clone), every
+        // module silently reverts to legacy unscoped behavior with no other symptom. Real
+        // generated content already existing on disk despite nothing being linked is the one
+        // detectable trace that a link used to exist and was lost. Only shown when
+        // DetermineLinkedSceneWarning above has nothing to say; the two are mutually exclusive.
+        internal static string DetermineMissingLinkWarning(bool isConfigured, bool generatedScaffoldFileExists)
+        {
+            if (isConfigured || !generatedScaffoldFileExists) return null;
+            return "Generated content already exists in the generated folder, but no scene is linked to it - " +
+                "was TsLinkedSceneConfig.asset deleted? Re-select the correct scene above to restore it.";
         }
 
         private void DrawStatus()
         {
             bool pending = TsGenerator.IsBootstrapPending;
             bool playMode = EditorApplication.isPlayingOrWillChangePlaymode;
-            var (message, type) = DetermineStatus(_config != null, pending, playMode);
-            TsEditorGUI.DrawStatusBox(message, type);
+            var (message, type) = DetermineStatus(_config != null, pending, playMode, TsLinkedScene.IsConfiguredButNotLoaded, TsLinkedScene.IsConfigured);
+            if (message != null)
+                TsEditorGUI.DrawStatusBox(message, type);
+        }
+
+        // A missing TsBuiltinConfig.asset (package-shipped, so a bad submodule update or merge
+        // can lose it for the whole team at once) silently drops every library-provided
+        // Singleton/pool prefab/Factory group with no other symptom.
+        private void DrawBuiltinConfigWarning()
+        {
+            var message = DetermineBuiltinConfigWarning(TsModule.IsBuiltinConfigMissing());
+            if (message != null)
+                TsEditorGUI.DrawStatusBox(message, MessageType.Warning);
+        }
+
+        // Pure so it's directly unit-testable without driving OnGUI/EditorWindow.
+        internal static string DetermineBuiltinConfigWarning(bool isBuiltinConfigMissing)
+        {
+            if (!isBuiltinConfigMissing) return null;
+            return $"Tsvrc's builtin config asset is missing at '{TsModule.BuiltinConfigPath}' - library-provided " +
+                "singletons, pool prefabs, and factories will not be included until it's restored.";
         }
 
         private void DrawCollisionWarning()
@@ -186,7 +225,12 @@ namespace Tsvrc.Editor
         }
 
         // Pure so it's directly unit-testable without driving OnGUI/EditorWindow.
-        internal static (string message, MessageType type) DetermineStatus(bool hasConfig, bool isBootstrapPending, bool isPlayMode)
+        // isConfiguredButNotLoaded/isLinked default to "no linked-scene complication at all,
+        // just report on hasConfig", so callers that don't care about scene-linking state can
+        // omit them.
+        internal static (string message, MessageType type) DetermineStatus(
+            bool hasConfig, bool isBootstrapPending, bool isPlayMode,
+            bool isConfiguredButNotLoaded = false, bool isLinked = true)
         {
             // Checked first: TsGenerator.Run() itself bails out during play mode (see its own
             // isPlayingOrWillChangePlaymode guard), so nothing below would be accurate anyway.
@@ -194,26 +238,52 @@ namespace Tsvrc.Editor
                 return ("Exit Play Mode to configure or regenerate Tsvrc.", MessageType.Warning);
             if (isBootstrapPending)
                 return ("Setting up Tsvrc… waiting for scripts to compile.", MessageType.Info);
+            // DrawLinkedScene's own warning box, drawn directly above this one, already explains
+            // this state in full ("linked but not open" / "no longer exists"). A second, "not yet
+            // set up" box here would contradict it: one implies first-time setup, the other
+            // implies the link already exists.
+            if (isConfiguredButNotLoaded)
+                return (null, MessageType.None);
             if (!hasConfig)
                 return ("Tsvrc is not yet set up in this scene. Click below to get started.", MessageType.Info);
+            // hasConfig here came from the legacy "search whatever scene is open" fallback, used
+            // when nothing is linked yet: a real, working setup that simply never got linked,
+            // leaving the whole corruption-safety net this feature exists for turned off with no
+            // other indication.
+            if (!isLinked)
+                return ("Tsvrc is set up here, but no scene is linked yet. Pick this scene above to enable safe, scene-scoped regeneration.", MessageType.Warning);
             return ("Tsvrc is set up.", MessageType.None);
         }
 
         // "Initialize Tsvrc" and "Force Regenerate" run the exact same action
         // (TsGenerator.ManualGenerate()) - only the label changes, since a first-time setup and a
         // maintenance regenerate are very different mental models for the person clicking it.
-        internal static string DetermineActionLabel(bool hasConfig) => hasConfig ? "Force Regenerate" : "Initialize Tsvrc";
+        // While the linked scene isn't open, regenerating is impossible, so this offers to open
+        // it instead of a "Force Regenerate" that would silently do nothing. isConfiguredButMissing
+        // takes priority over that: once the asset itself is gone, "open it" isn't a real recovery
+        // action either, so the button is disabled instead (see IsActionEnabled) and the label
+        // just names the blocker.
+        internal static string DetermineActionLabel(bool hasConfig, bool isConfiguredButNotLoaded, bool isConfiguredButMissing = false)
+        {
+            if (isConfiguredButMissing) return "Linked Scene Missing";
+            if (isConfiguredButNotLoaded) return "Open Linked Scene";
+            return hasConfig ? "Force Regenerate" : "Initialize Tsvrc";
+        }
 
         // Disabled while a bootstrap triggered by an earlier click is still waiting on a recompile,
-        // or during play mode (TsGenerator.Run() itself is a no-op there - see ValidateManualGenerate
-        // on the equivalent menu item).
-        internal static bool IsActionEnabled(bool isBootstrapPending, bool isPlayMode) => !isBootstrapPending && !isPlayMode;
+        // during play mode (TsGenerator.Run() itself is a no-op there - see ValidateManualGenerate
+        // on the equivalent menu item), or once the linked scene asset no longer exists at all:
+        // "Open Linked Scene" would just fail, so there is no action left to offer until a new
+        // scene is picked via the field above.
+        internal static bool IsActionEnabled(bool isBootstrapPending, bool isPlayMode, bool isConfiguredButMissing = false) =>
+            !isBootstrapPending && !isPlayMode && !isConfiguredButMissing;
 
         // Explains *why* the button above is disabled, shown as its tooltip. Null when enabled.
-        internal static string DetermineActionDisabledReason(bool isBootstrapPending, bool isPlayMode)
+        internal static string DetermineActionDisabledReason(bool isBootstrapPending, bool isPlayMode, bool isConfiguredButMissing = false)
         {
             if (isPlayMode) return "Exit Play Mode before regenerating.";
             if (isBootstrapPending) return "Waiting for the current setup pass to finish compiling.";
+            if (isConfiguredButMissing) return "The linked scene no longer exists - pick a new one above.";
             return null;
         }
 
@@ -221,15 +291,24 @@ namespace Tsvrc.Editor
         {
             bool pending = TsGenerator.IsBootstrapPending;
             bool playMode = EditorApplication.isPlayingOrWillChangePlaymode;
-            string label = DetermineActionLabel(_config != null);
-            bool enabled = IsActionEnabled(pending, playMode);
-            string disabledReason = DetermineActionDisabledReason(pending, playMode);
+            bool missing = TsLinkedScene.IsConfiguredButMissing;
+            bool notLoaded = TsLinkedScene.IsConfiguredButNotLoaded;
+            string label = DetermineActionLabel(_config != null, notLoaded, missing);
+            bool enabled = IsActionEnabled(pending, playMode, missing);
+            string disabledReason = DetermineActionDisabledReason(pending, playMode, missing);
 
             if (TsEditorGUI.PrimaryButton(label, enabled, disabledReason))
             {
-                TsGenerator.ManualGenerate();
+                if (notLoaded) OpenLinkedScene();
+                else TsGenerator.ManualGenerate();
                 GUIUtility.ExitGUI();
             }
+        }
+
+        private static void OpenLinkedScene()
+        {
+            if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                EditorSceneManager.OpenScene(TsLinkedScene.ScenePath, OpenSceneMode.Single);
         }
     }
 }

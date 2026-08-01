@@ -31,8 +31,15 @@ namespace Tsvrc.Editor
         // for production and most tests alike. Only overridden explicitly by tests that need the
         // scaffold script to live somewhere other than the generated folder (see
         // CompiledRootFixture / ScaffoldModuleWireTests).
-        private static string ScaffoldFilePath => TsPaths.ScaffoldScriptPath ?? $"{TsPaths.GeneratedFolder}/{TsPaths.CompiledClassName}.cs";
+        // internal, not private: shared with TsWindow and TsDomainReloadHandler, so both read the
+        // exact same "does the scaffold file genuinely exist" fact this module's writes are the
+        // source of truth for, rather than each re-deriving the path itself.
+        internal static string ScaffoldFilePath => TsPaths.ScaffoldScriptPath ?? $"{TsPaths.GeneratedFolder}/{TsPaths.CompiledClassName}.cs";
         private static string GeneratedAssetPath => TsPaths.ScaffoldAssetPath ?? $"{TsPaths.GeneratedFolder}/{TsPaths.CompiledClassName}.asset";
+
+        // Cheap, file-existence-only check (not a real parse) for whether a prior bootstrap ever
+        // completed.
+        internal static bool ScaffoldFileExists() => System.IO.File.Exists(TsPaths.ToFullPath(ScaffoldFilePath));
 
         internal override string FileName => TsPaths.CompiledClassName + ".cs";
 
@@ -105,7 +112,10 @@ namespace {CompiledNamespace}
             EnsureUdonSharpProgramAsset(ScaffoldFilePath, GeneratedAssetPath);
             var root = EnsureRootSceneObject();
             if (root != null)
+            {
                 EnsureChildSceneObject("TsConfig", typeof(TsConfig), root, isUdonSharp: false, editorOnly: true);
+                AutoLinkSceneIfUnconfigured(root);
+            }
 
             // fieldDefinitions order in the program asset is non-deterministic across compilations,
             // causing unnecessary file changes on every domain reload, so normalize to sorted order.
@@ -164,10 +174,13 @@ namespace {CompiledNamespace}
             var compiledType = FindCompiledType();
             if (compiledType == null) return false;
 
-            var instances = UnityEngine.Object.FindObjectsOfType(compiledType, true);
-            if (instances.Length != 1) return true;
+            // Scoped to the linked scene, same as every other lookup in this module: an unrelated
+            // compiled-type instance in an additively-loaded scene must never gate this module's
+            // own rerun scheduling.
+            var instances = TsLinkedScene.FindAllType(compiledType);
+            if (instances.Count != 1) return true;
 
-            var root = ((Component)instances[0]).transform;
+            var root = instances[0].transform;
             if (root.Find("TsConfig") == null) return true;
             return false;
         }
@@ -210,13 +223,37 @@ namespace {CompiledNamespace}
             return true;
         }
 
+        // The first successful bootstrap unambiguously identifies which scene the user means, so
+        // it auto-links it rather than leaving the corruption-safety net TsLinkedScene provides
+        // silently opt-in forever. A no-op once anything is already linked, including by an
+        // earlier call within this same pass: once a scene is linked, RunCore's own
+        // IsConfiguredButNotLoaded guard refuses to touch any other scene, so a second scene can
+        // never silently grow its own competing scaffold.
+        private static void AutoLinkSceneIfUnconfigured(Component root)
+        {
+            if (TsLinkedScene.IsConfigured) return;
+            string scenePath = root.gameObject.scene.path;
+            if (string.IsNullOrEmpty(scenePath)) return; // an unsaved scene has no path to link to yet
+            TsLinkedScene.ScenePath = scenePath;
+            Debug.Log($"[TsGenerator] Linked Tsvrc to scene '{scenePath}'.");
+        }
+
         private static Component EnsureRootSceneObject()
         {
             var compiledType = FindCompiledType();
             if (compiledType == null) return null;
 
-            var instances = UnityEngine.Object.FindObjectsOfType(compiledType, true)
-                .Cast<Component>().ToList();
+            // Scoped to the linked scene: an extra compiled-type instance in an unrelated
+            // additively-loaded scene must never be found (and destroyed as a "duplicate") here.
+            var instances = TsLinkedScene.FindAllType(compiledType);
+
+            // Logged before destroying, naming both which path survives and which are removed, so
+            // a puzzled "where did my other copy's settings go" (e.g. after a Ctrl+D duplicate)
+            // has a trail to follow in the Console.
+            if (instances.Count > 1)
+                Debug.LogWarning($"[TsGenerator] Multiple {CompiledClassName} instances found. Keeping " +
+                    $"'{GameObjectPath(instances[0].gameObject)}', destroying " +
+                    $"{string.Join(", ", instances.Skip(1).Select(c => $"'{GameObjectPath(c.gameObject)}'"))}.");
 
             for (int i = instances.Count - 1; i >= 1; i--)
             {
@@ -266,12 +303,36 @@ namespace {CompiledNamespace}
 
             if (existing == null)
             {
-                childGo = new GameObject(childName);
-                Undo.RegisterCreatedObjectUndo(childGo, $"Create {childName}");
-                childGo.transform.SetParent(root.transform, false);
-                AddChildComponent(childGo, componentType, isUdonSharp);
-                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
-                Debug.Log($"[TsGenerator] Created {childName} child under {CompiledClassName}.");
+                // Before creating a brand-new, empty child, check whether an instance of this
+                // component already exists elsewhere in the linked scene - it may have been
+                // dragged out from under the root rather than deleted. Reparenting it back
+                // preserves whatever data it holds instead of creating a second, empty sibling and
+                // leaving the real one orphaned. Also renamed to childName, so the next pass's
+                // root.transform.Find(childName) finds it directly. Not restricted to "not already
+                // a child of root": if it's a child of root but misnamed, reparenting to the same
+                // parent is a harmless no-op and the rename below is what actually fixes it.
+                var elsewhere = TsLinkedScene.FindType(componentType);
+                if (elsewhere != null && elsewhere.gameObject != root.gameObject)
+                {
+                    childGo = elsewhere.gameObject;
+                    Undo.SetTransformParent(childGo.transform, root.transform, $"Reparent {childName}");
+                    if (childGo.name != childName)
+                    {
+                        Undo.RecordObject(childGo, $"Rename {childName}");
+                        childGo.name = childName;
+                    }
+                    EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+                    Debug.Log($"[TsGenerator] Found an existing {childName} outside {CompiledClassName}'s hierarchy and moved it back, instead of creating a new empty one.");
+                }
+                else
+                {
+                    childGo = new GameObject(childName);
+                    Undo.RegisterCreatedObjectUndo(childGo, $"Create {childName}");
+                    childGo.transform.SetParent(root.transform, false);
+                    AddChildComponent(childGo, componentType, isUdonSharp);
+                    EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+                    Debug.Log($"[TsGenerator] Created {childName} child under {CompiledClassName}.");
+                }
             }
             else
             {
@@ -290,6 +351,18 @@ namespace {CompiledNamespace}
             }
         }
 
+        // "Root/Child/Grandchild" style path, for naming a specific GameObject in a diagnostic
+        // without requiring the reader to go hunting for it in the Hierarchy. internal, not
+        // private: also used by TsGenerator's own ambiguous-TsConfig diagnostic.
+        internal static string GameObjectPath(GameObject go)
+        {
+            var segments = new List<string>();
+            for (var t = go.transform; t != null; t = t.parent)
+                segments.Add(t.name);
+            segments.Reverse();
+            return string.Join("/", segments);
+        }
+
         private static void AddChildComponent(GameObject go, Type componentType, bool isUdonSharp)
         {
             if (isUdonSharp)
@@ -304,17 +377,32 @@ namespace {CompiledNamespace}
             Undo.RegisterCreatedObjectUndo(component, $"Add {componentType.Name}");
         }
 
+        // Scoped to the linked scene once one is configured, exactly like every other lookup in
+        // this module: an unrelated same-named GameObject in an additively-loaded scene must
+        // never be found (and its duplicates destroyed) by this scan. Falls back to scanning
+        // every loaded scene only when nothing is configured yet.
         private static List<GameObject> FindSceneGameObjects(string name)
         {
             var result = new List<GameObject>();
+            foreach (var scene in ScenesToScan())
+                foreach (var root in scene.GetRootGameObjects())
+                    CollectInHierarchy(root, name, result);
+            return result;
+        }
+
+        private static IEnumerable<Scene> ScenesToScan()
+        {
+            if (TsLinkedScene.IsConfigured)
+            {
+                var linked = TsLinkedScene.FindLoadedScene();
+                if (linked.HasValue) yield return linked.Value;
+                yield break;
+            }
             for (int i = 0; i < SceneManager.sceneCount; i++)
             {
                 var scene = SceneManager.GetSceneAt(i);
-                if (!scene.isLoaded) continue;
-                foreach (var root in scene.GetRootGameObjects())
-                    CollectInHierarchy(root, name, result);
+                if (scene.isLoaded) yield return scene;
             }
-            return result;
         }
 
         private static void CollectInHierarchy(GameObject root, string name, List<GameObject> result)
