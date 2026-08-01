@@ -20,6 +20,7 @@ namespace Tsvrc.Tests.EditMode
             // resets TsPaths.GeneratedFolder. Redirecting it to scratch keeps this test from
             // ever writing under a real project's Assets/TsGenerated/.cache.
             _scope = new TempSceneScope();
+            ScratchAssets.EnsureFolder();
             TsPaths.GeneratedFolder = ScratchAssets.Folder + "/SnapshotScratch";
         }
 

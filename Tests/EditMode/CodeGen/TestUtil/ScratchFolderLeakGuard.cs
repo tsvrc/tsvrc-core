@@ -1,3 +1,4 @@
+using System.IO;
 using NUnit.Framework;
 using UnityEditor;
 
@@ -14,7 +15,12 @@ namespace Tsvrc.Tests.EditMode
         [OneTimeTearDown]
         public void AssertNoScratchDebrisLeft()
         {
-            Assert.IsFalse(AssetDatabase.IsValidFolder(ScratchAssets.Folder),
+            // Checks the real filesystem too, not just AssetDatabase.IsValidFolder: raw file I/O
+            // under this folder (ModuleEntrySnapshot's cache writes, or a test that redirected
+            // TsPaths.GeneratedFolder here without calling EnsureFolder() first) can leave real
+            // debris on disk that AssetDatabase never learned about, which would otherwise let
+            // this check pass while a __Scratch__ folder still sits in the working tree.
+            Assert.IsFalse(AssetDatabase.IsValidFolder(ScratchAssets.Folder) || Directory.Exists(ScratchAssets.Folder),
                 $"'{ScratchAssets.Folder}' still exists after the full EditMode run - some test " +
                 "created scratch assets and did not clean them up (ScratchAssets.DeleteAll() / " +
                 "TsGeneratorTestHarness.Dispose() was skipped or threw before reaching it).");

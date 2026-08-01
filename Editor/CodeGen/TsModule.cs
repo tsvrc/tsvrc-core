@@ -53,7 +53,7 @@ namespace Tsvrc.Editor
         {
             var compiledType = ScaffoldModule.FindCompiledType();
             if (compiledType == null) return null;
-            return (Component)UnityEngine.Object.FindObjectOfType(compiledType, true);
+            return TsLinkedScene.FindType(compiledType);
         }
 
         // Tries reflection first: it is fast, exact, and correct even if two differently based
@@ -93,7 +93,10 @@ namespace Tsvrc.Editor
         // type always reflects normally and never needs the fallback. Mirrors
         // IsTsvrcBehaviourType's identical two-tier shape, applied to resolving a type's
         // identity instead of testing its base-class membership.
-        protected static bool TryResolveObjectType(UnityEngine.Object obj, out string typeName, out string ns)
+        // internal, not protected: ObjectListGUI (not a TsModule subclass) also calls this
+        // directly, to show a user which type tsvrc will actually resolve a reference to even
+        // while the project doesn't currently compile - see its own DrawResolvedTypeHint.
+        internal static bool TryResolveObjectType(UnityEngine.Object obj, out string typeName, out string ns)
         {
             typeName = null;
             ns = null;
@@ -195,6 +198,55 @@ namespace Tsvrc.Editor
         {
             if (so.ApplyModifiedProperties())
                 EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+        }
+
+        // The "no entries" fallback every module with a FileName falls back to: header, optional
+        // usings, the namespace/class wrapper, and zero or more empty methods inside it. usings
+        // may be null to omit the using block entirely (matching a module with no dependencies).
+        protected static string BuildStub(IEnumerable<string> usings, params string[] emptyMethodSignatures)
+        {
+            var w = new UdonWriter();
+            w.AutoGenHeader();
+            w.BlankLine();
+            if (usings != null) w.Usings(usings);
+            using (w.Namespace(ScaffoldModule.CompiledNamespace))
+            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
+                foreach (var signature in emptyMethodSignatures)
+                    using (w.Method(signature)) { }
+            return w.ToString();
+        }
+
+        // Resolves a serialized field by name during Wire(), logging the module's standard
+        // "force compile to regenerate" warning when it's missing - for example because the
+        // field was only just added to GenerateCode()'s output and the project hasn't recompiled
+        // yet. Callers should skip that entry rather than throw.
+        protected static bool TryFindField(SerializedObject so, string fieldName, string moduleTag, out SerializedProperty prop)
+        {
+            prop = so.FindProperty(fieldName);
+            if (prop != null) return true;
+            Debug.LogWarning($"[{moduleTag}] Field '{fieldName}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
+            return false;
+        }
+
+        // Null and duplicate config entries share the same skip-and-warn shape across modules
+        // that resolve a scene/asset object list (Singletons, Constructs): a null slot means a
+        // referenced object was deleted, a repeat means the same object was dragged in twice.
+        // Both are user config mistakes to fix, not generator bugs, so they're logged and
+        // skipped rather than thrown. configLabel/entryNoun preserve each module's own existing
+        // wording ("config" vs "Constructs config", "entry" vs "construct") exactly.
+        protected static bool TryAcceptEntry(UnityEngine.Object obj, string moduleTag, string configLabel, string entryNoun, HashSet<UnityEngine.Object> seen)
+        {
+            if (obj == null)
+            {
+                Debug.LogWarning($"[{moduleTag}] Null entry in {configLabel}, remove the missing-script slot.");
+                return false;
+            }
+            if (!seen.Add(obj))
+            {
+                Debug.LogWarning($"[{moduleTag}] Duplicate {entryNoun} '{obj.name}' in config, remove the duplicate.");
+                return false;
+            }
+            return true;
         }
     }
 }

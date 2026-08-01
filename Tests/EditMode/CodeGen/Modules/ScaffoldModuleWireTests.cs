@@ -75,6 +75,14 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void AfterFilesStable_MultipleExistingInstances_KeepsFirstDestroysRest()
         {
+            // UdonSharpUndo.AddComponent needs a real program asset for TestGenerated to already
+            // exist - normally AfterFilesStable() itself creates one (see its own
+            // EnsureUdonSharpProgramAsset call), but that hasn't run yet at this point in the
+            // test, so it's created here first at the exact path AfterFilesStable() would use.
+            // EnsureUdonSharpProgramAsset is idempotent, so AfterFilesStable()'s own call below
+            // is a safe no-op against this same asset.
+            Assert.IsTrue(ScaffoldModule.EnsureUdonSharpProgramAsset(TestGeneratedScriptPath, ScratchAssets.Folder + "/TestGenerated.asset"));
+
             var first = _scope.CreateGameObject("First");
             UdonSharpUndo.AddComponent(first, CompiledType);
             var second = _scope.CreateGameObject("Second");

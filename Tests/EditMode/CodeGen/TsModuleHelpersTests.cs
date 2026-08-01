@@ -1,9 +1,12 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using Tsvrc.Config;
 using Tsvrc.Editor;
 using Tsvrc.StateMachine;
 using Tsvrc.Testing.Framework;
+using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -37,6 +40,15 @@ namespace Tsvrc.Tests.EditMode
             => ApplySnapshotFallback(moduleKey, resolved,
                 s => new ModuleEntrySnapshot.Entry { Name = s, TypeName = s, Namespace = "" },
                 e => e.Name);
+
+        internal static string CallBuildStub(IEnumerable<string> usings, params string[] emptyMethodSignatures)
+            => BuildStub(usings, emptyMethodSignatures);
+
+        internal static bool CallTryFindField(SerializedObject so, string fieldName, string moduleTag, out SerializedProperty prop)
+            => TryFindField(so, fieldName, moduleTag, out prop);
+
+        internal static bool CallTryAcceptEntry(UnityEngine.Object obj, string moduleTag, string configLabel, string entryNoun, HashSet<UnityEngine.Object> seen)
+            => TryAcceptEntry(obj, moduleTag, configLabel, entryNoun, seen);
     }
 
     public class TsModuleHelpersTests
@@ -211,6 +223,7 @@ namespace Tsvrc.Tests.EditMode
         public void SetUpFallbackScope()
         {
             _fallbackScope = new TempSceneScope();
+            ScratchAssets.EnsureFolder();
             TsPaths.GeneratedFolder = ScratchAssets.Folder + "/ApplySnapshotFallbackScratch";
         }
 
@@ -367,6 +380,94 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsTrue(result);
             Assert.AreEqual("StateManager", typeName);
             Assert.AreEqual("Tsvrc.StateMachine", ns);
+        }
+
+        [Test]
+        public void BuildStub_NoUsingsNoMethods_OmitsUsingBlockAndWritesEmptyClass()
+        {
+            string code = TsModuleTestHarness.CallBuildStub(null);
+
+            StringAssert.DoesNotContain("using ", code);
+            StringAssert.Contains($"public partial class {ScaffoldModule.CompiledClassName}", code);
+        }
+
+        [Test]
+        public void BuildStub_WithUsingsAndOneMethod_WritesUsingsAndEmptyMethodBody()
+        {
+            string code = TsModuleTestHarness.CallBuildStub(new[] { "UdonSharp", "UnityEngine" }, "public void _TsPoolStart()");
+
+            StringAssert.Contains("using UdonSharp;", code);
+            StringAssert.Contains("using UnityEngine;", code);
+            StringAssert.Contains("public void _TsPoolStart()", code);
+        }
+
+        [Test]
+        public void BuildStub_MultipleMethodSignatures_WritesEachOne()
+        {
+            string code = TsModuleTestHarness.CallBuildStub(null, "public void A()", "public void B()");
+
+            StringAssert.Contains("public void A()", code);
+            StringAssert.Contains("public void B()", code);
+        }
+
+        [Test]
+        public void TryFindField_FieldExists_ReturnsTrueWithProperty()
+        {
+            var behaviour = _fallbackScope.CreateGameObject("Anything").AddComponent<StateManager>();
+            var so = new SerializedObject(behaviour);
+
+            bool result = TsModuleTestHarness.CallTryFindField(so, "m_Enabled", "SomeModule", out var prop);
+
+            Assert.IsTrue(result);
+            Assert.IsNotNull(prop);
+        }
+
+        [Test]
+        public void TryFindField_FieldMissing_LogsForceCompileWarningAndReturnsFalse()
+        {
+            var behaviour = _fallbackScope.CreateGameObject("Anything").AddComponent<StateManager>();
+            var so = new SerializedObject(behaviour);
+
+            LogAssert.Expect(LogType.Warning, "[SomeModule] Field 'NoSuchField' not found on TsGenerated. Force compile to regenerate.");
+            bool result = TsModuleTestHarness.CallTryFindField(so, "NoSuchField", "SomeModule", out var prop);
+
+            Assert.IsFalse(result);
+            Assert.IsNull(prop);
+        }
+
+        [Test]
+        public void TryAcceptEntry_NullObject_LogsNullEntryWarningWithGivenConfigLabelAndReturnsFalse()
+        {
+            var seen = new HashSet<UnityEngine.Object>();
+
+            LogAssert.Expect(LogType.Warning, "[SomeModule] Null entry in Constructs config, remove the missing-script slot.");
+            bool result = TsModuleTestHarness.CallTryAcceptEntry(null, "SomeModule", "Constructs config", "construct", seen);
+
+            Assert.IsFalse(result);
+        }
+
+        [Test]
+        public void TryAcceptEntry_DuplicateObject_LogsDuplicateWarningWithGivenEntryNounAndReturnsFalse()
+        {
+            var config = _fallbackScope.CreateGameObject("Dup").AddComponent<TsConfig>();
+            var seen = new HashSet<UnityEngine.Object> { config };
+
+            LogAssert.Expect(LogType.Warning, "[SomeModule] Duplicate construct 'Dup' in config, remove the duplicate.");
+            bool result = TsModuleTestHarness.CallTryAcceptEntry(config, "SomeModule", "Constructs config", "construct", seen);
+
+            Assert.IsFalse(result);
+        }
+
+        [Test]
+        public void TryAcceptEntry_NewValidObject_ReturnsTrueAndAddsItToSeen()
+        {
+            var config = _fallbackScope.CreateGameObject("Fresh").AddComponent<TsConfig>();
+            var seen = new HashSet<UnityEngine.Object>();
+
+            bool result = TsModuleTestHarness.CallTryAcceptEntry(config, "SomeModule", "config", "entry", seen);
+
+            Assert.IsTrue(result);
+            Assert.IsTrue(seen.Contains(config));
         }
     }
 }

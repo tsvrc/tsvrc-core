@@ -44,7 +44,7 @@ namespace Tsvrc.Editor
 
         internal override void LoadConfig()
         {
-            var sceneConfig = UnityEngine.Object.FindObjectOfType<TsConfig>(true);
+            var sceneConfig = TsLinkedScene.Find<TsConfig>();
             var builtinConfig = AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(BuiltinConfigPath);
 
             var sceneSingletons = Array.Empty<UnityEngine.Object>();
@@ -103,17 +103,7 @@ namespace Tsvrc.Editor
             return w.ToString();
         }
 
-        private static string BuildStub()
-        {
-            var w = new UdonWriter();
-            w.AutoGenHeader();
-            w.BlankLine();
-            using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
-            using (w.Method("public void _TsSingletonStart()"))
-            { }
-            return w.ToString();
-        }
+        private static string BuildStub() => BuildStub(null, "public void _TsSingletonStart()");
 
         internal override void Wire()
         {
@@ -123,12 +113,7 @@ namespace Tsvrc.Editor
             var so = new SerializedObject(root);
             foreach (var entry in _entries)
             {
-                var prop = so.FindProperty(entry.Name);
-                if (prop == null)
-                {
-                    Debug.LogWarning($"[SingletonModule] Field '{entry.Name}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
-                    continue;
-                }
+                if (!TryFindField(so, entry.Name, "SingletonModule", out var prop)) continue;
                 prop.objectReferenceValue = entry.SourceObject;
             }
 
@@ -143,16 +128,7 @@ namespace Tsvrc.Editor
 
             foreach (var obj in objects)
             {
-                if (obj == null)
-                {
-                    Debug.LogWarning("[SingletonModule] Null entry in config, remove the missing-script slot.");
-                    continue;
-                }
-                if (!seen.Add(obj))
-                {
-                    Debug.LogWarning($"[SingletonModule] Duplicate entry '{obj.name}' in config, remove the duplicate.");
-                    continue;
-                }
+                if (!TryAcceptEntry(obj, "SingletonModule", "config", "entry", seen)) continue;
 
                 if (!TryResolveObjectType(obj, out string typeName, out string ns))
                 {

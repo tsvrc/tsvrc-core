@@ -132,7 +132,7 @@ namespace Tsvrc.Editor
 
         internal override void LoadConfig()
         {
-            var userConfig = UnityEngine.Object.FindObjectOfType<TsConfig>(true);
+            var userConfig = TsLinkedScene.Find<TsConfig>();
             var builtinConfig = AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(BuiltinConfigPath);
             var resolved = BuildEntries(userConfig, builtinConfig);
             _entries = ApplySnapshotFallback(SnapshotKey, resolved,
@@ -196,17 +196,7 @@ namespace Tsvrc.Editor
             return w.ToString();
         }
 
-        private static string BuildStub()
-        {
-            var w = new UdonWriter();
-            w.AutoGenHeader();
-            w.BlankLine();
-            w.Usings(new[] { "UdonSharp", "UnityEngine" });
-            using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
-            { }
-            return w.ToString();
-        }
+        private static string BuildStub() => BuildStub(new[] { "UdonSharp", "UnityEngine" });
 
         internal override bool OnSceneHierarchyChanged()
         {
@@ -250,12 +240,7 @@ namespace Tsvrc.Editor
                     continue;
                 }
 
-                var prop = so.FindProperty(FieldName(entry.Name));
-                if (prop == null)
-                {
-                    Debug.LogWarning($"[FactoryModule] Field '{FieldName(entry.Name)}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
-                    continue;
-                }
+                if (!TryFindField(so, FieldName(entry.Name), "FactoryModule", out var prop)) continue;
 
                 var (container, instance) = CreateAndAssignInstance(prop, entry.PrefabAsset, entry.Name, factoriesContainer, root.transform);
                 factoriesContainer = container;

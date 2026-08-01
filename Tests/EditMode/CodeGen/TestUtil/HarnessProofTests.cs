@@ -1,3 +1,4 @@
+using System.IO;
 using NUnit.Framework;
 using Tsvrc.Config;
 using Tsvrc.Core.Generated;
@@ -38,6 +39,25 @@ namespace Tsvrc.Tests.EditMode
             ScratchAssets.DeleteAll();
             Assert.IsFalse(AssetDatabase.IsValidFolder(ScratchAssets.Folder));
             Assert.IsNull(AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(assetPath));
+        }
+
+        [Test]
+        public void ScratchAssets_DeleteAll_FolderExistsOnDiskButAssetDatabaseNeverLearnedAboutIt_DeletesItAnyway()
+        {
+            // Reproduces the actual bug this fallback exists for: ModuleEntrySnapshot.Save
+            // writes via raw Directory.CreateDirectory/File.WriteAllText, never calling
+            // AssetDatabase.Refresh(), so AssetDatabase.IsValidFolder never becomes true even
+            // though real files sit on disk - the exact condition that used to leave the
+            // __Scratch__ folder behind indefinitely.
+            Directory.CreateDirectory(ScratchAssets.Folder + "/RawlyCreated");
+            File.WriteAllText(ScratchAssets.Folder + "/RawlyCreated/debris.txt", "debris");
+            Assert.IsFalse(AssetDatabase.IsValidFolder(ScratchAssets.Folder),
+                "Precondition: AssetDatabase must not know about a raw-created folder.");
+
+            ScratchAssets.DeleteAll();
+
+            Assert.IsFalse(Directory.Exists(ScratchAssets.Folder),
+                "DeleteAll() must remove the folder from disk even when AssetDatabase never learned about it.");
         }
 
         [Test]

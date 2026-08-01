@@ -21,6 +21,22 @@ namespace Tsvrc.Editor
         // aside from the seen-set mutation, so it's testable without a real SerializedProperty/array.
         internal static bool IsDuplicate(Object obj, HashSet<Object> seen) => obj != null && !seen.Add(obj);
 
+        // Unity's PropertyField widget can only display a component's real type while the
+        // project compiles - a "Missing (Mono Script)" reference always renders as a blank type,
+        // with no way to tell what it points at. Resolves it anyway via
+        // TsModule.TryResolveObjectType, the same ScriptIndex-backed fallback Wire()/GenerateCode()
+        // already use. No-op when the live type already resolves fine on its own.
+        private static void DrawResolvedTypeHint(Object obj)
+        {
+            if (!(obj is Component component)) return;
+            if (component.GetType() != typeof(MonoBehaviour)) return;
+
+            string hint = TsModule.TryResolveObjectType(obj, out string typeName, out _)
+                ? $"detected as {typeName} (compile currently broken)"
+                : "could not detect a type for this reference (compile currently broken)";
+            EditorGUILayout.LabelField("   ↳ " + hint, EditorStyles.miniLabel);
+        }
+
         // Convenience overload for a top-level Object[] property (Singletons, Pool, Constructs).
         internal static void DrawObjectList(SerializedObject so, string propertyName, string emptyHint = null,
             bool assetsOnly = false, bool warnDuplicates = false)
@@ -48,6 +64,8 @@ namespace Tsvrc.Editor
                 if (DeleteButton())
                     toDelete = i;
                 EditorGUILayout.EndHorizontal();
+
+                DrawResolvedTypeHint(element.objectReferenceValue);
 
                 if (assetsOnly && IsSceneInstance(element.objectReferenceValue))
                     TsEditorGUI.DrawStatusBox(

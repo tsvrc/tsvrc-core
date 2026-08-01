@@ -57,7 +57,7 @@ namespace Tsvrc.Editor
 
         internal override void LoadConfig()
         {
-            var userConfig = UnityEngine.Object.FindObjectOfType<TsConfig>(true);
+            var userConfig = TsLinkedScene.Find<TsConfig>();
             var builtinConfig = AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(BuiltinConfigPath);
 
             _poolEntries = ResolveConfig(userConfig, builtinConfig);
@@ -111,8 +111,9 @@ namespace Tsvrc.Editor
         // contributes one external slot for the referenced type.
         private void ScanExternalRefs()
         {
-            var scene = SceneManager.GetActiveScene();
-            foreach (var rootGo in scene.GetRootGameObjects())
+            var scene = TsLinkedScene.SceneToScan;
+            if (scene == null) return;
+            foreach (var rootGo in scene.Value.GetRootGameObjects())
                 foreach (var behaviour in rootGo.GetComponentsInChildren<MonoBehaviour>(true))
                 {
                     // GetComponentsInChildren<MonoBehaviour> includes a null entry for any
@@ -234,18 +235,7 @@ namespace Tsvrc.Editor
             return w.ToString();
         }
 
-        private static string BuildStub()
-        {
-            var w = new UdonWriter();
-            w.AutoGenHeader();
-            w.BlankLine();
-            w.Usings(new[] { "UdonSharp", "UnityEngine" });
-            using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
-            using (w.Method("public void _TsPoolStart()"))
-            { }
-            return w.ToString();
-        }
+        private static string BuildStub() => BuildStub(new[] { "UdonSharp", "UnityEngine" }, "public void _TsPoolStart()");
 
         internal override bool OnSceneHierarchyChanged()
         {
@@ -333,11 +323,8 @@ namespace Tsvrc.Editor
 
                     instances.Add(instanceComponent);
 
-                    var initProp = so.FindProperty(SlotFieldName(typeName, i));
-                    if (initProp != null)
+                    if (TryFindField(so, SlotFieldName(typeName, i), "PoolModule", out var initProp))
                         initProp.objectReferenceValue = instanceComponent;
-                    else
-                        Debug.LogWarning($"[PoolModule] Field '{SlotFieldName(typeName, i)}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
                 }
             }
 

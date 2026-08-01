@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Tsvrc.Core;
 using Tsvrc.Config;
 using UnityEditor;
 using UnityEngine;
@@ -28,7 +27,7 @@ namespace Tsvrc.Editor
 
         internal override void LoadConfig()
         {
-            var sceneConfig = UnityEngine.Object.FindObjectOfType<TsConfig>(true);
+            var sceneConfig = TsLinkedScene.Find<TsConfig>();
 
             // Deliberately does NOT early-return an empty result when sceneConfig is null: that
             // would bypass ApplySnapshotFallback below, meaning a compile-broken pass on a scene
@@ -87,17 +86,7 @@ namespace Tsvrc.Editor
             return w.ToString();
         }
 
-        private static string BuildStub()
-        {
-            var w = new UdonWriter();
-            w.AutoGenHeader();
-            w.BlankLine();
-            using (w.Namespace(ScaffoldModule.CompiledNamespace))
-            using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
-            using (w.Method("public void _TsConstructStart()"))
-            { }
-            return w.ToString();
-        }
+        private static string BuildStub() => BuildStub(null, "public void _TsConstructStart()");
 
         internal override void Wire()
         {
@@ -113,12 +102,7 @@ namespace Tsvrc.Editor
                     continue;
                 }
 
-                var prop = so.FindProperty(FieldName(entry.Name));
-                if (prop == null)
-                {
-                    Debug.LogWarning($"[ConstructModule] Field '{FieldName(entry.Name)}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
-                    continue;
-                }
+                if (!TryFindField(so, FieldName(entry.Name), "ConstructModule", out var prop)) continue;
 
                 prop.objectReferenceValue = entry.SourceObject;
             }
@@ -136,16 +120,7 @@ namespace Tsvrc.Editor
 
             foreach (var obj in constructs)
             {
-                if (obj == null)
-                {
-                    Debug.LogWarning("[ConstructModule] Null entry in Constructs config, remove the missing-script slot.");
-                    continue;
-                }
-                if (!seen.Add(obj))
-                {
-                    Debug.LogWarning($"[ConstructModule] Duplicate construct '{obj.name}' in config, remove the duplicate.");
-                    continue;
-                }
+                if (!TryAcceptEntry(obj, "ConstructModule", "Constructs config", "construct", seen)) continue;
 
                 if (!(obj is Component component))
                 {

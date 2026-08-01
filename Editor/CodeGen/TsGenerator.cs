@@ -48,6 +48,58 @@ namespace Tsvrc.Editor
         private static List<TsModule> _activeModules;
         private static HashSet<string> _watchedComponentTypeNames = new HashSet<string>(StringComparer.Ordinal);
         private static bool _rerunPending;
+
+        // True for the entire duration of an automated test run (EditMode or PlayMode), computed
+        // once from the process's real command line. This is the only signal available at the
+        // one moment TsDomainReloadHandler's static constructor fires: right after the very first
+        // domain reload, before Unity Test Framework has discovered or started running anything,
+        // so no test-side SetUpFixture has had a chance to run yet either. See
+        // AutomaticTriggersSuppressed for the second, complementary signal that covers everything
+        // after that moment.
+        private static readonly bool IsAutomatedTestProcess = ComputeIsAutomatedTestProcess(Environment.GetCommandLineArgs());
+
+        // Ref-counted rather than a bool so nested SuppressAutomaticTriggers() scopes (for
+        // example a [SetUpFixture] wrapping a whole test assembly's run, with an individual
+        // test's own harness also taking a scope inside it) compose correctly: suppression only
+        // lifts once every scope that requested it has been disposed.
+        private static int _suppressionDepth;
+
+        // The one flag every automatic (non-explicit) entry point below must check before
+        // scheduling or running a real pass: the domain-reload trigger, the hierarchyChanged
+        // watch armed by a completed Run(), and the asset-watcher trigger (via ScheduleRerun()).
+        // Deliberate, explicit calls a test makes directly - Run(), AfterDomainReload() - are
+        // never gated by this: gating those would break every CodeGen test that drives TsGenerator
+        // on purpose to test it. Only the reactive paths that would otherwise fire against
+        // whatever scene Unity Test Framework happens to have open are suppressed.
+        internal static bool AutomaticTriggersSuppressed => _suppressionDepth > 0 || IsAutomatedTestProcess;
+
+        // Held by a [SetUpFixture] in each test assembly (Tsvrc.Tests.EditMode,
+        // Tsvrc.Tests.PlayMode) for the whole run, so no reactive trigger can regenerate
+        // TsGenerated against a test's temp/synthetic scene and corrupt a consuming project's
+        // real generated files. Safe to nest.
+        internal static IDisposable SuppressAutomaticTriggers() => new SuppressionScope();
+
+        private sealed class SuppressionScope : IDisposable
+        {
+            private bool _disposed;
+            internal SuppressionScope() => _suppressionDepth++;
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _suppressionDepth--;
+            }
+        }
+
+        // Pure and testable on its own: TsDomainReloadHandler used to duplicate this exact
+        // parsing logic locally. One source of truth here instead.
+        internal static bool ComputeIsAutomatedTestProcess(string[] commandLineArgs)
+        {
+            foreach (var arg in commandLineArgs)
+                if (string.Equals(arg, "-runTests", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
+        }
         // Suppresses the rerun during the Wire pass itself, since Wire() assigns SerializedObject
         // properties, which fires OnPostprocessModifications.
         private static bool _isWiring;
@@ -109,6 +161,12 @@ namespace Tsvrc.Editor
         private static void RunCore(bool skipRefresh, bool allowBootstrap)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            // Once a project has linked a scene (Tsvrc > Configure), no other loaded scene - a
+            // test's temp scene, or simply having something else open - is ever a legitimate
+            // source of scene config. See TsLinkedScene's own doc comment for why this matters
+            // more than just gating automatic triggers: an explicit Run()/ManualGenerate() call
+            // must be just as safe, not only the reactive paths.
+            if (TsLinkedScene.IsConfiguredButNotLoaded) return;
             EditorApplication.hierarchyChanged -= OnHierarchyChanged;
             Undo.postprocessModifications -= OnPostprocessModifications;
             _activeModules = null;
@@ -203,6 +261,7 @@ namespace Tsvrc.Editor
         private static void WaitForBootstrapSignal()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            if (AutomaticTriggersSuppressed) return;
             if (!HasBootstrapSignal()) return;
             EditorApplication.hierarchyChanged -= WaitForBootstrapSignal;
             Run(allowBootstrap: true);
@@ -216,10 +275,10 @@ namespace Tsvrc.Editor
         // warned.
         internal static bool HasBootstrapSignal()
         {
-            if (UnityEngine.Object.FindObjectOfType<TsConfig>(true) != null) return true;
+            if (TsLinkedScene.Find<TsConfig>() != null) return true;
 
             var compiledType = ScaffoldModule.FindCompiledType();
-            if (compiledType != null && UnityEngine.Object.FindObjectOfType(compiledType, true) != null) return true;
+            if (compiledType != null && TsLinkedScene.FindType(compiledType) != null) return true;
 
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -237,6 +296,7 @@ namespace Tsvrc.Editor
 
         internal static void ScheduleRerun()
         {
+            if (AutomaticTriggersSuppressed) return;
             if (_rerunPending) return;
             _rerunPending = true;
             EditorApplication.delayCall += RunScheduled;

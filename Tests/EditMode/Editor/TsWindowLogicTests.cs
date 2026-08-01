@@ -117,6 +117,20 @@ namespace Tsvrc.Tests.EditMode
             TsWindow.DetermineStatus(hasConfig, isBootstrapPending, isPlayMode);
 
         [Test]
+        public void DetermineLinkedSceneWarning_NotConfiguredButNotLoaded_ReturnsNull()
+        {
+            Assert.IsNull(TsWindow.DetermineLinkedSceneWarning("Assets/Foo.unity", isConfiguredButNotLoaded: false));
+        }
+
+        [Test]
+        public void DetermineLinkedSceneWarning_ConfiguredButNotLoaded_MentionsScenePath()
+        {
+            string message = TsWindow.DetermineLinkedSceneWarning("Assets/MoL/Scenes/MoL.unity", isConfiguredButNotLoaded: true);
+
+            StringAssert.Contains("Assets/MoL/Scenes/MoL.unity", message);
+        }
+
+        [Test]
         public void DetermineCollisionWarning_NoCollisions_ReturnsNull()
         {
             Assert.IsNull(TsWindow.DetermineCollisionWarning(new List<string>()));

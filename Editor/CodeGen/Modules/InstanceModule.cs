@@ -178,12 +178,7 @@ namespace Tsvrc.Editor
         private static void SetInstanceField(Component root, UdonSharpBehaviour value)
         {
             var so = new SerializedObject(root);
-            var prop = so.FindProperty(FieldName);
-            if (prop == null)
-            {
-                Debug.LogWarning($"[InstanceModule] Field '{FieldName}' not found on {ScaffoldModule.CompiledClassName}. Force compile to regenerate.");
-                return;
-            }
+            if (!TryFindField(so, FieldName, "InstanceModule", out var prop)) return;
 
             if (prop.objectReferenceValue == (UnityEngine.Object)value) return;
 

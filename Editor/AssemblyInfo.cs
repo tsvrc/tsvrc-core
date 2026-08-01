@@ -4,3 +4,7 @@ using System.Runtime.CompilerServices;
 // helpers, module slot-count/parsing logic, etc.) directly instead of via
 // reflection.
 [assembly: InternalsVisibleTo("Tsvrc.Tests.EditMode")]
+
+// Lets Tests/PlayMode reach TsGenerator.SuppressAutomaticTriggers(), the test-isolation seam
+// its own [SetUpFixture] uses to stop reactive codegen regeneration during a PlayMode run.
+[assembly: InternalsVisibleTo("Tsvrc.Tests.PlayMode")]

@@ -26,6 +26,10 @@ namespace Tsvrc.Tests.EditMode
         internal TempSceneScope()
         {
             Scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            // Points TsLinkedScene at this scope's own synthetic scene (an unsaved scene's path
+            // is always ""), so CodeGen tests keep resolving their own TsConfig regardless of
+            // what a real consuming project has configured via Tsvrc > Configure.
+            TsLinkedScene.SetOverride(Scene.path);
         }
 
         internal GameObject CreateGameObject(string name)
@@ -42,6 +46,7 @@ namespace Tsvrc.Tests.EditMode
                 if (go != null) UnityEngine.Object.DestroyImmediate(go);
             _tracked.Clear();
             TsPaths.ResetToDefaults();
+            TsLinkedScene.ClearOverride();
         }
     }
 }

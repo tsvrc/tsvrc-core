@@ -20,7 +20,19 @@ namespace Tsvrc.Tests.EditMode
         internal static void DeleteAll()
         {
             if (AssetDatabase.IsValidFolder(Folder))
+            {
                 AssetDatabase.DeleteAsset(Folder);
+                return;
+            }
+            // AssetDatabase may not know this folder exists at all if something wrote into it via
+            // raw File/Directory I/O without ever refreshing first (ModuleEntrySnapshot's own
+            // cache writes do exactly this), or a test redirected TsPaths.GeneratedFolder here
+            // without calling EnsureFolder() first. Delete straight from disk too, including a
+            // stray .meta, so a leak like that can never survive past this test's own TearDown.
+            if (Directory.Exists(Folder))
+                Directory.Delete(Folder, recursive: true);
+            if (File.Exists(Folder + ".meta"))
+                File.Delete(Folder + ".meta");
         }
     }
 }

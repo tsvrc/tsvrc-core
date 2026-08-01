@@ -4,6 +4,7 @@
     "references": [
         "UnityEngine.TestRunner",
         "Tsvrc.Runtime",
+        "Tsvrc.Editor",
         "Tsvrc.Tests.Doubles",
         "Tsvrc.Testing.Framework",
         "UdonSharp.Runtime",
