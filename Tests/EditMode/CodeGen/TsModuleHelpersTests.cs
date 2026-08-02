@@ -46,8 +46,10 @@ namespace Tsvrc.Tests.EditMode
         // above: ApplyTreeShaking's own branching (config null/off, force-include, referenced,
         // grace period) doesn't care about entry shape, only about the name each entry maps to.
         internal static List<string> CallApplyTreeShaking(TsConfig config, List<string> resolved,
-            System.Func<string, bool> isReferenced, out int excludedCount, out List<string> excludedNames, out List<string> graceIncludedNames)
-            => ApplyTreeShaking(config, "TestModule", resolved, s => s, isReferenced, out excludedCount, out excludedNames, out graceIncludedNames);
+            System.Func<string, bool> isReferenced, out int excludedCount, out List<string> excludedNames, out List<string> graceIncludedNames,
+            bool countsForGracePeriod = true)
+            => ApplyTreeShaking(config, "TestModule", resolved, s => s, isReferenced, out excludedCount, out excludedNames, out graceIncludedNames,
+                countsForGracePeriod);
 
         internal static string CallBuildStub(IEnumerable<string> usings, params string[] emptyMethodSignatures)
             => BuildStub(usings, emptyMethodSignatures);
@@ -696,6 +698,83 @@ namespace Tsvrc.Tests.EditMode
             Assert.AreEqual(1, excluded);
             CollectionAssert.AreEqual(new[] { "Dead" }, names);
             Assert.IsEmpty(grace);
+        }
+
+        // A pass caused only by a reactive trigger unrelated to a real recompile
+        // (countsForGracePeriod: false) must still show an accurate, current result, but must
+        // never consume or reset any entry's grace-period miss-streak, since the developer had no
+        // real opportunity in that pass to reference the entry.
+        [Test]
+        public void ApplyTreeShaking_CountsForGracePeriodFalse_KeepsUnreferencedEntryEvenOnWhatWouldOtherwiseBeTheSecondMiss()
+        {
+            var config = _fallbackScope.CreateGameObject("Cfg").AddComponent<TsConfig>();
+            config.TreeShakeUnused = true;
+            // A real pass consumes the first miss.
+            TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" }, _ => false, out _, out _, out _, countsForGracePeriod: true);
+
+            // A non-counting pass immediately after: would normally be the excluding second miss,
+            // but must not exclude, since it doesn't count.
+            var result = TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" },
+                _ => false, out int excluded, out var names, out var grace, countsForGracePeriod: false);
+
+            CollectionAssert.AreEqual(new[] { "A" }, result, "A non-counting pass must never exclude an entry.");
+            Assert.AreEqual(0, excluded);
+            Assert.IsEmpty(names);
+            CollectionAssert.AreEqual(new[] { "A" }, grace, "Still surfaced as grace-included, so nothing looks silently gone.");
+        }
+
+        [Test]
+        public void ApplyTreeShaking_CountsForGracePeriodFalse_LeavesPersistedMissStreakUntouchedForTheNextRealPass()
+        {
+            var config = _fallbackScope.CreateGameObject("Cfg").AddComponent<TsConfig>();
+            config.TreeShakeUnused = true;
+            // First real pass consumes the first miss.
+            TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" }, _ => false, out _, out _, out _, countsForGracePeriod: true);
+            // A non-counting pass in between must not reset or otherwise perturb that miss.
+            TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" }, _ => false, out _, out _, out _, countsForGracePeriod: false);
+
+            // The next real pass must see this as the genuine second consecutive real miss and
+            // exclude - proving the non-counting pass in between neither consumed nor reset state.
+            LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex(@"\[TestModule\] Excluded 'A'"));
+            var result = TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" },
+                _ => false, out int excluded, out var names, out var grace, countsForGracePeriod: true);
+
+            Assert.IsEmpty(result);
+            Assert.AreEqual(1, excluded);
+            CollectionAssert.AreEqual(new[] { "A" }, names);
+        }
+
+        // A broken compile anywhere in the project - not necessarily Tsvrc's own generated files -
+        // means live resolution can't be trusted, mirroring ApplySnapshotFallback's own gate, even
+        // though countsForGracePeriod itself is left at its default true.
+        [Test]
+        public void ApplyTreeShaking_ScriptCompilationFailed_DoesNotConsumeOrExcludeGraceEvenOnASecondPass()
+        {
+            var config = _fallbackScope.CreateGameObject("Cfg").AddComponent<TsConfig>();
+            config.TreeShakeUnused = true;
+            TsPaths.ScriptCompilationFailedOverride = false;
+            // First pass, compile clean: consumes the first miss.
+            TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" }, _ => false, out _, out _, out _);
+
+            TsPaths.ScriptCompilationFailedOverride = true;
+            var result = TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" },
+                _ => false, out int excluded, out var names, out var grace);
+
+            CollectionAssert.AreEqual(new[] { "A" }, result, "Must never exclude while the compile is broken.");
+            Assert.AreEqual(0, excluded);
+            Assert.IsEmpty(names);
+            CollectionAssert.AreEqual(new[] { "A" }, grace);
+
+            // Once clean again, the pre-break miss must still be exactly one, not reset and not
+            // double-counted by the broken-compile pass in between.
+            TsPaths.ScriptCompilationFailedOverride = false;
+            LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex(@"\[TestModule\] Excluded 'A'"));
+            var finalResult = TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" },
+                _ => false, out int finalExcluded, out var finalNames, out _);
+
+            Assert.IsEmpty(finalResult);
+            Assert.AreEqual(1, finalExcluded);
+            CollectionAssert.AreEqual(new[] { "A" }, finalNames);
         }
 
         // The attributed-drop reconciliation between ApplyTreeShaking's exclusions and

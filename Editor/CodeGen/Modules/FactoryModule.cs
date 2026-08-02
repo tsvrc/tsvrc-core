@@ -184,7 +184,8 @@ namespace Tsvrc.Editor
             // groups, since BuildEntries already merged them.
             resolved = ApplyTreeShaking(userConfig, "FactoryModule", resolved,
                 e => e.Name, name => TsUsageScanner.IsMethodCallReferenced($"Create{name}"),
-                out int excluded, out _lastExcluded, out _lastGraceIncluded);
+                out int excluded, out _lastExcluded, out _lastGraceIncluded,
+                TsGenerator.CurrentPassCountsForGracePeriod);
             _entries = ApplySnapshotFallback(SnapshotKey, resolved,
                 e => new ModuleEntrySnapshot.Entry { Name = e.Name, TypeName = e.TypeName, Namespace = e.TypeNamespace },
                 s => new FactoryEntry

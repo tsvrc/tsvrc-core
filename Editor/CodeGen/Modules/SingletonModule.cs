@@ -69,7 +69,8 @@ namespace Tsvrc.Editor
             // Builtin-sourced entries flow through the same filter as scene-sourced ones, since
             // combined above already merged them before Resolve() ran.
             resolved = ApplyTreeShaking(sceneConfig, "SingletonModule", resolved,
-                e => e.Name, TsUsageScanner.IsMemberReferenced, out int excluded, out _lastExcluded, out _lastGraceIncluded);
+                e => e.Name, TsUsageScanner.IsMemberReferenced, out int excluded, out _lastExcluded, out _lastGraceIncluded,
+                TsGenerator.CurrentPassCountsForGracePeriod);
             _entries = ApplySnapshotFallback(SnapshotKey, resolved,
                 e => new ModuleEntrySnapshot.Entry { Name = e.Name, TypeName = e.TypeName, Namespace = e.Namespace },
                 s => new SingletonEntry { Name = s.Name, TypeName = s.TypeName, Namespace = s.Namespace, SourceObject = null },

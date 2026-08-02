@@ -61,7 +61,8 @@ namespace Tsvrc.Editor
 
             var kept = ApplyTreeShaking(config, ModuleTag, new List<string> { PublicPropertyName },
                 name => name, IsReferencedByProjectSource,
-                out _, out _lastExcluded, out _lastGraceIncluded);
+                out _, out _lastExcluded, out _lastGraceIncluded,
+                TsGenerator.CurrentPassCountsForGracePeriod);
 
             _isUsed = kept.Count > 0;
         }

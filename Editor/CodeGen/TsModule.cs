@@ -237,7 +237,13 @@ namespace Tsvrc.Editor
         //
         // Every unreferenced-and-not-force-included entry goes through ConsumeGracePeriod before
         // being excluded for real, so an entry is only removed once it's been observed unreferenced
-        // on two separate passes, never the first time (see ConsumeGracePeriod).
+        // on two separate, counting passes, never the first time (see ConsumeGracePeriod).
+        //
+        // countsForGracePeriod is false for a pass caused only by a reactive trigger unrelated to
+        // the entry being evaluated: the result is still shown, but must not consume or reset any
+        // grace progress, since the developer had no real opportunity to reference it this pass.
+        // Defaults to true so a direct call (every module's own LoadConfig(), or a test calling
+        // this without going through TsGenerator.Run()) is its own real, counting pass.
         protected static List<TEntry> ApplyTreeShaking<TEntry>(
             TsConfig config,
             string moduleTag,
@@ -246,7 +252,8 @@ namespace Tsvrc.Editor
             Func<string, bool> isReferenced,
             out int excludedCount,
             out List<string> excludedNames,
-            out List<string> graceIncludedNames)
+            out List<string> graceIncludedNames,
+            bool countsForGracePeriod = true)
         {
             excludedCount = 0;
             excludedNames = new List<string>();
@@ -261,8 +268,15 @@ namespace Tsvrc.Editor
             }
 
             var forceIncludeNames = new HashSet<string>(config.ForceIncludeNames ?? Array.Empty<string>(), StringComparer.Ordinal);
-            var previouslyUnreferenced = LoadGraceState(moduleTag);
-            var stillUnreferenced = new HashSet<string>(StringComparer.Ordinal);
+
+            // A live result decides anything (advances a miss-streak, resets one, or excludes an
+            // entry) only when the pass counts and the project compiles cleanly, mirroring
+            // ApplySnapshotFallback's own compile-health gate. Otherwise unreferenced entries are
+            // still shown as grace-included, but persisted grace state is left untouched.
+            bool evaluateForReal = countsForGracePeriod && !TsPaths.ScriptCompilationFailed;
+
+            var previouslyUnreferenced = evaluateForReal ? LoadGraceState(moduleTag) : null;
+            var stillUnreferenced = evaluateForReal ? new HashSet<string>(StringComparer.Ordinal) : null;
             var kept = new List<TEntry>();
 
             foreach (var entry in resolved)
@@ -274,7 +288,7 @@ namespace Tsvrc.Editor
                     continue;
                 }
 
-                if (!ConsumeGracePeriod(name, previouslyUnreferenced, stillUnreferenced))
+                if (!evaluateForReal || !ConsumeGracePeriod(name, previouslyUnreferenced, stillUnreferenced))
                 {
                     kept.Add(entry);
                     graceIncludedNames.Add(name);
@@ -288,7 +302,8 @@ namespace Tsvrc.Editor
                     "Include Names in Configure, to keep generating it.");
             }
 
-            SaveGraceState(moduleTag, stillUnreferenced);
+            if (evaluateForReal)
+                SaveGraceState(moduleTag, stillUnreferenced);
             if (graceIncludedNames.Count > 0)
             {
                 string plural = graceIncludedNames.Count == 1 ? "entry isn't" : "entries aren't";
@@ -301,12 +316,11 @@ namespace Tsvrc.Editor
         }
 
         // A name is excluded only once it's been observed unreferenced on two separate,
-        // consecutive passes, never the first time. A newly-registered entry (or one whose last
-        // reference just disappeared) is otherwise indistinguishable from a bug: nothing can
-        // reference "_ts.Foo" in code before Foo has been generated at least once. Keeping it for
-        // one extra pass gives a developer the normal edit-save-recompile cycle to write (or
-        // restore) the reference before it's actually removed.
-        //
+        // consecutive *counting* passes, never the first time. A newly-registered entry (or one
+        // whose last reference just disappeared) is otherwise indistinguishable from a bug:
+        // nothing can reference "_ts.Foo" in code before Foo has been generated at least once.
+        // Keeping it for one extra counting pass gives a developer the normal edit-save-recompile
+        // cycle to write (or restore) the reference before it's actually removed.
         private static bool ConsumeGracePeriod(string name, HashSet<string> previouslyUnreferenced, HashSet<string> stillUnreferencedThisPass)
         {
             stillUnreferencedThisPass.Add(name);

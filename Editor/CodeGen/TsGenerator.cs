@@ -49,6 +49,13 @@ namespace Tsvrc.Editor
         private static HashSet<string> _watchedComponentTypeNames = new HashSet<string>(StringComparer.Ordinal);
         private static bool _rerunPending;
 
+        // Whether this pass represents genuine developer opportunity to have referenced a
+        // tree-shaking-eligible entry: true for a real recompile or an explicit Force
+        // Regenerate/Initialize click, false for a pass caused only by a reactive trigger (asset
+        // watcher, hierarchy-changed watch, property-modification watch), since those can fire for
+        // reasons unrelated to any given entry. Read by TsModule.ApplyTreeShaking.
+        internal static bool CurrentPassCountsForGracePeriod { get; private set; } = true;
+
         // True for the entire duration of an automated test run (EditMode or PlayMode), computed
         // once from the process's real command line. This is the only signal available at the
         // one moment TsDomainReloadHandler's static constructor fires: right after the very first
@@ -121,7 +128,8 @@ namespace Tsvrc.Editor
                 Debug.LogWarning($"[Tsvrc] Linked scene '{TsLinkedScene.ScenePath}' is not open - nothing to regenerate. Open it first.");
                 return;
             }
-            Run(allowBootstrap: true);
+            // A deliberate click is itself real developer opportunity, exactly like a recompile.
+            Run(allowBootstrap: true, countsForGracePeriod: true);
             Debug.Log("[Tsvrc] Regenerated.");
         }
 
@@ -140,14 +148,15 @@ namespace Tsvrc.Editor
         {
             bool pending = SessionState.GetBool(PendingBootstrapKey, false);
             if (pending) SessionState.SetBool(PendingBootstrapKey, false);
-            Run(skipRefresh, allowBootstrap: pending);
+            // A real recompile is unambiguous developer opportunity, so this always counts.
+            Run(skipRefresh, allowBootstrap: pending, countsForGracePeriod: true);
         }
 
         // allowBootstrap false, the default used by every automatic trigger, waits for
         // HasBootstrapSignal() via WaitForBootstrapSignal instead of creating the scaffold
         // outright. ManualGenerate() passes true, since a deliberate click is itself the
         // bootstrap signal.
-        internal static void Run(bool skipRefresh = false, bool allowBootstrap = false)
+        internal static void Run(bool skipRefresh = false, bool allowBootstrap = false, bool countsForGracePeriod = true)
         {
             var collectedWarnings = new List<string>();
             void OnLog(string condition, string stackTrace, LogType type)
@@ -159,7 +168,7 @@ namespace Tsvrc.Editor
             Application.logMessageReceived += OnLog;
             try
             {
-                RunCore(skipRefresh, allowBootstrap);
+                RunCore(skipRefresh, allowBootstrap, countsForGracePeriod);
             }
             finally
             {
@@ -169,9 +178,10 @@ namespace Tsvrc.Editor
             }
         }
 
-        private static void RunCore(bool skipRefresh, bool allowBootstrap)
+        private static void RunCore(bool skipRefresh, bool allowBootstrap, bool countsForGracePeriod)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            CurrentPassCountsForGracePeriod = countsForGracePeriod;
             // Once a project has linked a scene (Tsvrc > Configure), no other loaded scene - a
             // test's temp scene, or simply having something else open - is ever a legitimate
             // source of scene config. See TsLinkedScene's own doc comment for why this matters
@@ -304,7 +314,7 @@ namespace Tsvrc.Editor
             if (AutomaticTriggersSuppressed) return;
             if (!HasBootstrapSignal()) return;
             EditorApplication.hierarchyChanged -= WaitForBootstrapSignal;
-            Run(allowBootstrap: true);
+            Run(allowBootstrap: true, countsForGracePeriod: true);
         }
 
         // Types marked [TsCodegenIgnore], such as a test double Instance subclass, are excluded
@@ -345,7 +355,9 @@ namespace Tsvrc.Editor
         private static void RunScheduled()
         {
             _rerunPending = false;
-            Run();
+            // Every reactive trigger funnels through here regardless of which module's change
+            // caused it, so none of them count toward any module's grace period.
+            Run(countsForGracePeriod: false);
         }
 
         private static void OnHierarchyChanged()
