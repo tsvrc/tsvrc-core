@@ -140,5 +140,60 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsFalse(TsGenerator.IsBootstrapPending,
                 "A pass that reaches Wire() without writing anything new must not leave a stale pending flag.");
         }
+
+        [Test]
+        public void Run_StableChangedOnlyNoFileContentChange_DoesNotSetIsBootstrapPending()
+        {
+            // AfterFilesStable() alone reporting a change (LogModule/MemoryModule creating their
+            // scene children, ScaffoldModule creating its program asset) must never be treated as
+            // "a recompile is coming": nothing here changes compiled shape, so nothing would ever
+            // call AfterDomainReload() to clear a pending flag set for it.
+            var root = CompiledRootFixture.AddTo(_scope);
+            TsPaths.ScaffoldScriptPath = TestGeneratedScriptPath;
+            var configGo = _scope.CreateGameObject("TsConfig");
+            configGo.transform.SetParent(root.transform);
+            configGo.AddComponent<TsConfig>();
+
+            // First pass: GenerateCode() output doesn't exist on disk yet, so WriteModules()
+            // returns true and the pass stops there - the genuine "wait for recompile" branch.
+            TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
+            Assert.IsTrue(TsGenerator.IsBootstrapPending, "Sanity check: a real file write arms the flag.");
+            SessionState.SetBool("Tsvrc.PendingBootstrap", false); // simulate the domain reload that would have cleared it
+
+            // Second pass: content already matches disk (WriteModules() false), but
+            // AfterFilesStable() still has one-time scene setup left to do (stableChanged true,
+            // no .cs content changed) - this must not arm IsBootstrapPending.
+            TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
+
+            Assert.IsFalse(TsGenerator.IsBootstrapPending,
+                "A stableChanged-only pass (no .cs content change) must never arm the pending " +
+                "flag - nothing about it will ever trigger the domain reload needed to clear it.");
+        }
+
+        [Test]
+        public void Run_ReachesFullySettledPathWithStalePendingFlag_SelfClearsWithoutAfterDomainReload()
+        {
+            // Any pass reaching full settlement must clear a stuck pending flag, not only a pass
+            // that arrives via AfterDomainReload(). Otherwise a project can be stranded with the
+            // action button disabled and no way to unstick itself short of an unrelated recompile.
+            var root = CompiledRootFixture.AddTo(_scope);
+            TsPaths.ScaffoldScriptPath = TestGeneratedScriptPath;
+            var configGo = _scope.CreateGameObject("TsConfig");
+            configGo.transform.SetParent(root.transform);
+            configGo.AddComponent<TsConfig>();
+
+            // Settle fully first (same two-pass pattern as the tests above).
+            TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
+            TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
+
+            // Simulate a stuck flag from some unrelated cause, then run again with nothing left
+            // to write or stabilize - the fully settled path.
+            SessionState.SetBool("Tsvrc.PendingBootstrap", true);
+            TsGenerator.Run(skipRefresh: true, allowBootstrap: true);
+
+            Assert.IsFalse(TsGenerator.IsBootstrapPending,
+                "A pass that reaches full settlement must self-clear a stale pending flag, not " +
+                "only AfterDomainReload().");
+        }
     }
 }

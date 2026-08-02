@@ -178,7 +178,12 @@ namespace Tsvrc.Editor
             }
         }
 
-        private static void RunCore(bool skipRefresh, bool allowBootstrap, bool countsForGracePeriod)
+        // Bounds the stableChanged-only self-retry below: real modules converge in one extra
+        // pass (AfterFilesStable() becomes a no-op once whatever it created/reparented already
+        // exists), so this only ever fires if some module's AfterFilesStable() isn't idempotent.
+        private const int MaxStableSettlePasses = 3;
+
+        private static void RunCore(bool skipRefresh, bool allowBootstrap, bool countsForGracePeriod, int stableSettleDepth = 0)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             CurrentPassCountsForGracePeriod = countsForGracePeriod;
@@ -265,16 +270,36 @@ namespace Tsvrc.Editor
             foreach (var module in modules)
                 stableChanged |= module.AfterFilesStable();
 
-            // stableChanged alone (for example, a program asset was recreated) is enough to need
-            // a Refresh even if no .cs file changed, since UdonSharp won't re-link the backing
-            // UdonBehaviour until it processes the new asset.
             bool filesWritten = WriteModules(modules);
-            if (filesWritten || stableChanged)
+            if (filesWritten)
             {
                 if (allowBootstrap) SessionState.SetBool(PendingBootstrapKey, true);
                 if (!skipRefresh) AssetDatabase.Refresh();
                 return;
             }
+
+            if (stableChanged)
+            {
+                // No .cs content changed, so no recompile is coming and AfterDomainReload() will
+                // never run to clear a pending flag set here. Refresh() still lets UdonSharp
+                // reprocess whatever AfterFilesStable() created; settling then continues
+                // synchronously in this same call rather than via EditorApplication.delayCall, so
+                // CurrentPassCountsForGracePeriod can't be read by unrelated work running in
+                // between (for example a test calling a module's LoadConfig() directly).
+                if (!skipRefresh) AssetDatabase.Refresh();
+                // Silence here is deliberate: this is a bound against runaway recursion in case
+                // some module's AfterFilesStable() never converges, not a user-facing failure.
+                // The next real trigger retries fresh regardless.
+                if (stableSettleDepth < MaxStableSettlePasses)
+                    RunCore(skipRefresh, allowBootstrap, countsForGracePeriod, stableSettleDepth + 1);
+                return;
+            }
+
+            // Reached only when nothing needed writing or stabilizing. Self-clearing the pending
+            // flag here, not only in AfterDomainReload(), means any pass that reaches settlement
+            // resolves it, regardless of what triggered the pass.
+            if (SessionState.GetBool(PendingBootstrapKey, false))
+                SessionState.SetBool(PendingBootstrapKey, false);
 
             // Scoped to the linked scene: an unrelated compiled-type instance in an additively-
             // loaded scene must never gate Wire() open or shut for the scene actually being edited.

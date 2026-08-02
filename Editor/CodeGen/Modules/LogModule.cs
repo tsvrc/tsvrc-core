@@ -32,9 +32,9 @@ namespace Tsvrc.Editor
         protected override string AssetPath => LogAssetPath;
         protected override string ModuleTag => "LogModule";
 
-        internal override string TabLabel => "Logging";
-        internal override string TabDescription =>
-            "Configure the scene's TsvrcLogger: the optional project tag shown after the always-present [TsVRC] framework tag, and which log levels are shown, independently for Tsvrc's own internal diagnostics and your world's own scripts. All levels are shown by default.";
+        // No TabLabel: Logging is rendered as a section inside TsWindow's "Settings" tab
+        // (TsWindow.SettingsTabModule) instead of as its own top-level tab. DrawTab below still
+        // owns the render logic; SettingsTabModule just calls it directly.
 
         // Unlike other tabs, this data lives on the scene's TsvrcLogger component, not TsConfig,
         // so it builds its own SerializedObject instead of using the TsConfig-bound `so` param.

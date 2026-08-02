@@ -9,7 +9,8 @@ using UnityEngine;
 namespace Tsvrc.Editor
 {
     // Open via Tsvrc > Configure.
-    // Tabs come from TsGenerator.CreateModules(), filtered to modules with a non-null TabLabel.
+    // Tabs come from TsGenerator.CreateModules(), filtered to modules with a non-null TabLabel,
+    // plus a "Settings" pseudo-tab always appended last (see SettingsTabModule below).
     internal class TsWindow : EditorWindow
     {
         private List<TsModule> _tabs;
@@ -55,7 +56,13 @@ namespace Tsvrc.Editor
         // that state, so ReloadConfig() below - not this method - runs on every TsGenerator.StateChanged.
         private void ReloadTabs()
         {
-            _tabs = TsGenerator.CreateModules().Where(m => m.TabLabel != null).ToList();
+            var modules = TsGenerator.CreateModules();
+            var logModule = modules.OfType<LogModule>().FirstOrDefault();
+            _tabs = modules.Where(m => m.TabLabel != null).ToList();
+            // Settings isn't one real module's data (it spans LogModule's logging fields and
+            // TsConfig's tree-shaking fields), so it's a pseudo-module appended last rather than
+            // a real module registered via TsGenerator.CreateModules() - see SettingsTabModule.
+            _tabs.Add(new SettingsTabModule(this, logModule));
             _tabLabels = _tabs.Select(m => m.TabLabel).ToArray();
             if (_tabIndex >= _tabs.Count) _tabIndex = 0;
         }
@@ -77,15 +84,12 @@ namespace Tsvrc.Editor
             DrawBuiltinConfigWarning();
             DrawCollisionWarning();
             DrawRunWarnings();
-            DrawTreeShakingSummary();
 
             if (_config == null)
             {
                 DrawActionFooter();
                 return;
             }
-
-            DrawTreeShakingControls();
 
             if (_tabs.Count == 0)
             {
@@ -381,6 +385,39 @@ namespace Tsvrc.Editor
         {
             if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 EditorSceneManager.OpenScene(TsLinkedScene.ScenePath, OpenSceneMode.Single);
+        }
+
+        // Backs the "Settings" tab. Never passed to TsGenerator.CreateModules()/RunCore, so
+        // LoadConfig() below is never actually called; it only exists to satisfy TsModule's
+        // abstract member.
+        private sealed class SettingsTabModule : TsModule
+        {
+            private readonly TsWindow _window;
+            private readonly TsModule _logModule;
+
+            internal SettingsTabModule(TsWindow window, TsModule logModule)
+            {
+                _window = window;
+                _logModule = logModule;
+            }
+
+            internal override string TabLabel => "Settings";
+            internal override string TabDescription =>
+                "Project-wide Tsvrc configuration: logging levels and tags, and tree-shaking " +
+                "(generate only what's used).";
+
+            internal override void LoadConfig() { }
+
+            internal override void DrawTab(SerializedObject so)
+            {
+                EditorGUILayout.LabelField("Logging", EditorStyles.boldLabel);
+                _logModule?.DrawTab(so);
+
+                EditorGUILayout.Space(12);
+                EditorGUILayout.LabelField("Tree-Shaking (generate only what's used)", EditorStyles.boldLabel);
+                _window.DrawTreeShakingControls();
+                _window.DrawTreeShakingSummary();
+            }
         }
     }
 }
