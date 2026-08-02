@@ -17,6 +17,11 @@ namespace Tsvrc.Editor
         private const string SnapshotKey = "FactoryModule";
 
         private List<FactoryEntry> _entries = new List<FactoryEntry>();
+        private List<string> _lastExcluded = new List<string>();
+        private List<string> _lastGraceIncluded = new List<string>();
+
+        internal override IEnumerable<string> LastTreeShakingExclusions => _lastExcluded;
+        internal override IEnumerable<string> LastTreeShakingGraceIncluded => _lastGraceIncluded;
 
         // Tab-only UI state, keyed by array index (not group name) so the key is stable while
         // the user is typing and the foldout never collapses mid-edit.
@@ -174,6 +179,12 @@ namespace Tsvrc.Editor
             var userConfig = TsLinkedScene.Find<TsConfig>();
             var builtinConfig = AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(BuiltinConfigPath);
             var resolved = BuildEntries(userConfig, builtinConfig);
+            // A Factory entry's usage signature is its generated Create{Name}(...) call site, not
+            // a bare member access. Builtin-sourced groups flow through the same filter as user
+            // groups, since BuildEntries already merged them.
+            resolved = ApplyTreeShaking(userConfig, "FactoryModule", resolved,
+                e => e.Name, name => TsUsageScanner.IsMethodCallReferenced($"Create{name}"),
+                out int excluded, out _lastExcluded, out _lastGraceIncluded);
             _entries = ApplySnapshotFallback(SnapshotKey, resolved,
                 e => new ModuleEntrySnapshot.Entry { Name = e.Name, TypeName = e.TypeName, Namespace = e.TypeNamespace },
                 s => new FactoryEntry
@@ -183,7 +194,8 @@ namespace Tsvrc.Editor
                     TypeNamespace = s.Namespace,
                     IsTsvrcBehaviour = IsTsvrcBehaviourType(s.TypeName, s.Namespace),
                     PrefabAsset = null,
-                });
+                },
+                excluded);
         }
 
         internal override string GenerateCode()

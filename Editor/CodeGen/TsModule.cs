@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Tsvrc.Config;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -55,6 +56,16 @@ namespace Tsvrc.Editor
         internal virtual string TabLabel => null;
         internal virtual string TabDescription => null;
         internal virtual void DrawTab(SerializedObject so) { }
+
+        // Names ApplyTreeShaking excluded this pass, empty when tree-shaking is off or nothing was
+        // excluded. TsGenerator aggregates every module's list for TsWindow to display.
+        internal virtual IEnumerable<string> LastTreeShakingExclusions => Enumerable.Empty<string>();
+
+        // Names kept this pass only via ConsumeGracePeriod below: genuinely unreferenced, but not
+        // yet excluded since this is the first pass they've been seen that way. Kept separate from
+        // LastTreeShakingExclusions so TsWindow can show "newly unused, kept for now" apart from
+        // "actually removed."
+        internal virtual IEnumerable<string> LastTreeShakingGraceIncluded => Enumerable.Empty<string>();
 
         // Returns null if the compiled type does not yet exist or has no instance in the scene.
         protected static Component FindRoot()
@@ -154,11 +165,15 @@ namespace Tsvrc.Editor
         // declarations and TsConstruct() calls, across a transient broken compile, but Wire()
         // cannot re-wire the scene field for a restored entry. It harmlessly writes null into
         // it until the next clean compile refreshes the snapshot with real objects.
+        // treeShakingExclusions: how many entries ApplyTreeShaking already removed from resolved
+        // this same pass, as a deliberate exclusion rather than a compile break or accidental
+        // deletion. Defaults to 0 for modules that don't tree-shake. See WarnIfBelowLastKnownGood.
         protected static List<TEntry> ApplySnapshotFallback<TEntry>(
             string moduleKey,
             List<TEntry> resolved,
             Func<TEntry, ModuleEntrySnapshot.Entry> toSnapshot,
-            Func<ModuleEntrySnapshot.Entry, TEntry> fromSnapshot)
+            Func<ModuleEntrySnapshot.Entry, TEntry> fromSnapshot,
+            int treeShakingExclusions = 0)
         {
             if (TsPaths.ScriptCompilationFailed)
             {
@@ -174,7 +189,7 @@ namespace Tsvrc.Editor
                 return resolved;
             }
 
-            WarnIfBelowLastKnownGood(moduleKey, resolved.Count);
+            WarnIfBelowLastKnownGood(moduleKey, resolved.Count, treeShakingExclusions);
             ModuleEntrySnapshot.Save(moduleKey, resolved.Select(toSnapshot).ToList());
             return resolved;
         }
@@ -188,20 +203,121 @@ namespace Tsvrc.Editor
         // known good" count, tracked separately from the compile-broken snapshot above, that only
         // ever rises. A drop below it is always a real regression relative to the true high-water
         // mark, never a target that quietly moves down to match whatever just happened.
-        private static void WarnIfBelowLastKnownGood(string moduleKey, int resolvedCount)
+        // A drop fully explained by this pass's own tree-shaking exclusions is expected and must
+        // not trigger the warning below (it would otherwise be indistinguishable from an
+        // accidental deletion). Only the unattributed remainder of a drop still warns.
+        private static void WarnIfBelowLastKnownGood(string moduleKey, int resolvedCount, int treeShakingExclusions)
         {
             string lastKnownGoodKey = LastKnownGoodSnapshotKey(moduleKey);
             int? lastKnownGood = ModuleEntrySnapshot.LoadCount(lastKnownGoodKey);
 
             if (lastKnownGood.HasValue && lastKnownGood.Value > resolvedCount)
-                Debug.LogWarning($"[{moduleKey}] This regenerate resolved fewer entries ({resolvedCount}) than the " +
-                    $"last known-good count ({lastKnownGood.Value}), on an otherwise clean compile. If this wasn't " +
-                    "intentional (for example the TsConfig object was accidentally deleted from the Hierarchy), " +
-                    "check Tsvrc > Configure and Undo before this state is overwritten again.");
+            {
+                int drop = lastKnownGood.Value - resolvedCount;
+                if (drop > treeShakingExclusions)
+                    Debug.LogWarning($"[{moduleKey}] This regenerate resolved fewer entries ({resolvedCount}) than the " +
+                        $"last known-good count ({lastKnownGood.Value}), on an otherwise clean compile. If this wasn't " +
+                        "intentional (for example the TsConfig object was accidentally deleted from the Hierarchy), " +
+                        "check Tsvrc > Configure and Undo before this state is overwritten again.");
+            }
 
             if (!lastKnownGood.HasValue || resolvedCount >= lastKnownGood.Value)
                 ModuleEntrySnapshot.SaveCount(lastKnownGoodKey, resolvedCount);
         }
+
+        // Filters resolved down to entries referenced by project source (via isReferenced) or
+        // explicitly pinned via config.ForceIncludeNames, when config.TreeShakeUnused is on. A
+        // no-op when config is null or TreeShakeUnused is off. Shared by every tree-shaking module
+        // (Singleton, Factory, and Log/Memory via a single-element list) instead of each
+        // hand-rolling the same filter.
+        //
+        // nameOf/isReferenced take the entry's already-resolved generated name rather than its
+        // source object, since usage is a fact about the chosen identifier, independent of where
+        // the entry came from.
+        //
+        // Every unreferenced-and-not-force-included entry goes through ConsumeGracePeriod before
+        // being excluded for real, so an entry is only removed once it's been observed unreferenced
+        // on two separate passes, never the first time (see ConsumeGracePeriod).
+        protected static List<TEntry> ApplyTreeShaking<TEntry>(
+            TsConfig config,
+            string moduleTag,
+            List<TEntry> resolved,
+            Func<TEntry, string> nameOf,
+            Func<string, bool> isReferenced,
+            out int excludedCount,
+            out List<string> excludedNames,
+            out List<string> graceIncludedNames)
+        {
+            excludedCount = 0;
+            excludedNames = new List<string>();
+            graceIncludedNames = new List<string>();
+            if (config == null || !config.TreeShakeUnused)
+            {
+                // Cleared, not left stale: re-enabling tree-shaking later should give every entry
+                // a fresh grace period, not silently resume a miss-streak that started months ago
+                // while the feature was off.
+                SaveGraceState(moduleTag, Enumerable.Empty<string>());
+                return resolved;
+            }
+
+            var forceIncludeNames = new HashSet<string>(config.ForceIncludeNames ?? Array.Empty<string>(), StringComparer.Ordinal);
+            var previouslyUnreferenced = LoadGraceState(moduleTag);
+            var stillUnreferenced = new HashSet<string>(StringComparer.Ordinal);
+            var kept = new List<TEntry>();
+
+            foreach (var entry in resolved)
+            {
+                string name = nameOf(entry);
+                if (forceIncludeNames.Contains(name) || isReferenced(name))
+                {
+                    kept.Add(entry);
+                    continue;
+                }
+
+                if (!ConsumeGracePeriod(name, previouslyUnreferenced, stillUnreferenced))
+                {
+                    kept.Add(entry);
+                    graceIncludedNames.Add(name);
+                    continue;
+                }
+
+                excludedCount++;
+                excludedNames.Add(name);
+                Debug.Log($"[{moduleTag}] Excluded '{name}' - not referenced anywhere in the project (checked across " +
+                    "two regenerates) and not force-included. Reference it from a TsvrcBehaviour, or add it to Force " +
+                    "Include Names in Configure, to keep generating it.");
+            }
+
+            SaveGraceState(moduleTag, stillUnreferenced);
+            if (graceIncludedNames.Count > 0)
+            {
+                string plural = graceIncludedNames.Count == 1 ? "entry isn't" : "entries aren't";
+                string pronoun = graceIncludedNames.Count == 1 ? "it" : "them";
+                Debug.Log($"[{moduleTag}] {graceIncludedNames.Count} {plural} referenced anywhere in the project yet, " +
+                    $"kept for now, pending one more regenerate: {string.Join(", ", graceIncludedNames)}. Reference " +
+                    $"{pronoun} soon, or {pronoun} may be excluded next time.");
+            }
+            return kept;
+        }
+
+        // A name is excluded only once it's been observed unreferenced on two separate,
+        // consecutive passes, never the first time. A newly-registered entry (or one whose last
+        // reference just disappeared) is otherwise indistinguishable from a bug: nothing can
+        // reference "_ts.Foo" in code before Foo has been generated at least once. Keeping it for
+        // one extra pass gives a developer the normal edit-save-recompile cycle to write (or
+        // restore) the reference before it's actually removed.
+        //
+        private static bool ConsumeGracePeriod(string name, HashSet<string> previouslyUnreferenced, HashSet<string> stillUnreferencedThisPass)
+        {
+            stillUnreferencedThisPass.Add(name);
+            return previouslyUnreferenced.Contains(name);
+        }
+
+        private static HashSet<string> LoadGraceState(string moduleKey) => ModuleEntrySnapshot.LoadNames(TreeShakeGraceKey(moduleKey));
+
+        private static void SaveGraceState(string moduleKey, IEnumerable<string> names) => ModuleEntrySnapshot.SaveNames(TreeShakeGraceKey(moduleKey), names);
+
+        private static string TreeShakeGraceKey(string moduleKey) => $"{moduleKey}.TreeShakeGrace";
 
         private static string LastKnownGoodSnapshotKey(string moduleKey) => $"{moduleKey}.LastKnownGood";
 

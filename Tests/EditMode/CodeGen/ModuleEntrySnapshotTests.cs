@@ -199,5 +199,82 @@ namespace Tsvrc.Tests.EditMode
             Assert.DoesNotThrow(() => result = ModuleEntrySnapshot.Load(Key));
             if (result != null) Assert.IsEmpty(result, "If parsing recovers rather than failing outright, it must not fabricate entries.");
         }
+
+        // SaveNames/LoadNames: the dedicated name-set store TsModule's tree-shaking grace period
+        // (ConsumeGracePeriod) uses to persist which names were unreferenced last pass, kept
+        // separate from Save/Load(List of Entry) since it only needs bare names, not full entries.
+        private const string NamesKey = "TestModuleEntrySnapshotNames";
+
+        [TearDown]
+        public void TearDownNames() => ModuleEntrySnapshot.Clear(NamesKey);
+
+        [Test]
+        public void LoadNames_NeverSaved_ReturnsEmptySetNotNull()
+        {
+            var loaded = ModuleEntrySnapshot.LoadNames(NamesKey);
+
+            Assert.IsNotNull(loaded, "Callers use this directly as a Contains() lookup - it must never require a null check.");
+            Assert.IsEmpty(loaded);
+        }
+
+        [Test]
+        public void SaveNames_ThenLoadNames_RoundTrips()
+        {
+            ModuleEntrySnapshot.SaveNames(NamesKey, new[] { "A", "B" });
+
+            var loaded = ModuleEntrySnapshot.LoadNames(NamesKey);
+
+            CollectionAssert.AreEquivalent(new[] { "A", "B" }, loaded);
+        }
+
+        [Test]
+        public void SaveNames_EmptySet_RoundTripsAsEmptyNotNull()
+        {
+            ModuleEntrySnapshot.SaveNames(NamesKey, new string[0]);
+
+            var loaded = ModuleEntrySnapshot.LoadNames(NamesKey);
+
+            Assert.IsNotNull(loaded);
+            Assert.IsEmpty(loaded);
+        }
+
+        [Test]
+        public void SaveNames_CalledTwice_SecondSaveOverwritesTheFirst()
+        {
+            ModuleEntrySnapshot.SaveNames(NamesKey, new[] { "A", "B" });
+            ModuleEntrySnapshot.SaveNames(NamesKey, new[] { "Solo" });
+
+            var loaded = ModuleEntrySnapshot.LoadNames(NamesKey);
+
+            CollectionAssert.AreEquivalent(new[] { "Solo" }, loaded);
+        }
+
+        [Test]
+        public void SaveNames_AndSave_UseIndependentKeysEvenWhenSharingAModuleKey()
+        {
+            // Both persist under the same {moduleKey}.json path convention as Save/SaveCount, so
+            // this pins that a names-only key never collides with a full-entry-list key as long as
+            // callers (as TsModule's TreeShakeGraceKey does) suffix the names key distinctly.
+            ModuleEntrySnapshot.Save(Key, Sample());
+            ModuleEntrySnapshot.SaveNames(NamesKey, new[] { "A" });
+
+            Assert.AreEqual(2, ModuleEntrySnapshot.Load(Key).Count);
+            CollectionAssert.AreEquivalent(new[] { "A" }, ModuleEntrySnapshot.LoadNames(NamesKey));
+        }
+
+        [Test]
+        public void LoadNames_CorruptedFile_ReturnsEmptySetWithoutThrowing()
+        {
+            ModuleEntrySnapshot.SaveNames(NamesKey, new[] { "A" }); // ensures the .cache directory exists
+            string path = System.IO.Path.Combine(
+                System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath),
+                (TsPaths.GeneratedFolder + "/.cache/" + NamesKey + ".json").Replace('/', System.IO.Path.DirectorySeparatorChar));
+            System.IO.File.WriteAllText(path, "{ not valid json ]]]");
+
+            HashSet<string> result = null;
+            Assert.DoesNotThrow(() => result = ModuleEntrySnapshot.LoadNames(NamesKey));
+            Assert.IsNotNull(result);
+            Assert.IsEmpty(result);
+        }
     }
 }

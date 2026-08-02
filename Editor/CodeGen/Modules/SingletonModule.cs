@@ -17,6 +17,11 @@ namespace Tsvrc.Editor
         private const string SnapshotKey = "SingletonModule";
 
         private List<SingletonEntry> _entries = new List<SingletonEntry>();
+        private List<string> _lastExcluded = new List<string>();
+        private List<string> _lastGraceIncluded = new List<string>();
+
+        internal override IEnumerable<string> LastTreeShakingExclusions => _lastExcluded;
+        internal override IEnumerable<string> LastTreeShakingGraceIncluded => _lastGraceIncluded;
 
         internal override string FileName => "TsGeneratedSingleton.cs";
 
@@ -61,9 +66,14 @@ namespace Tsvrc.Editor
                 .Concat(builtinConfig?.Singletons ?? Array.Empty<UnityEngine.Object>());
 
             var resolved = Resolve(combined);
+            // Builtin-sourced entries flow through the same filter as scene-sourced ones, since
+            // combined above already merged them before Resolve() ran.
+            resolved = ApplyTreeShaking(sceneConfig, "SingletonModule", resolved,
+                e => e.Name, TsUsageScanner.IsMemberReferenced, out int excluded, out _lastExcluded, out _lastGraceIncluded);
             _entries = ApplySnapshotFallback(SnapshotKey, resolved,
                 e => new ModuleEntrySnapshot.Entry { Name = e.Name, TypeName = e.TypeName, Namespace = e.Namespace },
-                s => new SingletonEntry { Name = s.Name, TypeName = s.TypeName, Namespace = s.Namespace, SourceObject = null });
+                s => new SingletonEntry { Name = s.Name, TypeName = s.TypeName, Namespace = s.Namespace, SourceObject = null },
+                excluded);
         }
 
         internal override string GenerateCode()

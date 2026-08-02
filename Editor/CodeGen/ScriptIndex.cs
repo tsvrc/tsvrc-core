@@ -42,6 +42,11 @@ namespace Tsvrc.Editor
         // two unrelated classes share a short name in different namespaces.
         private static Dictionary<string, List<ClassInfo>> _baseByClass;
 
+        // Every MonoScript's raw source text, collected in the same Rebuild() pass as
+        // _baseByClass so usage-based lookups (see TsUsageScanner) don't need a second
+        // AssetDatabase.FindAssets("t:MonoScript") walk of their own.
+        private static List<string> _sourceTexts;
+
         private static readonly Regex ClassDeclaration = new Regex(
             @"\bclass\s+(?<name>[A-Za-z_]\w*)\s*(?:<[^>{]*>)?\s*(?::\s*(?<base>[A-Za-z_][\w\.]*))?",
             RegexOptions.Compiled);
@@ -58,14 +63,28 @@ namespace Tsvrc.Editor
         internal static void Rebuild()
         {
             var map = new Dictionary<string, List<ClassInfo>>(System.StringComparer.Ordinal);
+            var texts = new List<string>();
             foreach (var guid in AssetDatabase.FindAssets("t:MonoScript"))
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 var script = AssetDatabase.LoadAssetAtPath<MonoScript>(path);
                 if (script == null) continue;
+                texts.Add(script.text);
                 ParseInto(script.text, map);
             }
             _baseByClass = map;
+            _sourceTexts = texts;
+        }
+
+        // True if any indexed script's raw source text matches pattern. Backs TsUsageScanner's
+        // "is this generated member referenced anywhere in the project" checks. Rebuilds first if
+        // nothing has been indexed yet this pass, same as every other query below.
+        internal static bool AnySourceMatches(Regex pattern)
+        {
+            if (_sourceTexts == null) Rebuild();
+            foreach (var text in _sourceTexts)
+                if (pattern.IsMatch(text)) return true;
+            return false;
         }
 
         // Walks the base class chain by simple name, starting at className, until it either

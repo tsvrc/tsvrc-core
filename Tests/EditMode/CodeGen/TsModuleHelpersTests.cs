@@ -36,10 +36,18 @@ namespace Tsvrc.Tests.EditMode
         // entry shape, only about counts and the two conversion delegates, so a string keeps
         // these tests focused on ApplySnapshotFallback's own branching instead of any real
         // module's entry struct.
-        internal static List<string> CallApplySnapshotFallback(string moduleKey, List<string> resolved)
+        internal static List<string> CallApplySnapshotFallback(string moduleKey, List<string> resolved, int treeShakingExclusions = 0)
             => ApplySnapshotFallback(moduleKey, resolved,
                 s => new ModuleEntrySnapshot.Entry { Name = s, TypeName = s, Namespace = "" },
-                e => e.Name);
+                e => e.Name,
+                treeShakingExclusions);
+
+        // Uses a plain string as TEntry here too, same reasoning as CallApplySnapshotFallback
+        // above: ApplyTreeShaking's own branching (config null/off, force-include, referenced,
+        // grace period) doesn't care about entry shape, only about the name each entry maps to.
+        internal static List<string> CallApplyTreeShaking(TsConfig config, List<string> resolved,
+            System.Func<string, bool> isReferenced, out int excludedCount, out List<string> excludedNames, out List<string> graceIncludedNames)
+            => ApplyTreeShaking(config, "TestModule", resolved, s => s, isReferenced, out excludedCount, out excludedNames, out graceIncludedNames);
 
         internal static string CallBuildStub(IEnumerable<string> usings, params string[] emptyMethodSignatures)
             => BuildStub(usings, emptyMethodSignatures);
@@ -529,6 +537,195 @@ namespace Tsvrc.Tests.EditMode
 
             Assert.IsTrue(result);
             Assert.IsTrue(seen.Contains(config));
+        }
+
+        // ApplyTreeShaking: the shared filter Singleton and Factory both route through instead of
+        // hand-rolling their own, the same reasoning TryAcceptEntry already established for
+        // null/duplicate handling above. Every "unreferenced" case below goes through
+        // ConsumeGracePeriod's one-pass grace: an entry is only excluded once it's been observed
+        // unreferenced on two separate calls, never the first.
+        [Test]
+        public void ApplyTreeShaking_ConfigNull_ReturnsResolvedUnchangedWithNoExclusions()
+        {
+            var result = TsModuleTestHarness.CallApplyTreeShaking(null, new List<string> { "A", "B" },
+                _ => false, out int excluded, out var names, out var grace);
+
+            CollectionAssert.AreEqual(new[] { "A", "B" }, result);
+            Assert.AreEqual(0, excluded);
+            Assert.IsEmpty(names);
+            Assert.IsEmpty(grace);
+        }
+
+        [Test]
+        public void ApplyTreeShaking_TreeShakeUnusedOff_ReturnsResolvedUnchangedEvenIfNothingIsReferenced()
+        {
+            var config = _fallbackScope.CreateGameObject("Cfg").AddComponent<TsConfig>();
+            config.TreeShakeUnused = false;
+
+            var result = TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A", "B" },
+                _ => false, out int excluded, out var names, out var grace);
+
+            CollectionAssert.AreEqual(new[] { "A", "B" }, result);
+            Assert.AreEqual(0, excluded);
+            Assert.IsEmpty(grace);
+        }
+
+        [Test]
+        public void ApplyTreeShaking_OnAndReferenced_KeepsEntry()
+        {
+            var config = _fallbackScope.CreateGameObject("Cfg").AddComponent<TsConfig>();
+            config.TreeShakeUnused = true;
+
+            var result = TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" },
+                name => name == "A", out int excluded, out var names, out var grace);
+
+            CollectionAssert.AreEqual(new[] { "A" }, result);
+            Assert.AreEqual(0, excluded);
+            Assert.IsEmpty(names);
+            Assert.IsEmpty(grace);
+        }
+
+        // The core fix for the chicken-and-egg problem: a name resolved as unreferenced for the
+        // very first time is kept (via the grace period), never excluded outright - otherwise a
+        // just-registered entry could never be written against in code, since it would vanish
+        // before a developer ever got the chance to reference it.
+        [Test]
+        public void ApplyTreeShaking_OnAndNotReferencedForTheFirstTime_KeepsEntryViaGracePeriodInsteadOfExcluding()
+        {
+            var config = _fallbackScope.CreateGameObject("Cfg").AddComponent<TsConfig>();
+            config.TreeShakeUnused = true;
+
+            LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex(@"\[TestModule\] 1 entry isn't referenced"));
+            var result = TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" },
+                _ => false, out int excluded, out var names, out var grace);
+
+            CollectionAssert.AreEqual(new[] { "A" }, result, "First unreferenced observation must be kept, not excluded.");
+            Assert.AreEqual(0, excluded);
+            Assert.IsEmpty(names);
+            CollectionAssert.AreEqual(new[] { "A" }, grace);
+        }
+
+        [Test]
+        public void ApplyTreeShaking_OnAndNotReferencedForASecondConsecutivePass_ExcludesEntryAndLogsIt()
+        {
+            var config = _fallbackScope.CreateGameObject("Cfg").AddComponent<TsConfig>();
+            config.TreeShakeUnused = true;
+            // First pass consumes the grace period.
+            TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" }, _ => false, out _, out _, out _);
+
+            LogAssert.Expect(LogType.Log, "[TestModule] Excluded 'A' - not referenced anywhere in the project (checked " +
+                "across two regenerates) and not force-included. Reference it from a TsvrcBehaviour, or add it to " +
+                "Force Include Names in Configure, to keep generating it.");
+            var result = TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" },
+                _ => false, out int excluded, out var names, out var grace);
+
+            Assert.IsEmpty(result);
+            Assert.AreEqual(1, excluded);
+            CollectionAssert.AreEqual(new[] { "A" }, names);
+            Assert.IsEmpty(grace);
+        }
+
+        [Test]
+        public void ApplyTreeShaking_ReferencedAfterAMissedPass_ResetsTheGracePeriodInsteadOfExcludingLater()
+        {
+            var config = _fallbackScope.CreateGameObject("Cfg").AddComponent<TsConfig>();
+            config.TreeShakeUnused = true;
+            // First pass: unreferenced, consumes grace.
+            TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" }, _ => false, out _, out _, out _);
+            // Second pass: now referenced - must clear the miss-streak entirely, not just survive this one pass.
+            TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" }, name => name == "A", out _, out _, out _);
+
+            // Third pass: unreferenced again - if the miss-streak weren't reset by the referenced
+            // pass in between, this would exclude immediately; it must instead restart from zero.
+            var result = TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" },
+                _ => false, out int excluded, out var names, out var grace);
+
+            CollectionAssert.AreEqual(new[] { "A" }, result);
+            Assert.AreEqual(0, excluded);
+            CollectionAssert.AreEqual(new[] { "A" }, grace);
+        }
+
+        [Test]
+        public void ApplyTreeShaking_OnAndForceIncluded_KeepsEntryEvenWhenNotReferenced()
+        {
+            var config = _fallbackScope.CreateGameObject("Cfg").AddComponent<TsConfig>();
+            config.TreeShakeUnused = true;
+            config.ForceIncludeNames = new[] { "A" };
+
+            var result = TsModuleTestHarness.CallApplyTreeShaking(config, new List<string> { "A" },
+                _ => false, out int excluded, out var names, out var grace);
+
+            CollectionAssert.AreEqual(new[] { "A" }, result);
+            Assert.AreEqual(0, excluded);
+            Assert.IsEmpty(grace, "Force-included entries never even enter the grace-period bookkeeping.");
+        }
+
+        [Test]
+        public void ApplyTreeShaking_MixOfReferencedGraceAndForceIncluded_KeepsAllThreeOnFirstPass()
+        {
+            var config = _fallbackScope.CreateGameObject("Cfg").AddComponent<TsConfig>();
+            config.TreeShakeUnused = true;
+            config.ForceIncludeNames = new[] { "Pinned" };
+
+            var result = TsModuleTestHarness.CallApplyTreeShaking(config,
+                new List<string> { "Referenced", "NewlyUnreferenced", "Pinned" },
+                name => name == "Referenced", out int excluded, out var names, out var grace);
+
+            CollectionAssert.AreEquivalent(new[] { "Referenced", "NewlyUnreferenced", "Pinned" }, result);
+            Assert.AreEqual(0, excluded);
+            Assert.IsEmpty(names);
+            CollectionAssert.AreEqual(new[] { "NewlyUnreferenced" }, grace);
+        }
+
+        [Test]
+        public void ApplyTreeShaking_MixOfReferencedAndNotOnASecondPass_ExcludesOnlyTheStillUnreferencedOne()
+        {
+            var config = _fallbackScope.CreateGameObject("Cfg").AddComponent<TsConfig>();
+            config.TreeShakeUnused = true;
+            config.ForceIncludeNames = new[] { "Pinned" };
+            // First pass consumes "Dead"'s grace period.
+            TsModuleTestHarness.CallApplyTreeShaking(config,
+                new List<string> { "Referenced", "Dead", "Pinned" }, name => name == "Referenced", out _, out _, out _);
+
+            LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex(@"\[TestModule\] Excluded 'Dead'"));
+            var result = TsModuleTestHarness.CallApplyTreeShaking(config,
+                new List<string> { "Referenced", "Dead", "Pinned" },
+                name => name == "Referenced", out int excluded, out var names, out var grace);
+
+            CollectionAssert.AreEquivalent(new[] { "Referenced", "Pinned" }, result);
+            Assert.AreEqual(1, excluded);
+            CollectionAssert.AreEqual(new[] { "Dead" }, names);
+            Assert.IsEmpty(grace);
+        }
+
+        // The attributed-drop reconciliation between ApplyTreeShaking's exclusions and
+        // ApplySnapshotFallback's last-known-good warning: a drop fully explained by this pass's
+        // own tree-shaking must not repeat the "accidental deletion" warning, but any unattributed
+        // remainder still must.
+        [Test]
+        public void ApplySnapshotFallback_DropFullyExplainedByTreeShakingExclusions_NoWarning()
+        {
+            TsPaths.ScriptCompilationFailedOverride = false;
+            TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "A", "B", "C" });
+
+            // Drop from 3 to 1 (two fewer), fully attributed to two tree-shaking exclusions this
+            // pass - no LogAssert.Expect here, so any unexpected warning fails the test on its own.
+            var result = TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "X" }, treeShakingExclusions: 2);
+
+            CollectionAssert.AreEqual(new[] { "X" }, result);
+        }
+
+        [Test]
+        public void ApplySnapshotFallback_DropLargerThanTreeShakingExclusions_WarnsForTheUnattributedRemainder()
+        {
+            TsPaths.ScriptCompilationFailedOverride = false;
+            TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "A", "B", "C" });
+
+            // Drop from 3 to 1 (two fewer), but only one is attributed to tree-shaking - the
+            // remaining, unexplained one still needs the loud warning.
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(
+                $@"\[{FallbackKey}\] This regenerate resolved fewer entries \(1\) than the last known-good count \(3\)"));
+            TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "X" }, treeShakingExclusions: 1);
         }
     }
 }

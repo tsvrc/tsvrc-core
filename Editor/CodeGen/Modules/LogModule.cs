@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System;
+using System.Collections.Generic;
 using Tsvrc.Utils;
 using UnityEditor;
 using UnityEngine;
@@ -10,6 +11,12 @@ namespace Tsvrc.Editor
     // only through TsGenerated.Log (or TsvrcBehaviour.LogInfo/LogWarning/LogError). Mirrors MemoryModule.
     internal class LogModule : TsSingleComponentModule
     {
+        // LogInfo/LogWarning/LogError (TsvrcBehaviour.cs) reach _ts.Log indirectly - a script
+        // calling LogInfo(...) never textually mentions "_ts.Log", so the base class's plain
+        // member-access check alone would miss the most common way Log actually gets used.
+        protected override IEnumerable<string> AdditionalUsageMethodNames() =>
+            new[] { "LogInfo", "LogWarning", "LogError" };
+
         // Package-relative, not a literal, see PackagePaths.
         private static string LogScriptPath => $"{PackagePaths.Root}/Runtime/Utils/TsvrcLogger.cs";
         private static string LogAssetPath => $"{PackagePaths.Root}/Runtime/Utils/TsvrcLogger.asset";
@@ -38,9 +45,12 @@ namespace Tsvrc.Editor
             var logger = (TsvrcLogger)TsLinkedScene.FindType(typeof(TsvrcLogger));
             if (logger == null)
             {
-                EditorGUILayout.HelpBox(
-                    "No TsvrcLogger found in the scene yet. Press Force Regenerate below to create it.",
-                    MessageType.Info);
+                string message = IsUsed
+                    ? "No TsvrcLogger found in the scene yet. Press Force Regenerate below to create it."
+                    : "Tree-Shake Unused is on and no project script currently calls _ts.Log/LogInfo/LogWarning/" +
+                      "LogError, so TsvrcLogger isn't generated right now. Reference it from a TsvrcBehaviour, or " +
+                      "add \"Log\" to Force Include Names above, to bring it back.";
+                EditorGUILayout.HelpBox(message, MessageType.Info);
                 return;
             }
 

@@ -77,12 +77,15 @@ namespace Tsvrc.Editor
             DrawBuiltinConfigWarning();
             DrawCollisionWarning();
             DrawRunWarnings();
+            DrawTreeShakingSummary();
 
             if (_config == null)
             {
                 DrawActionFooter();
                 return;
             }
+
+            DrawTreeShakingControls();
 
             if (_tabs.Count == 0)
             {
@@ -222,6 +225,75 @@ namespace Tsvrc.Editor
             string list = string.Join("\n", shown.Select(w => $"• {w}"));
             string more = warnings.Count > shown.Count ? $"\n(+{warnings.Count - shown.Count} more — see Console)" : "";
             return $"{warnings.Count} issue(s) reported during the last regenerate:\n{list}{more}";
+        }
+
+        // Surfaces the most recent Run() pass's tree-shaking exclusions and grace-period
+        // inclusions so a developer sees what disappeared (or is about to) without digging through
+        // the Console. Both Info, not Warning: this is the feature working as intended. Drawn as
+        // two separate boxes since they call for different reactions: "gone, bring it back if you
+        // want it" versus "still here for now, but reference it soon."
+        private void DrawTreeShakingSummary()
+        {
+            var graceMessage = DetermineTreeShakingGraceSummary(TsGenerator.LastTreeShakingGraceIncluded);
+            if (graceMessage != null)
+                TsEditorGUI.DrawStatusBox(graceMessage, MessageType.Info);
+
+            var exclusionMessage = DetermineTreeShakingSummary(TsGenerator.LastTreeShakingExclusions);
+            if (exclusionMessage != null)
+                TsEditorGUI.DrawStatusBox(exclusionMessage, MessageType.Info);
+        }
+
+        // Pure so it's directly unit-testable without driving OnGUI/EditorWindow. Returns null
+        // when there's nothing to report (tree-shaking off, or on with nothing excluded).
+        internal static string DetermineTreeShakingSummary(IReadOnlyList<string> exclusions, int maxShown = 5)
+        {
+            if (exclusions == null || exclusions.Count == 0) return null;
+
+            var shown = exclusions.Take(maxShown).ToList();
+            string list = string.Join(", ", shown);
+            string more = exclusions.Count > shown.Count ? $" (+{exclusions.Count - shown.Count} more)" : "";
+            string plural = exclusions.Count == 1 ? "entry" : "entries";
+            return $"Tree-shaking excluded {exclusions.Count} unused {plural} this pass: {list}{more}. " +
+                "Add a name to Force Include Names below to keep generating it, or reference it from a TsvrcBehaviour.";
+        }
+
+        // Pure so it's directly unit-testable without driving OnGUI/EditorWindow. Returns null
+        // when there's nothing to report. Worded as reassurance, not a warning: this is the
+        // normal, expected state for anything just registered or just stopped being referenced.
+        internal static string DetermineTreeShakingGraceSummary(IReadOnlyList<string> graceIncluded, int maxShown = 5)
+        {
+            if (graceIncluded == null || graceIncluded.Count == 0) return null;
+
+            var shown = graceIncluded.Take(maxShown).ToList();
+            string list = string.Join(", ", shown);
+            string more = graceIncluded.Count > shown.Count ? $" (+{graceIncluded.Count - shown.Count} more)" : "";
+            string plural = graceIncluded.Count == 1 ? "entry isn't" : "entries aren't";
+            string pronoun = graceIncluded.Count == 1 ? "it" : "them";
+            return $"{graceIncluded.Count} {plural} referenced anywhere in the project yet, kept for now: " +
+                $"{list}{more}. This is normal right after registering something new - reference {pronoun} soon " +
+                $"(or add {pronoun} to Force Include Names below), or {pronoun} may be excluded on a future regenerate.";
+        }
+
+        // Drawn only once a TsConfig exists (mirrors every tab below it): TreeShakeUnused and
+        // ForceIncludeNames both live on TsConfig, one toggle per linked scene/project rather
+        // than per module, so there's nothing to bind to before that.
+        private void DrawTreeShakingControls()
+        {
+            if (_so == null) return;
+
+            _so.Update();
+            var treeShakeProp = _so.FindProperty("TreeShakeUnused");
+            EditorGUILayout.PropertyField(treeShakeProp, new GUIContent("Tree-Shake Unused Singletons/Factories (Experimental)"));
+            if (treeShakeProp.boolValue)
+            {
+                EditorGUILayout.PropertyField(_so.FindProperty("ForceIncludeNames"), new GUIContent("Force Include Names"), true);
+                TsEditorGUI.DrawStatusBox(
+                    "Singleton and Factory entries not referenced anywhere in the project (via _ts.Name or " +
+                    "CreateName(...)) will be excluded on the next regenerate. List a name above to always keep it.",
+                    MessageType.Info);
+            }
+            _so.ApplyModifiedProperties();
+            EditorGUILayout.Space(4);
         }
 
         // Pure so it's directly unit-testable without driving OnGUI/EditorWindow.

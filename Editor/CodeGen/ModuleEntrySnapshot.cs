@@ -129,6 +129,46 @@ namespace Tsvrc.Editor
             }
         }
 
+        [Serializable]
+        private class NameSet
+        {
+            public List<string> Names = new List<string>();
+        }
+
+        // A dedicated name-only shape, for callers that just need a set of strings and shouldn't
+        // have to allocate Entry objects with unused fields.
+        internal static void SaveNames(string moduleKey, IEnumerable<string> names)
+        {
+            string path = PathFor(moduleKey);
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllText(path, JsonUtility.ToJson(new NameSet { Names = new List<string>(names) }));
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[ModuleEntrySnapshot] Could not save names for '{moduleKey}': {e.Message}");
+            }
+        }
+
+        // Empty, never null, when nothing is on record or it can't be read, so callers can use it
+        // directly as a Contains() lookup without a separate null check.
+        internal static HashSet<string> LoadNames(string moduleKey)
+        {
+            string path = PathFor(moduleKey);
+            if (!File.Exists(path)) return new HashSet<string>(StringComparer.Ordinal);
+            try
+            {
+                var loaded = JsonUtility.FromJson<NameSet>(File.ReadAllText(path))?.Names;
+                return new HashSet<string>(loaded ?? new List<string>(), StringComparer.Ordinal);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[ModuleEntrySnapshot] Could not read names for '{moduleKey}': {e.Message}");
+                return new HashSet<string>(StringComparer.Ordinal);
+            }
+        }
+
         private static string PathFor(string moduleKey) =>
             TsPaths.ToFullPath($"{TsPaths.GeneratedFolder}/.cache/{moduleKey}.json");
     }

@@ -214,6 +214,19 @@ namespace Tsvrc.Editor
             foreach (var module in modules)
                 module.LoadConfig();
 
+            // Collected after LoadConfig() so each module's tree-shaking decisions for this pass
+            // are final. Kept as two separate lists, not merged, so TsWindow can show "actually
+            // gone" apart from "kept for now."
+            var treeShakingExclusions = new List<string>();
+            var treeShakingGraceIncluded = new List<string>();
+            foreach (var module in modules)
+            {
+                treeShakingExclusions.AddRange(module.LastTreeShakingExclusions);
+                treeShakingGraceIncluded.AddRange(module.LastTreeShakingGraceIncluded);
+            }
+            LastTreeShakingExclusions = treeShakingExclusions;
+            LastTreeShakingGraceIncluded = treeShakingGraceIncluded;
+
             DetectAndExcludeFieldNameCollisions(modules);
 
             var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -419,6 +432,14 @@ namespace Tsvrc.Editor
         // "GameManager". Surfaced in TsWindow as a warning instead of only the console
         // Debug.LogError each affected module already logs in its ExcludeFieldNames() override.
         internal static IReadOnlyList<string> LastFieldNameCollisions { get; private set; } = Array.Empty<string>();
+
+        // Names ApplyTreeShaking excluded across every module during the most recent Run() pass,
+        // in module order. Empty whenever tree-shaking is off or nothing was excluded.
+        internal static IReadOnlyList<string> LastTreeShakingExclusions { get; private set; } = Array.Empty<string>();
+
+        // Names kept this pass only via the tree-shaking grace period: unreferenced right now,
+        // but not yet excluded since this is the first pass they've been seen that way.
+        internal static IReadOnlyList<string> LastTreeShakingGraceIncluded { get; private set; } = Array.Empty<string>();
 
         private static bool WriteModules(List<TsModule> modules)
         {

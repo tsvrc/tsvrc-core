@@ -326,5 +326,92 @@ namespace Tsvrc.Tests.EditMode
             StringAssert.Contains("+2 more", message);
             StringAssert.Contains("Console", message);
         }
+
+        [Test]
+        public void DetermineTreeShakingSummary_NoExclusions_ReturnsNull()
+        {
+            Assert.IsNull(TsWindow.DetermineTreeShakingSummary(new List<string>()));
+        }
+
+        [Test]
+        public void DetermineTreeShakingSummary_Null_ReturnsNull()
+        {
+            Assert.IsNull(TsWindow.DetermineTreeShakingSummary(null));
+        }
+
+        [Test]
+        public void DetermineTreeShakingSummary_FewerThanMax_ListsAllExcludedNames()
+        {
+            string message = TsWindow.DetermineTreeShakingSummary(new List<string> { "GameManager", "CreateWidget" }, maxShown: 5);
+
+            StringAssert.Contains("GameManager", message);
+            StringAssert.Contains("CreateWidget", message);
+            StringAssert.Contains("2 unused entries", message);
+            StringAssert.DoesNotContain("more", message);
+        }
+
+        [Test]
+        public void DetermineTreeShakingSummary_SingleExclusion_UsesSingularWording()
+        {
+            string message = TsWindow.DetermineTreeShakingSummary(new List<string> { "GameManager" });
+
+            StringAssert.Contains("1 unused entry", message);
+        }
+
+        [Test]
+        public void DetermineTreeShakingSummary_MoreThanMax_TruncatesAndMentionsRemainingCount()
+        {
+            string message = TsWindow.DetermineTreeShakingSummary(
+                new List<string> { "A", "B", "C", "D" }, maxShown: 2);
+
+            StringAssert.Contains("A", message);
+            StringAssert.Contains("B", message);
+            StringAssert.DoesNotContain("C", message);
+            StringAssert.Contains("+2 more", message);
+        }
+
+        [Test]
+        public void DetermineTreeShakingGraceSummary_NoneKept_ReturnsNull()
+        {
+            Assert.IsNull(TsWindow.DetermineTreeShakingGraceSummary(new List<string>()));
+        }
+
+        [Test]
+        public void DetermineTreeShakingGraceSummary_Null_ReturnsNull()
+        {
+            Assert.IsNull(TsWindow.DetermineTreeShakingGraceSummary(null));
+        }
+
+        [Test]
+        public void DetermineTreeShakingGraceSummary_FewerThanMax_ListsAllNamesAndReadsAsReassurance()
+        {
+            string message = TsWindow.DetermineTreeShakingGraceSummary(new List<string> { "GameManager", "CreateWidget" }, maxShown: 5);
+
+            StringAssert.Contains("GameManager", message);
+            StringAssert.Contains("CreateWidget", message);
+            StringAssert.Contains("kept for now", message);
+            StringAssert.Contains("normal right after registering", message);
+            StringAssert.DoesNotContain("more", message);
+        }
+
+        [Test]
+        public void DetermineTreeShakingGraceSummary_SingleEntry_UsesSingularWording()
+        {
+            string message = TsWindow.DetermineTreeShakingGraceSummary(new List<string> { "GameManager" });
+
+            StringAssert.Contains("1 entry isn't referenced", message);
+        }
+
+        [Test]
+        public void DetermineTreeShakingGraceSummary_MoreThanMax_TruncatesAndMentionsRemainingCount()
+        {
+            string message = TsWindow.DetermineTreeShakingGraceSummary(
+                new List<string> { "A", "B", "C", "D" }, maxShown: 2);
+
+            StringAssert.Contains("A", message);
+            StringAssert.Contains("B", message);
+            StringAssert.DoesNotContain("C", message);
+            StringAssert.Contains("+2 more", message);
+        }
     }
 }

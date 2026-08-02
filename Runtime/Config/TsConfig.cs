@@ -32,5 +32,21 @@ namespace Tsvrc.Config
         public TsvrcBehaviour[] Constructs;
         [Tooltip("Factory groups for runtime-instantiated (non-networked) prefabs.")]
         public TsFactoryGroup[] Factories;
+
+        /// <summary>
+        /// When enabled, Singleton and Factory entries that no project script references (via
+        /// <c>_ts.Name</c> or <c>CreateName(...)</c>) are left out of the generated output instead
+        /// of always being included. Off by default.
+        /// </summary>
+        [Tooltip("Experimental: when enabled, Singleton and Factory entries not referenced by any project script (via _ts.Name or CreateName(...)) are excluded from generated output instead of always being included. Defaults to off.")]
+        public bool TreeShakeUnused;
+
+        /// <summary>
+        /// Singleton/Factory names to always generate even when <see cref="TreeShakeUnused"/> is on
+        /// and nothing currently references them. Use for reflection-based access, editor-only
+        /// tooling, or entries you're about to wire up.
+        /// </summary>
+        [Tooltip("Singleton/Factory names to always generate even when TreeShakeUnused is on and no script currently references them - the escape valve for reflection-based access, editor-only tooling, or work in progress.")]
+        public string[] ForceIncludeNames;
     }
 }
