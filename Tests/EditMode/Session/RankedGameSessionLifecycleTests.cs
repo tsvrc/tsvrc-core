@@ -274,5 +274,99 @@ namespace Tsvrc.Tests.EditMode
 
             CollectionAssert.AreEqual(new[] { "Hook:OnSessionStopped", "Event:OnSessionStoppedEvent" }, h.Session.CallLog);
         }
+
+        [Test]
+        public void CurrentState_GameTrackerAlreadyRunning_ReportsInGameWithoutAnyTransitionEventEverFiring()
+        {
+            // Simulates a client that joined after InGame was already reached elsewhere: it only
+            // ever receives the tracker's live running state via ordinary deserialization, never
+            // the _OnReadyCheckCompleted event.
+            var h = CreateWiredSession();
+            Assert.AreEqual(RankedGameSessionState.Idle, h.Session.CurrentState);
+
+            h.GameTracker.StartPlayerTracking(new[] { "A" });
+
+            Assert.AreEqual(RankedGameSessionState.InGame, h.Session.CurrentState);
+            Assert.AreEqual(0, h.Session.OnSessionStartedCount,
+                "No RankedGameSession hook should have run - CurrentState must be correct from live tracker state alone.");
+        }
+
+        [Test]
+        public void CurrentState_ReadyCheckRunningGameTrackerNot_ReportsLoading()
+        {
+            // Unlike the game-tracker case above, ReadyCheckProcess itself (not
+            // RankedGameSession) fires OnSessionLoading from inside its own OnTrackingStarted
+            // override, so starting it directly still fires the hook - this test's point is
+            // narrower: CurrentState correctly reads Loading (not InGame or Idle) purely from
+            // the ready-check's own running state, independent of the game tracker.
+            var h = CreateWiredSession();
+
+            h.ReadyCheck.StartPlayerTracking(new[] { "A" }, useProcessUpdate: true);
+
+            Assert.AreEqual(RankedGameSessionState.Loading, h.Session.CurrentState);
+        }
+
+        [Test]
+        public void EndSession_SnapshotsGameAndCompletedPlayerIdsBeforeTearingDownTrackers()
+        {
+            var h = CreateWiredSession();
+            SetMasterOnly(h.Session, false);
+            h.Session.StartLobbyTracking();
+            h.LobbyTracker.AddTrackedPlayers(new[] { "A", "B" });
+            h.Session.StartSession();
+            h.ReadyCheck.BroadcastAddReadyPlayer("A");
+            h.ReadyCheck.BroadcastAddReadyPlayer("B");
+            h.Session.AddCompletedPlayer("A");
+
+            CollectionAssert.AreEqual(new string[0], h.Session.LastEndedGamePlayerIds,
+                "Sanity check: not populated before the session actually ends.");
+
+            h.Session.AddCompletedPlayer("B"); // all completed -> ends naturally
+
+            CollectionAssert.AreEqual(new[] { "A", "B" }, h.Session.LastEndedGamePlayerIds);
+            CollectionAssert.AreEqual(new[] { "A", "B" }, h.Session.LastEndedCompletedPlayerIds);
+            // The live properties, by contrast, are already cleared by the time OnSessionEnded's
+            // subscribers run - this is exactly why the snapshot exists.
+            CollectionAssert.AreEqual(new string[0], h.Session.GamePlayerIds);
+        }
+
+        [Test]
+        public void LastLobbyPlayerLeavesDuringLoading_StopsSessionInsteadOfHangingForever()
+        {
+            // Mirrors _endOnAllGamePlayersLeft's InGame-phase equivalent, one phase earlier.
+            var h = CreateWiredSession();
+            SetMasterOnly(h.Session, false);
+            h.Session.StartLobbyTracking();
+            h.LobbyTracker.AddTrackedPlayers(new[] { "A", "B" });
+            h.Session.StartSession();
+            Assert.AreEqual(RankedGameSessionState.Loading, h.Session.CurrentState);
+
+            h.ReadyCheck.RemoveTrackedPlayers(new[] { "A" });
+            Assert.AreEqual(RankedGameSessionState.Loading, h.Session.CurrentState,
+                "One of two players leaving must not stop the session - the other is still pending.");
+
+            h.ReadyCheck.RemoveTrackedPlayers(new[] { "B" }); // last remaining player leaves
+
+            Assert.AreEqual(RankedGameSessionState.Idle, h.Session.CurrentState);
+            Assert.AreEqual(1, h.Session.OnSessionStoppedCount);
+        }
+
+        [Test]
+        public void LastLobbyPlayerLeavesDuringLoading_StopOnEmptyLobbyDuringLoadingFalse_SessionStaysInLoading()
+        {
+            var h = CreateWiredSession();
+            SetMasterOnly(h.Session, false);
+            SetStopOnEmptyLobbyDuringLoading(h.Session, false);
+            h.Session.StartLobbyTracking();
+            h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
+            h.Session.StartSession();
+
+            h.ReadyCheck.RemoveTrackedPlayers(new[] { "A" });
+
+            Assert.AreEqual(RankedGameSessionState.Loading, h.Session.CurrentState,
+                "The ready-check process itself still has zero tracked players either way - " +
+                "only the session's own reaction to that is suppressed by the flag.");
+            Assert.AreEqual(0, h.Session.OnSessionStoppedCount);
+        }
     }
 }

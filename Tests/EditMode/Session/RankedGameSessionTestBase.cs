@@ -75,6 +75,9 @@ namespace Tsvrc.Tests.EditMode
         protected static void SetEndOnAllPlayersCompleted(RankedGameSessionTestSubclass s, bool v) =>
             PrivateFieldAccess.SetField(s, "_endOnAllPlayersCompleted", v);
 
+        protected static void SetStopOnEmptyLobbyDuringLoading(RankedGameSessionTestSubclass s, bool v) =>
+            PrivateFieldAccess.SetField(s, "_stopOnEmptyLobbyDuringLoading", v);
+
         protected static void SetTimerDurationMsField(RankedGameSessionTestSubclass s, int v) =>
             PrivateFieldAccess.SetField(s, "_timerDurationMs", v);
 

@@ -1,5 +1,8 @@
+using System;
 using System.Collections;
+using System.Collections.Generic;
 using NUnit.Framework;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace Tsvrc.Testing.Framework
@@ -13,6 +16,8 @@ namespace Tsvrc.Testing.Framework
     {
         protected readonly ClientSimPlayerEnvironment Players = new ClientSimPlayerEnvironment();
 
+        private readonly List<Action> _rootBuilderTeardowns = new List<Action>();
+
         [OneTimeSetUp]
         public void TsPlayModeTestBase_OneTimeSetUp()
         {
@@ -25,6 +30,10 @@ namespace Tsvrc.Testing.Framework
         {
             Players.Teardown();
 
+            foreach (var teardown in _rootBuilderTeardowns)
+                teardown();
+            _rootBuilderTeardowns.Clear();
+
             foreach (var fixup in FixupRegistry.ActiveFixups)
                 fixup.OnUnityTearDown();
 
@@ -34,6 +43,16 @@ namespace Tsvrc.Testing.Framework
         protected IEnumerator StartClientSim(bool localPlayerIsMaster = true)
         {
             return Players.Start(localPlayerIsMaster);
+        }
+
+        /// <summary>Starts composing a project's generated composition root from code - see
+        /// TsRootBuilder's own doc comment for why this replaces loading a saved scene. The
+        /// builder's spawned GameObjects are torn down automatically alongside ClientSim.</summary>
+        protected TsRootBuilder<TRoot> BuildTsRoot<TRoot>() where TRoot : Component
+        {
+            var builder = new TsRootBuilder<TRoot>();
+            _rootBuilderTeardowns.Add(builder.Teardown);
+            return builder;
         }
     }
 }
