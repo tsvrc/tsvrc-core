@@ -381,10 +381,17 @@ namespace Tsvrc.Editor
             }
         }
 
-        private static void OpenLinkedScene()
+        // Refreshes _config right after the scene loads: OpenScene doesn't raise
+        // TsGenerator.StateChanged, and this call already runs with the window focused, so
+        // OnFocus's own ReloadConfig() won't fire again on its own.
+        private void OpenLinkedScene()
         {
             if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            {
                 EditorSceneManager.OpenScene(TsLinkedScene.ScenePath, OpenSceneMode.Single);
+                ReloadConfig();
+                Repaint();
+            }
         }
 
         // Backs the "Settings" tab. Never passed to TsGenerator.CreateModules()/RunCore, so
