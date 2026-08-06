@@ -59,6 +59,11 @@ namespace Tsvrc.Tests.EditMode
 
         internal static bool CallTryAcceptEntry(UnityEngine.Object obj, string moduleTag, string configLabel, string entryNoun, HashSet<UnityEngine.Object> seen)
             => TryAcceptEntry(obj, moduleTag, configLabel, entryNoun, seen);
+
+        internal static void CallBreakGroupCycles(string moduleTag, TsGroup[] groups) => BreakGroupCycles(moduleTag, groups);
+
+        internal static string CallBuildGroupPrefix(int groupId, TsGroup[] groups, System.Func<string, string> sanitize)
+            => BuildGroupPrefix(groupId, ToGroupLookup(groups), sanitize);
     }
 
     public class TsModuleHelpersTests
@@ -287,7 +292,7 @@ namespace Tsvrc.Tests.EditMode
             // Pins the exact tie boundary. The comparison is cached.Count > resolved.Count,
             // strictly greater, not greater than or equal, so an equal count trusts the live
             // result even though its actual entries differ from the cached ones. A same-size
-            // legitimate swap, one singleton replaced by another, must not be masked by the
+            // legitimate swap, one entry replaced by another, must not be masked by the
             // stale cache.
             TsPaths.ScriptCompilationFailedOverride = false;
             TsModuleTestHarness.CallApplySnapshotFallback(FallbackKey, new List<string> { "A", "B" });
@@ -541,7 +546,7 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsTrue(seen.Contains(config));
         }
 
-        // ApplyTreeShaking: the shared filter Singleton and Factory both route through instead of
+        // ApplyTreeShaking: the shared filter Global and Factory both route through instead of
         // hand-rolling their own, the same reasoning TryAcceptEntry already established for
         // null/duplicate handling above. Every "unreferenced" case below goes through
         // ConsumeGracePeriod's one-pass grace: an entry is only excluded once it's been observed

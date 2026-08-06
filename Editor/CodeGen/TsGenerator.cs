@@ -212,11 +212,11 @@ namespace Tsvrc.Editor
 
             var modules = CreateModules();
 
-            // Checked once here, not once per module, even though Singleton/Pool/Factory each
+            // Checked once here, not once per module, even though Global/Pool/Factory each
             // independently read TsBuiltinConfig.
             if (TsModule.IsBuiltinConfigMissing())
                 Debug.LogWarning($"[Tsvrc] Builtin config asset is missing at '{TsModule.BuiltinConfigPath}' - " +
-                    "library-provided singletons/pool prefabs/factories will not be included until it's restored.");
+                    "library-provided globals/pool prefabs/factories will not be included until it's restored.");
 
             // TsLinkedScene.Find<TsConfig>() itself now silently returns null on an ambiguous
             // match; this is the one place that turns that into a specific diagnostic naming
@@ -254,7 +254,13 @@ namespace Tsvrc.Editor
                     paths.Add($"{TsPaths.GeneratedFolder}/{module.FileName}");
             WatchedPaths = paths;
 
-            if (WriteModules(modules))
+            // A module that stops producing a file it used to (renamed or removed) leaves that
+            // file behind forever otherwise, since WatchedPaths above only tracks each module's
+            // current FileName. A leftover file redeclaring the same partial-class members as the
+            // current one is a guaranteed compile break, not just clutter.
+            bool orphansDeleted = DeleteOrphanedGeneratedFiles(modules);
+
+            if (WriteModules(modules) || orphansDeleted)
             {
                 // Stop here even with skipRefresh, which TsBuildCompile passes at build time: the
                 // compiled type on disk is now stale relative to what was just written, so wiring
@@ -426,7 +432,7 @@ namespace Tsvrc.Editor
             new PoolModule(),
             new TranslationModule(),
             new InstanceModule(),
-            new SingletonModule(),
+            new GlobalModule(),
             new ConstructModule(),
             new FactoryModule(),
             new ScaffoldModule(),
@@ -444,7 +450,7 @@ namespace Tsvrc.Editor
 
         // Any field name exposed by more than one module is stripped from every module that
         // declared it, so a collision never silently produces two same named fields on
-        // TsGenerated. Only SingletonModule currently overrides ExposedFieldNames() and
+        // TsGenerated. Only GlobalModule currently overrides ExposedFieldNames() and
         // ExcludeFieldNames() among the real modules, so this path is otherwise only
         // exercisable with synthetic test modules.
         internal static void DetectAndExcludeFieldNameCollisions(List<TsModule> modules)
@@ -465,7 +471,7 @@ namespace Tsvrc.Editor
         }
 
         // Field names dropped by the most recent Run() because more than one module tried to
-        // expose the same name, for example a Singleton and a Construct both deriving
+        // expose the same name, for example a Global and a Construct both deriving
         // "GameManager". Surfaced in TsWindow as a warning instead of only the console
         // Debug.LogError each affected module already logs in its ExcludeFieldNames() override.
         internal static IReadOnlyList<string> LastFieldNameCollisions { get; private set; } = Array.Empty<string>();
@@ -477,6 +483,50 @@ namespace Tsvrc.Editor
         // Names kept this pass only via the tree-shaking grace period: unreferenced right now,
         // but not yet excluded since this is the first pass they've been seen that way.
         internal static IReadOnlyList<string> LastTreeShakingGraceIncluded { get; private set; } = Array.Empty<string>();
+
+        // Deletes any *.cs file directly under TsPaths.GeneratedFolder that carries tsvrc's own
+        // auto-generated header but doesn't match any current module's FileName. Only files with
+        // that exact header are touched, so a hand-added file sharing this folder is never at
+        // risk. Runs on every pass regardless of compile state, since a stale duplicate-defining
+        // file is often the actual cause of a compile break, not just something to tidy up once
+        // healthy. Returns true if anything was deleted, so the caller knows a refresh is needed.
+        private static bool DeleteOrphanedGeneratedFiles(List<TsModule> modules)
+        {
+            string folder = TsPaths.ToFullPath(TsPaths.GeneratedFolder);
+            if (!Directory.Exists(folder)) return false;
+
+            var expected = new HashSet<string>(
+                modules.Where(m => m.FileName != null).Select(m => m.FileName),
+                StringComparer.Ordinal);
+
+            bool deletedAny = false;
+            foreach (string fullPath in Directory.GetFiles(folder, "*.cs", SearchOption.TopDirectoryOnly))
+            {
+                string fileName = Path.GetFileName(fullPath);
+                if (expected.Contains(fileName)) continue;
+
+                string content;
+                try { content = File.ReadAllText(fullPath, Encoding.UTF8); }
+                catch { continue; }
+                if (!content.StartsWith("// <auto-generated/>")) continue;
+
+                try
+                {
+                    File.Delete(fullPath);
+                    string metaPath = fullPath + ".meta";
+                    if (File.Exists(metaPath)) File.Delete(metaPath);
+                    deletedAny = true;
+                    Debug.LogWarning($"[Tsvrc] Deleted orphaned generated file '{fileName}' - no module produces " +
+                        "it anymore (it was likely renamed or removed in a tsvrc update). If this looks wrong, " +
+                        "check for an unrelated hand-added file that happens to share this folder.");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[Tsvrc] Failed to delete orphaned generated file '{fileName}': {e.Message}.");
+                }
+            }
+            return deletedAny;
+        }
 
         private static bool WriteModules(List<TsModule> modules)
         {

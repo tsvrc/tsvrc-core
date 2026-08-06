@@ -11,7 +11,7 @@ namespace Tsvrc.Tests.EditMode
     // generated shadow class (see ScaffoldModuleGenerateCodeTests): a same-named property
     // that hides the inherited TsRoot-typed _ts field with one retyped to the concrete
     // generated root. This is the mechanism the refactor depends on for world scripts (e.g.
-    // MolInstance : TsInstance) to reach project-specific singleton/pool/construct/
+    // MolInstance : TsInstance) to reach project-specific global/pool/construct/
     // factory members through plain `_ts.Member` calls, with no cast at any call site.
     //
     // Exercised here against ExtensionPointBehaviourDouble/ExtensionPointStateManagerDouble
@@ -73,7 +73,7 @@ namespace Tsvrc.Tests.EditMode
         public void ShadowedTs_ExposesConcreteMembersNotOnTsRoot_WithNoCastAtCallSite()
         {
             // The actual bug being fixed: a member declared only on the concrete root
-            // (FakeInstance stands in for a project's generated singleton/pool/factory member)
+            // (FakeInstance stands in for a project's generated global/pool/factory member)
             // must be reachable through _ts directly, unqualified, from a leaf world script.
             var root = Create<FullTsRootDouble>();
             var instance = Create<Instance>();

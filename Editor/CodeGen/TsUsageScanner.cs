@@ -5,7 +5,7 @@ namespace Tsvrc.Editor
 {
     // Answers "is this generated member actually referenced by any project script" for
     // tree-shaking. Built on ScriptIndex's whole-project source-text scan rather than reflection:
-    // a Singleton read (_ts.Name) or a Factory call (CreateName(...)) is a bare member/method
+    // a Global read (_ts.Name) or a Factory call (CreateName(...)) is a bare member/method
     // access with no attribute-markable field to reflect over, unlike PoolModule's [WirePool]
     // mechanism, so this has to look at source text rather than live scene instances or compiled
     // types.
@@ -17,7 +17,7 @@ namespace Tsvrc.Editor
     internal static class TsUsageScanner
     {
         // True if any script in the project contains "_ts.{memberName}" (whitespace around the
-        // dot tolerated), the shape every Singleton/Log/Memory access takes from a
+        // dot tolerated), the shape every Global/Log/Memory access takes from a
         // TsvrcBehaviour.
         internal static bool IsMemberReferenced(string memberName) =>
             ScriptIndex.AnySourceMatches(MemberAccessPattern(memberName));

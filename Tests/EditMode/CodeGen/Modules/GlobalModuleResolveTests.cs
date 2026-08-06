@@ -8,10 +8,10 @@ using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // SingletonModule.Resolve() called directly via reflection with fully synthetic
+    // GlobalModule.Resolve() called directly via reflection with fully synthetic
     // UnityEngine.Object instances - no AssetDatabase, no TsConfig/TsBuiltinConfig
     // asset touched at all.
-    public class SingletonModuleResolveTests
+    public class GlobalModuleResolveTests
     {
         private TempSceneScope _scope;
 
@@ -22,7 +22,7 @@ namespace Tsvrc.Tests.EditMode
         public void TearDown() => _scope.Dispose();
 
         private static IList Resolve(IEnumerable<Object> objects)
-            => (IList)PrivateFieldAccess.InvokeStatic(typeof(SingletonModule), "Resolve", objects);
+            => (IList)PrivateFieldAccess.InvokeStatic(typeof(GlobalModule), "Resolve", objects);
 
         private static string NameOf(object entry) => PrivateFieldAccess.GetField<string>(entry, "Name");
         private static string TypeNameOf(object entry) => PrivateFieldAccess.GetField<string>(entry, "TypeName");
@@ -30,7 +30,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Resolve_NullEntry_WarnsAndSkips()
         {
-            LogAssert.Expect(LogType.Warning, "[SingletonModule] Null entry in config, remove the missing-script slot.");
+            LogAssert.Expect(LogType.Warning, "[GlobalModule] Null entry in config, remove the missing-script slot.");
 
             var result = Resolve(new Object[] { null });
 
@@ -42,7 +42,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var go = _scope.CreateGameObject("Dup");
 
-            LogAssert.Expect(LogType.Warning, "[SingletonModule] Duplicate entry 'Dup' in config, remove the duplicate.");
+            LogAssert.Expect(LogType.Warning, "[GlobalModule] Duplicate entry 'Dup' in config, remove the duplicate.");
 
             var result = Resolve(new Object[] { go, go });
 
@@ -109,8 +109,8 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Resolve_CombinedSceneThenBuiltinStream_SceneEntryKeepsUnsuffixedName()
         {
-            // Resolve() is fed scene-then-builtin concatenated (SingletonModule.LoadConfig
-            // builds `sceneSingletons.Concat(builtinConfig.Singletons)`), so iteration order
+            // Resolve() is fed scene-then-builtin concatenated (GlobalModule.LoadConfig
+            // builds `sceneGlobals.Concat(builtinGlobals)`), so iteration order
             // alone determines which of two same-named entries wins the unsuffixed name -
             // the scene one, since it's always listed first in the concatenation.
             var sceneObj = _scope.CreateGameObject("__Foo__");

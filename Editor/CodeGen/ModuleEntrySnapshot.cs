@@ -14,10 +14,10 @@ namespace Tsvrc.Editor
     //
     // This is what actually happened in the field: a world script referencing a not yet
     // generated TsGenerated member breaks Assembly-CSharp's compile, which makes every scene
-    // reference to a component declared in that same assembly, meaning every real Singleton or
+    // reference to a component declared in that same assembly, meaning every real Global or
     // Factory entry, resolve to null. LoadConfig() would otherwise see zero entries and silently
-    // regenerate an empty _TsSingletonStart(){}, permanently wiping 9 real singletons down to
-    // nothing on the very next domain reload. See SingletonModule and FactoryModule for the call
+    // regenerate an empty _TsGlobalStart(){}, permanently wiping 9 real globals down to
+    // nothing on the very next domain reload. See GlobalModule and FactoryModule for the call
     // sites, and TsModule.IsTsvrcBehaviourType and ScriptIndex for the complementary fix that
     // avoids needing this fallback in the first place wherever possible.
     //

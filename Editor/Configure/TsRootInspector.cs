@@ -19,7 +19,7 @@ namespace Tsvrc.Editor
         {
             TsEditorGUI.DrawManagedByConfigureBanner(
                 "This is the Tsvrc-generated root behaviour. Its fields are auto-wired by the generator " +
-                "- don't edit TsGenerated.cs directly. Configure singletons/pool/constructs/factories via " +
+                "- don't edit TsGenerated.cs directly. Configure globals/pool/constructs/factories via " +
                 "Tsvrc > Configure.");
             DrawDefaultInspector();
         }

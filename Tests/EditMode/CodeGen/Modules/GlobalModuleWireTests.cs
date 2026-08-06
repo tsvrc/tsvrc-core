@@ -9,19 +9,19 @@ using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // SingletonModule.Wire() against a real compiled root in an isolated temp scene, fed
+    // GlobalModule.Wire() against a real compiled root in an isolated temp scene, fed
     // synthetic entries via reflection (bypassing LoadConfig()).
     //
-    // This project ships with no real configured Singleton entries, so the mechanism here is
+    // This project ships with no real configured Global entries, so the mechanism here is
     // exercised against "_memory", a field that unconditionally exists on the compiled type
-    // regardless of config (MemoryModule's own field). SingletonModule.Wire() only cares that
+    // regardless of config (MemoryModule's own field). GlobalModule.Wire() only cares that
     // FindProperty(entry.Name) resolves and that the source object's type matches the field's
     // declared type. It has no idea which module "owns" the field name, so this is a
     // faithful, if borrowed, test of the exact same mechanical assignment path a real
-    // Singleton field goes through.
-    public class SingletonModuleWireTests
+    // Global field goes through.
+    public class GlobalModuleWireTests
     {
-        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(SingletonModule), "SingletonEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(GlobalModule), "GlobalEntry");
         private const string RealFieldName = "_memory";
 
         private TempSceneScope _scope;
@@ -40,9 +40,9 @@ namespace Tsvrc.Tests.EditMode
         private static object Entry(string name, UnityEngine.Object source)
             => CodeGenModuleReflection.BuildEntry(EntryType, ("Name", name), ("TypeName", ""), ("Namespace", ""), ("SourceObject", source));
 
-        private static SingletonModule ModuleWith(params object[] entries)
+        private static GlobalModule ModuleWith(params object[] entries)
         {
-            var module = new SingletonModule();
+            var module = new GlobalModule();
             PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, entries));
             return module;
         }

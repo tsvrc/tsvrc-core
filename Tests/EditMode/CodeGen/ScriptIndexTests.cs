@@ -322,7 +322,7 @@ namespace Tsvrc.Tests.EditMode
 
         // TryResolveDeclaredType(string, string, ...): the pure logic half, used by
         // TsModule.TryResolveViaScript to answer "what class/namespace does this script declare"
-        // independent of live reflection - the mechanism that makes SingletonModule and
+        // independent of live reflection - the mechanism that makes GlobalModule and
         // ConstructModule resilient to a currently-broken Assembly-CSharp compile.
         [Test]
         public void TryResolveDeclaredType_NullOrEmptyScriptName_ReturnsFalse()

@@ -18,7 +18,7 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsInstanceOf<PoolModule>(modules[2]);
             Assert.IsInstanceOf<TranslationModule>(modules[3]);
             Assert.IsInstanceOf<InstanceModule>(modules[4]);
-            Assert.IsInstanceOf<SingletonModule>(modules[5]);
+            Assert.IsInstanceOf<GlobalModule>(modules[5]);
             Assert.IsInstanceOf<ConstructModule>(modules[6]);
             Assert.IsInstanceOf<FactoryModule>(modules[7]);
             Assert.IsInstanceOf<ScaffoldModule>(modules[8]);

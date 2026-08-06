@@ -31,7 +31,7 @@ namespace Tsvrc.Editor
             // real against whatever scene the NUnit batchmode test runner happens to have open, a
             // scene that never has the real project's TsConfig, and since compiling clean with a
             // smaller live result is (by design, see TsModule.ApplySnapshotFallback) treated as a
-            // legitimate removal, it would overwrite the real generated Singleton/Factory/Pool/
+            // legitimate removal, it would overwrite the real generated Global/Factory/Pool/
             // Construct files with an almost-empty result. Tests call TsGenerator.Run()/
             // AfterDomainReload() directly and deliberately when they want to exercise it, so
             // skipping only this automatic entry point doesn't affect them.

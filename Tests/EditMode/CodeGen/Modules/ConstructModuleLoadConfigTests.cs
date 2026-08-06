@@ -8,7 +8,7 @@ namespace Tsvrc.Tests.EditMode
 {
     // Tests ConstructModule.LoadConfig()'s Layer A snapshot fallback (see ModuleEntrySnapshot
     // and TsModule.ApplySnapshotFallback). This uses the same mechanism and the same test shape
-    // as SingletonModuleLoadConfigTests, applied to TsConfig.Constructs instead of Singletons.
+    // as GlobalModuleLoadConfigTests, applied to TsConfig.Constructs instead of Globals.
     public class ConstructModuleLoadConfigTests
     {
         private const string SnapshotKey = "ConstructModule";

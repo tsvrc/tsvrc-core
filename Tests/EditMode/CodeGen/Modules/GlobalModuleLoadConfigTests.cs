@@ -6,15 +6,15 @@ using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // Tests SingletonModule.LoadConfig()'s Layer A snapshot fallback (see ModuleEntrySnapshot and
+    // Tests GlobalModule.LoadConfig()'s Layer A snapshot fallback (see ModuleEntrySnapshot and
     // TsModule.ApplySnapshotFallback). This is the exact mechanism that would have prevented
     // the real regression that motivated it: a broken Assembly-CSharp compile nulling out
-    // every scene reference to a Singleton, silently regenerating an empty stub over 9 real
+    // every scene reference to a Global, silently regenerating an empty stub over 9 real
     // entries. Resolve()'s own name-derivation, dedup, and alias logic is covered separately in
-    // SingletonModuleResolveTests; this file is only about the snapshot save/restore wiring.
-    public class SingletonModuleLoadConfigTests
+    // GlobalModuleResolveTests; this file is only about the snapshot save/restore wiring.
+    public class GlobalModuleLoadConfigTests
     {
-        private const string SnapshotKey = "SingletonModule";
+        private const string SnapshotKey = "GlobalModule";
 
         private TempSceneScope _scope;
 
@@ -24,11 +24,11 @@ namespace Tsvrc.Tests.EditMode
             _scope = new TempSceneScope();
             ScratchAssets.EnsureFolder();
             // Without this redirect, Save/Load(SnapshotKey) would hit the real
-            // Assets/TsGenerated/.cache/SingletonModule.json, the same file the real,
-            // production SingletonModule reads and writes whenever an actual domain reload runs
+            // Assets/TsGenerated/.cache/GlobalModule.json, the same file the real,
+            // production GlobalModule reads and writes whenever an actual domain reload runs
             // TsGenerator against this project's real scene, which can happen interleaved with
             // this exact test suite run and contaminate these assertions with real project data.
-            TsPaths.GeneratedFolder = ScratchAssets.Folder + "/SingletonLoadConfigScratch";
+            TsPaths.GeneratedFolder = ScratchAssets.Folder + "/GlobalLoadConfigScratch";
         }
 
         [TearDown]
@@ -39,22 +39,22 @@ namespace Tsvrc.Tests.EditMode
             ScratchAssets.DeleteAll();
         }
 
-        private TsConfig AddConfigWithSingleton(string goName)
+        private TsConfig AddConfigWithGlobal(string goName)
         {
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
             var target = _scope.CreateGameObject(goName).AddComponent<TsvrcMemory>();
-            config.Singletons = new Object[] { target };
+            config.GlobalEntries = new[] { new TsGroupedEntry { Value = target, GroupId = 0 } };
             return config;
         }
 
         [Test]
         public void LoadConfig_CompilesClean_SavesASnapshotOfTheLiveResult()
         {
-            AddConfigWithSingleton("SomeMemory");
+            AddConfigWithGlobal("SomeMemory");
             TsPaths.ScriptCompilationFailedOverride = false;
 
-            new SingletonModule().LoadConfig();
+            new GlobalModule().LoadConfig();
 
             var snapshot = ModuleEntrySnapshot.Load(SnapshotKey);
             Assert.IsNotNull(snapshot);
@@ -72,7 +72,7 @@ namespace Tsvrc.Tests.EditMode
             });
             TsPaths.ScriptCompilationFailedOverride = false;
 
-            var module = new SingletonModule();
+            var module = new GlobalModule();
             module.LoadConfig();
 
             StringAssert.DoesNotContain("Stale", module.GenerateCode(),
@@ -89,11 +89,11 @@ namespace Tsvrc.Tests.EditMode
                 new ModuleEntrySnapshot.Entry { Name = "GameManager", TypeName = "GameManager", Namespace = "MoL.Game" },
             });
             // There is no TsConfig in this scene at all, so live resolution finds nothing, simulating every
-            // Singleton reference having gone null because the assembly that declares them
+            // Global reference having gone null because the assembly that declares them
             // failed to compile.
             TsPaths.ScriptCompilationFailedOverride = true;
 
-            var module = new SingletonModule();
+            var module = new GlobalModule();
             module.LoadConfig();
             string generated = module.GenerateCode();
 
@@ -108,10 +108,10 @@ namespace Tsvrc.Tests.EditMode
             {
                 new ModuleEntrySnapshot.Entry { Name = "OldEntry", TypeName = "OldEntry", Namespace = "" },
             });
-            AddConfigWithSingleton("CurrentMemory");
+            AddConfigWithGlobal("CurrentMemory");
             TsPaths.ScriptCompilationFailedOverride = true;
 
-            var module = new SingletonModule();
+            var module = new GlobalModule();
             module.LoadConfig();
             string generated = module.GenerateCode();
 
@@ -126,7 +126,7 @@ namespace Tsvrc.Tests.EditMode
             // config would produce, not throw.
             TsPaths.ScriptCompilationFailedOverride = true;
 
-            var module = new SingletonModule();
+            var module = new GlobalModule();
 
             Assert.DoesNotThrow(() => module.LoadConfig());
             StringAssert.DoesNotContain("[SerializeField]", module.GenerateCode());

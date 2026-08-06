@@ -10,13 +10,13 @@ using UnityEngine.TestTools;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // SingletonModule.LoadConfig()'s tree-shaking gate (TsModule.ApplyTreeShaking). Off by
+    // GlobalModule.LoadConfig()'s tree-shaking gate (TsModule.ApplyTreeShaking). Off by
     // default - every test here explicitly opts a TsConfig into TreeShakeUnused, so the
-    // default-off behavior already covered by SingletonModuleLoadConfigTests is never silently
+    // default-off behavior already covered by GlobalModuleLoadConfigTests is never silently
     // changed by this feature.
-    public class SingletonModuleTreeShakingTests
+    public class GlobalModuleTreeShakingTests
     {
-        private const string SnapshotKey = "SingletonModule";
+        private const string SnapshotKey = "GlobalModule";
         private TempSceneScope _scope;
 
         [SetUp]
@@ -24,7 +24,7 @@ namespace Tsvrc.Tests.EditMode
         {
             _scope = new TempSceneScope();
             ScratchAssets.EnsureFolder();
-            TsPaths.GeneratedFolder = ScratchAssets.Folder + "/SingletonTreeShakingScratch";
+            TsPaths.GeneratedFolder = ScratchAssets.Folder + "/GlobalTreeShakingScratch";
             TsPaths.ScriptCompilationFailedOverride = false;
         }
 
@@ -44,12 +44,12 @@ namespace Tsvrc.Tests.EditMode
         private static void SeedProjectSource(params string[] sourceFiles) =>
             PrivateFieldAccess.SetField(typeof(ScriptIndex), "_sourceTexts", new List<string>(sourceFiles));
 
-        private TsConfig AddConfigWithSingleton(string goName, bool treeShake, params string[] forceIncludeNames)
+        private TsConfig AddConfigWithGlobal(string goName, bool treeShake, params string[] forceIncludeNames)
         {
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
             var target = _scope.CreateGameObject(goName).AddComponent<TsvrcMemory>();
-            config.Singletons = new Object[] { target };
+            config.GlobalEntries = new[] { new TsGroupedEntry { Value = target, GroupId = 0 } };
             config.TreeShakeUnused = treeShake;
             config.ForceIncludeNames = forceIncludeNames;
             return config;
@@ -58,10 +58,10 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void LoadConfig_TreeShakingOff_KeepsEntryEvenWithNoReferencesAnywhere()
         {
-            AddConfigWithSingleton("SomeMemory", treeShake: false);
+            AddConfigWithGlobal("SomeMemory", treeShake: false);
             SeedProjectSource("public class Unrelated { }");
 
-            var module = new SingletonModule();
+            var module = new GlobalModule();
             module.LoadConfig();
 
             StringAssert.Contains("TsvrcMemory", module.GenerateCode());
@@ -71,27 +71,27 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void LoadConfig_TreeShakingOnAndReferenced_KeepsEntry()
         {
-            AddConfigWithSingleton("SomeMemory", treeShake: true);
+            AddConfigWithGlobal("SomeMemory", treeShake: true);
             SeedProjectSource("public class Foo : TsvrcBehaviour { void Bar() { _ts.TsvrcMemory.DoThing(); } }");
 
-            var module = new SingletonModule();
+            var module = new GlobalModule();
             module.LoadConfig();
 
             StringAssert.Contains("TsvrcMemory", module.GenerateCode());
             CollectionAssert.IsEmpty(module.LastTreeShakingExclusions);
         }
 
-        // The first time a registered Singleton resolves as unreferenced, it's kept via the
+        // The first time a registered Global resolves as unreferenced, it's kept via the
         // one-pass grace period (TsModule.ConsumeGracePeriod), not excluded outright, since a
         // developer who just registered it would otherwise have no field to write code against.
         [Test]
         public void LoadConfig_TreeShakingOnAndNotReferencedForTheFirstTime_KeepsEntryViaGracePeriod()
         {
-            AddConfigWithSingleton("SomeMemory", treeShake: true);
+            AddConfigWithGlobal("SomeMemory", treeShake: true);
             SeedProjectSource("public class Unrelated { }");
 
-            LogAssert.Expect(LogType.Log, new Regex(@"\[SingletonModule\] 1 entry isn't referenced"));
-            var module = new SingletonModule();
+            LogAssert.Expect(LogType.Log, new Regex(@"\[GlobalModule\] 1 entry isn't referenced"));
+            var module = new GlobalModule();
             module.LoadConfig();
 
             StringAssert.Contains("TsvrcMemory", module.GenerateCode(), "Must still be generated during its grace period.");
@@ -102,13 +102,13 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void LoadConfig_TreeShakingOnAndNotReferencedForASecondConsecutivePass_ExcludesEntryAndLogsIt()
         {
-            AddConfigWithSingleton("SomeMemory", treeShake: true);
+            AddConfigWithGlobal("SomeMemory", treeShake: true);
             SeedProjectSource("public class Unrelated { }");
             // First pass consumes the grace period.
-            new SingletonModule().LoadConfig();
+            new GlobalModule().LoadConfig();
 
-            LogAssert.Expect(LogType.Log, new Regex(@"\[SingletonModule\] Excluded 'TsvrcMemory' - not referenced.*two regenerates"));
-            var module = new SingletonModule();
+            LogAssert.Expect(LogType.Log, new Regex(@"\[GlobalModule\] Excluded 'TsvrcMemory' - not referenced.*two regenerates"));
+            var module = new GlobalModule();
             module.LoadConfig();
 
             StringAssert.DoesNotContain("TsvrcMemory", module.GenerateCode());
@@ -119,10 +119,10 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void LoadConfig_TreeShakingOnAndForceIncluded_KeepsEntryEvenWithoutAnyReference()
         {
-            AddConfigWithSingleton("SomeMemory", treeShake: true, "TsvrcMemory");
+            AddConfigWithGlobal("SomeMemory", treeShake: true, "TsvrcMemory");
             SeedProjectSource("public class Unrelated { }");
 
-            var module = new SingletonModule();
+            var module = new GlobalModule();
             module.LoadConfig();
 
             StringAssert.Contains("TsvrcMemory", module.GenerateCode());
@@ -135,21 +135,21 @@ namespace Tsvrc.Tests.EditMode
         {
             // First pass: tree-shaking off, one real entry, establishes a last-known-good count
             // of 1 (see TsModule.ApplySnapshotFallback/WarnIfBelowLastKnownGood).
-            var config = AddConfigWithSingleton("SomeMemory", treeShake: false);
-            new SingletonModule().LoadConfig();
+            var config = AddConfigWithGlobal("SomeMemory", treeShake: false);
+            new GlobalModule().LoadConfig();
 
             // Second pass: tree-shaking now on, unreferenced for the first time - kept via grace,
             // count stays at 1, nothing to warn about yet.
             config.TreeShakeUnused = true;
             SeedProjectSource("public class Unrelated { }");
-            new SingletonModule().LoadConfig();
+            new GlobalModule().LoadConfig();
 
             // Third pass: still unreferenced (second consecutive miss) - now actually excluded,
             // dropping the count from 1 to 0. This drop is fully explained by this pass's own
             // tree-shaking exclusion, so WarnIfBelowLastKnownGood must stay silent. Any unexpected
             // Warning here fails the test via LogAssert's own default behavior.
-            LogAssert.Expect(LogType.Log, new Regex(@"\[SingletonModule\] Excluded"));
-            new SingletonModule().LoadConfig();
+            LogAssert.Expect(LogType.Log, new Regex(@"\[GlobalModule\] Excluded"));
+            new GlobalModule().LoadConfig();
         }
     }
 }

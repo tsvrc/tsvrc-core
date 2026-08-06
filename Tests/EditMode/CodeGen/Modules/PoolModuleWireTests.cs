@@ -12,12 +12,12 @@ using UnityEngine;
 namespace Tsvrc.Tests.EditMode
 {
     // PoolModule.Wire() against a real compiled root in an isolated temp scene. Unlike
-    // Singleton/Construct/Factory, PoolModule's slot-field-not-found path only skips the
+    // Global/Construct/Factory, PoolModule's slot-field-not-found path only skips the
     // *field assignment* (Debug.LogWarning, no `continue`) - it still creates the "Pool"
     // container and instantiates every prefab regardless. That makes the scene-mutation half
     // of Wire() fully testable here always. The slot-field assignment mechanism itself is the
     // same generic SerializedProperty scalar assignment proven end-to-end by
-    // SingletonModuleWireTests.Wire_FieldFound_DirectReferenceIsAssigned. IsPoolAlreadyWired's
+    // GlobalModuleWireTests.Wire_FieldFound_DirectReferenceIsAssigned. IsPoolAlreadyWired's
     // per-slot field-match checks below are instance methods that take `root` as an explicit
     // parameter rather than looking it up themselves, so their "true" outcomes are tested
     // directly against a plain test double carrying a literal "_pool_StateManager_0" field,

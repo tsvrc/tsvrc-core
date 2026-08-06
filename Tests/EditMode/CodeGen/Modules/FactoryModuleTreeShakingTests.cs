@@ -13,7 +13,7 @@ namespace Tsvrc.Tests.EditMode
     // FactoryModule.LoadConfig()'s tree-shaking gate (TsModule.ApplyTreeShaking). A Factory
     // entry's usage signature is its generated Create{Name}(...) call site
     // (TsUsageScanner.IsMethodCallReferenced), not a bare member access, so this gets its own
-    // file rather than sharing SingletonModuleTreeShakingTests' fixture.
+    // file rather than sharing GlobalModuleTreeShakingTests' fixture.
     //
     // Tsvrc ships its own real Assets/Tsvrc/Runtime/Config/TsBuiltinConfig.asset with real
     // builtin Factory prefabs. Those flow through the same tree-shaking filter as this file's own
@@ -58,7 +58,7 @@ namespace Tsvrc.Tests.EditMode
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
             var prefab = CreateScratchPrefab(prefabName);
-            config.Factories = new[] { new TsFactoryGroup { GroupName = "", Prefabs = new Object[] { prefab } } };
+            config.FactoryEntries = new[] { new TsGroupedEntry { Value = prefab, GroupId = 0 } };
             config.TreeShakeUnused = treeShake;
             config.ForceIncludeNames = forceIncludeNames;
             return config;

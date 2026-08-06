@@ -9,10 +9,9 @@ using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TsConfig is a pure data container - four public array fields, zero methods.
-    // Tests here pin the class's documented contracts: plain MonoBehaviour (never
-    // compiled to Udon), not living under an Editor/ folder, default field values,
-    // and that the four fields are genuinely serialized.
+    // TsConfig is a pure data container, zero methods. Tests here pin the class's documented
+    // contracts: plain MonoBehaviour (never compiled to Udon), not living under an Editor/
+    // folder, default field values, and that the fields are genuinely serialized.
     public class TsConfigTests
     {
         private readonly List<GameObject> _spawned = new List<GameObject>();
@@ -55,39 +54,30 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void FreshInstance_AllFourFields_DefaultToNull()
+        public void FreshInstance_ArrayFields_DefaultToNull()
         {
             TsConfig config = CreateConfig();
 
-            Assert.IsNull(config.Singletons);
+            Assert.IsNull(config.GlobalEntries);
+            Assert.IsNull(config.GlobalGroups);
             Assert.IsNull(config.PooledObjects);
             Assert.IsNull(config.Constructs);
-            Assert.IsNull(config.Factories);
+            Assert.IsNull(config.FactoryEntries);
+            Assert.IsNull(config.FactoryGroups);
         }
 
         [Test]
-        public void Singletons_AssignAndReadBack_RoundTrips()
+        public void GlobalEntries_AssignAndReadBack_RoundTrips()
         {
             TsConfig config = CreateConfig();
-            var marker = new GameObject("SingletonMarker");
+            var marker = new GameObject("GlobalMarker");
             _spawned.Add(marker);
-            var value = new Object[] { marker };
+            var value = new[] { new TsGroupedEntry { Value = marker, GroupId = 0 } };
 
-            config.Singletons = value;
+            config.GlobalEntries = value;
 
-            Assert.AreSame(value, config.Singletons);
-            Assert.AreSame(marker, config.Singletons[0]);
-        }
-
-        [Test]
-        public void Singletons_AssignedEmptyArray_StaysEmptyArray_NotNull()
-        {
-            TsConfig config = CreateConfig();
-
-            config.Singletons = new Object[0];
-
-            Assert.IsNotNull(config.Singletons);
-            Assert.AreEqual(0, config.Singletons.Length);
+            Assert.AreSame(value, config.GlobalEntries);
+            Assert.AreSame(marker, config.GlobalEntries[0].Value);
         }
 
         [Test]
@@ -117,42 +107,45 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void Factories_AssignAndReadBack_RoundTrips()
+        public void FactoryEntries_AssignAndReadBack_RoundTrips()
         {
             TsConfig config = CreateConfig();
-            var group = new TsFactoryGroup { GroupName = "Maze" };
-            var value = new[] { group };
+            var prefabGo = new GameObject("FactoryPrefabMarker");
+            _spawned.Add(prefabGo);
+            var value = new[] { new TsGroupedEntry { Value = prefabGo, GroupId = 0 } };
 
-            config.Factories = value;
+            config.FactoryEntries = value;
 
-            Assert.AreSame(value, config.Factories);
-            Assert.AreEqual("Maze", config.Factories[0].GroupName);
+            Assert.AreSame(value, config.FactoryEntries);
+            Assert.AreSame(prefabGo, config.FactoryEntries[0].Value);
         }
 
         [Test]
-        public void SerializedObject_FindsAllFourFieldsByName()
+        public void SerializedObject_FindsEveryFieldByName()
         {
             TsConfig config = CreateConfig();
             var so = new SerializedObject(config);
 
-            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.Singletons)),
-                "Singletons must be a genuinely serialized field for the generator/Inspector to read it.");
+            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.GlobalEntries)),
+                "GlobalEntries must be a genuinely serialized field for the generator/Inspector to read it.");
+            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.GlobalGroups)));
             Assert.IsNotNull(so.FindProperty(nameof(TsConfig.PooledObjects)));
             Assert.IsNotNull(so.FindProperty(nameof(TsConfig.Constructs)));
-            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.Factories)));
+            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.FactoryEntries)));
+            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.FactoryGroups)));
         }
 
         [Test]
-        public void Singletons_TooltipText_NamesTheRealGeneratedClass_NotAStaleApiShape()
+        public void GlobalEntries_TooltipText_NamesTheRealGeneratedClass_NotAStaleApiShape()
         {
-            // SingletonModule.GenerateCode() generates Singletons entries directly
+            // GlobalModule.GenerateCode() generates Globals entries directly
             // as fields on the TsGenerated partial class, with no nested wrapper
             // type - the tooltip must describe that shape.
-            FieldInfo field = typeof(TsConfig).GetField(nameof(TsConfig.Singletons));
+            FieldInfo field = typeof(TsConfig).GetField(nameof(TsConfig.GlobalEntries));
             var tooltip = field.GetCustomAttribute<TooltipAttribute>();
 
             Assert.IsNotNull(tooltip);
-            StringAssert.DoesNotContain("_ts.Singleton", tooltip.tooltip);
+            StringAssert.DoesNotContain("_ts.Global", tooltip.tooltip);
             StringAssert.Contains("TsGenerated", tooltip.tooltip);
         }
     }

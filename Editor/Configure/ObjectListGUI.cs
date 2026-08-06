@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Shared tab-drawing helpers for any Object[]-backed list: Singletons/Pool/Constructs draw a
+    // Shared tab-drawing helpers for any Object[]-backed list: Globals/Pool/Constructs draw a
     // top-level property directly via the SerializedObject overload; FactoryModule's Prefabs array
     // is nested inside each group element, drawn via the SerializedProperty overload instead
     // (FactoryModule otherwise has its own DrawTab for the group/foldout structure around it).
@@ -51,7 +51,27 @@ namespace Tsvrc.Editor
                 EditorStyles.miniLabel);
         }
 
-        // Convenience overload for a top-level Object[] property (Singletons, Pool, Constructs).
+        // The per-row hint/warning block shared by DrawObjectList and TsGroupTreeGUI's own
+        // grouped-entry rows: resolved-type hint, empty-slot hint, scene-instance warning
+        // (assetsOnly), duplicate-reference warning (warnDuplicates, seen mutated as a side
+        // effect exactly like DrawObjectList's own loop).
+        internal static void DrawEntryHints(Object obj, bool assetsOnly, bool warnDuplicates, HashSet<Object> seen)
+        {
+            DrawResolvedTypeHint(obj);
+            DrawNullSlotHint(obj);
+
+            if (assetsOnly && IsSceneInstance(obj))
+                TsEditorGUI.DrawStatusBox(
+                    $"'{obj.name}' is a scene object, not a prefab asset - drag one in from the Project window instead.",
+                    MessageType.Warning);
+
+            if (warnDuplicates && IsDuplicate(obj, seen))
+                TsEditorGUI.DrawStatusBox(
+                    $"'{obj.name}' is already listed above - the duplicate will be dropped at regenerate.",
+                    MessageType.Warning);
+        }
+
+        // Convenience overload for a top-level Object[] property (Globals, Pool, Constructs).
         internal static void DrawObjectList(SerializedObject so, string propertyName, string emptyHint = null,
             bool assetsOnly = false, bool warnDuplicates = false)
             => DrawObjectList(so.FindProperty(propertyName), emptyHint, assetsOnly, warnDuplicates);
@@ -60,7 +80,7 @@ namespace Tsvrc.Editor
         // assetsOnly: warns inline on a scene-object reference, the same mistake TsGenerator.Run()
         // already catches - surfaced here at the moment it's made instead of only after a regenerate.
         // warnDuplicates: warns inline on a repeated reference. Opt-in since duplicates are only a
-        // mistake for modules that dedupe at generate time (Singletons, Constructs); Pool allows
+        // mistake for modules that dedupe at generate time (Globals, Constructs); Pool allows
         // repeated slots of the same prefab type.
         internal static void DrawObjectList(SerializedProperty prop, string emptyHint = null,
             bool assetsOnly = false, bool warnDuplicates = false)
@@ -79,18 +99,7 @@ namespace Tsvrc.Editor
                     toDelete = i;
                 EditorGUILayout.EndHorizontal();
 
-                DrawResolvedTypeHint(element.objectReferenceValue);
-                DrawNullSlotHint(element.objectReferenceValue);
-
-                if (assetsOnly && IsSceneInstance(element.objectReferenceValue))
-                    TsEditorGUI.DrawStatusBox(
-                        $"'{element.objectReferenceValue.name}' is a scene object, not a prefab asset - drag one in from the Project window instead.",
-                        MessageType.Warning);
-
-                if (warnDuplicates && IsDuplicate(element.objectReferenceValue, seen))
-                    TsEditorGUI.DrawStatusBox(
-                        $"'{element.objectReferenceValue.name}' is already listed above - the duplicate will be dropped at regenerate.",
-                        MessageType.Warning);
+                DrawEntryHints(element.objectReferenceValue, assetsOnly, warnDuplicates, seen);
             }
 
             // Deletion deferred outside the draw loop to avoid index invalidation.

@@ -71,7 +71,7 @@ namespace Tsvrc.Tests.EditMode
         // InstanceModuleWireTestDouble instance here. Only the scene-structure half
         // (child/component creation) can be. Confirming the field-assignment *mechanism* itself (a
         // compatible-type value really does get assigned) is exactly what
-        // MemoryModuleWireTests/SingletonModuleWireTests already do against `_memory`, a
+        // MemoryModuleWireTests/GlobalModuleWireTests already do against `_memory`, a
         // same-shape unconditional field.
 
         [Test]

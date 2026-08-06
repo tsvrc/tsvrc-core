@@ -32,7 +32,7 @@ namespace Tsvrc.Editor
             // Deliberately does NOT early-return an empty result when sceneConfig is null: that
             // would bypass ApplySnapshotFallback below, meaning a compile-broken pass on a scene
             // that hasn't loaded TsConfig yet (or ever) would collapse a real snapshot to empty
-            // when it should fall back to it, same as SingletonModule's handling of the same case.
+            // when it should fall back to it, same as GlobalModule's handling of the same case.
             //
             // Read as plain Object, not `as TsvrcBehaviour`: that cast silently drops any entry
             // whose script currently has no compiled type (a "Missing (Mono Script)" component,

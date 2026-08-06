@@ -10,7 +10,7 @@ namespace Tsvrc.Tests.EditMode
 {
     // ConstructModule.Resolve() via reflection with real (but scene-only, throwaway)
     // components. No builtin source exists for Constructs - scene-only, unlike
-    // Singleton/Pool/Factory. Takes plain Object[], not TsvrcBehaviour[]: LoadConfig() reads
+    // Global/Pool/Factory. Takes plain Object[], not TsvrcBehaviour[]: LoadConfig() reads
     // the config array as Object so a currently-uncompiled entry reaches Resolve() instead of
     // being silently dropped by an early `as TsvrcBehaviour` cast (see TryResolveObjectType).
     public class ConstructModuleResolveTests

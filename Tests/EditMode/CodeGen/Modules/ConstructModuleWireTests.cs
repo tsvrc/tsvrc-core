@@ -15,7 +15,7 @@ namespace Tsvrc.Tests.EditMode
     // GenerateCode() both call the same private FieldName() helper, so the name they agree on
     // can never drift, and the mechanical SerializedProperty assignment the "field found ->
     // assigned" path performs is the identical one proven end-to-end by
-    // SingletonModuleWireTests.Wire_FieldFound_DirectReferenceIsAssigned.
+    // GlobalModuleWireTests.Wire_FieldFound_DirectReferenceIsAssigned.
     public class ConstructModuleWireTests
     {
         private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(ConstructModule), "ConstructEntry");

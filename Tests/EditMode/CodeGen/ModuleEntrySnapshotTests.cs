@@ -4,7 +4,7 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // ModuleEntrySnapshot is the last known good cache SingletonModule and FactoryModule fall
+    // ModuleEntrySnapshot is the last known good cache GlobalModule and FactoryModule fall
     // back to when EditorUtility.scriptCompilationFailed is true and the current live
     // resolution came back empty or reduced.
     public class ModuleEntrySnapshotTests

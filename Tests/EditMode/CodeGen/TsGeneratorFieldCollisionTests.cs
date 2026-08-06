@@ -5,7 +5,7 @@ using Tsvrc.Editor;
 namespace Tsvrc.Tests.EditMode
 {
     // Tests TsGenerator.DetectAndExcludeFieldNameCollisions() in isolation from Run(). Only
-    // SingletonModule overrides ExposedFieldNames()/ExcludeFieldNames() among real modules, and its
+    // GlobalModule overrides ExposedFieldNames()/ExcludeFieldNames() among real modules, and its
     // own Deduplicate() step prevents same-module collisions - so the cross-module path is only
     // reachable through synthetic modules like these.
     public class TsGeneratorFieldCollisionTests

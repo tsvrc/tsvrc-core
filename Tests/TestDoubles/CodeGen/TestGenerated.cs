@@ -23,7 +23,7 @@ namespace Tsvrc.Core.Generated
     // double instead, see for example FactoryModuleWireTests.FactoryFieldDouble, rather than
     // coupling to this type's exact fields. GenericSlotA and GenericSlotB exist only for tests
     // that want some real field of a known name and type already on the compiled root, without
-    // pretending it's a specific module's own output, see SingletonModuleWireTests.
+    // pretending it's a specific module's own output, see GlobalModuleWireTests.
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class TestGenerated : TsRoot
     {

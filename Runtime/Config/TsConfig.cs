@@ -4,8 +4,8 @@ using UnityEngine;
 
 namespace Tsvrc.Config
 {
-    // Single scene-based config for everything PoolModule/SingletonModule/(future)Construct-
-    // /FactoryModule need. Singletons/Constructs are scene-object references, which only a
+    // Single scene-based config for everything PoolModule/GlobalModule/(future)Construct-
+    // /FactoryModule need. Globals/Constructs are scene-object references, which only a
     // scene object can hold (a ScriptableObject asset cannot reference a scene object - a scene
     // object only has a fileID meaningful within its own scene file, no stable cross-file
     // address). PooledObjects/Factories are asset/prefab references, which a scene object can
@@ -24,29 +24,47 @@ namespace Tsvrc.Config
     // ScaffoldModule) is what strips it from the VRChat build, not the script's location.
     public class TsConfig : MonoBehaviour
     {
-        [Tooltip("Scene objects exposed as named fields directly on the generated TsGenerated root. Drag a GameObject or Component here.")]
-        public Object[] Singletons;
+        /// <summary>Scene objects exposed as named fields directly on the generated TsGenerated root.</summary>
+        [Tooltip("Scene objects exposed as named fields directly on the generated TsGenerated root. Drag a GameObject or Component here. Organize into groups via Tsvrc > Configure.")]
+        public TsGroupedEntry[] GlobalEntries;
+
+        /// <summary>Nested groups organizing <see cref="GlobalEntries"/> for browsing. Purely organizational; does not affect generated field names.</summary>
+        [Tooltip("Nested groups organizing GlobalEntries for browsing. Purely organizational - group names do not affect generated field names.")]
+        public TsGroup[] GlobalGroups;
+
+        /// <summary>The next unused id to assign in <see cref="GlobalGroups"/>.</summary>
+        public int GlobalNextGroupId = 1;
+
         [Tooltip("UdonSharpBehaviour prefabs to pool. Must be prefab assets, not scene objects.")]
         public UdonSharpBehaviour[] PooledObjects;
         [Tooltip("TsvrcBehaviours that are always active in the scene, not pooled. Constructed at startup.")]
         public TsvrcBehaviour[] Constructs;
-        [Tooltip("Factory groups for runtime-instantiated (non-networked) prefabs.")]
-        public TsFactoryGroup[] Factories;
+
+        /// <summary>Prefabs to register for runtime instantiation (non-networked).</summary>
+        [Tooltip("Prefabs to register for runtime instantiation (non-networked). Organize into nested groups via Tsvrc > Configure; a prefab's full group ancestor chain becomes its Create{...}(Transform parent) method name prefix.")]
+        public TsGroupedEntry[] FactoryEntries;
+
+        /// <summary>Nested groups organizing <see cref="FactoryEntries"/>. Each group's ancestor chain becomes a prefix on the generated Create method name for prefabs inside it.</summary>
+        [Tooltip("Nested groups organizing FactoryEntries. Each group's (and its ancestors') name becomes a prefix on the generated Create method name for prefabs inside it.")]
+        public TsGroup[] FactoryGroups;
+
+        /// <summary>The next unused id to assign in <see cref="FactoryGroups"/>.</summary>
+        public int FactoryNextGroupId = 1;
 
         /// <summary>
-        /// When enabled, Singleton and Factory entries that no project script references (via
+        /// When enabled, Global and Factory entries that no project script references (via
         /// <c>_ts.Name</c> or <c>CreateName(...)</c>) are left out of the generated output instead
         /// of always being included. Off by default.
         /// </summary>
-        [Tooltip("Experimental: when enabled, Singleton and Factory entries not referenced by any project script (via _ts.Name or CreateName(...)) are excluded from generated output instead of always being included. Defaults to off.")]
+        [Tooltip("Experimental: when enabled, Global and Factory entries not referenced by any project script (via _ts.Name or CreateName(...)) are excluded from generated output instead of always being included. Defaults to off.")]
         public bool TreeShakeUnused;
 
         /// <summary>
-        /// Singleton/Factory names to always generate even when <see cref="TreeShakeUnused"/> is on
+        /// Global/Factory names to always generate even when <see cref="TreeShakeUnused"/> is on
         /// and nothing currently references them. Use for reflection-based access, editor-only
         /// tooling, or entries you're about to wire up.
         /// </summary>
-        [Tooltip("Singleton/Factory names to always generate even when TreeShakeUnused is on and no script currently references them - the escape valve for reflection-based access, editor-only tooling, or work in progress.")]
+        [Tooltip("Global/Factory names to always generate even when TreeShakeUnused is on and no script currently references them - the escape valve for reflection-based access, editor-only tooling, or work in progress.")]
         public string[] ForceIncludeNames;
     }
 }

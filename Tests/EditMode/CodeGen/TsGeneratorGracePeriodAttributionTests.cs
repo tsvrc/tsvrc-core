@@ -8,12 +8,12 @@ using UnityEngine.TestTools;
 namespace Tsvrc.Tests.EditMode
 {
     // Drives the real, static TsGenerator.Run() - the one place every trigger converges - rather
-    // than SingletonModule.LoadConfig() directly, so a pass caused only by a reactive trigger
+    // than GlobalModule.LoadConfig() directly, so a pass caused only by a reactive trigger
     // unrelated to the entry being evaluated (countsForGracePeriod: false) is proven not to
     // consume or reset that entry's grace-period miss-streak. Going through Run() means RunCore's
     // own ScriptIndex.Rebuild() re-scans this real project's actual scripts every pass, which would
     // overwrite any seeded fake source text a test tried to inject - so instead these tests use a
-    // Singleton name (via the __alias__ convention) that cannot possibly appear anywhere in this
+    // Global name (via the __alias__ convention) that cannot possibly appear anywhere in this
     // repository's real source, and only assert it stays consistently unreferenced across passes.
     public class TsGeneratorGracePeriodAttributionTests
     {
@@ -36,23 +36,23 @@ namespace Tsvrc.Tests.EditMode
         [TearDown]
         public void TearDown()
         {
-            ModuleEntrySnapshot.Clear("SingletonModule");
+            ModuleEntrySnapshot.Clear("GlobalModule");
             _harness.Dispose(); // also resets TsPaths, including ScriptCompilationFailedOverride
         }
 
-        private void AddUnreferencedSingleton()
+        private void AddUnreferencedGlobal()
         {
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
             var target = _scope.CreateGameObject($"__{EntryName}__");
-            config.Singletons = new Object[] { target };
+            config.GlobalEntries = new[] { new TsGroupedEntry { Value = target, GroupId = 0 } };
             config.TreeShakeUnused = true;
         }
 
         [Test]
         public void Run_ReactiveTriggerPassBetweenTwoRealPasses_DoesNotConsumeOrExcludeAnUnrelatedEntrysGrace()
         {
-            AddUnreferencedSingleton();
+            AddUnreferencedGlobal();
 
             // Pass 1: a real recompile (AfterDomainReload's own shape) - consumes the first miss.
             TsGenerator.Run(skipRefresh: true, allowBootstrap: true, countsForGracePeriod: true);
@@ -68,7 +68,7 @@ namespace Tsvrc.Tests.EditMode
 
             // Pass 3: the next real pass must see this as the genuine second consecutive real
             // miss and exclude - proving pass 2 neither consumed nor reset the streak.
-            LogAssert.Expect(LogType.Log, new Regex($@"\[SingletonModule\] Excluded '{EntryName}'"));
+            LogAssert.Expect(LogType.Log, new Regex($@"\[GlobalModule\] Excluded '{EntryName}'"));
             TsGenerator.Run(skipRefresh: true, allowBootstrap: true, countsForGracePeriod: true);
             CollectionAssert.Contains(TsGenerator.LastTreeShakingExclusions, EntryName);
         }
@@ -76,7 +76,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Run_ScriptCompilationFailedDuringAReactivePass_AlsoDoesNotConsumeGrace()
         {
-            AddUnreferencedSingleton();
+            AddUnreferencedGlobal();
 
             TsGenerator.Run(skipRefresh: true, allowBootstrap: true, countsForGracePeriod: true);
             CollectionAssert.IsEmpty(TsGenerator.LastTreeShakingExclusions);
@@ -90,7 +90,7 @@ namespace Tsvrc.Tests.EditMode
                 "A broken compile anywhere in the project must never consume this entry's grace period.");
 
             TsPaths.ScriptCompilationFailedOverride = false;
-            LogAssert.Expect(LogType.Log, new Regex($@"\[SingletonModule\] Excluded '{EntryName}'"));
+            LogAssert.Expect(LogType.Log, new Regex($@"\[GlobalModule\] Excluded '{EntryName}'"));
             TsGenerator.Run(skipRefresh: true, allowBootstrap: true, countsForGracePeriod: true);
             CollectionAssert.Contains(TsGenerator.LastTreeShakingExclusions, EntryName);
         }

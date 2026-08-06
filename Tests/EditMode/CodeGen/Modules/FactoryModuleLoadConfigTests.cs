@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Tsvrc.Tests.EditMode
 {
     // Tests FactoryModule.LoadConfig()'s Layer A snapshot fallback (see ModuleEntrySnapshot and
-    // TsModule.ApplySnapshotFallback), using the same mechanism as SingletonModuleLoadConfigTests,
+    // TsModule.ApplySnapshotFallback), using the same mechanism as GlobalModuleLoadConfigTests,
     // for the module that also generates the Create{Group}{Name} methods MoL's own world
     // scripts were calling. BuildEntries()'s own group/prefix/dedup logic is covered separately
     // in FactoryModuleBuildEntriesTests; this file is only about the snapshot save/restore
@@ -52,7 +52,7 @@ namespace Tsvrc.Tests.EditMode
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
             var prefab = CreateScratchPrefab(prefabName);
-            config.Factories = new[] { new TsFactoryGroup { GroupName = "", Prefabs = new Object[] { prefab } } };
+            config.FactoryEntries = new[] { new TsGroupedEntry { Value = prefab, GroupId = 0 } };
             return config;
         }
 
@@ -65,8 +65,8 @@ namespace Tsvrc.Tests.EditMode
         private static int RealBuiltinFactoryCount()
         {
             var builtin = AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>("Assets/Tsvrc/Runtime/Config/TsBuiltinConfig.asset");
-            if (builtin?.Factories == null) return 0;
-            return builtin.Factories.Where(g => g?.Prefabs != null).SelectMany(g => g.Prefabs).Count(p => p != null);
+            if (builtin?.FactoryEntries == null) return 0;
+            return builtin.FactoryEntries.Count(e => e?.Value != null);
         }
 
         [Test]

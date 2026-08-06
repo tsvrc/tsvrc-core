@@ -26,7 +26,7 @@ namespace Tsvrc.Editor
         // Set when LoadConfig() had to fall back to the snapshot this pass. Wire() checks this
         // to avoid its own destructive behavior, tearing down the real "Pool" container when
         // _poolEntries looks empty, based on a currently unreliable, compile broken live scan.
-        // See Wire()'s own guard for why this matters more here than for Singleton, Factory, and
+        // See Wire()'s own guard for why this matters more here than for Global, Factory, and
         // Construct, none of which destroy existing scene state on empty input.
         private bool _usedSnapshotFallback;
 
@@ -89,7 +89,7 @@ namespace Tsvrc.Editor
             // scene wiring. A type that only survives via the snapshot has no live Prefab
             // reference here, since fromSnapshot leaves it null, so Wire() can't instantiate it.
             // See TsModule.ApplySnapshotFallback's doc comment for the same accepted contract
-            // Singleton, Factory, and Construct already have. TotalSlots is itself derived from
+            // Global, Factory, and Construct already have. TotalSlots is itself derived from
             // a live, scene-wide [WirePool] reflection scan, ScanExternalRefs and
             // ScanInternalDeps, just as fragile to a broken compile as the entry list, so it is
             // snapshotted here too via Entry.SlotCount rather than recomputed for restored
@@ -449,7 +449,7 @@ namespace Tsvrc.Editor
         // entries.
         //
         // A deleted prefab reference (a null slot) and the same prefab dragged in twice both
-        // route through the shared TryAcceptEntry helper, exactly like SingletonModule/
+        // route through the shared TryAcceptEntry helper, exactly like GlobalModule/
         // ConstructModule already do, instead of a silent `if (obj == null) continue;` with no
         // warning and no duplicate detection. seen is shared across both loops so a prefab
         // registered as both a builtin and a user entry is also caught, not just a duplicate

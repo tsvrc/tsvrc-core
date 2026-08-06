@@ -30,18 +30,18 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Run_SkipRefreshTrueWithPendingFileChanges_StopsAfterWritingWithoutWiringOrThrowing()
         {
-            // A real Singleton entry guarantees GenerateCode() output differs from whatever
+            // A real Global entry guarantees GenerateCode() output differs from whatever
             // is currently on disk (forcing WriteModules() to return true and actually write),
             // exercising the write-then-stop path deterministically regardless of prior state.
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
-            var singletonTarget = _scope.CreateGameObject("__SkipRefreshFallthroughSingleton__");
-            config.Singletons = new Object[] { singletonTarget };
+            var globalTarget = _scope.CreateGameObject("__SkipRefreshFallthroughGlobal__");
+            config.GlobalEntries = new[] { new TsGroupedEntry { Value = globalTarget, GroupId = 0 } };
 
             var root = CompiledRootFixture.AddTo(_scope);
 
             // Wire() must not run this pass. If it did, it would warn about the new
-            // Singleton entry's field missing on the stale compiled type. No such warning
+            // Global entry's field missing on the stale compiled type. No such warning
             // should appear, since Run() stops before ever reaching Wire().
             LogAssert.NoUnexpectedReceived();
 

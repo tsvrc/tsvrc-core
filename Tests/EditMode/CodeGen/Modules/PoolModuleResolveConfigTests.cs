@@ -78,7 +78,7 @@ namespace Tsvrc.Tests.EditMode
         }
 
         // A deleted prefab reference (a null slot) and a prefab dragged in twice both route
-        // through TsModule.TryAcceptEntry, exactly like SingletonModule/ConstructModule.
+        // through TsModule.TryAcceptEntry, exactly like GlobalModule/ConstructModule.
         [Test]
         public void ResolveConfig_UserNullEntry_LogsWarningAndSkips()
         {

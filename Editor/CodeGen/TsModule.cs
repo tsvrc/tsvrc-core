@@ -23,7 +23,7 @@ namespace Tsvrc.Editor
         // IsBuiltinConfigMissing below), not just the modules that read builtin entries from it.
         internal static string BuiltinConfigPath => $"{PackagePaths.Root}/Runtime/Config/TsBuiltinConfig.asset";
 
-        // Singleton/Pool/Factory each treat a missing TsBuiltinConfig as "no builtins" with no
+        // Global/Pool/Factory each treat a missing TsBuiltinConfig as "no builtins" with no
         // warning. Checking it once here lets RunCore log a single shared warning instead of
         // three identical ones, and lets TsWindow surface it as a persistent status.
         internal static bool IsBuiltinConfigMissing() =>
@@ -160,7 +160,7 @@ namespace Tsvrc.Editor
         // Callers need to know one thing about the contract here: a restored entry's
         // fromSnapshot delegate has no way to recover an actual UnityEngine.Object scene or
         // prefab reference from a name alone, so callers correctly construct it with that
-        // reference left null (see SingletonModule, FactoryModule, and ConstructModule's
+        // reference left null (see GlobalModule, FactoryModule, and ConstructModule's
         // fromSnapshot lambdas). This protects GenerateCode()'s output, meaning field
         // declarations and TsConstruct() calls, across a transient broken compile, but Wire()
         // cannot re-wire the scene field for a restored entry. It harmlessly writes null into
@@ -228,7 +228,7 @@ namespace Tsvrc.Editor
         // Filters resolved down to entries referenced by project source (via isReferenced) or
         // explicitly pinned via config.ForceIncludeNames, when config.TreeShakeUnused is on. A
         // no-op when config is null or TreeShakeUnused is off. Shared by every tree-shaking module
-        // (Singleton, Factory, and Log/Memory via a single-element list) instead of each
+        // (Global, Factory, and Log/Memory via a single-element list) instead of each
         // hand-rolling the same filter.
         //
         // nameOf/isReferenced take the entry's already-resolved generated name rather than its
@@ -344,6 +344,63 @@ namespace Tsvrc.Editor
             return null;
         }
 
+        // Resets any group caught in a ParentId cycle to root-level (ParentId = 0), logging which
+        // group and name, instead of looping forever or throwing when a caller later walks
+        // ancestors. A cycle can only reach serialized data via a bad merge or hand edit; the
+        // Configure window's own reparent UI already rejects dropping a group onto its descendant.
+        protected static void BreakGroupCycles(string moduleTag, TsGroup[] groups)
+        {
+            if (groups == null) return;
+
+            foreach (var group in groups)
+            {
+                if (group == null) continue;
+                var visited = new HashSet<int>();
+                var current = group;
+                while (current.ParentId != 0)
+                {
+                    if (!visited.Add(current.Id))
+                    {
+                        Debug.LogError($"[{moduleTag}] Group cycle detected involving '{group.Name}' (id {group.Id}) - " +
+                            "treating it as a root-level group until the cycle is fixed.");
+                        group.ParentId = 0;
+                        break;
+                    }
+
+                    var parent = Array.Find(groups, g => g != null && g.Id == current.ParentId);
+                    if (parent == null) break;
+                    current = parent;
+                }
+            }
+        }
+
+        // Builds an id -> group lookup once per pass, reused across every entry's
+        // BuildGroupPrefix call rather than rebuilt per entry.
+        protected static Dictionary<int, TsGroup> ToGroupLookup(TsGroup[] groups) =>
+            (groups ?? Array.Empty<TsGroup>()).Where(g => g != null).ToDictionary(g => g.Id);
+
+        // Walks groupId up through ParentId to the root (ParentId 0), concatenating
+        // sanitize(name) from the outermost ancestor down to the entry's own direct group.
+        // GroupId 0 (ungrouped), or a group id that no longer resolves (stale/cycle-broken),
+        // yields an empty prefix - the same "no prefix" result an ungrouped entry gets today.
+        protected static string BuildGroupPrefix(int groupId, Dictionary<int, TsGroup> groupsById, Func<string, string> sanitize)
+        {
+            if (groupId == 0 || groupsById == null) return string.Empty;
+
+            var chain = new List<string>();
+            var visited = new HashSet<int>();
+            int currentId = groupId;
+            while (currentId != 0 && groupsById.TryGetValue(currentId, out var group))
+            {
+                if (!visited.Add(currentId)) break;
+                chain.Add(group.Name ?? string.Empty);
+                currentId = group.ParentId;
+            }
+
+            chain.Reverse();
+            return string.Concat(chain.Select(sanitize));
+        }
+
         // Appends a numeric suffix (2, 3, ...) until the name is not in usedNames.
         // Suffix starts at 2 so the first collision reads "Foo 2" rather than "Foo 1",
         // matching the convention used by OS file copy dialogs and Unity's own asset
@@ -394,7 +451,7 @@ namespace Tsvrc.Editor
         }
 
         // Null and duplicate config entries share the same skip-and-warn shape across modules
-        // that resolve a scene/asset object list (Singletons, Constructs): a null slot means a
+        // that resolve a scene/asset object list (Globals, Constructs): a null slot means a
         // referenced object was deleted, a repeat means the same object was dragged in twice.
         // Both are user config mistakes to fix, not generator bugs, so they're logged and
         // skipped rather than thrown. configLabel/entryNoun preserve each module's own existing

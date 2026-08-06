@@ -5,15 +5,15 @@ using Tsvrc.Testing.Framework;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // Tests feed SingletonModule.GenerateCode() synthetic entries via reflection, bypassing
+    // Tests feed GlobalModule.GenerateCode() synthetic entries via reflection, bypassing
     // the real LoadConfig()/AssetDatabase-coupled pipeline entirely.
-    public class SingletonModuleGenerateCodeTests
+    public class GlobalModuleGenerateCodeTests
     {
-        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(SingletonModule), "SingletonEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(GlobalModule), "GlobalEntry");
 
-        private static SingletonModule BuildModule(params object[] entries)
+        private static GlobalModule BuildModule(params object[] entries)
         {
-            var module = new SingletonModule();
+            var module = new GlobalModule();
             PrivateFieldAccess.SetField(module, "_entries", CodeGenModuleReflection.BuildList(EntryType, entries));
             return module;
         }
@@ -34,7 +34,7 @@ namespace {ScaffoldModule.CompiledNamespace}
 {{
     public partial class {ScaffoldModule.CompiledClassName}
     {{
-        public void _TsSingletonStart()
+        public void _TsGlobalStart()
         {{
         }}
     }}
@@ -87,7 +87,7 @@ namespace {ScaffoldModule.CompiledNamespace}
             int alphaCall = code.IndexOf("Alpha.TsConstruct(this);", StringComparison.Ordinal);
             int midCall = code.IndexOf("Mid.TsConstruct(this);", StringComparison.Ordinal);
             int zebraCall = code.IndexOf("Zebra.TsConstruct(this);", StringComparison.Ordinal);
-            Assert.Greater(midCall, alphaCall, "_TsSingletonStart body must also be alphabetical.");
+            Assert.Greater(midCall, alphaCall, "_TsGlobalStart body must also be alphabetical.");
             Assert.Greater(zebraCall, midCall);
         }
 

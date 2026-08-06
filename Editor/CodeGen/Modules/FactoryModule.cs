@@ -23,154 +23,19 @@ namespace Tsvrc.Editor
         internal override IEnumerable<string> LastTreeShakingExclusions => _lastExcluded;
         internal override IEnumerable<string> LastTreeShakingGraceIncluded => _lastGraceIncluded;
 
-        // Tab-only UI state, keyed by array index (not group name) so the key is stable while
-        // the user is typing and the foldout never collapses mid-edit.
-        private readonly Dictionary<int, bool> _foldouts = new Dictionary<int, bool>();
-        private static readonly GUIContent LabelGroupName = new GUIContent("Group Name");
-        private static readonly GUIContent LabelPrefabs = new GUIContent("Prefabs");
+        // Tab-only UI state (tree expand/select/search), never written to TsConfig - see
+        // TsGroupTreeGUI.State's own doc comment.
+        private readonly TsGroupTreeGUI.State _treeState = new TsGroupTreeGUI.State();
 
         internal override string FileName => "TsGeneratedFactory.cs";
 
         internal override string TabLabel => "Factories";
         internal override string TabDescription =>
-            "Register prefabs organized into named groups. Generates a Create{Group}{Name}(Transform parent) method for each entry. WARNING: instantiated objects do not receive a VRChat network ID and cannot send or receive network events. Use Pool for networked objects.";
+            "Register prefabs organized into nested groups. Generates a Create{Group}{SubGroup}...{Name}(Transform parent) method for each entry, prefixed by its full group ancestor chain. WARNING: instantiated objects do not receive a VRChat network ID and cannot send or receive network events. Use Pool for networked objects.";
 
-        internal override void DrawTab(SerializedObject so)
-        {
-            var factoriesProp = so.FindProperty("Factories");
-
-            if (factoriesProp.arraySize == 0)
-                TsEditorGUI.DrawStatusBox(
-                    "No factory groups registered yet. Add a group below to register prefabs for on-demand instantiation.",
-                    MessageType.None);
-
-            // Mirrors BuildEntries' own Sanitize+Deduplicate, shared across every group rendered
-            // this pass so an earlier group's names affect a later group's collision check, the
-            // same as Deduplicate's real contract. Only covers this TsConfig's own groups, not
-            // TsBuiltinConfig's (never rendered here), so a collision against a builtin group's
-            // prefab isn't caught by this preview, only by the real regenerate pass.
-            var usedNames = new HashSet<string>(StringComparer.Ordinal);
-
-            int toDelete = -1;
-            for (int i = 0; i < factoriesProp.arraySize; i++)
-            {
-                var groupProp = factoriesProp.GetArrayElementAtIndex(i);
-                var groupNameProp = groupProp.FindPropertyRelative("GroupName");
-                var prefabsProp = groupProp.FindPropertyRelative("Prefabs");
-
-                string groupName = groupNameProp.stringValue;
-                int prefabCount = prefabsProp.arraySize;
-
-                if (!_foldouts.TryGetValue(i, out bool expanded))
-                    expanded = false;
-
-                string foldoutLabel = string.IsNullOrEmpty(groupName)
-                    ? $"(unnamed)   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})"
-                    : $"{groupName}   ({prefabCount} prefab{(prefabCount == 1 ? "" : "s")})";
-
-                EditorGUILayout.BeginHorizontal();
-                // Foldout is UI-only state. Save and restore GUI.changed around it so toggling
-                // one never reads back as "the user edited TsConfig" to any future change check.
-                bool prevChanged = GUI.changed;
-                GUI.changed = false;
-                expanded = EditorGUILayout.Foldout(expanded, foldoutLabel, true);
-                _foldouts[i] = expanded;
-                GUI.changed = prevChanged;
-                if (ObjectListGUI.DeleteButton())
-                    toDelete = i;
-                EditorGUILayout.EndHorizontal();
-
-                string prefix = string.IsNullOrWhiteSpace(groupName) ? string.Empty : Sanitize(groupName);
-                var collisions = ComputeNameCollisions(prefabsProp, prefix, usedNames);
-
-                if (expanded)
-                {
-                    EditorGUI.indentLevel++;
-                    // DelayedTextField, not PropertyField: the name feeds Sanitize(name) into the
-                    // generated Create{Group}{Name} method, and TsConfig is a watched type, so
-                    // PropertyField would write TsGeneratedFactory.cs and refresh on every keystroke.
-                    string committedName = EditorGUILayout.DelayedTextField(LabelGroupName, groupNameProp.stringValue);
-                    if (committedName != groupNameProp.stringValue)
-                        groupNameProp.stringValue = committedName;
-                    // Read groupName after the field so the prefix preview reflects the committed value.
-                    string currentName = groupNameProp.stringValue;
-                    string preview = string.IsNullOrWhiteSpace(currentName)
-                        ? "Create…"
-                        : $"Create{Sanitize(currentName)}…";
-                    EditorGUILayout.LabelField($"Prefix:  {preview}", EditorStyles.miniLabel);
-                    EditorGUILayout.LabelField(LabelPrefabs);
-                    ObjectListGUI.DrawObjectList(prefabsProp, assetsOnly: true);
-
-                    if (collisions.Count > 0)
-                        TsEditorGUI.DrawStatusBox(
-                            $"Name collision(s) in this group, renamed automatically in generated code: {string.Join(", ", collisions)}.",
-                            MessageType.Info);
-
-                    EditorGUI.indentLevel--;
-                }
-
-                EditorGUILayout.Space(2);
-            }
-
-            // Deletion deferred outside the draw loop to avoid index invalidation.
-            if (toDelete >= 0)
-            {
-                factoriesProp.DeleteArrayElementAtIndex(toDelete);
-                ShiftFoldoutsAfterDelete(toDelete);
-            }
-
-            EditorGUILayout.Space(4);
-            if (GUILayout.Button("+ Add Factory Group"))
-            {
-                int newIndex = factoriesProp.arraySize;
-                factoriesProp.InsertArrayElementAtIndex(newIndex);
-                var newGroup = factoriesProp.GetArrayElementAtIndex(newIndex);
-                newGroup.FindPropertyRelative("GroupName").stringValue = string.Empty;
-                newGroup.FindPropertyRelative("Prefabs").ClearArray();
-                // Auto-expand the new group so the user can immediately name it.
-                _foldouts[newIndex] = true;
-            }
-        }
-
-        // Walks this one group's Prefabs array applying the same naive-name-then-Deduplicate
-        // step BuildEntries performs, updating the shared usedNames set as a side effect so a
-        // later group's collisions are checked against every name assigned so far. Returns only
-        // the entries that actually needed a suffix; an already-unique name needs no mention.
-        private static List<string> ComputeNameCollisions(SerializedProperty prefabsProp, string prefix, HashSet<string> usedNames)
-        {
-            var collisions = new List<string>();
-            for (int i = 0; i < prefabsProp.arraySize; i++)
-            {
-                var obj = prefabsProp.GetArrayElementAtIndex(i).objectReferenceValue;
-                if (obj == null) continue;
-                var prefab = obj is Component c ? c.gameObject : obj as GameObject;
-                if (prefab == null || !EditorUtility.IsPersistent(prefab)) continue;
-
-                string naive = prefix + Sanitize(prefab.name);
-                string actual = Deduplicate(naive, usedNames);
-                usedNames.Add(actual);
-                if (actual != naive)
-                    collisions.Add($"{naive} → {actual}");
-            }
-            return collisions;
-        }
-
-        private void ShiftFoldoutsAfterDelete(int deletedIndex)
-        {
-            _foldouts.Remove(deletedIndex);
-            // Shift all entries above the deleted index down by one.
-            var keys = new List<int>(_foldouts.Keys);
-            keys.Sort();
-            foreach (int key in keys)
-            {
-                if (key > deletedIndex)
-                {
-                    bool val = _foldouts[key];
-                    _foldouts.Remove(key);
-                    _foldouts[key - 1] = val;
-                }
-            }
-        }
+        internal override void DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "FactoryGroups", "FactoryEntries", _treeState,
+            "No factory prefabs registered yet. Add a group on the left, then add prefabs inside it for on-demand instantiation.",
+            assetsOnly: true);
 
         internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
 
@@ -178,6 +43,12 @@ namespace Tsvrc.Editor
         {
             var userConfig = TsLinkedScene.Find<TsConfig>();
             var builtinConfig = AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(BuiltinConfigPath);
+
+            if (userConfig != null)
+                BreakGroupCycles("FactoryModule", userConfig.FactoryGroups);
+            if (builtinConfig != null)
+                BreakGroupCycles("FactoryModule", builtinConfig.FactoryGroups);
+
             var resolved = BuildEntries(userConfig, builtinConfig);
             // A Factory entry's usage signature is its generated Create{Name}(...) call site, not
             // a bare member access. Builtin-sourced groups flow through the same filter as user
@@ -308,56 +179,66 @@ namespace Tsvrc.Editor
             var usedNames = new HashSet<string>(StringComparer.Ordinal);
             var entries = new List<FactoryEntry>();
 
-            var allGroups = (builtinConfig?.Factories ?? Array.Empty<TsFactoryGroup>())
-                .Concat(config?.Factories ?? Array.Empty<TsFactoryGroup>());
-
-            foreach (var group in allGroups)
-            {
-                if (group?.Prefabs == null) continue;
-                string prefix = string.IsNullOrEmpty(group.GroupName) ? string.Empty : Sanitize(group.GroupName);
-
-                foreach (var obj in group.Prefabs)
-                {
-                    // A deleted prefab reference (a null slot) logs, matching Singleton/Construct/
-                    // Pool's wording. Deliberately does not route through the shared
-                    // TryAcceptEntry helper the way Pool does: the same prefab registered twice
-                    // here (once per differently-named group, e.g. "Maze" and "Boss" both
-                    // spawning the same bullet prefab) is a legitimate use case, not a mistake, so
-                    // duplicate-reference detection would be a false positive.
-                    if (obj == null)
-                    {
-                        Debug.LogWarning("[FactoryModule] Null entry in config, remove the missing-script slot.");
-                        continue;
-                    }
-
-                    var prefab = obj is Component c ? c.gameObject : obj as GameObject;
-                    if (prefab == null) continue;
-
-                    if (!EditorUtility.IsPersistent(prefab))
-                    {
-                        Debug.LogWarning($"[FactoryModule] '{prefab.name}' is a scene object, not a prefab asset. Drag a prefab asset from the Project window instead. Skipping.");
-                        continue;
-                    }
-
-                    string name = Deduplicate(prefix + Sanitize(prefab.name), usedNames);
-                    usedNames.Add(name);
-
-                    var behaviour = prefab.GetComponent<TsvrcBehaviour>();
-                    string typeName = behaviour != null ? behaviour.GetType().Name : "GameObject";
-                    string typeNamespace = behaviour != null ? (behaviour.GetType().Namespace ?? string.Empty) : string.Empty;
-
-                    entries.Add(new FactoryEntry
-                    {
-                        Name = name,
-                        TypeName = typeName,
-                        TypeNamespace = typeNamespace,
-                        IsTsvrcBehaviour = behaviour != null,
-                        PrefabAsset = prefab,
-                    });
-                }
-            }
+            // Builtin entries resolved first, so a name collision between a builtin and a
+            // world-config prefab always suffixes the world-config one, never the builtin.
+            AddEntries(builtinConfig?.FactoryEntries, builtinConfig?.FactoryGroups, usedNames, entries);
+            AddEntries(config?.FactoryEntries, config?.FactoryGroups, usedNames, entries);
 
             return entries;
+        }
+
+        // One config source's (scene or builtin) grouped entries resolved into FactoryEntry,
+        // each entry's method-name prefix computed by walking its group's full ancestor chain
+        // (see TsModule.BuildGroupPrefix). usedNames/entries are threaded through both calls in
+        // BuildEntries above so a later source's collisions are checked against every name
+        // already assigned.
+        private static void AddEntries(TsGroupedEntry[] groupedEntries, TsGroup[] groups,
+            HashSet<string> usedNames, List<FactoryEntry> entries)
+        {
+            if (groupedEntries == null) return;
+            var groupsById = ToGroupLookup(groups);
+
+            foreach (var entry in groupedEntries)
+            {
+                // A deleted prefab reference (a null slot) logs, matching Global/Construct/
+                // Pool's wording. Deliberately does not route through the shared TryAcceptEntry
+                // helper the way Pool does: the same prefab registered twice here (once per
+                // differently-named group, e.g. "Maze" and "Boss" both spawning the same bullet
+                // prefab) is a legitimate use case, not a mistake, so duplicate-reference
+                // detection would be a false positive.
+                var obj = entry?.Value;
+                if (obj == null)
+                {
+                    Debug.LogWarning("[FactoryModule] Null entry in config, remove the missing-script slot.");
+                    continue;
+                }
+
+                var prefab = obj is Component c ? c.gameObject : obj as GameObject;
+                if (prefab == null) continue;
+
+                if (!EditorUtility.IsPersistent(prefab))
+                {
+                    Debug.LogWarning($"[FactoryModule] '{prefab.name}' is a scene object, not a prefab asset. Drag a prefab asset from the Project window instead. Skipping.");
+                    continue;
+                }
+
+                string prefix = BuildGroupPrefix(entry.GroupId, groupsById, Sanitize);
+                string name = Deduplicate(prefix + Sanitize(prefab.name), usedNames);
+                usedNames.Add(name);
+
+                var behaviour = prefab.GetComponent<TsvrcBehaviour>();
+                string typeName = behaviour != null ? behaviour.GetType().Name : "GameObject";
+                string typeNamespace = behaviour != null ? (behaviour.GetType().Namespace ?? string.Empty) : string.Empty;
+
+                entries.Add(new FactoryEntry
+                {
+                    Name = name,
+                    TypeName = typeName,
+                    TypeNamespace = typeNamespace,
+                    IsTsvrcBehaviour = behaviour != null,
+                    PrefabAsset = prefab,
+                });
+            }
         }
 
         // Testable in isolation via reflection against any SerializedProperty and parent

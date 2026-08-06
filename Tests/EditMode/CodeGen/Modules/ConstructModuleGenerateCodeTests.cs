@@ -47,7 +47,7 @@ namespace {ScaffoldModule.CompiledNamespace}
         public void GenerateCode_SingleEntry_UsesConstructPrefixedFieldNameAndAlwaysCallsTsConstruct()
         {
             // Every Constructs entry must be a TsvrcBehaviour by config type, so unlike
-            // Singleton/Pool there is no non-TsvrcBehaviour branch to test here.
+            // Global/Pool there is no non-TsvrcBehaviour branch to test here.
             var module = BuildModule(Entry("HudManager", "StateManager", "Tsvrc.StateMachine"));
 
             string code = module.GenerateCode();

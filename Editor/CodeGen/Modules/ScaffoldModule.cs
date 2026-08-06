@@ -51,7 +51,7 @@ namespace Tsvrc.Editor
         // corresponding Tsvrc framework class directly (e.g. `MolInstance : TsInstance`, where
         // `TsInstance` is the generated shadow of the framework's `Instance` class). Each entry
         // hides the inherited `_ts` field with a same-named property retyped to the concrete
-        // {CompiledClassName}, so every project-specific singleton/pool/construct/factory member
+        // {CompiledClassName}, so every project-specific global/pool/construct/factory member
         // becomes visible through `_ts` with no cast. The set of base types is discovered via
         // reflection, not hardcoded here: any class in Tsvrc.Runtime tagged with
         // [TsWorldExtensionPoint(generatedName)] gets a shadow generated under that name, so
@@ -97,7 +97,7 @@ namespace {CompiledNamespace}
         {{
             _TsLogStart();
             _TsMemoryStart();
-            _TsSingletonStart();
+            _TsGlobalStart();
             _TsPoolStart();
             _TsConstructStart();
             _TsInstanceStart();

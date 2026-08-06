@@ -245,7 +245,7 @@ namespace Tsvrc.Tests.EditMode
 
         // A missing TsBuiltinConfig.asset (package-shipped, so a bad submodule update or merge
         // can lose it for the whole team at once) silently drops every library-provided
-        // Singleton/pool prefab/Factory group with no other symptom.
+        // Global/pool prefab/Factory group with no other symptom.
         [Test]
         public void DetermineBuiltinConfigWarning_Missing_MentionsTheAssetPath()
         {

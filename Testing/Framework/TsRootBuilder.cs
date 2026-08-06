@@ -7,9 +7,9 @@ namespace Tsvrc.Testing.Framework
     /// <summary>
     /// Builds a project's generated composition root (TsGenerated and friends) from code
     /// instead of loading a saved scene. Every generator output follows the same shape
-    /// regardless of project: a root type with a handful of singleton/pool/construct/
+    /// regardless of project: a root type with a handful of global/pool/construct/
     /// instance fields, and up to six generated bootstrap methods
-    /// (<c>_TsLogStart</c>/<c>_TsMemoryStart</c>/<c>_TsSingletonStart</c>/<c>_TsPoolStart</c>/
+    /// (<c>_TsLogStart</c>/<c>_TsMemoryStart</c>/<c>_TsGlobalStart</c>/<c>_TsPoolStart</c>/
     /// <c>_TsConstructStart</c>/<c>_TsInstanceStart</c>) that a real client only runs because
     /// Unity dispatches <c>Start()</c> on a scene-loaded, Udon-compiled instance. Building the
     /// same graph with <c>AddComponent</c> instead sidesteps Udon's VM entirely - these become
@@ -24,17 +24,17 @@ namespace Tsvrc.Testing.Framework
     ///
     /// Usage: call <see cref="With{T}"/>/<see cref="WithNew{T}"/> for every root field a test's
     /// scenario actually cares about (wiring each returned instance's own dependencies first),
-    /// then <see cref="Build"/>. Any singleton/pool/construct field the test never touches is
+    /// then <see cref="Build"/>. Any global/pool/construct field the test never touches is
     /// auto-filled with a bare stand-in just before the bootstrap methods run, so a generated
-    /// stage that unconditionally iterates every field of its module (e.g. `_TsSingletonStart`
-    /// calling `TsConstruct` on every registered singleton) never NREs on a field the test
+    /// stage that unconditionally iterates every field of its module (e.g. `_TsGlobalStart`
+    /// calling `TsConstruct` on every registered global) never NREs on a field the test
     /// didn't care about.
     /// </summary>
     public sealed class TsRootBuilder<TRoot> where TRoot : Component
     {
         private static readonly string[] BootstrapMethodOrder =
         {
-            "_TsLogStart", "_TsMemoryStart", "_TsSingletonStart",
+            "_TsLogStart", "_TsMemoryStart", "_TsGlobalStart",
             "_TsPoolStart", "_TsConstructStart", "_TsInstanceStart",
         };
 

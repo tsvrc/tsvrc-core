@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // Tests PoolModule.LoadConfig()'s Layer A snapshot fallback, the same mechanism as Singleton,
+    // Tests PoolModule.LoadConfig()'s Layer A snapshot fallback, the same mechanism as Global,
     // Construct, and Factory, but PoolModule also snapshots each type's TotalSlots (Entry.SlotCount)
     // since that number is itself derived from a live, scene-wide [WirePool] reflection scan,
     // just as fragile to a broken compile as the entry list itself. Wire()'s destructive early

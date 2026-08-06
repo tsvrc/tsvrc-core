@@ -13,6 +13,10 @@ MonoBehaviour:
   m_Name: TsBuiltinConfig
   m_EditorClassIdentifier: 
   Singletons: []
+  Factories: []
+  SingletonEntries: []
+  SingletonGroups: []
+  SingletonNextGroupId: 1
   PoolPrefabs:
   - {fileID: -1197653813904076162, guid: 4e9f3cdbd4eebf1408aea8c85707d3f3, type: 3}
   - {fileID: 904728548572175217, guid: 5d7c5bf1c5d628e4d966bf4b8e7224ba, type: 3}
@@ -20,8 +24,14 @@ MonoBehaviour:
   - {fileID: -9092729703651741013, guid: 4a39ae8ed67ac1d45bc5907497be584f, type: 3}
   - {fileID: -8422451999444563390, guid: b48a2040f97bddd4fbaef83d8386149d, type: 3}
   - {fileID: -7723276961423239022, guid: be930027a70efd14cb173ae966d71654, type: 3}
-  Factories:
-  - GroupName: 
-    Prefabs:
-    - {fileID: -3083329989026124594, guid: ecd96f90cad7074449bd47c032bcfb6a, type: 3}
-    - {fileID: 1511807388170487104, guid: 1c7efac5a635e2046a5f43dcd65b7449, type: 3}
+  FactoryEntries:
+  - Value: {fileID: -3083329989026124594, guid: ecd96f90cad7074449bd47c032bcfb6a,
+      type: 3}
+    GroupId: 1
+  - Value: {fileID: 1511807388170487104, guid: 1c7efac5a635e2046a5f43dcd65b7449, type: 3}
+    GroupId: 1
+  FactoryGroups:
+  - Id: 1
+    ParentId: 0
+    Name: 
+  FactoryNextGroupId: 2

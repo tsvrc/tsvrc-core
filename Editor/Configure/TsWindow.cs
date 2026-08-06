@@ -178,7 +178,7 @@ namespace Tsvrc.Editor
 
         // A missing TsBuiltinConfig.asset (package-shipped, so a bad submodule update or merge
         // can lose it for the whole team at once) silently drops every library-provided
-        // Singleton/pool prefab/Factory group with no other symptom.
+        // Global/pool prefab/Factory group with no other symptom.
         private void DrawBuiltinConfigWarning()
         {
             var message = DetermineBuiltinConfigWarning(TsModule.IsBuiltinConfigMissing());
@@ -191,7 +191,7 @@ namespace Tsvrc.Editor
         {
             if (!isBuiltinConfigMissing) return null;
             return $"Tsvrc's builtin config asset is missing at '{TsModule.BuiltinConfigPath}' - library-provided " +
-                "singletons, pool prefabs, and factories will not be included until it's restored.";
+                "globals, pool prefabs, and factories will not be included until it's restored.";
         }
 
         private void DrawCollisionWarning()
@@ -287,12 +287,12 @@ namespace Tsvrc.Editor
 
             _so.Update();
             var treeShakeProp = _so.FindProperty("TreeShakeUnused");
-            EditorGUILayout.PropertyField(treeShakeProp, new GUIContent("Tree-Shake Unused Singletons/Factories (Experimental)"));
+            EditorGUILayout.PropertyField(treeShakeProp, new GUIContent("Tree-Shake Unused Globals/Factories (Experimental)"));
             if (treeShakeProp.boolValue)
             {
                 EditorGUILayout.PropertyField(_so.FindProperty("ForceIncludeNames"), new GUIContent("Force Include Names"), true);
                 TsEditorGUI.DrawStatusBox(
-                    "Singleton and Factory entries not referenced anywhere in the project (via _ts.Name or " +
+                    "Global and Factory entries not referenced anywhere in the project (via _ts.Name or " +
                     "CreateName(...)) will be excluded on the next regenerate. List a name above to always keep it.",
                     MessageType.Info);
             }

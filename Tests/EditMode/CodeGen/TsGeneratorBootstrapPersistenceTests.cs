@@ -35,12 +35,12 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Run_AllowBootstrapTrueWithPendingFileChanges_SetsIsBootstrapPending()
         {
-            // A real Singleton entry guarantees GenerateCode() output differs from disk, forcing
+            // A real Global entry guarantees GenerateCode() output differs from disk, forcing
             // WriteModules() to return true and take the write-then-stop branch deterministically.
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
-            var singletonTarget = _scope.CreateGameObject("__BootstrapPersistenceSingleton__");
-            config.Singletons = new Object[] { singletonTarget };
+            var globalTarget = _scope.CreateGameObject("__BootstrapPersistenceGlobal__");
+            config.GlobalEntries = new[] { new TsGroupedEntry { Value = globalTarget, GroupId = 0 } };
 
             Assert.IsFalse(TsGenerator.IsBootstrapPending, "Must start clear.");
 
@@ -59,8 +59,8 @@ namespace Tsvrc.Tests.EditMode
             // deliberate bootstrap click and must not arm the pending flag.
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
-            var singletonTarget = _scope.CreateGameObject("__BootstrapPersistenceSingleton2__");
-            config.Singletons = new Object[] { singletonTarget };
+            var globalTarget = _scope.CreateGameObject("__BootstrapPersistenceGlobal2__");
+            config.GlobalEntries = new[] { new TsGroupedEntry { Value = globalTarget, GroupId = 0 } };
 
             TsGenerator.Run(skipRefresh: true, allowBootstrap: false);
 
