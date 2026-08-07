@@ -30,6 +30,10 @@ namespace Tsvrc.Editor
         // Construct, none of which destroy existing scene state on empty input.
         private bool _usedSnapshotFallback;
 
+        // Tab-only UI state (tree expand/select/search), never written to TsConfig - see
+        // TsGroupTreeGUI.State's own doc comment.
+        private readonly TsGroupTreeGUI.State _treeState = new TsGroupTreeGUI.State();
+
         private class PoolTypeInfo
         {
             public Component Prefab;
@@ -47,7 +51,7 @@ namespace Tsvrc.Editor
             "Register UdonSharpBehaviour prefabs to pool. " +
             "The system automatically instantiates all slots, initializes them, and wires every [WirePool] field across your behaviours at compile time. " +
             "No manual scene placement, no cross-behaviour drag-and-drop, and no broken references when you refactor.";
-        internal override void DrawTab(SerializedObject so) => ObjectListGUI.DrawObjectList(so, "PooledObjects",
+        internal override void DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "PoolGroups", "PoolEntries", _treeState,
             "No pooled prefabs registered yet. Add a prefab here to make it available for network-synced spawning.",
             assetsOnly: true);
 
@@ -59,6 +63,11 @@ namespace Tsvrc.Editor
         {
             var userConfig = TsLinkedScene.Find<TsConfig>();
             var builtinConfig = AssetDatabase.LoadAssetAtPath<TsBuiltinConfig>(BuiltinConfigPath);
+
+            if (userConfig != null)
+                BreakGroupCycles("PoolModule", userConfig.PoolGroups);
+            if (builtinConfig != null)
+                BreakGroupCycles("PoolModule", builtinConfig.PoolGroups);
 
             _poolEntries = ResolveConfig(userConfig, builtinConfig);
 
@@ -459,28 +468,40 @@ namespace Tsvrc.Editor
             var entries = new List<(Component, string)>();
             var seen = new HashSet<UnityEngine.Object>();
 
-            if (builtinConfig?.PoolPrefabs != null)
-                foreach (var proc in builtinConfig.PoolPrefabs)
+            if (builtinConfig?.PoolEntries != null)
+                foreach (var grouped in builtinConfig.PoolEntries)
                 {
+                    var proc = grouped?.Value;
                     if (!TryAcceptEntry(proc, "PoolModule", "config", "pool prefab", seen)) continue;
                     if (!EditorUtility.IsPersistent(proc))
                     {
                         Debug.LogWarning($"[PoolModule] Builtin '{proc.name}' is a scene object. Pool entries must be prefab assets. Skipping.");
                         continue;
                     }
-                    entries.Add((proc, proc.GetType().Name));
+                    if (!(proc is Component procComponent))
+                    {
+                        Debug.LogWarning($"[PoolModule] Builtin '{proc.name}' is not a component. Pool entries must be UdonSharpBehaviour prefabs. Skipping.");
+                        continue;
+                    }
+                    entries.Add((procComponent, proc.GetType().Name));
                 }
 
-            if (userConfig?.PooledObjects != null)
-                foreach (var obj in userConfig.PooledObjects)
+            if (userConfig?.PoolEntries != null)
+                foreach (var grouped in userConfig.PoolEntries)
                 {
+                    var obj = grouped?.Value;
                     if (!TryAcceptEntry(obj, "PoolModule", "config", "pool prefab", seen)) continue;
                     if (!EditorUtility.IsPersistent(obj))
                     {
                         Debug.LogWarning($"[PoolModule] '{obj.name}' is a scene object. Pool entries must be prefab assets. Skipping.");
                         continue;
                     }
-                    entries.Add((obj, obj.GetType().Name));
+                    if (!(obj is Component objComponent))
+                    {
+                        Debug.LogWarning($"[PoolModule] '{obj.name}' is not a component. Pool entries must be UdonSharpBehaviour prefabs. Skipping.");
+                        continue;
+                    }
+                    entries.Add((objComponent, obj.GetType().Name));
                 }
 
             return entries;

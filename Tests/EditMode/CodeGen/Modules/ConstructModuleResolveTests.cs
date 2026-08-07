@@ -10,9 +10,9 @@ namespace Tsvrc.Tests.EditMode
 {
     // ConstructModule.Resolve() via reflection with real (but scene-only, throwaway)
     // components. No builtin source exists for Constructs - scene-only, unlike
-    // Global/Pool/Factory. Takes plain Object[], not TsvrcBehaviour[]: LoadConfig() reads
-    // the config array as Object so a currently-uncompiled entry reaches Resolve() instead of
-    // being silently dropped by an early `as TsvrcBehaviour` cast (see TryResolveObjectType).
+    // Global/Pool/Factory. Takes IEnumerable<Object>, not TsvrcBehaviour[]: TsGroupedEntry.Value
+    // is plain Object, so a currently-uncompiled entry reaches Resolve() instead of being
+    // silently dropped by an early `as TsvrcBehaviour` cast (see TryResolveObjectType).
     public class ConstructModuleResolveTests
     {
         private TempSceneScope _scope;
@@ -28,12 +28,6 @@ namespace Tsvrc.Tests.EditMode
 
         private static string NameOf(object entry) => PrivateFieldAccess.GetField<string>(entry, "Name");
         private static string TypeNameOf(object entry) => PrivateFieldAccess.GetField<string>(entry, "TypeName");
-
-        [Test]
-        public void Resolve_NullConstructsArray_ReturnsEmptyList()
-        {
-            Assert.AreEqual(0, Resolve(null).Count);
-        }
 
         [Test]
         public void Resolve_NullEntry_WarnsAndSkips()
@@ -92,8 +86,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Resolve_NonComponentObject_WarnsAndSkips()
         {
-            // TsConfig.Constructs is typed TsvrcBehaviour[] in the Inspector, but Resolve() now
-            // receives plain Object[] (see LoadConfig()'s comment), so a non-component reference
+            // TsGroupedEntry.Value is plain Object, so a non-component reference
             // must be rejected explicitly rather than crashing on an invalid cast downstream.
             var asset = ScriptableObject.CreateInstance<TestScriptableObject>();
             try

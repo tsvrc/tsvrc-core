@@ -55,7 +55,7 @@ namespace Tsvrc.Tests.EditMode
         public void ResolveConfig_BuiltinNonPersistentEntry_WarnsAndSkips()
         {
             var sceneInstance = _scope.CreateGameObject("SceneOnly").AddComponent<StateManager>();
-            _builtinConfig.PoolPrefabs = new UdonSharp.UdonSharpBehaviour[] { sceneInstance };
+            _builtinConfig.PoolEntries = new[] { new TsGroupedEntry { Value = sceneInstance, GroupId = 0 } };
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*is a scene object.*"));
 
@@ -68,7 +68,7 @@ namespace Tsvrc.Tests.EditMode
         public void ResolveConfig_UserNonPersistentEntry_WarnsAndSkips()
         {
             var sceneInstance = _scope.CreateGameObject("SceneOnly").AddComponent<StateManager>();
-            _userConfig.PooledObjects = new UdonSharp.UdonSharpBehaviour[] { sceneInstance };
+            _userConfig.PoolEntries = new[] { new TsGroupedEntry { Value = sceneInstance, GroupId = 0 } };
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*is a scene object.*"));
 
@@ -82,7 +82,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void ResolveConfig_UserNullEntry_LogsWarningAndSkips()
         {
-            _userConfig.PooledObjects = new UdonSharp.UdonSharpBehaviour[] { null };
+            _userConfig.PoolEntries = new[] { new TsGroupedEntry { Value = null, GroupId = 0 } };
 
             LogAssert.Expect(LogType.Warning, "[PoolModule] Null entry in config, remove the missing-script slot.");
             var result = ResolveConfig(_userConfig, null);
@@ -93,7 +93,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void ResolveConfig_BuiltinNullEntry_LogsWarningAndSkips()
         {
-            _builtinConfig.PoolPrefabs = new UdonSharp.UdonSharpBehaviour[] { null };
+            _builtinConfig.PoolEntries = new[] { new TsGroupedEntry { Value = null, GroupId = 0 } };
 
             LogAssert.Expect(LogType.Warning, "[PoolModule] Null entry in config, remove the missing-script slot.");
             var result = ResolveConfig(null, _builtinConfig);
@@ -105,7 +105,7 @@ namespace Tsvrc.Tests.EditMode
         public void ResolveConfig_SamePrefabRegisteredTwiceInUserList_LogsDuplicateWarningAndSkipsSecondOccurrence()
         {
             var prefab = CreateScratchPrefab("DupUser");
-            _userConfig.PooledObjects = new UdonSharp.UdonSharpBehaviour[] { prefab, prefab };
+            _userConfig.PoolEntries = new[] { new TsGroupedEntry { Value = prefab, GroupId = 0 }, new TsGroupedEntry { Value = prefab, GroupId = 0 } };
 
             LogAssert.Expect(LogType.Warning, $"[PoolModule] Duplicate pool prefab '{prefab.name}' in config, remove the duplicate.");
             var result = ResolveConfig(_userConfig, null);
@@ -120,8 +120,8 @@ namespace Tsvrc.Tests.EditMode
             // not just within one - registering the exact same prefab asset as both a builtin and
             // a user entry is exactly as much a mistake as registering it twice in one list.
             var prefab = CreateScratchPrefab("DupAcrossBoth");
-            _builtinConfig.PoolPrefabs = new UdonSharp.UdonSharpBehaviour[] { prefab };
-            _userConfig.PooledObjects = new UdonSharp.UdonSharpBehaviour[] { prefab };
+            _builtinConfig.PoolEntries = new[] { new TsGroupedEntry { Value = prefab, GroupId = 0 } };
+            _userConfig.PoolEntries = new[] { new TsGroupedEntry { Value = prefab, GroupId = 0 } };
 
             LogAssert.Expect(LogType.Warning, $"[PoolModule] Duplicate pool prefab '{prefab.name}' in config, remove the duplicate.");
             var result = ResolveConfig(_userConfig, _builtinConfig);
@@ -134,8 +134,8 @@ namespace Tsvrc.Tests.EditMode
         {
             var builtinPrefab = CreateScratchPrefab("BuiltinPrefab");
             var userPrefab = CreateScratchPrefab("UserPrefab");
-            _builtinConfig.PoolPrefabs = new UdonSharp.UdonSharpBehaviour[] { builtinPrefab };
-            _userConfig.PooledObjects = new UdonSharp.UdonSharpBehaviour[] { userPrefab };
+            _builtinConfig.PoolEntries = new[] { new TsGroupedEntry { Value = builtinPrefab, GroupId = 0 } };
+            _userConfig.PoolEntries = new[] { new TsGroupedEntry { Value = userPrefab, GroupId = 0 } };
 
             var result = ResolveConfig(_userConfig, _builtinConfig);
 
@@ -153,8 +153,8 @@ namespace Tsvrc.Tests.EditMode
             // (same typeName), the builtin one (first in iteration order) must win.
             var builtinPrefab = CreateScratchPrefab("BuiltinSM");
             var userPrefab = CreateScratchPrefab("UserSM");
-            _builtinConfig.PoolPrefabs = new UdonSharp.UdonSharpBehaviour[] { builtinPrefab };
-            _userConfig.PooledObjects = new UdonSharp.UdonSharpBehaviour[] { userPrefab };
+            _builtinConfig.PoolEntries = new[] { new TsGroupedEntry { Value = builtinPrefab, GroupId = 0 } };
+            _userConfig.PoolEntries = new[] { new TsGroupedEntry { Value = userPrefab, GroupId = 0 } };
 
             var combined = ResolveConfig(_userConfig, _builtinConfig);
             var seenTypes = new HashSet<string>();

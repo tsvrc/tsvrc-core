@@ -5,10 +5,11 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Shared tab-drawing helpers for any Object[]-backed list: Globals/Pool/Constructs draw a
-    // top-level property directly via the SerializedObject overload; FactoryModule's Prefabs array
-    // is nested inside each group element, drawn via the SerializedProperty overload instead
-    // (FactoryModule otherwise has its own DrawTab for the group/foldout structure around it).
+    // Shared tab-drawing helpers for an Object[]-backed list. Every grouped module (Globals,
+    // Pool, Constructs, Factories) draws its entries through TsGroupTreeGUI instead, which reuses
+    // this class's row-rendering helpers (DeleteButton, DrawEntryHints) internally rather than
+    // the top-level DrawObjectList entry points below - those remain available for any future
+    // non-grouped Object[]-backed tab.
     internal static class ObjectListGUI
     {
         internal static bool DeleteButton() => GUILayout.Button("✕", GUILayout.Width(22));
@@ -71,7 +72,7 @@ namespace Tsvrc.Editor
                     MessageType.Warning);
         }
 
-        // Convenience overload for a top-level Object[] property (Globals, Pool, Constructs).
+        // Convenience overload for a top-level, non-grouped Object[] property.
         internal static void DrawObjectList(SerializedObject so, string propertyName, string emptyHint = null,
             bool assetsOnly = false, bool warnDuplicates = false)
             => DrawObjectList(so.FindProperty(propertyName), emptyHint, assetsOnly, warnDuplicates);

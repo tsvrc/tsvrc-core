@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Generates a _construct{Name} field per TsvrcBehaviour in TsConfig.Constructs;
+    // Generates a _construct{Name} field per TsvrcBehaviour in TsConfig.ConstructEntries;
     // _TsConstructStart() calls TsConstruct(this) on each in field-name order.
     internal class ConstructModule : TsModule
     {
@@ -16,12 +16,16 @@ namespace Tsvrc.Editor
 
         private List<ConstructEntry> _entries = new List<ConstructEntry>();
 
+        // Tab-only UI state (tree expand/select/search), never written to TsConfig - see
+        // TsGroupTreeGUI.State's own doc comment.
+        private readonly TsGroupTreeGUI.State _treeState = new TsGroupTreeGUI.State();
+
         internal override string FileName => "TsGeneratedConstruct.cs";
 
         internal override string TabLabel => "Constructs";
         internal override string TabDescription =>
-            "Register TsvrcBehaviours that are always active in the scene, not pooled. TsConstruct() is called once on each at startup. Example: add your HudManager here and it is initialized automatically when the world loads.";
-        internal override void DrawTab(SerializedObject so) => ObjectListGUI.DrawObjectList(so, "Constructs",
+            "Register TsvrcBehaviours that are always active in the scene, not pooled. TsConstruct() is called once on each at startup. Example: add your HudManager here and it is initialized automatically when the world loads. Groups are purely organizational.";
+        internal override void DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "ConstructGroups", "ConstructEntries", _treeState,
             "No constructs registered yet. Add a TsvrcBehaviour here to have TsConstruct(this) called on it at startup.",
             warnDuplicates: true);
 
@@ -33,21 +37,17 @@ namespace Tsvrc.Editor
             // would bypass ApplySnapshotFallback below, meaning a compile-broken pass on a scene
             // that hasn't loaded TsConfig yet (or ever) would collapse a real snapshot to empty
             // when it should fall back to it, same as GlobalModule's handling of the same case.
-            //
-            // Read as plain Object, not `as TsvrcBehaviour`: that cast silently drops any entry
-            // whose script currently has no compiled type (a "Missing (Mono Script)" component,
-            // typically because Assembly-CSharp is broken precisely because it's missing a field
-            // this module is responsible for generating), before Resolve() ever gets a chance to
-            // fall back to ScriptIndex for it. See TryResolveObjectType.
-            var constructs = Array.Empty<UnityEngine.Object>();
+            var configEntries = Array.Empty<TsGroupedEntry>();
             if (sceneConfig != null)
             {
-                var so = new SerializedObject(sceneConfig);
-                var prop = so.FindProperty("Constructs");
-                constructs = new UnityEngine.Object[prop.arraySize];
-                for (int i = 0; i < prop.arraySize; i++)
-                    constructs[i] = prop.GetArrayElementAtIndex(i).objectReferenceValue;
+                BreakGroupCycles("ConstructModule", sceneConfig.ConstructGroups);
+                configEntries = sceneConfig.ConstructEntries ?? Array.Empty<TsGroupedEntry>();
             }
+
+            // TsGroupedEntry.Value is UnityEngine.Object, so an entry whose script currently has
+            // no compiled type (a "Missing (Mono Script)" component) still reaches Resolve() -
+            // TryResolveObjectType falls back to ScriptIndex for it there.
+            var constructs = configEntries.Select(e => e.Value);
 
             var resolved = Resolve(constructs);
             _entries = ApplySnapshotFallback(SnapshotKey, resolved,
@@ -110,10 +110,8 @@ namespace Tsvrc.Editor
             ApplyAndMarkDirty(so, root);
         }
 
-        private static List<ConstructEntry> Resolve(UnityEngine.Object[] constructs)
+        private static List<ConstructEntry> Resolve(IEnumerable<UnityEngine.Object> constructs)
         {
-            if (constructs == null) return new List<ConstructEntry>();
-
             var entries = new List<ConstructEntry>();
             var usedNames = new HashSet<string>(StringComparer.Ordinal);
             var seen = new HashSet<UnityEngine.Object>();

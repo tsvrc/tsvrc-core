@@ -1,6 +1,5 @@
 #if UNITY_EDITOR
 using Tsvrc.Config;
-using UdonSharp;
 using UnityEngine;
 
 namespace Tsvrc.Editor
@@ -22,8 +21,16 @@ namespace Tsvrc.Editor
         /// <summary>The next unused id to assign in <see cref="GlobalGroups"/>.</summary>
         public int GlobalNextGroupId = 1;
 
+        /// <summary>UdonSharpBehaviour prefabs always included in the generated pool as library builtins, regardless of world config.</summary>
         [Tooltip("UdonSharpBehaviour prefabs always included in the generated pool as library builtins, regardless of world config.")]
-        public UdonSharpBehaviour[] PoolPrefabs;
+        public TsGroupedEntry[] PoolEntries;
+
+        /// <summary>Nested groups organizing <see cref="PoolEntries"/>.</summary>
+        [Tooltip("Nested groups organizing PoolEntries for browsing. Purely organizational.")]
+        public TsGroup[] PoolGroups;
+
+        /// <summary>The next unused id to assign in <see cref="PoolGroups"/>.</summary>
+        public int PoolNextGroupId = 1;
 
         /// <summary>Library-internal factory prefabs, regardless of world config.</summary>
         [Tooltip("Library-internal factory prefabs. Each entry's full group ancestor chain becomes a prefix on the generated Create{...}(Transform parent) method name.")]

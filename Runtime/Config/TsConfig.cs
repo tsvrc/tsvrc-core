@@ -1,5 +1,3 @@
-using Tsvrc.Core;
-using UdonSharp;
 using UnityEngine;
 
 namespace Tsvrc.Config
@@ -35,10 +33,27 @@ namespace Tsvrc.Config
         /// <summary>The next unused id to assign in <see cref="GlobalGroups"/>.</summary>
         public int GlobalNextGroupId = 1;
 
-        [Tooltip("UdonSharpBehaviour prefabs to pool. Must be prefab assets, not scene objects.")]
-        public UdonSharpBehaviour[] PooledObjects;
-        [Tooltip("TsvrcBehaviours that are always active in the scene, not pooled. Constructed at startup.")]
-        public TsvrcBehaviour[] Constructs;
+        /// <summary>UdonSharpBehaviour prefabs to pool. Must be prefab assets, not scene objects.</summary>
+        [Tooltip("UdonSharpBehaviour prefabs to pool. Must be prefab assets, not scene objects. Organize into groups via Tsvrc > Configure; groups are purely organizational.")]
+        public TsGroupedEntry[] PoolEntries;
+
+        /// <summary>Nested groups organizing <see cref="PoolEntries"/> for browsing. Purely organizational.</summary>
+        [Tooltip("Nested groups organizing PoolEntries for browsing. Purely organizational.")]
+        public TsGroup[] PoolGroups;
+
+        /// <summary>The next unused id to assign in <see cref="PoolGroups"/>.</summary>
+        public int PoolNextGroupId = 1;
+
+        /// <summary>TsvrcBehaviours that are always active in the scene, not pooled. Constructed at startup.</summary>
+        [Tooltip("TsvrcBehaviours that are always active in the scene, not pooled. Constructed at startup. Organize into groups via Tsvrc > Configure; groups are purely organizational.")]
+        public TsGroupedEntry[] ConstructEntries;
+
+        /// <summary>Nested groups organizing <see cref="ConstructEntries"/> for browsing. Purely organizational.</summary>
+        [Tooltip("Nested groups organizing ConstructEntries for browsing. Purely organizational.")]
+        public TsGroup[] ConstructGroups;
+
+        /// <summary>The next unused id to assign in <see cref="ConstructGroups"/>.</summary>
+        public int ConstructNextGroupId = 1;
 
         /// <summary>Prefabs to register for runtime instantiation (non-networked).</summary>
         [Tooltip("Prefabs to register for runtime instantiation (non-networked). Organize into nested groups via Tsvrc > Configure; a prefab's full group ancestor chain becomes its Create{...}(Transform parent) method name prefix.")]

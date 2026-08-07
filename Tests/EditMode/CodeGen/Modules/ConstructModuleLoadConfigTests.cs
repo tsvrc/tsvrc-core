@@ -8,7 +8,7 @@ namespace Tsvrc.Tests.EditMode
 {
     // Tests ConstructModule.LoadConfig()'s Layer A snapshot fallback (see ModuleEntrySnapshot
     // and TsModule.ApplySnapshotFallback). This uses the same mechanism and the same test shape
-    // as GlobalModuleLoadConfigTests, applied to TsConfig.Constructs instead of Globals.
+    // as GlobalModuleLoadConfigTests, applied to TsConfig.ConstructEntries instead of Globals.
     public class ConstructModuleLoadConfigTests
     {
         private const string SnapshotKey = "ConstructModule";
@@ -41,7 +41,7 @@ namespace Tsvrc.Tests.EditMode
             var configGo = _scope.CreateGameObject("TsConfig");
             var config = configGo.AddComponent<TsConfig>();
             var target = _scope.CreateGameObject(goName).AddComponent<TsvrcMemory>();
-            config.Constructs = new TsvrcBehaviour[] { target };
+            config.ConstructEntries = new[] { new TsGroupedEntry { Value = target, GroupId = 0 } };
             return config;
         }
 

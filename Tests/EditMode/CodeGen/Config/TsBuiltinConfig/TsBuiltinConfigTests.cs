@@ -31,7 +31,8 @@ namespace Tsvrc.Tests.EditMode
             {
                 Assert.IsNull(config.GlobalEntries);
                 Assert.IsNull(config.GlobalGroups);
-                Assert.IsNull(config.PoolPrefabs);
+                Assert.IsNull(config.PoolEntries);
+                Assert.IsNull(config.PoolGroups);
                 Assert.IsNull(config.FactoryEntries);
                 Assert.IsNull(config.FactoryGroups);
             }

@@ -66,7 +66,7 @@ namespace Tsvrc.Tests.EditMode
         private void AddConfigWithPooledPrefab(string name)
         {
             var config = _scope.CreateGameObject("TsConfig").AddComponent<TsConfig>();
-            config.PooledObjects = new UdonSharpBehaviour[] { CreateScratchPrefab(name) };
+            config.PoolEntries = new[] { new TsGroupedEntry { Value = CreateScratchPrefab(name), GroupId = 0 } };
         }
 
         // Tsvrc ships its own real Assets/Tsvrc/Runtime/Config/TsBuiltinConfig.asset with real

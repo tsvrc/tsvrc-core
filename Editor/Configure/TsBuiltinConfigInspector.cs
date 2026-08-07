@@ -20,6 +20,7 @@ namespace Tsvrc.Editor
     {
         private readonly TsGroupTreeGUI.State _globalTreeState = new TsGroupTreeGUI.State();
         private readonly TsGroupTreeGUI.State _factoryTreeState = new TsGroupTreeGUI.State();
+        private readonly TsGroupTreeGUI.State _poolTreeState = new TsGroupTreeGUI.State();
 
         // The live group fields are drawn explicitly above via TsGroupTreeGUI instead of
         // DrawDefaultInspector's raw array view, so they're excluded here to avoid showing the
@@ -29,6 +30,7 @@ namespace Tsvrc.Editor
             "m_Script",
             "GlobalEntries", "GlobalGroups", "GlobalNextGroupId",
             "FactoryEntries", "FactoryGroups", "FactoryNextGroupId",
+            "PoolEntries", "PoolGroups", "PoolNextGroupId",
         };
 
         public override void OnInspectorGUI()
@@ -50,6 +52,11 @@ namespace Tsvrc.Editor
             EditorGUILayout.LabelField("Factories", EditorStyles.boldLabel);
             TsGroupTreeGUI.Draw(serializedObject, "FactoryGroups", "FactoryEntries", _factoryTreeState,
                 "No builtin factory prefabs registered yet.", assetsOnly: true);
+
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Pool", EditorStyles.boldLabel);
+            TsGroupTreeGUI.Draw(serializedObject, "PoolGroups", "PoolEntries", _poolTreeState,
+                "No builtin pool prefabs registered yet.", assetsOnly: true);
 
             serializedObject.ApplyModifiedProperties();
 

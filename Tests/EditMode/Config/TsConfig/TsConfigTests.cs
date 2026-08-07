@@ -60,8 +60,10 @@ namespace Tsvrc.Tests.EditMode
 
             Assert.IsNull(config.GlobalEntries);
             Assert.IsNull(config.GlobalGroups);
-            Assert.IsNull(config.PooledObjects);
-            Assert.IsNull(config.Constructs);
+            Assert.IsNull(config.PoolEntries);
+            Assert.IsNull(config.PoolGroups);
+            Assert.IsNull(config.ConstructEntries);
+            Assert.IsNull(config.ConstructGroups);
             Assert.IsNull(config.FactoryEntries);
             Assert.IsNull(config.FactoryGroups);
         }
@@ -81,29 +83,32 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void PooledObjects_AssignAndReadBack_RoundTrips()
+        public void PoolEntries_AssignAndReadBack_RoundTrips()
         {
             TsConfig config = CreateConfig();
-            var value = new UdonSharpBehaviour[0];
+            var prefabGo = new GameObject("PoolPrefabMarker");
+            _spawned.Add(prefabGo);
+            var value = new[] { new TsGroupedEntry { Value = prefabGo, GroupId = 0 } };
 
-            config.PooledObjects = value;
+            config.PoolEntries = value;
 
-            Assert.AreSame(value, config.PooledObjects);
+            Assert.AreSame(value, config.PoolEntries);
+            Assert.AreSame(prefabGo, config.PoolEntries[0].Value);
         }
 
         [Test]
-        public void Constructs_AssignAndReadBack_RoundTrips()
+        public void ConstructEntries_AssignAndReadBack_RoundTrips()
         {
             TsConfig config = CreateConfig();
             var behaviourGo = new GameObject("ConstructEntry");
             _spawned.Add(behaviourGo);
             var behaviour = behaviourGo.AddComponent<TsvrcBehaviour>();
-            var value = new[] { behaviour };
+            var value = new[] { new TsGroupedEntry { Value = behaviour, GroupId = 0 } };
 
-            config.Constructs = value;
+            config.ConstructEntries = value;
 
-            Assert.AreSame(value, config.Constructs);
-            Assert.AreSame(behaviour, config.Constructs[0]);
+            Assert.AreSame(value, config.ConstructEntries);
+            Assert.AreSame(behaviour, config.ConstructEntries[0].Value);
         }
 
         [Test]
@@ -129,8 +134,10 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsNotNull(so.FindProperty(nameof(TsConfig.GlobalEntries)),
                 "GlobalEntries must be a genuinely serialized field for the generator/Inspector to read it.");
             Assert.IsNotNull(so.FindProperty(nameof(TsConfig.GlobalGroups)));
-            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.PooledObjects)));
-            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.Constructs)));
+            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.PoolEntries)));
+            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.PoolGroups)));
+            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.ConstructEntries)));
+            Assert.IsNotNull(so.FindProperty(nameof(TsConfig.ConstructGroups)));
             Assert.IsNotNull(so.FindProperty(nameof(TsConfig.FactoryEntries)));
             Assert.IsNotNull(so.FindProperty(nameof(TsConfig.FactoryGroups)));
         }
