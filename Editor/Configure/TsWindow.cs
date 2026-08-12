@@ -24,8 +24,20 @@ namespace Tsvrc.Editor
         [MenuItem("Tsvrc/Configure", priority = 1)]
         private static void Open()
         {
+            // Size the window only on first creation, so re-opening respects a layout the user has
+            // resized or docked. minSize is a floor, not the default size (it is ignored while docked).
+            bool firstOpen = Resources.FindObjectsOfTypeAll<TsWindow>().Length == 0;
             var window = GetWindow<TsWindow>("Configure");
-            window.minSize = new Vector2(420, 360);
+            window.minSize = new Vector2(480, 360);
+            if (firstOpen)
+            {
+                // Preferred size, clamped to the editor's own window so it never opens oversized or
+                // off-screen on a small or high-DPI display, then centered over the editor.
+                var main = EditorGUIUtility.GetMainWindowPosition();
+                var size = new Vector2(Mathf.Min(600, main.width * 0.7f), Mathf.Min(600, main.height * 0.8f));
+                var pos = new Vector2(main.x + (main.width - size.x) * 0.5f, main.y + (main.height - size.y) * 0.5f);
+                window.position = new Rect(pos, size);
+            }
             window.Show();
         }
 
