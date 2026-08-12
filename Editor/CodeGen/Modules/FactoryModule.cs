@@ -34,7 +34,7 @@ namespace Tsvrc.Editor
 
         internal override void DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "FactoryGroups", "FactoryEntries", _treeState,
             "No factory prefabs registered yet. Add a group on the left, then add prefabs inside it for on-demand instantiation.",
-            assetsOnly: true);
+            assetsOnly: true, memberPrefix: "Create", memberSuffix: "(parent)", prefixRespectsToggle: false);
 
         internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
 
@@ -222,7 +222,9 @@ namespace Tsvrc.Editor
                 }
 
                 string prefix = BuildGroupPrefix(entry.GroupId, groupsById, Sanitize);
-                string name = Deduplicate(prefix + Sanitize(prefab.name), usedNames);
+                string leaf = Sanitize(entry.Name);
+                if (leaf.Length == 0) leaf = Sanitize(prefab.name);
+                string name = Deduplicate(prefix + leaf, usedNames);
                 usedNames.Add(name);
 
                 var behaviour = prefab.GetComponent<TsvrcBehaviour>();

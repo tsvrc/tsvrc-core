@@ -34,7 +34,7 @@ namespace Tsvrc.Editor
             "Register any scene object or component as a named field on _ts. After compiling, access it from any TsvrcBehaviour via _ts.FieldName. Example: drag your GameManager here, then use _ts.GameManager from any behaviour. Groups are organizational by default; toggle 'Namespace with group name' on a group to prefix its entries' member names (e.g. _ts.EnemiesSpawner).";
         internal override void DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "GlobalGroups", "GlobalEntries", _treeState,
             "No globals registered yet. Add a scene object here to expose it as a field on TsGenerated.",
-            warnDuplicates: true, groupNaming: true);
+            warnDuplicates: true, groupNaming: true, memberPrefix: "_ts.");
 
         internal override IEnumerable<string> WatchedAssets() => new[] { BuiltinConfigPath };
 
@@ -46,7 +46,7 @@ namespace Tsvrc.Editor
             _entries.RemoveAll(e =>
             {
                 if (!excluded.Contains(e.Name)) return false;
-                Debug.LogWarning($"[GlobalModule] '{e.Name}' is also provided by a higher-precedence registration, so this Global entry is dropped and '_ts.{e.Name}' comes from that instead. If this object is also registered as a Construct, remove it from Globals - the Construct already exposes it. Otherwise rename via __Alias__.");
+                Debug.LogWarning($"[GlobalModule] '{e.Name}' is also provided by a higher-precedence registration, so this Global entry is dropped and '_ts.{e.Name}' comes from that instead. If this object is also registered as a Construct, remove it from Globals - the Construct already exposes it. Otherwise set a distinct Name on this entry in Tsvrc > Configure.");
                 return true;
             });
         }
@@ -65,11 +65,11 @@ namespace Tsvrc.Editor
             // prefix). One Resolve call covers both so deduplication spans the merged set, scene
             // entries first so they keep the unsuffixed name on a clash.
             var sceneGroups = ToGroupLookup(sceneConfig?.GlobalGroups);
-            var input = new List<(UnityEngine.Object, string)>();
+            var input = new List<(UnityEngine.Object, string, string)>();
             foreach (var e in sceneConfig?.GlobalEntries ?? Array.Empty<TsGroupedEntry>())
-                input.Add((e.Value, BuildGroupPrefix(e.GroupId, sceneGroups, Sanitize, respectToggle: true)));
+                input.Add((e.Value, BuildGroupPrefix(e.GroupId, sceneGroups, Sanitize, respectToggle: true), e.Name));
             foreach (var e in builtinConfig?.GlobalEntries ?? Array.Empty<TsGroupedEntry>())
-                input.Add((e.Value, string.Empty));
+                input.Add((e.Value, string.Empty, e.Name));
 
             var resolved = Resolve(input);
             resolved = ApplyTreeShaking(sceneConfig, "GlobalModule", resolved,
@@ -146,27 +146,25 @@ namespace Tsvrc.Editor
             PrimaryName = DeriveName,
         };
 
-        private static List<ResolvedEntry> Resolve(IEnumerable<(UnityEngine.Object value, string prefix)> inputs)
+        private static List<ResolvedEntry> Resolve(IEnumerable<(UnityEngine.Object value, string prefix, string explicitName)> inputs)
             => ResolveEntries(inputs, Policy);
 
+        // The default name when an entry has no explicit one.
         private static string DeriveName(string typeName, string goName)
         {
-            string alias = AliasName(goName);
-
             // A plain GameObject resolves to the literal type name "GameObject", which is useless and
             // collides across entries, so name it after the object instead. Fall back to the type
             // name only when the object's name sanitizes to nothing.
             if (typeName == "GameObject")
             {
-                string fromGoName = Sanitize(alias ?? goName);
+                string fromGoName = Sanitize(goName);
                 return fromGoName.Length > 0 ? fromGoName : typeName;
             }
 
             if (typeName == "Animator")
-                return Sanitize(alias ?? goName) + "Animator";
+                return Sanitize(goName) + "Animator";
 
-            // A component: an explicit alias wins, otherwise its type name.
-            return alias != null ? Sanitize(alias) : typeName;
+            return typeName;
         }
     }
 }

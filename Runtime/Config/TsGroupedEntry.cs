@@ -15,5 +15,11 @@ namespace Tsvrc.Config
 
         /// <summary>The owning group's <see cref="TsGroup.Id"/>, or 0 if ungrouped.</summary>
         public int GroupId;
+
+        /// <summary>
+        /// Explicit name for the generated member, sanitized to a valid C# identifier. Blank derives
+        /// a default: the component's type name, a plain GameObject's own name, or a prefab's name.
+        /// </summary>
+        public string Name;
     }
 }

@@ -342,15 +342,6 @@ namespace Tsvrc.Editor
 
         private static string LastKnownGoodSnapshotKey(string moduleKey) => $"{moduleKey}.LastKnownGood";
 
-        // Extracts the alias text from a __Alias__ GameObject name convention.
-        // Returns null if the name does not follow the convention.
-        protected static string AliasName(string goName)
-        {
-            if (goName != null && goName.StartsWith("__") && goName.EndsWith("__") && goName.Length > 4)
-                return goName.Substring(2, goName.Length - 4);
-            return null;
-        }
-
         // Resets any group caught in a ParentId cycle to root-level (ParentId = 0), logging which
         // group and name, instead of looping forever or throwing when a caller later walks
         // ancestors. A cycle can only reach serialized data via a bad merge or hand edit; the
@@ -427,15 +418,16 @@ namespace Tsvrc.Editor
             return name;
         }
 
-        // Converts an arbitrary name into a valid C# identifier: strips __Alias__ markers, splits on
-        // non-alphanumeric separators, PascalCases each word, and prepends '_' if it starts with a
-        // digit. Returns an empty string when nothing usable remains; callers choose the fallback.
+        // Exposes Sanitize to editor GUI code that lives outside the TsModule hierarchy, so a
+        // Configure-window name preview matches the identifier generation exactly.
+        internal static string SanitizeIdentifier(string raw) => Sanitize(raw);
+
+        // Converts an arbitrary name into a valid C# identifier: splits on non-alphanumeric
+        // separators, PascalCases each word, and prepends '_' if it starts with a digit. Returns an
+        // empty string when nothing usable remains; callers choose the fallback.
         protected static string Sanitize(string raw)
         {
             if (string.IsNullOrEmpty(raw)) return string.Empty;
-
-            if (raw.StartsWith("__") && raw.EndsWith("__") && raw.Length > 4)
-                raw = raw.Substring(2, raw.Length - 4);
 
             var sb = new StringBuilder();
             bool capitalizeNext = true;
@@ -525,7 +517,8 @@ namespace Tsvrc.Editor
         }
 
         // The per-module inputs to ResolveEntries: validation strictness, log wording, and how the
-        // pre-prefix identifier is derived. PrimaryName maps (typeName, gameObjectName) to that name.
+        // default identifier is derived when the entry has no explicit name. PrimaryName maps
+        // (typeName, gameObjectName) to that default.
         protected sealed class EntryPolicy
         {
             public string ModuleTag;
@@ -537,16 +530,17 @@ namespace Tsvrc.Editor
         }
 
         // The shared resolve loop for Global and Construct. Each input pairs an object with the
-        // sanitized group prefix its group opted into (empty when none); the identifier is
-        // prefix + PrimaryName, deduplicated across the set.
+        // sanitized group prefix its group opted into (empty when none) and its explicit name (blank
+        // to derive one). The identifier is prefix + explicit-name-or-PrimaryName, deduplicated
+        // across the set.
         protected static List<ResolvedEntry> ResolveEntries(
-            IEnumerable<(UnityEngine.Object value, string prefix)> inputs, EntryPolicy policy)
+            IEnumerable<(UnityEngine.Object value, string prefix, string explicitName)> inputs, EntryPolicy policy)
         {
             var entries = new List<ResolvedEntry>();
             var usedNames = new HashSet<string>(StringComparer.Ordinal);
             var seen = new HashSet<UnityEngine.Object>();
 
-            foreach (var (obj, prefix) in inputs)
+            foreach (var (obj, prefix, explicitName) in inputs)
             {
                 if (!TryAcceptEntry(obj, policy.ModuleTag, policy.ConfigLabel, policy.EntryNoun, seen)) continue;
 
@@ -571,7 +565,9 @@ namespace Tsvrc.Editor
 
                 string goName = component != null ? component.gameObject.name
                     : (obj is GameObject go ? go.name : string.Empty);
-                string name = Deduplicate(prefix + policy.PrimaryName(typeName, goName), usedNames);
+                string leaf = Sanitize(explicitName);
+                if (leaf.Length == 0) leaf = policy.PrimaryName(typeName, goName);
+                string name = Deduplicate(prefix + leaf, usedNames);
                 usedNames.Add(name);
 
                 entries.Add(new ResolvedEntry { Name = name, TypeName = typeName, Namespace = ns, SourceObject = obj });

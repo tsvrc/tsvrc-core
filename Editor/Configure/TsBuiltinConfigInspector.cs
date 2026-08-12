@@ -46,12 +46,13 @@ namespace Tsvrc.Editor
 
             EditorGUILayout.LabelField("Globals", EditorStyles.boldLabel);
             TsGroupTreeGUI.Draw(serializedObject, "GlobalGroups", "GlobalEntries", _globalTreeState,
-                "No builtin globals registered yet.", warnDuplicates: true);
+                "No builtin globals registered yet.", warnDuplicates: true, memberPrefix: "_ts.");
 
             EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("Factories", EditorStyles.boldLabel);
             TsGroupTreeGUI.Draw(serializedObject, "FactoryGroups", "FactoryEntries", _factoryTreeState,
-                "No builtin factory prefabs registered yet.", assetsOnly: true);
+                "No builtin factory prefabs registered yet.", assetsOnly: true,
+                memberPrefix: "Create", memberSuffix: "(parent)", prefixRespectsToggle: false);
 
             EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("Pool", EditorStyles.boldLabel);

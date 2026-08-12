@@ -31,7 +31,7 @@ namespace Tsvrc.Editor
             "Register TsvrcBehaviours that are always active in the scene, not pooled. Each is initialized once at startup (TsConstruct) AND reachable as _ts.Name - one registration, both behaviours, so you don't also need a separate Global entry. Example: add your HudManager here and use _ts.HudManager anywhere. Groups are organizational by default; toggle 'Namespace with group name' on a group to prefix member names.";
         internal override void DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "ConstructGroups", "ConstructEntries", _treeState,
             "No constructs registered yet. Add a TsvrcBehaviour here to initialize it at startup and expose it as _ts.Name.",
-            warnDuplicates: true, groupNaming: true);
+            warnDuplicates: true, groupNaming: true, memberPrefix: "_ts.");
 
         internal override void LoadConfig()
         {
@@ -42,13 +42,13 @@ namespace Tsvrc.Editor
             // ApplySnapshotFallback, so a compile-broken pass falls back to the snapshot instead of
             // collapsing it to empty. Entries reach Resolve as UnityEngine.Object, so a
             // missing-script component still resolves via ScriptIndex.
-            var input = new List<(UnityEngine.Object, string)>();
+            var input = new List<(UnityEngine.Object, string, string)>();
             if (sceneConfig != null)
             {
                 BreakGroupCycles("ConstructModule", sceneConfig.ConstructGroups);
                 var groups = ToGroupLookup(sceneConfig.ConstructGroups);
                 foreach (var e in sceneConfig.ConstructEntries ?? Array.Empty<TsGroupedEntry>())
-                    input.Add((e.Value, BuildGroupPrefix(e.GroupId, groups, Sanitize, respectToggle: true)));
+                    input.Add((e.Value, BuildGroupPrefix(e.GroupId, groups, Sanitize, respectToggle: true), e.Name));
             }
 
             var resolved = Resolve(input);
@@ -111,7 +111,7 @@ namespace Tsvrc.Editor
             {
                 if (!mine.Contains(name) || !_suppressedAccessors.Add(name)) continue;
                 Debug.LogWarning($"[ConstructModule] '_ts.{name}' collides with another same-precedence registration; " +
-                    "keeping this construct's startup initialization but not its accessor. Rename one via __Alias__ to expose both.");
+                    "keeping this construct's startup initialization but not its accessor. Set a distinct Name on one in Tsvrc > Configure to expose both.");
             }
         }
 
@@ -137,8 +137,8 @@ namespace Tsvrc.Editor
             ApplyAndMarkDirty(so, root);
         }
 
-        // A construct must be a TsvrcBehaviour on a scene object, named by alias-or-type-name. The
-        // shared ResolveEntries loop does the accept/resolve/validate/name/dedup.
+        // A construct must be a TsvrcBehaviour on a scene object, named by its explicit Name or its
+        // type name. The shared ResolveEntries loop does the accept/resolve/validate/name/dedup.
         private static readonly EntryPolicy Policy = new EntryPolicy
         {
             ModuleTag = "ConstructModule",
@@ -149,13 +149,12 @@ namespace Tsvrc.Editor
             PrimaryName = ConstructPrimaryName,
         };
 
-        private static List<ResolvedEntry> Resolve(IEnumerable<(UnityEngine.Object value, string prefix)> inputs)
+        private static List<ResolvedEntry> Resolve(IEnumerable<(UnityEngine.Object value, string prefix, string explicitName)> inputs)
             => ResolveEntries(inputs, Policy);
 
-        // Same primary-name rule as GlobalModule's component branch: an explicit alias wins
-        // (sanitized), otherwise the component's own type name (already a valid identifier).
-        private static string ConstructPrimaryName(string typeName, string goName)
-            => AliasName(goName) is string alias ? Sanitize(alias) : typeName;
+        // The default name when a construct has no explicit one: its component type name, already a
+        // valid identifier.
+        private static string ConstructPrimaryName(string typeName, string goName) => typeName;
 
         private static string FieldName(string name) => $"_construct{name}";
     }

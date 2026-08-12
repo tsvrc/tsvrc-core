@@ -273,12 +273,12 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void DetermineCollisionWarning_HasCollisions_MentionsFieldNamesAndAliasGuidance()
+        public void DetermineCollisionWarning_HasCollisions_MentionsFieldNamesAndNameGuidance()
         {
             string message = TsWindow.DetermineCollisionWarning(new List<string> { "GameManager" });
 
             StringAssert.Contains("GameManager", message);
-            StringAssert.Contains("__Alias__", message);
+            StringAssert.Contains("Name", message);
         }
 
         [Test]

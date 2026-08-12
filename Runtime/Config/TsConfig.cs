@@ -23,7 +23,7 @@ namespace Tsvrc.Config
     public class TsConfig : MonoBehaviour
     {
         /// <summary>Scene objects exposed as named fields directly on the generated TsGenerated root.</summary>
-        [Tooltip("Scene objects exposed as named fields directly on the generated TsGenerated root. Drag a GameObject or Component here. Organize into groups via Tsvrc > Configure.")]
+        [Tooltip("Scene objects exposed as named fields directly on the generated TsGenerated root. Drag a GameObject or Component here. Set a Name to control the generated member (e.g. _ts.Hud), or leave it blank to derive one. Organize into groups via Tsvrc > Configure.")]
         public TsGroupedEntry[] GlobalEntries;
 
         /// <summary>Nested groups organizing <see cref="GlobalEntries"/>. Organizational by default; a group can opt into namespacing via <see cref="TsGroup.IncludeInName"/>.</summary>
@@ -45,7 +45,7 @@ namespace Tsvrc.Config
         public int PoolNextGroupId = 1;
 
         /// <summary>TsvrcBehaviours that are always active in the scene, not pooled. Constructed at startup AND exposed as <c>_ts.Name</c>.</summary>
-        [Tooltip("TsvrcBehaviours that are always active in the scene, not pooled. Each is initialized at startup (TsConstruct) and reachable as _ts.Name - no separate Global entry needed. Organize into groups via Tsvrc > Configure.")]
+        [Tooltip("TsvrcBehaviours that are always active in the scene, not pooled. Each is initialized at startup (TsConstruct) and reachable as _ts.Name - no separate Global entry needed. Set a Name to control the member, or leave it blank to use the type name. Organize into groups via Tsvrc > Configure.")]
         public TsGroupedEntry[] ConstructEntries;
 
         /// <summary>Nested groups organizing <see cref="ConstructEntries"/>. Organizational by default; a group can opt into namespacing via <see cref="TsGroup.IncludeInName"/>.</summary>
@@ -56,7 +56,7 @@ namespace Tsvrc.Config
         public int ConstructNextGroupId = 1;
 
         /// <summary>Prefabs to register for runtime instantiation (non-networked).</summary>
-        [Tooltip("Prefabs to register for runtime instantiation (non-networked). Organize into nested groups via Tsvrc > Configure; a prefab's full group ancestor chain becomes its Create{...}(Transform parent) method name prefix.")]
+        [Tooltip("Prefabs to register for runtime instantiation (non-networked). Set a Name to control the generated Create{Name}(Transform parent) method, or leave it blank to use the prefab name. Organize into nested groups via Tsvrc > Configure; a prefab's full group ancestor chain prefixes the method name.")]
         public TsGroupedEntry[] FactoryEntries;
 
         /// <summary>Nested groups organizing <see cref="FactoryEntries"/>. Each group's ancestor chain becomes a prefix on the generated Create method name for prefabs inside it.</summary>

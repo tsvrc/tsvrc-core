@@ -29,9 +29,14 @@ namespace Tsvrc.Editor
             internal bool RenamePending;
         }
 
+        // memberPrefix/memberSuffix enable the per-entry Name field and a live member preview:
+        // "_ts." (Global/Construct) or "Create"/"(parent)" (Factory). Null (Pool) hides both.
+        // prefixRespectsToggle mirrors BuildGroupPrefix: true honors each group's IncludeInName,
+        // false always prefixes (Factory).
         internal static void Draw(SerializedObject so, string groupsPropertyName, string entriesPropertyName,
             State state, string emptyHint = null, bool assetsOnly = false, bool warnDuplicates = false,
-            bool groupNaming = false)
+            bool groupNaming = false, string memberPrefix = null, string memberSuffix = null,
+            bool prefixRespectsToggle = true)
         {
             var groupsProp = so.FindProperty(groupsPropertyName);
             var entriesProp = so.FindProperty(entriesPropertyName);
@@ -63,7 +68,8 @@ namespace Tsvrc.Editor
             EditorGUILayout.EndVertical();
 
             EditorGUILayout.BeginVertical();
-            DrawContents(entriesProp, groupsProp, state, emptyHint, assetsOnly, warnDuplicates);
+            DrawContents(entriesProp, groupsProp, state, emptyHint, assetsOnly, warnDuplicates,
+                memberPrefix, memberSuffix, prefixRespectsToggle);
             EditorGUILayout.EndVertical();
 
             EditorGUILayout.EndHorizontal();
@@ -236,8 +242,10 @@ namespace Tsvrc.Editor
         // selected group's entire subtree so a broad search from a parent group surfaces
         // everything nested under it.
         private static void DrawContents(SerializedProperty entriesProp, SerializedProperty groupsProp, State state,
-            string emptyHint, bool assetsOnly, bool warnDuplicates)
+            string emptyHint, bool assetsOnly, bool warnDuplicates,
+            string memberPrefix, string memberSuffix, bool prefixRespectsToggle)
         {
+            bool showNames = memberPrefix != null;
             bool searching = !string.IsNullOrEmpty(state.SearchText);
             var allowedGroupIds = searching
                 ? GroupTreeView.CollectSubtreeIds(groupsProp, state.SelectedGroupId)
@@ -269,11 +277,19 @@ namespace Tsvrc.Editor
 
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.PropertyField(valueProp, GUIContent.none);
+                if (showNames)
+                {
+                    var nameProp = entry.FindPropertyRelative("Name");
+                    nameProp.stringValue = EditorGUILayout.DelayedTextField(nameProp.stringValue, GUILayout.Width(120));
+                }
                 if (ObjectListGUI.DeleteButton())
                     toDelete = i;
                 EditorGUILayout.EndHorizontal();
 
                 ObjectListGUI.DrawEntryHints(valueProp.objectReferenceValue, assetsOnly, warnDuplicates, seen);
+
+                if (showNames)
+                    DrawMemberPreview(entry, groupsProp, memberPrefix, memberSuffix, prefixRespectsToggle);
             }
 
             if (toDelete >= 0)
@@ -292,6 +308,40 @@ namespace Tsvrc.Editor
                 element.FindPropertyRelative("Value").objectReferenceValue = null;
                 element.FindPropertyRelative("GroupId").intValue = state.SelectedGroupId;
             }
+        }
+
+        // Dim line under an entry showing the member it generates: "_ts.Name" (Global/Construct) or
+        // "CreateName(parent)" (Factory), prefixed by its group chain. A blank Name shows "<auto>",
+        // since the derived default depends on the object's resolved type at generate time.
+        private static void DrawMemberPreview(SerializedProperty entry, SerializedProperty groupsProp,
+            string memberPrefix, string memberSuffix, bool prefixRespectsToggle)
+        {
+            int groupId = entry.FindPropertyRelative("GroupId").intValue;
+            string prefix = ComputeGroupPrefix(groupsProp, groupId, prefixRespectsToggle);
+            string leaf = TsModule.SanitizeIdentifier(entry.FindPropertyRelative("Name").stringValue);
+            string body = prefix + (leaf.Length > 0 ? leaf : "<auto>");
+            EditorGUILayout.LabelField($"   ↳ {memberPrefix}{body}{memberSuffix}", EditorStyles.miniLabel);
+        }
+
+        // Same walk as TsModule.BuildGroupPrefix, over live SerializedProperty data, so the preview
+        // matches the generated identifier.
+        private static string ComputeGroupPrefix(SerializedProperty groupsProp, int groupId, bool respectToggle)
+        {
+            var chain = new List<string>();
+            var visited = new HashSet<int>();
+            int current = groupId;
+            while (current != 0 && visited.Add(current))
+            {
+                int index = IndexOfGroup(groupsProp, current);
+                if (index < 0) break;
+                var group = groupsProp.GetArrayElementAtIndex(index);
+                if (!respectToggle || group.FindPropertyRelative("IncludeInName").boolValue)
+                    chain.Add(group.FindPropertyRelative("Name").stringValue ?? string.Empty);
+                current = group.FindPropertyRelative("ParentId").intValue;
+            }
+
+            chain.Reverse();
+            return string.Concat(chain.Select(TsModule.SanitizeIdentifier));
         }
 
         // Left-pane tree. Rebuilt from the live SerializedProperty data on every Reload() rather

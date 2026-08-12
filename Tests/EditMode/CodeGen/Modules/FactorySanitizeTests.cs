@@ -39,17 +39,15 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void Sanitize_AliasWrapper_UnwrapsBeforeProcessing()
+        public void Sanitize_SurroundingUnderscores_TreatedAsSeparators()
         {
             Assert.AreEqual("Foo", Sanitize("__Foo__"));
             Assert.AreEqual("X", Sanitize("__x__"));
         }
 
         [Test]
-        public void Sanitize_ExactlyFourUnderscores_TreatedAsLiteralNotAlias()
+        public void Sanitize_OnlyUnderscores_ReturnsEmptyString()
         {
-            // "____" starts/ends with "__" but Length == 4 fails the `> 4` unwrap guard,
-            // and underscore alone is not alphanumeric, so the result is empty.
             Assert.AreEqual(string.Empty, Sanitize("____"));
         }
     }

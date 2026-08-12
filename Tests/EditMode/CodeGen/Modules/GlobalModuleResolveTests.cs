@@ -22,12 +22,18 @@ namespace Tsvrc.Tests.EditMode
         [TearDown]
         public void TearDown() => _scope.Dispose();
 
-        // These ungrouped tests pass an empty prefix; the prefixed path is covered by
-        // Resolve_GroupPrefix_* below.
+        // These ungrouped tests pass an empty prefix and no explicit name; the prefixed path is
+        // covered by Resolve_GroupPrefix_* and the explicit-name path by ResolveNamed below.
         private static IList Resolve(IEnumerable<Object> objects)
-            => ResolvePrefixed(objects.Select(o => (o, string.Empty)));
+            => ResolveFull(objects.Select(o => (o, string.Empty, string.Empty)));
+
+        private static IList ResolveNamed(IEnumerable<(Object value, string name)> inputs)
+            => ResolveFull(inputs.Select(t => (t.value, string.Empty, t.name)));
 
         private static IList ResolvePrefixed(IEnumerable<(Object value, string prefix)> inputs)
+            => ResolveFull(inputs.Select(t => (t.value, t.prefix, string.Empty)));
+
+        private static IList ResolveFull(IEnumerable<(Object value, string prefix, string name)> inputs)
             => (IList)PrivateFieldAccess.InvokeStatic(typeof(GlobalModule), "Resolve", (object)inputs.ToList());
 
         private static string NameOf(object entry) => PrivateFieldAccess.GetField<string>(entry, "Name");
@@ -116,23 +122,43 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void Resolve_AliasedPlainGameObject_AliasWinsOverGameObjectOwnName()
+        public void Resolve_ExplicitName_WinsOverGameObjectOwnName()
         {
-            var go = _scope.CreateGameObject("__Hero__");
+            var go = _scope.CreateGameObject("Villain");
 
-            var result = Resolve(new Object[] { go });
+            var result = ResolveNamed(new[] { ((Object)go, "Hero") });
 
             Assert.AreEqual("Hero", NameOf(result[0]));
         }
 
         [Test]
-        public void Resolve_AliasedGameObjectName_AliasWinsOverTypeName()
+        public void Resolve_ExplicitName_WinsOverComponentTypeName()
         {
-            var go = _scope.CreateGameObject("__MyAlias__");
+            var go = _scope.CreateGameObject("AnyName");
 
-            var result = Resolve(new Object[] { go.transform });
+            var result = ResolveNamed(new[] { ((Object)go.transform, "MyAlias") });
 
             Assert.AreEqual("MyAlias", NameOf(result[0]));
+        }
+
+        [Test]
+        public void Resolve_ExplicitName_SanitizedToValidIdentifier()
+        {
+            var go = _scope.CreateGameObject("AnyName");
+
+            var result = ResolveNamed(new[] { ((Object)go.transform, "my hud 1!") });
+
+            Assert.AreEqual("MyHud1", NameOf(result[0]));
+        }
+
+        [Test]
+        public void Resolve_BlankExplicitName_FallsBackToDerivedDefault()
+        {
+            var go = _scope.CreateGameObject("AnyName");
+
+            var result = ResolveNamed(new[] { ((Object)go.transform, "   ") });
+
+            Assert.AreEqual("Transform", NameOf(result[0]));
         }
 
         [Test]
@@ -147,23 +173,24 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void Resolve_AliasedAnimator_AliasPlusAnimatorSuffix()
+        public void Resolve_ExplicitNameOnAnimator_UsedVerbatimWithoutAnimatorSuffix()
         {
-            var go = _scope.CreateGameObject("__Hero__");
+            // The +Animator suffix is part of the derived default; an explicit name replaces it.
+            var go = _scope.CreateGameObject("Char");
             var animator = go.AddComponent<Animator>();
 
-            var result = Resolve(new Object[] { animator });
+            var result = ResolveNamed(new[] { ((Object)animator, "Rig") });
 
-            Assert.AreEqual("HeroAnimator", NameOf(result[0]));
+            Assert.AreEqual("Rig", NameOf(result[0]));
         }
 
         [Test]
-        public void Resolve_TwoDifferentObjectsWouldProduceSameName_SecondGetsDeduplicatedSuffix()
+        public void Resolve_TwoExplicitNamesCollide_SecondGetsDeduplicatedSuffix()
         {
-            var goA = _scope.CreateGameObject("__Foo__");
-            var goB = _scope.CreateGameObject("__Foo__");
+            var a = _scope.CreateGameObject("A");
+            var b = _scope.CreateGameObject("B");
 
-            var result = Resolve(new Object[] { goA.transform, goB.transform });
+            var result = ResolveNamed(new[] { ((Object)a.transform, "Foo"), ((Object)b.transform, "Foo") });
 
             Assert.AreEqual("Foo", NameOf(result[0]));
             Assert.AreEqual("Foo2", NameOf(result[1]));
@@ -183,8 +210,8 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Resolve_GroupPrefix_DisambiguatesOtherwiseCollidingEntries()
         {
-            var a = _scope.CreateGameObject("__Spawner__");
-            var b = _scope.CreateGameObject("__Spawner__");
+            var a = _scope.CreateGameObject("Spawner");
+            var b = _scope.CreateGameObject("Spawner");
 
             var result = ResolvePrefixed(new[]
             {
@@ -199,14 +226,12 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void Resolve_CombinedSceneThenBuiltinStream_SceneEntryKeepsUnsuffixedName()
         {
-            // Resolve() is fed scene-then-builtin concatenated (GlobalModule.LoadConfig
-            // builds `sceneGlobals.Concat(builtinGlobals)`), so iteration order
-            // alone determines which of two same-named entries wins the unsuffixed name -
-            // the scene one, since it's always listed first in the concatenation.
-            var sceneObj = _scope.CreateGameObject("__Foo__");
-            var builtinObj = _scope.CreateGameObject("__Foo__"); // stands in for a builtin-sourced object
+            // Resolve() is fed scene entries before builtin ones, so iteration order alone decides
+            // which of two same-named entries keeps the unsuffixed name: the scene one, listed first.
+            var sceneObj = _scope.CreateGameObject("Scene");
+            var builtinObj = _scope.CreateGameObject("Builtin"); // stands in for a builtin-sourced object
 
-            var result = Resolve(new Object[] { sceneObj.transform, builtinObj.transform });
+            var result = ResolveNamed(new[] { ((Object)sceneObj.transform, "Foo"), ((Object)builtinObj.transform, "Foo") });
 
             Assert.AreEqual("Foo", NameOf(result[0]), "The first (scene-position) entry keeps the unsuffixed name.");
             Assert.AreEqual("Foo2", NameOf(result[1]));

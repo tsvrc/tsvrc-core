@@ -207,8 +207,8 @@ namespace Tsvrc.Editor
         {
             if (collisions == null || collisions.Count == 0) return null;
             return $"{collisions.Count} field name(s) dropped from the last regenerate due to a naming " +
-                $"conflict between modules: {string.Join(", ", collisions)}. Use __Alias__ on the " +
-                "GameObject name(s) to assign a unique name, then regenerate.";
+                $"conflict between modules: {string.Join(", ", collisions)}. Set a distinct Name on the " +
+                "entry(ies) in the tab above, then regenerate.";
         }
 
         private void DrawRunWarnings()

@@ -123,7 +123,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void PreviousCollisionResolved_LastFieldNameCollisionsClearsOnNextCall()
         {
-            // A collision fixed by the user (e.g. renamed via __Alias__) must not linger in the
+            // A collision the user fixed (e.g. by setting a distinct Name) must not linger in the
             // recorded list forever - each call reflects only its own pass.
             TsGenerator.DetectAndExcludeFieldNameCollisions(new List<TsModule>
             {

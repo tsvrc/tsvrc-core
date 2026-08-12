@@ -25,12 +25,19 @@ namespace Tsvrc.Tests.EditMode
         [TearDown]
         public void TearDown() => _scope.Dispose();
 
-        // These ungrouped tests pass an empty prefix; the prefixed path is covered by
-        // Resolve_GroupPrefix_IsPrependedToTheName.
+        // These ungrouped tests pass an empty prefix and no explicit name; the prefixed path is
+        // covered by Resolve_GroupPrefix_IsPrependedToTheName and the explicit-name path by
+        // ResolveNamed.
         private static IList Resolve(Object[] constructs)
-            => ResolvePrefixed(constructs.Select(o => (o, string.Empty)));
+            => ResolveFull(constructs.Select(o => (o, string.Empty, string.Empty)));
+
+        private static IList ResolveNamed(IEnumerable<(Object value, string name)> inputs)
+            => ResolveFull(inputs.Select(t => (t.value, string.Empty, t.name)));
 
         private static IList ResolvePrefixed(IEnumerable<(Object value, string prefix)> inputs)
+            => ResolveFull(inputs.Select(t => (t.value, t.prefix, string.Empty)));
+
+        private static IList ResolveFull(IEnumerable<(Object value, string prefix, string name)> inputs)
             => (IList)PrivateFieldAccess.InvokeStatic(typeof(ConstructModule), "Resolve", (object)inputs.ToList());
 
         private static string NameOf(object entry) => PrivateFieldAccess.GetField<string>(entry, "Name");
@@ -69,22 +76,22 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void Resolve_AliasedName_AliasWinsOverTypeName()
+        public void Resolve_ExplicitName_WinsOverTypeName()
         {
-            var behaviour = _scope.CreateGameObject("__Hud__").AddComponent<StateManager>();
+            var behaviour = _scope.CreateGameObject("AnyName").AddComponent<StateManager>();
 
-            var result = Resolve(new Object[] { behaviour });
+            var result = ResolveNamed(new[] { ((Object)behaviour, "Hud") });
 
             Assert.AreEqual("Hud", NameOf(result[0]));
         }
 
         [Test]
-        public void Resolve_TwoEntriesCollideOnName_SecondGetsDeduplicatedSuffix()
+        public void Resolve_TwoExplicitNamesCollide_SecondGetsDeduplicatedSuffix()
         {
-            var a = _scope.CreateGameObject("__Dup__").AddComponent<StateManager>();
-            var b = _scope.CreateGameObject("__Dup__").AddComponent<StateManager>();
+            var a = _scope.CreateGameObject("A").AddComponent<StateManager>();
+            var b = _scope.CreateGameObject("B").AddComponent<StateManager>();
 
-            var result = Resolve(new Object[] { a, b });
+            var result = ResolveNamed(new[] { ((Object)a, "Dup"), ((Object)b, "Dup") });
 
             Assert.AreEqual("Dup", NameOf(result[0]));
             Assert.AreEqual("Dup2", NameOf(result[1]));
