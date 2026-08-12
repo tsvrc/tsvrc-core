@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Tsvrc.Config;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -50,6 +51,12 @@ namespace Tsvrc.Editor
 
         // Called with the set of conflicting names so the module can remove them and log errors.
         internal virtual void ExcludeFieldNames(IEnumerable<string> names) { }
+
+        // Tie-breaker when two modules expose the same field name: the highest-precedence module
+        // keeps it and the others drop it. An exact tie at the top is a real collision and strips
+        // the name from all. Default 0; ConstructModule raises it so its accessor supersedes a
+        // Global field of the same name.
+        internal virtual int FieldNamePrecedence => 0;
 
         // Non-null shows this module as a tab in TsWindow, labeled TabLabel, described by
         // TabDescription, drawn by DrawTab.
@@ -383,7 +390,12 @@ namespace Tsvrc.Editor
         // sanitize(name) from the outermost ancestor down to the entry's own direct group.
         // GroupId 0 (ungrouped), or a group id that no longer resolves (stale/cycle-broken),
         // yields an empty prefix - the same "no prefix" result an ungrouped entry gets today.
-        protected static string BuildGroupPrefix(int groupId, Dictionary<int, TsGroup> groupsById, Func<string, string> sanitize)
+        //
+        // respectToggle controls the per-group IncludeInName opt-in. When false (Factory), every
+        // ancestor's name is included. When true (Global, Construct), only ancestors with
+        // IncludeInName set contribute, though the walk still climbs through the others.
+        protected static string BuildGroupPrefix(int groupId, Dictionary<int, TsGroup> groupsById, Func<string, string> sanitize,
+            bool respectToggle = false)
         {
             if (groupId == 0 || groupsById == null) return string.Empty;
 
@@ -393,7 +405,8 @@ namespace Tsvrc.Editor
             while (currentId != 0 && groupsById.TryGetValue(currentId, out var group))
             {
                 if (!visited.Add(currentId)) break;
-                chain.Add(group.Name ?? string.Empty);
+                if (!respectToggle || group.IncludeInName)
+                    chain.Add(group.Name ?? string.Empty);
                 currentId = group.ParentId;
             }
 
@@ -412,6 +425,36 @@ namespace Tsvrc.Editor
             while (usedNames.Contains(name))
                 name = $"{baseName}{suffix++}";
             return name;
+        }
+
+        // Converts an arbitrary name into a valid C# identifier: strips __Alias__ markers, splits on
+        // non-alphanumeric separators, PascalCases each word, and prepends '_' if it starts with a
+        // digit. Returns an empty string when nothing usable remains; callers choose the fallback.
+        protected static string Sanitize(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return string.Empty;
+
+            if (raw.StartsWith("__") && raw.EndsWith("__") && raw.Length > 4)
+                raw = raw.Substring(2, raw.Length - 4);
+
+            var sb = new StringBuilder();
+            bool capitalizeNext = true;
+            foreach (char ch in raw)
+            {
+                if (char.IsLetterOrDigit(ch))
+                {
+                    sb.Append(capitalizeNext ? char.ToUpper(ch) : ch);
+                    capitalizeNext = false;
+                }
+                else
+                {
+                    capitalizeNext = true;
+                }
+            }
+
+            if (sb.Length == 0) return string.Empty;
+            if (char.IsDigit(sb[0])) sb.Insert(0, '_');
+            return sb.ToString();
         }
 
         // Unity does not auto dirty the scene when SerializedObject properties are changed
@@ -469,6 +512,72 @@ namespace Tsvrc.Editor
                 return false;
             }
             return true;
+        }
+
+        // A resolved, named registration shared by Global and Construct: a scene object exposed on
+        // _ts under a stable identifier.
+        protected struct ResolvedEntry
+        {
+            public string Name;
+            public string TypeName;
+            public string Namespace;
+            public UnityEngine.Object SourceObject;
+        }
+
+        // The per-module inputs to ResolveEntries: validation strictness, log wording, and how the
+        // pre-prefix identifier is derived. PrimaryName maps (typeName, gameObjectName) to that name.
+        protected sealed class EntryPolicy
+        {
+            public string ModuleTag;
+            public string ConfigLabel;   // TryAcceptEntry null/dupe wording ("config" / "Constructs config")
+            public string EntryNoun;     // TryAcceptEntry duplicate wording ("entry" / "construct")
+            public bool RequireComponent;
+            public bool RequireTsvrcBehaviour;
+            public Func<string, string, string> PrimaryName;
+        }
+
+        // The shared resolve loop for Global and Construct. Each input pairs an object with the
+        // sanitized group prefix its group opted into (empty when none); the identifier is
+        // prefix + PrimaryName, deduplicated across the set.
+        protected static List<ResolvedEntry> ResolveEntries(
+            IEnumerable<(UnityEngine.Object value, string prefix)> inputs, EntryPolicy policy)
+        {
+            var entries = new List<ResolvedEntry>();
+            var usedNames = new HashSet<string>(StringComparer.Ordinal);
+            var seen = new HashSet<UnityEngine.Object>();
+
+            foreach (var (obj, prefix) in inputs)
+            {
+                if (!TryAcceptEntry(obj, policy.ModuleTag, policy.ConfigLabel, policy.EntryNoun, seen)) continue;
+
+                var component = obj as Component;
+                if (policy.RequireComponent && component == null)
+                {
+                    Debug.LogWarning($"[{policy.ModuleTag}] '{obj.name}' is not a component. It must be a TsvrcBehaviour on a scene object. Skipping.");
+                    continue;
+                }
+
+                if (!TryResolveObjectType(obj, out string typeName, out string ns))
+                {
+                    Debug.LogWarning($"[{policy.ModuleTag}] Could not resolve a type for '{obj.name}'; its script may be missing. Skipping.");
+                    continue;
+                }
+
+                if (policy.RequireTsvrcBehaviour && !IsTsvrcBehaviourType(typeName, ns))
+                {
+                    Debug.LogWarning($"[{policy.ModuleTag}] '{obj.name}' ({typeName}) is not a TsvrcBehaviour. Skipping.");
+                    continue;
+                }
+
+                string goName = component != null ? component.gameObject.name
+                    : (obj is GameObject go ? go.name : string.Empty);
+                string name = Deduplicate(prefix + policy.PrimaryName(typeName, goName), usedNames);
+                usedNames.Add(name);
+
+                entries.Add(new ResolvedEntry { Name = name, TypeName = typeName, Namespace = ns, SourceObject = obj });
+            }
+
+            return entries;
         }
     }
 }

@@ -61,6 +61,49 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
+        public void BuildGroupPrefix_RespectToggle_AllGroupsOff_ReturnsEmptyString()
+        {
+            var groups = new[]
+            {
+                new TsGroup { Id = 1, ParentId = 0, Name = "Enemies", IncludeInName = false },
+                new TsGroup { Id = 2, ParentId = 1, Name = "Bosses", IncludeInName = false },
+            };
+
+            string prefix = TsModuleTestHarness.CallBuildGroupPrefix(2, groups, s => s, respectToggle: true);
+
+            Assert.AreEqual(string.Empty, prefix, "With respectToggle on and no group opted in, nesting stays purely organizational.");
+        }
+
+        [Test]
+        public void BuildGroupPrefix_RespectToggle_OnlyIncludedGroupsContribute_ButWalkClimbsThroughExcludedAncestors()
+        {
+            var groups = new[]
+            {
+                new TsGroup { Id = 1, ParentId = 0, Name = "Enemies", IncludeInName = false }, // organizational only
+                new TsGroup { Id = 2, ParentId = 1, Name = "Bosses", IncludeInName = true },   // opted into naming
+                new TsGroup { Id = 3, ParentId = 2, Name = "Dragons", IncludeInName = true },
+            };
+
+            string prefix = TsModuleTestHarness.CallBuildGroupPrefix(3, groups, s => s, respectToggle: true);
+
+            Assert.AreEqual("BossesDragons", prefix, "Excluded 'Enemies' is skipped, but the walk still climbs through it to reach its included ancestors.");
+        }
+
+        [Test]
+        public void BuildGroupPrefix_RespectToggleOff_IncludesEveryAncestorRegardlessOfFlag()
+        {
+            var groups = new[]
+            {
+                new TsGroup { Id = 1, ParentId = 0, Name = "Maze", IncludeInName = false },
+                new TsGroup { Id = 2, ParentId = 1, Name = "Skybox", IncludeInName = false },
+            };
+
+            string prefix = TsModuleTestHarness.CallBuildGroupPrefix(2, groups, s => s, respectToggle: false);
+
+            Assert.AreEqual("MazeSkybox", prefix, "The Factory case (respectToggle off) always uses the full path.");
+        }
+
+        [Test]
         public void BuildGroupPrefix_UngroupedId_ReturnsEmptyString()
         {
             var groups = new[] { new TsGroup { Id = 1, ParentId = 0, Name = "Whatever" } };

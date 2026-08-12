@@ -30,7 +30,8 @@ namespace Tsvrc.Editor
         }
 
         internal static void Draw(SerializedObject so, string groupsPropertyName, string entriesPropertyName,
-            State state, string emptyHint = null, bool assetsOnly = false, bool warnDuplicates = false)
+            State state, string emptyHint = null, bool assetsOnly = false, bool warnDuplicates = false,
+            bool groupNaming = false)
         {
             var groupsProp = so.FindProperty(groupsPropertyName);
             var entriesProp = so.FindProperty(entriesPropertyName);
@@ -58,7 +59,7 @@ namespace Tsvrc.Editor
             state.TreeView.OnGUI(treeRect);
             if (state.TreeViewState.selectedIDs.Count > 0)
                 state.SelectedGroupId = state.TreeViewState.selectedIDs[0];
-            DrawGroupToolbar(groupsProp, entriesProp, state);
+            DrawGroupToolbar(groupsProp, entriesProp, state, groupNaming);
             EditorGUILayout.EndVertical();
 
             EditorGUILayout.BeginVertical();
@@ -70,7 +71,8 @@ namespace Tsvrc.Editor
 
         // Deleting a group never deletes its contents: child groups and entries are reparented
         // one level up, only the group node itself is removed.
-        private static void DrawGroupToolbar(SerializedProperty groupsProp, SerializedProperty entriesProp, State state)
+        private static void DrawGroupToolbar(SerializedProperty groupsProp, SerializedProperty entriesProp, State state,
+            bool groupNaming)
         {
             bool realGroupSelected = state.SelectedGroupId != 0;
 
@@ -86,7 +88,27 @@ namespace Tsvrc.Editor
             EditorGUILayout.EndHorizontal();
 
             if (realGroupSelected)
+            {
                 DrawRenameField(groupsProp, state);
+                if (groupNaming)
+                    DrawIncludeInNameToggle(groupsProp, state);
+            }
+        }
+
+        // Per-group opt-in that turns organizational nesting into namespacing. Shown only for the
+        // reference tabs (Global, Construct); Factory always path-names and Pool is type-named.
+        private static void DrawIncludeInNameToggle(SerializedProperty groupsProp, State state)
+        {
+            int index = IndexOfGroup(groupsProp, state.SelectedGroupId);
+            if (index < 0) return;
+
+            var includeProp = groupsProp.GetArrayElementAtIndex(index).FindPropertyRelative("IncludeInName");
+            includeProp.boolValue = EditorGUILayout.ToggleLeft(
+                new GUIContent("Namespace with group name",
+                    "When on, this group's name (and any opted-in ancestor's) prefixes the generated member name " +
+                    "of entries inside it - e.g. _ts.EnemiesSpawner instead of _ts.Spawner. Off keeps the group " +
+                    "purely organizational. Renaming or reparenting an opted-in group renames the member."),
+                includeProp.boolValue);
         }
 
         internal static void AddGroup(SerializedProperty groupsProp, State state, int parentId)

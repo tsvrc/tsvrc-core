@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Tsvrc.Core;
 using Tsvrc.Config;
 using UnityEditor;
@@ -290,35 +289,6 @@ namespace Tsvrc.Editor
         }
 
         private static string FieldName(string name) => $"_factory{name}";
-
-        // Strips __Alias__ markers, splits on non-alphanumeric separators, PascalCases each word,
-        // and prepends '_' if the result starts with a digit.
-        private static string Sanitize(string raw)
-        {
-            if (string.IsNullOrEmpty(raw)) return string.Empty;
-
-            if (raw.StartsWith("__") && raw.EndsWith("__") && raw.Length > 4)
-                raw = raw.Substring(2, raw.Length - 4);
-
-            var sb = new StringBuilder();
-            bool capitalizeNext = true;
-            foreach (char ch in raw)
-            {
-                if (char.IsLetterOrDigit(ch))
-                {
-                    sb.Append(capitalizeNext ? char.ToUpper(ch) : ch);
-                    capitalizeNext = false;
-                }
-                else
-                {
-                    capitalizeNext = true;
-                }
-            }
-
-            if (sb.Length == 0) return string.Empty;
-            if (char.IsDigit(sb[0])) sb.Insert(0, '_');
-            return sb.ToString();
-        }
 
         private struct FactoryEntry
         {

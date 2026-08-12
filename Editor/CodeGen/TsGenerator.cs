@@ -455,19 +455,59 @@ namespace Tsvrc.Editor
         // exercisable with synthetic test modules.
         internal static void DetectAndExcludeFieldNameCollisions(List<TsModule> modules)
         {
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            var duplicates = new HashSet<string>(StringComparer.Ordinal);
+            // name -> every module that would declare it this pass.
+            var exposers = new Dictionary<string, List<TsModule>>(StringComparer.Ordinal);
             foreach (var module in modules)
                 foreach (var name in module.ExposedFieldNames())
-                    if (!seen.Add(name))
-                        duplicates.Add(name);
-            if (duplicates.Count > 0)
-                foreach (var module in modules)
-                    module.ExcludeFieldNames(duplicates);
+                {
+                    if (!exposers.TryGetValue(name, out var list))
+                        exposers[name] = list = new List<TsModule>();
+                    list.Add(module);
+                }
 
-            // Recorded even when empty, so a collision fixed by the user is reflected on the very
-            // next Run() rather than lingering in TsWindow's warning box.
-            LastFieldNameCollisions = duplicates.OrderBy(n => n, StringComparer.Ordinal).ToList();
+            // Per-module set of names to strip. A name exposed by more than one module goes to the
+            // highest FieldNamePrecedence; the rest drop it. An exact tie at the top is a genuine
+            // collision and strips the name from every exposer.
+            var toExclude = new Dictionary<TsModule, HashSet<string>>();
+            var genuineCollisions = new List<string>();
+
+            foreach (var pair in exposers)
+            {
+                var list = pair.Value;
+                if (list.Count <= 1) continue;
+
+                int maxPrec = list.Max(m => m.FieldNamePrecedence);
+                var winners = list.Where(m => m.FieldNamePrecedence == maxPrec).ToList();
+
+                if (winners.Count == 1)
+                {
+                    // Precedence-resolved: strip from the losers only, keep on the winner.
+                    foreach (var loser in list)
+                        if (loser != winners[0])
+                            AddExclusion(toExclude, loser, pair.Key);
+                }
+                else
+                {
+                    // Genuine same-precedence collision: strip from every exposer.
+                    foreach (var module in list)
+                        AddExclusion(toExclude, module, pair.Key);
+                    genuineCollisions.Add(pair.Key);
+                }
+            }
+
+            foreach (var pair in toExclude)
+                pair.Key.ExcludeFieldNames(pair.Value);
+
+            // Recorded each pass so a resolved collision clears on the next Run(). Only genuine ties
+            // count; a precedence-resolved supersede is expected, not an error.
+            LastFieldNameCollisions = genuineCollisions.OrderBy(n => n, StringComparer.Ordinal).ToList();
+        }
+
+        private static void AddExclusion(Dictionary<TsModule, HashSet<string>> toExclude, TsModule module, string name)
+        {
+            if (!toExclude.TryGetValue(module, out var set))
+                toExclude[module] = set = new HashSet<string>(StringComparer.Ordinal);
+            set.Add(name);
         }
 
         // Field names dropped by the most recent Run() because more than one module tried to

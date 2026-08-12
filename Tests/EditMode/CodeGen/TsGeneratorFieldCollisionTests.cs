@@ -13,13 +13,20 @@ namespace Tsvrc.Tests.EditMode
         private class RecordingModule : TsModule
         {
             private readonly string[] _exposedNames;
+            private readonly int _precedence;
             internal List<string> ExcludedNames { get; } = new List<string>();
 
-            internal RecordingModule(params string[] exposedNames) => _exposedNames = exposedNames;
+            internal RecordingModule(params string[] exposedNames) : this(0, exposedNames) { }
+            internal RecordingModule(int precedence, params string[] exposedNames)
+            {
+                _precedence = precedence;
+                _exposedNames = exposedNames;
+            }
 
             internal override void LoadConfig() { }
             internal override IEnumerable<string> ExposedFieldNames() => _exposedNames;
             internal override void ExcludeFieldNames(IEnumerable<string> names) => ExcludedNames.AddRange(names);
+            internal override int FieldNamePrecedence => _precedence;
         }
 
         [Test]
@@ -46,6 +53,35 @@ namespace Tsvrc.Tests.EditMode
 
             Assert.IsEmpty(a.ExcludedNames);
             Assert.IsEmpty(b.ExcludedNames);
+        }
+
+        [Test]
+        public void HigherPrecedenceModuleKeepsName_LowerPrecedenceModuleDropsIt()
+        {
+            // The Construct-supersedes-Global case: a construct (high precedence) exposing the same
+            // name as a global (default precedence) keeps it; the global drops it, and it is NOT
+            // reported as a genuine collision.
+            var global = new RecordingModule(0, "GameManager");
+            var construct = new RecordingModule(100, "GameManager");
+
+            TsGenerator.DetectAndExcludeFieldNameCollisions(new List<TsModule> { global, construct });
+
+            CollectionAssert.Contains(global.ExcludedNames, "GameManager");
+            CollectionAssert.DoesNotContain(construct.ExcludedNames, "GameManager");
+            CollectionAssert.DoesNotContain(TsGenerator.LastFieldNameCollisions, "GameManager");
+        }
+
+        [Test]
+        public void EqualHighPrecedenceModules_StillGenuineCollision_BothDrop()
+        {
+            var a = new RecordingModule(100, "Shared");
+            var b = new RecordingModule(100, "Shared");
+
+            TsGenerator.DetectAndExcludeFieldNameCollisions(new List<TsModule> { a, b });
+
+            CollectionAssert.Contains(a.ExcludedNames, "Shared");
+            CollectionAssert.Contains(b.ExcludedNames, "Shared");
+            CollectionAssert.Contains(TsGenerator.LastFieldNameCollisions, "Shared");
         }
 
         [Test]

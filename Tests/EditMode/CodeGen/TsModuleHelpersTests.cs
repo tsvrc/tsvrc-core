@@ -64,6 +64,11 @@ namespace Tsvrc.Tests.EditMode
 
         internal static string CallBuildGroupPrefix(int groupId, TsGroup[] groups, System.Func<string, string> sanitize)
             => BuildGroupPrefix(groupId, ToGroupLookup(groups), sanitize);
+
+        internal static string CallBuildGroupPrefix(int groupId, TsGroup[] groups, System.Func<string, string> sanitize, bool respectToggle)
+            => BuildGroupPrefix(groupId, ToGroupLookup(groups), sanitize, respectToggle);
+
+        internal static string CallSanitize(string raw) => Sanitize(raw);
     }
 
     public class TsModuleHelpersTests

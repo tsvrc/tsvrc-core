@@ -18,7 +18,7 @@ namespace Tsvrc.Tests.EditMode
     // GlobalModuleWireTests.Wire_FieldFound_DirectReferenceIsAssigned.
     public class ConstructModuleWireTests
     {
-        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(ConstructModule), "ConstructEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(TsModule), "ResolvedEntry");
 
         private TempSceneScope _scope;
 

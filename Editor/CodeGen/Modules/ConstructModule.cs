@@ -14,7 +14,11 @@ namespace Tsvrc.Editor
     {
         private const string SnapshotKey = "ConstructModule";
 
-        private List<ConstructEntry> _entries = new List<ConstructEntry>();
+        private List<ResolvedEntry> _entries = new List<ResolvedEntry>();
+
+        // Names whose _ts.Name accessor is suppressed this pass because another module of equal or
+        // higher precedence owns the name. The private field and its TsConstruct call still emit.
+        private HashSet<string> _suppressedAccessors = new HashSet<string>(StringComparer.Ordinal);
 
         // Tab-only UI state (tree expand/select/search), never written to TsConfig - see
         // TsGroupTreeGUI.State's own doc comment.
@@ -24,35 +28,33 @@ namespace Tsvrc.Editor
 
         internal override string TabLabel => "Constructs";
         internal override string TabDescription =>
-            "Register TsvrcBehaviours that are always active in the scene, not pooled. TsConstruct() is called once on each at startup. Example: add your HudManager here and it is initialized automatically when the world loads. Groups are purely organizational.";
+            "Register TsvrcBehaviours that are always active in the scene, not pooled. Each is initialized once at startup (TsConstruct) AND reachable as _ts.Name - one registration, both behaviours, so you don't also need a separate Global entry. Example: add your HudManager here and use _ts.HudManager anywhere. Groups are organizational by default; toggle 'Namespace with group name' on a group to prefix member names.";
         internal override void DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "ConstructGroups", "ConstructEntries", _treeState,
-            "No constructs registered yet. Add a TsvrcBehaviour here to have TsConstruct(this) called on it at startup.",
-            warnDuplicates: true);
+            "No constructs registered yet. Add a TsvrcBehaviour here to initialize it at startup and expose it as _ts.Name.",
+            warnDuplicates: true, groupNaming: true);
 
         internal override void LoadConfig()
         {
+            _suppressedAccessors = new HashSet<string>(StringComparer.Ordinal);
             var sceneConfig = TsLinkedScene.Find<TsConfig>();
 
-            // Deliberately does NOT early-return an empty result when sceneConfig is null: that
-            // would bypass ApplySnapshotFallback below, meaning a compile-broken pass on a scene
-            // that hasn't loaded TsConfig yet (or ever) would collapse a real snapshot to empty
-            // when it should fall back to it, same as GlobalModule's handling of the same case.
-            var configEntries = Array.Empty<TsGroupedEntry>();
+            // Does not early-return when sceneConfig is null: that path still runs
+            // ApplySnapshotFallback, so a compile-broken pass falls back to the snapshot instead of
+            // collapsing it to empty. Entries reach Resolve as UnityEngine.Object, so a
+            // missing-script component still resolves via ScriptIndex.
+            var input = new List<(UnityEngine.Object, string)>();
             if (sceneConfig != null)
             {
                 BreakGroupCycles("ConstructModule", sceneConfig.ConstructGroups);
-                configEntries = sceneConfig.ConstructEntries ?? Array.Empty<TsGroupedEntry>();
+                var groups = ToGroupLookup(sceneConfig.ConstructGroups);
+                foreach (var e in sceneConfig.ConstructEntries ?? Array.Empty<TsGroupedEntry>())
+                    input.Add((e.Value, BuildGroupPrefix(e.GroupId, groups, Sanitize, respectToggle: true)));
             }
 
-            // TsGroupedEntry.Value is UnityEngine.Object, so an entry whose script currently has
-            // no compiled type (a "Missing (Mono Script)" component) still reaches Resolve() -
-            // TryResolveObjectType falls back to ScriptIndex for it there.
-            var constructs = configEntries.Select(e => e.Value);
-
-            var resolved = Resolve(constructs);
+            var resolved = Resolve(input);
             _entries = ApplySnapshotFallback(SnapshotKey, resolved,
                 e => new ModuleEntrySnapshot.Entry { Name = e.Name, TypeName = e.TypeName, Namespace = e.Namespace },
-                s => new ConstructEntry { Name = s.Name, TypeName = s.TypeName, Namespace = s.Namespace, SourceObject = null });
+                s => new ResolvedEntry { Name = s.Name, TypeName = s.TypeName, Namespace = s.Namespace, SourceObject = null });
         }
 
         internal override string GenerateCode()
@@ -74,7 +76,13 @@ namespace Tsvrc.Editor
             using (w.Block($"public partial class {ScaffoldModule.CompiledClassName}"))
             {
                 foreach (var entry in _entries.OrderBy(e => e.Name))
+                {
                     w.Line($"[HideInInspector] [SerializeField] private {entry.TypeName} {FieldName(entry.Name)};");
+                    // A construct is initialized at startup and exposed as _ts.Name. The accessor is
+                    // omitted only when a higher-precedence module owns the name; the init still runs.
+                    if (!_suppressedAccessors.Contains(entry.Name))
+                        w.Line($"public {entry.TypeName} {entry.Name} => {FieldName(entry.Name)};");
+                }
 
                 using (w.Method("public void _TsConstructStart()"))
                 {
@@ -87,6 +95,25 @@ namespace Tsvrc.Editor
         }
 
         private static string BuildStub() => BuildStub(null, "public void _TsConstructStart()");
+
+        // A construct exposes _ts.Name, so it participates in cross-module collision detection.
+        internal override IEnumerable<string> ExposedFieldNames() => _entries.Select(e => e.Name);
+
+        // A construct's accessor supersedes a Global field of the same name, so registering the same
+        // object as both resolves to the construct. A tie with another equal-precedence module
+        // suppresses the accessor instead.
+        internal override int FieldNamePrecedence => 100;
+
+        internal override void ExcludeFieldNames(IEnumerable<string> names)
+        {
+            var mine = new HashSet<string>(_entries.Select(e => e.Name), StringComparer.Ordinal);
+            foreach (var name in names)
+            {
+                if (!mine.Contains(name) || !_suppressedAccessors.Add(name)) continue;
+                Debug.LogWarning($"[ConstructModule] '_ts.{name}' collides with another same-precedence registration; " +
+                    "keeping this construct's startup initialization but not its accessor. Rename one via __Alias__ to expose both.");
+            }
+        }
 
         internal override void Wire()
         {
@@ -110,60 +137,27 @@ namespace Tsvrc.Editor
             ApplyAndMarkDirty(so, root);
         }
 
-        private static List<ConstructEntry> Resolve(IEnumerable<UnityEngine.Object> constructs)
+        // A construct must be a TsvrcBehaviour on a scene object, named by alias-or-type-name. The
+        // shared ResolveEntries loop does the accept/resolve/validate/name/dedup.
+        private static readonly EntryPolicy Policy = new EntryPolicy
         {
-            var entries = new List<ConstructEntry>();
-            var usedNames = new HashSet<string>(StringComparer.Ordinal);
-            var seen = new HashSet<UnityEngine.Object>();
+            ModuleTag = "ConstructModule",
+            ConfigLabel = "Constructs config",
+            EntryNoun = "construct",
+            RequireComponent = true,
+            RequireTsvrcBehaviour = true,
+            PrimaryName = ConstructPrimaryName,
+        };
 
-            foreach (var obj in constructs)
-            {
-                if (!TryAcceptEntry(obj, "ConstructModule", "Constructs config", "construct", seen)) continue;
+        private static List<ResolvedEntry> Resolve(IEnumerable<(UnityEngine.Object value, string prefix)> inputs)
+            => ResolveEntries(inputs, Policy);
 
-                if (!(obj is Component component))
-                {
-                    Debug.LogWarning($"[ConstructModule] '{obj.name}' is not a component. Constructs must be TsvrcBehaviours on a scene object.");
-                    continue;
-                }
-
-                if (!TryResolveObjectType(obj, out string typeName, out string ns))
-                {
-                    Debug.LogWarning($"[ConstructModule] Could not resolve a type for '{obj.name}'; its script may be missing. Skipping.");
-                    continue;
-                }
-
-                if (!IsTsvrcBehaviourType(typeName, ns))
-                {
-                    Debug.LogWarning($"[ConstructModule] '{obj.name}' ({typeName}) is not a TsvrcBehaviour. Skipping.");
-                    continue;
-                }
-
-                string goName = component.gameObject.name;
-                string baseName = AliasName(goName) ?? typeName;
-                string name = Deduplicate(baseName, usedNames);
-                usedNames.Add(name);
-
-                entries.Add(new ConstructEntry
-                {
-                    Name = name,
-                    TypeName = typeName,
-                    Namespace = ns,
-                    SourceObject = obj,
-                });
-            }
-
-            return entries;
-        }
+        // Same primary-name rule as GlobalModule's component branch: an explicit alias wins
+        // (sanitized), otherwise the component's own type name (already a valid identifier).
+        private static string ConstructPrimaryName(string typeName, string goName)
+            => AliasName(goName) is string alias ? Sanitize(alias) : typeName;
 
         private static string FieldName(string name) => $"_construct{name}";
-
-        private struct ConstructEntry
-        {
-            public string Name;
-            public string TypeName;
-            public string Namespace;
-            public UnityEngine.Object SourceObject;
-        }
     }
 }
 #endif

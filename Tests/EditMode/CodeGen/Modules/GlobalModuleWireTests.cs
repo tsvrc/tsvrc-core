@@ -21,7 +21,7 @@ namespace Tsvrc.Tests.EditMode
     // Global field goes through.
     public class GlobalModuleWireTests
     {
-        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(GlobalModule), "GlobalEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(TsModule), "ResolvedEntry");
         private const string RealFieldName = "_memory";
 
         private TempSceneScope _scope;

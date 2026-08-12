@@ -16,8 +16,8 @@ namespace Tsvrc.Tests.EditMode
     {
         private const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-        // Builds a boxed instance of a module's private nested entry struct (e.g.
-        // GlobalModule.GlobalEntry) with the given field values set, for feeding
+        // Builds a boxed instance of a module's entry struct (e.g. the shared
+        // TsModule.ResolvedEntry, or PoolModule's own) with the given field values set, for feeding
         // GenerateCode()/Wire() tests without going through the real LoadConfig() pipeline.
         internal static object BuildEntry(Type structType, params (string field, object value)[] fields)
         {

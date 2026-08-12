@@ -1,19 +1,11 @@
-using System.Reflection;
 using NUnit.Framework;
-using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.EditMode
 {
+    // Exercises the shared TsModule.Sanitize through TsModuleTestHarness.
     public class FactorySanitizeTests
     {
-        // FactoryModule.Sanitize is `private static` — reflection is the only way in,
-        // since InternalsVisibleTo only reaches internal (not private) members.
-        private static string Sanitize(string raw)
-        {
-            MethodInfo method = typeof(FactoryModule).GetMethod("Sanitize", BindingFlags.NonPublic | BindingFlags.Static);
-            Assert.IsNotNull(method, "FactoryModule.Sanitize method signature changed or was removed.");
-            return (string)method.Invoke(null, new object[] { raw });
-        }
+        private static string Sanitize(string raw) => TsModuleTestHarness.CallSanitize(raw);
 
         [Test]
         public void Sanitize_NullInput_ReturnsEmptyString()

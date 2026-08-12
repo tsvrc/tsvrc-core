@@ -8,7 +8,7 @@ namespace Tsvrc.Tests.EditMode
     // Tests feed ConstructModule.GenerateCode() synthetic entries via reflection.
     public class ConstructModuleGenerateCodeTests
     {
-        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(ConstructModule), "ConstructEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(TsModule), "ResolvedEntry");
 
         private static ConstructModule BuildModule(params object[] entries)
         {

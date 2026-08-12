@@ -9,7 +9,7 @@ namespace Tsvrc.Tests.EditMode
     // the real LoadConfig()/AssetDatabase-coupled pipeline entirely.
     public class GlobalModuleGenerateCodeTests
     {
-        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(GlobalModule), "GlobalEntry");
+        private static readonly Type EntryType = CodeGenModuleReflection.NestedType(typeof(TsModule), "ResolvedEntry");
 
         private static GlobalModule BuildModule(params object[] entries)
         {

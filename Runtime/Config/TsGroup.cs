@@ -18,5 +18,13 @@ namespace Tsvrc.Config
 
         /// <summary>Display name, shown in the Configure window and used as a naming prefix for Factory groups.</summary>
         public string Name;
+
+        /// <summary>
+        /// When true, this group's <see cref="Name"/> prefixes the generated member name of entries
+        /// inside it and its descendants, so nesting becomes namespacing (<c>_ts.EnemiesBossSpawner</c>
+        /// instead of <c>_ts.Spawner</c>). Applies to Global and Construct entries; Factory groups
+        /// always prefix regardless. Renaming or reparenting an opted-in group renames the member.
+        /// </summary>
+        public bool IncludeInName;
     }
 }

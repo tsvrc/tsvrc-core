@@ -26,8 +26,8 @@ namespace Tsvrc.Config
         [Tooltip("Scene objects exposed as named fields directly on the generated TsGenerated root. Drag a GameObject or Component here. Organize into groups via Tsvrc > Configure.")]
         public TsGroupedEntry[] GlobalEntries;
 
-        /// <summary>Nested groups organizing <see cref="GlobalEntries"/> for browsing. Purely organizational; does not affect generated field names.</summary>
-        [Tooltip("Nested groups organizing GlobalEntries for browsing. Purely organizational - group names do not affect generated field names.")]
+        /// <summary>Nested groups organizing <see cref="GlobalEntries"/>. Organizational by default; a group can opt into namespacing via <see cref="TsGroup.IncludeInName"/>.</summary>
+        [Tooltip("Nested groups organizing GlobalEntries. Organizational by default - toggle 'Namespace with group name' on a group to prefix its entries' generated member names (e.g. _ts.EnemiesSpawner).")]
         public TsGroup[] GlobalGroups;
 
         /// <summary>The next unused id to assign in <see cref="GlobalGroups"/>.</summary>
@@ -44,12 +44,12 @@ namespace Tsvrc.Config
         /// <summary>The next unused id to assign in <see cref="PoolGroups"/>.</summary>
         public int PoolNextGroupId = 1;
 
-        /// <summary>TsvrcBehaviours that are always active in the scene, not pooled. Constructed at startup.</summary>
-        [Tooltip("TsvrcBehaviours that are always active in the scene, not pooled. Constructed at startup. Organize into groups via Tsvrc > Configure; groups are purely organizational.")]
+        /// <summary>TsvrcBehaviours that are always active in the scene, not pooled. Constructed at startup AND exposed as <c>_ts.Name</c>.</summary>
+        [Tooltip("TsvrcBehaviours that are always active in the scene, not pooled. Each is initialized at startup (TsConstruct) and reachable as _ts.Name - no separate Global entry needed. Organize into groups via Tsvrc > Configure.")]
         public TsGroupedEntry[] ConstructEntries;
 
-        /// <summary>Nested groups organizing <see cref="ConstructEntries"/> for browsing. Purely organizational.</summary>
-        [Tooltip("Nested groups organizing ConstructEntries for browsing. Purely organizational.")]
+        /// <summary>Nested groups organizing <see cref="ConstructEntries"/>. Organizational by default; a group can opt into namespacing via <see cref="TsGroup.IncludeInName"/>.</summary>
+        [Tooltip("Nested groups organizing ConstructEntries. Organizational by default - toggle 'Namespace with group name' on a group to prefix its entries' generated member names.")]
         public TsGroup[] ConstructGroups;
 
         /// <summary>The next unused id to assign in <see cref="ConstructGroups"/>.</summary>

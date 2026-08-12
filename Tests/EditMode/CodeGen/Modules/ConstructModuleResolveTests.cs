@@ -1,5 +1,7 @@
 using NUnit.Framework;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using Tsvrc.Editor;
 using Tsvrc.StateMachine;
 using Tsvrc.Testing.Framework;
@@ -23,8 +25,13 @@ namespace Tsvrc.Tests.EditMode
         [TearDown]
         public void TearDown() => _scope.Dispose();
 
+        // These ungrouped tests pass an empty prefix; the prefixed path is covered by
+        // Resolve_GroupPrefix_IsPrependedToTheName.
         private static IList Resolve(Object[] constructs)
-            => (IList)PrivateFieldAccess.InvokeStatic(typeof(ConstructModule), "Resolve", (object)constructs);
+            => ResolvePrefixed(constructs.Select(o => (o, string.Empty)));
+
+        private static IList ResolvePrefixed(IEnumerable<(Object value, string prefix)> inputs)
+            => (IList)PrivateFieldAccess.InvokeStatic(typeof(ConstructModule), "Resolve", (object)inputs.ToList());
 
         private static string NameOf(object entry) => PrivateFieldAccess.GetField<string>(entry, "Name");
         private static string TypeNameOf(object entry) => PrivateFieldAccess.GetField<string>(entry, "TypeName");
@@ -84,6 +91,16 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
+        public void Resolve_GroupPrefix_IsPrependedToTheName()
+        {
+            var behaviour = _scope.CreateGameObject("AnyName").AddComponent<StateManager>();
+
+            var result = ResolvePrefixed(new[] { ((Object)behaviour, "Hud") });
+
+            Assert.AreEqual("HudStateManager", NameOf(result[0]));
+        }
+
+        [Test]
         public void Resolve_NonComponentObject_WarnsAndSkips()
         {
             // TsGroupedEntry.Value is plain Object, so a non-component reference
@@ -91,7 +108,7 @@ namespace Tsvrc.Tests.EditMode
             var asset = ScriptableObject.CreateInstance<TestScriptableObject>();
             try
             {
-                LogAssert.Expect(LogType.Warning, $"[ConstructModule] '{asset.name}' is not a component. Constructs must be TsvrcBehaviours on a scene object.");
+                LogAssert.Expect(LogType.Warning, $"[ConstructModule] '{asset.name}' is not a component. It must be a TsvrcBehaviour on a scene object. Skipping.");
 
                 var result = Resolve(new Object[] { asset });
 
