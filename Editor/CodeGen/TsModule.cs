@@ -108,20 +108,23 @@ namespace Tsvrc.Editor
             return ScriptIndex.DerivesFrom(shortName, "TsvrcBehaviour", ns);
         }
 
-        // Resolves the type name + namespace backing a live scene Object reference, preferring
-        // fast live reflection but falling back to ScriptIndex - source text scanning,
-        // independent of compile state - when reflection can't produce a real answer. A
-        // "Missing (Mono Script)" component, typically a world script that has never yet been
-        // part of a successfully compiled assembly because it needs a field this very generator
-        // pass is responsible for producing, always reports GetType() as exactly
-        // typeof(MonoBehaviour), never a concrete subclass, so that exact check is what signals
-        // "hand off to the fallback" rather than a null check. A GameObject or any other Object
-        // type always reflects normally and never needs the fallback. Mirrors
-        // IsTsvrcBehaviourType's identical two-tier shape, applied to resolving a type's
-        // identity instead of testing its base-class membership.
-        // internal, not protected: ObjectListGUI (not a TsModule subclass) also calls this
-        // directly, to show a user which type tsvrc will actually resolve a reference to even
-        // while the project doesn't currently compile - see its own DrawResolvedTypeHint.
+        // The base types a script-backed reference collapses to when its class isn't in any loaded
+        // assembly (a broken or not-yet-built compile). None is ever a real registered type, so a
+        // reference reflecting as one must be resolved from source rather than trusted: reflection
+        // has nothing concrete to offer. UdonSharp surfaces such a reference as bare Object;
+        // plain missing MonoBehaviours surface as MonoBehaviour.
+        protected static bool IsErasedType(Type type) =>
+            type == typeof(UnityEngine.Object) || type == typeof(Component) ||
+            type == typeof(Behaviour) || type == typeof(MonoBehaviour);
+
+        // Resolves the type name + namespace backing a live scene Object reference, preferring fast
+        // live reflection but falling back to ScriptIndex - source text scanning, independent of
+        // compile state - when reflection produces only an erased base type (see IsErasedType).
+        // Returns false when neither path yields a concrete type, so callers skip the entry rather
+        // than generate a field typed as bare Object.
+        // internal, not protected: ObjectListGUI (not a TsModule subclass) also calls this directly,
+        // to show a user which type tsvrc will resolve a reference to even while the project doesn't
+        // currently compile - see its own DrawResolvedTypeHint.
         internal static bool TryResolveObjectType(UnityEngine.Object obj, out string typeName, out string ns)
         {
             typeName = null;
@@ -129,28 +132,29 @@ namespace Tsvrc.Editor
             if (obj == null) return false;
 
             var type = obj.GetType();
-            if (!(obj is Component) || type != typeof(MonoBehaviour))
+            if (!IsErasedType(type))
             {
                 typeName = type.Name;
                 ns = type.Namespace ?? string.Empty;
                 return true;
             }
 
-            return TryResolveViaScript((Component)obj, out typeName, out ns);
+            return TryResolveViaScript(obj, out typeName, out ns);
         }
 
-        // Split out from TryResolveObjectType so tests can exercise the ScriptIndex-backed
-        // fallback directly against a real component's real MonoScript, without needing to
-        // construct an actual "Missing (Mono Script)" component - Unity provides no supported
-        // way to do that from editor script (AddComponent<MonoBehaviour> is rejected as
-        // abstract-for-attachment).
-        protected static bool TryResolveViaScript(Component component, out string typeName, out string ns)
+        // Resolves a reference's declared type from its own m_Script source, independent of compile
+        // state. Accepts any UnityEngine.Object, not just Component, because a missing-script
+        // reference can reflect as bare Object yet still carry a serialized m_Script pointing at its
+        // MonoScript. Split out from TryResolveObjectType so tests can exercise it directly against
+        // a real component's MonoScript, without an actual "Missing (Mono Script)" reference (Unity
+        // provides no supported way to construct one from editor script).
+        protected static bool TryResolveViaScript(UnityEngine.Object obj, out string typeName, out string ns)
         {
             typeName = null;
             ns = null;
-            if (component == null) return false;
+            if (obj == null) return false;
 
-            var so = new SerializedObject(component);
+            var so = new SerializedObject(obj);
             var scriptProp = so.FindProperty("m_Script");
             var script = scriptProp?.objectReferenceValue as MonoScript;
             return ScriptIndex.TryResolveDeclaredType(script, out typeName, out ns);

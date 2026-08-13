@@ -27,8 +27,10 @@ namespace Tsvrc.Tests.EditMode
         internal static bool CallTryResolveObjectType(UnityEngine.Object obj, out string typeName, out string ns)
             => TryResolveObjectType(obj, out typeName, out ns);
 
-        internal static bool CallTryResolveViaScript(Component component, out string typeName, out string ns)
-            => TryResolveViaScript(component, out typeName, out ns);
+        internal static bool CallTryResolveViaScript(UnityEngine.Object obj, out string typeName, out string ns)
+            => TryResolveViaScript(obj, out typeName, out ns);
+
+        internal static bool CallIsErasedType(System.Type type) => IsErasedType(type);
 
         // Uses a plain string as TEntry, since the fallback logic itself doesn't care about
         // entry shape, only about counts and the two conversion delegates, so a string keeps
@@ -414,6 +416,32 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsTrue(result);
             Assert.AreEqual("StateManager", typeName);
             Assert.AreEqual("Tsvrc.StateMachine", ns);
+        }
+
+        [Test]
+        public void IsErasedType_ErasedBaseTypes_ReturnTrue()
+        {
+            Assert.IsTrue(TsModuleTestHarness.CallIsErasedType(typeof(UnityEngine.Object)));
+            Assert.IsTrue(TsModuleTestHarness.CallIsErasedType(typeof(Component)));
+            Assert.IsTrue(TsModuleTestHarness.CallIsErasedType(typeof(Behaviour)));
+            Assert.IsTrue(TsModuleTestHarness.CallIsErasedType(typeof(MonoBehaviour)));
+        }
+
+        [Test]
+        public void IsErasedType_ConcreteTypes_ReturnFalse()
+        {
+            Assert.IsFalse(TsModuleTestHarness.CallIsErasedType(typeof(GameObject)));
+            Assert.IsFalse(TsModuleTestHarness.CallIsErasedType(typeof(Transform)));
+            Assert.IsFalse(TsModuleTestHarness.CallIsErasedType(typeof(StateManager)));
+        }
+
+        [Test]
+        public void TryResolveViaScript_ObjectWithoutMonoScript_ReturnsFalse()
+        {
+            // A GameObject has no m_Script, so there is nothing to source-resolve from.
+            var go = _fallbackScope.CreateGameObject("Anything");
+
+            Assert.IsFalse(TsModuleTestHarness.CallTryResolveViaScript(go, out _, out _));
         }
 
         [Test]
