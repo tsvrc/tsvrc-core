@@ -71,14 +71,24 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void RegisterState_DefaultTarget_DispatchesOnManagerItself()
+        public void RegisterState_ManagerPassedAsTarget_DispatchesOnManagerItself()
         {
             var manager = CreateBehaviour<StateManagerSelfDispatchSubclass>();
-            manager.RegisterState(StateA, enterMethod: nameof(StateManagerSelfDispatchSubclass.EnterSelf));
+            manager.RegisterState(StateA, manager, nameof(StateManagerSelfDispatchSubclass.EnterSelf));
 
             manager.SetState(StateA);
 
             Assert.AreEqual(1, manager.EnterSelfCount);
+        }
+
+        [Test]
+        public void SetState_NullTarget_DispatchSkippedSilently()
+        {
+            var manager = CreateBehaviour<StateManagerTestSubclass>();
+            manager.RegisterState(StateA, null, nameof(StateTargetDouble.EnterA));
+
+            Assert.DoesNotThrow(() => manager.SetState(StateA));
+            Assert.AreEqual(StateA, manager.CurrentState);
         }
 
         [Test]
@@ -170,7 +180,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var manager = CreateBehaviour<StateManagerTestSubclass>();
             var target = CreateBehaviour<StateTargetDouble>();
-            manager.RegisterState(StateA, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA), target);
+            manager.RegisterState(StateA, target, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
             manager.SetState(StateA);
             int callsAfterFirstEntry = manager.OnStateChangedCallCount;
 
@@ -205,7 +215,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var manager = CreateBehaviour<StateManagerTestSubclass>();
             var target = CreateBehaviour<StateTargetDouble>();
-            manager.RegisterState(StateA, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA), target);
+            manager.RegisterState(StateA, target, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
 
             manager.SetState(StateA);
 
@@ -220,8 +230,8 @@ namespace Tsvrc.Tests.EditMode
             var log = new List<string>();
             var target = CreateBehaviour<StateTargetDouble>();
             target.Log = log;
-            manager.RegisterState(StateA, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA), target);
-            manager.RegisterState(StateB, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB), target);
+            manager.RegisterState(StateA, target, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
+            manager.RegisterState(StateB, target, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB));
             manager.SetState(StateA);
             log.Clear();
 
@@ -304,8 +314,8 @@ namespace Tsvrc.Tests.EditMode
             var manager = CreateBehaviour<StateManagerTestSubclass>();
             var targetA = CreateBehaviour<StateTargetDouble>("TargetA");
             var targetB = CreateBehaviour<StateTargetDouble>("TargetB");
-            manager.RegisterState(StateA, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA), targetA);
-            manager.RegisterState(StateB, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB), targetB);
+            manager.RegisterState(StateA, targetA, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
+            manager.RegisterState(StateB, targetB, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB));
             manager.SetState(StateA);
 
             manager.SetState(StateB);
@@ -350,8 +360,8 @@ namespace Tsvrc.Tests.EditMode
             target.Log = log;
             var externalListener = CreateBehaviour<TsListenerDouble>("External");
             externalListener.Log = log;
-            manager.RegisterState(StateA, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA), target);
-            manager.RegisterState(StateB, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB), target);
+            manager.RegisterState(StateA, target, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
+            manager.RegisterState(StateB, target, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB));
             manager.TsSubscribe(externalListener, "OnStateChanged", nameof(TsListenerDouble.CallbackA));
             manager.SetState(StateA);
             log.Clear();
@@ -444,9 +454,9 @@ namespace Tsvrc.Tests.EditMode
             var log = new List<string>();
             var target = CreateBehaviour<StateTargetDouble>();
             target.Log = log;
-            manager.RegisterState(StateA, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA), target);
-            manager.RegisterState(StateB, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB), target);
-            manager.RegisterState(StateC, nameof(StateTargetDouble.EnterC), nameof(StateTargetDouble.ExitC), target);
+            manager.RegisterState(StateA, target, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
+            manager.RegisterState(StateB, target, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB));
+            manager.RegisterState(StateC, target, nameof(StateTargetDouble.EnterC), nameof(StateTargetDouble.ExitC));
             manager.ArmRedirect = true;
             manager.RedirectFrom = StateB;
             manager.RedirectTo = StateC;
@@ -504,9 +514,9 @@ namespace Tsvrc.Tests.EditMode
             // calls SetState more than once while a transition is already running, only
             // the most recent request survives to be drained.
             var manager = CreateBehaviour<MultiRedirectSubclass>();
-            manager.RegisterState(StateA);
-            manager.RegisterState(StateB);
-            manager.RegisterState(StateC);
+            manager.RegisterState(StateA, manager);
+            manager.RegisterState(StateB, manager);
+            manager.RegisterState(StateC, manager);
             manager.FirstRedirectTarget = StateB;
             manager.SecondRedirectTarget = StateC;
             manager.ArmOnEntering = StateA;

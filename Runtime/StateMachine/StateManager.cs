@@ -40,16 +40,16 @@ namespace Tsvrc.StateMachine
         private int _queuedState;
 
         /// <summary>
-        /// Register a state with optional enter/exit method names and an optional target behaviour to
-        /// dispatch them on. If target is null, dispatches on this StateManager (for subclass overrides).
-        /// Use nameof() at the call site for rename-safety.
+        /// Register a state with the behaviour its enter/exit methods are dispatched on, and their
+        /// optional method names. Pass <c>this</c> as <paramref name="target"/> for a subclass that
+        /// hosts the methods itself. Use nameof() at the call site for rename-safety.
         /// </summary>
-        public void RegisterState(int state, string enterMethod = null, string exitMethod = null, UdonSharpBehaviour target = null)
+        public void RegisterState(int state, UdonSharpBehaviour target, string enterMethod = null, string exitMethod = null)
         {
             var entry = new DataDictionary();
             entry["enter"] = enterMethod ?? string.Empty;
             entry["exit"] = exitMethod ?? string.Empty;
-            entry["target"] = target != null ? new DataToken((object)target) : new DataToken((object)this);
+            entry["target"] = new DataToken((object)target);
             _stateData[state] = entry;
         }
 
@@ -111,11 +111,9 @@ namespace Tsvrc.StateMachine
                 Dispatch(enterEntry.DataDictionary, "enter");
         }
 
-        // Skips silently if no method name was registered, or if the registered
-        // target's GameObject was destroyed since RegisterState (the target itself is
-        // never truly C#-null, since RegisterState always defaults it to `this`, so the
-        // cast-then-compare below is specifically checking Unity's overridden equality
-        // for a destroyed object, not a real null reference).
+        // Skips silently when no method name was registered, or when the target is null or its
+        // GameObject was destroyed since RegisterState (Unity's overridden equality reports both as
+        // == null).
         private void Dispatch(DataDictionary entry, string methodKey)
         {
             string method = entry[methodKey].String;
@@ -123,7 +121,7 @@ namespace Tsvrc.StateMachine
                 return;
 
             var target = (UdonSharpBehaviour)entry["target"].Reference;
-            if ((object)target != null && target == null)
+            if (target == null)
                 return;
 
             target.SendCustomEvent(method);

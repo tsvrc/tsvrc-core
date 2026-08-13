@@ -29,7 +29,7 @@ namespace Tsvrc.Tests.PlayMode.StateMachine.StateManager
             var manager = _managerGameObject.AddComponent<Tsvrc.StateMachine.StateManager>();
             _targetGameObject = new GameObject("Target");
             var target = _targetGameObject.AddComponent<StateTargetDouble>();
-            manager.RegisterState(1, nameof(StateTargetDouble.EnterA), null, target);
+            manager.RegisterState(1, target, nameof(StateTargetDouble.EnterA), null);
 
             Object.Destroy(_targetGameObject);
             yield return null;
@@ -48,7 +48,7 @@ namespace Tsvrc.Tests.PlayMode.StateMachine.StateManager
             var manager = _managerGameObject.AddComponent<Tsvrc.StateMachine.StateManager>();
             _targetGameObject = new GameObject("Target");
             var target = _targetGameObject.AddComponent<StateTargetDouble>();
-            manager.RegisterState(1, nameof(StateTargetDouble.EnterA), null, target);
+            manager.RegisterState(1, target, nameof(StateTargetDouble.EnterA), null);
 
             Object.Destroy(_targetGameObject);
             // No yield here: SetState runs in the same frame as Destroy(), before Unity has
