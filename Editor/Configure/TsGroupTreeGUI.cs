@@ -27,6 +27,10 @@ namespace Tsvrc.Editor
             internal int SelectedGroupId; // 0 = the always-present "(ungrouped)" bucket
             internal string SearchText = string.Empty;
             internal bool RenamePending;
+
+            // Signature of the data the tree renders from, so Reload() runs only when it actually
+            // changes rather than every repaint. Null until the first draw.
+            internal int? LastTreeSignature;
         }
 
         // memberPrefix/memberSuffix enable the per-entry Name field and a live member preview:
@@ -55,7 +59,12 @@ namespace Tsvrc.Editor
                 state.TreeView.searchString = newSearch;
             }
 
-            state.TreeView.Reload();
+            int signature = ComputeTreeSignature(groupsProp, entriesProp, state.SearchText);
+            if (state.LastTreeSignature != signature)
+            {
+                state.TreeView.Reload();
+                state.LastTreeSignature = signature;
+            }
 
             EditorGUILayout.BeginHorizontal();
 
@@ -83,11 +92,14 @@ namespace Tsvrc.Editor
             bool realGroupSelected = state.SelectedGroupId != 0;
 
             EditorGUILayout.BeginHorizontal();
-            string addLabel = realGroupSelected ? "+ Sub-group" : "+ Add Group";
-            if (GUILayout.Button(addLabel))
-                AddGroup(groupsProp, state, parentId: realGroupSelected ? state.SelectedGroupId : 0);
+            // Always available, so adding a top-level group never requires selecting the ungrouped
+            // bucket first. Sub-group and Delete act on the selected group.
+            if (GUILayout.Button("+ Group"))
+                AddGroup(groupsProp, state, parentId: 0);
             using (new EditorGUI.DisabledScope(!realGroupSelected))
             {
+                if (GUILayout.Button("+ Sub-group"))
+                    AddGroup(groupsProp, state, parentId: state.SelectedGroupId);
                 if (GUILayout.Button("Delete", GUILayout.Width(56)))
                     DeleteGroup(groupsProp, entriesProp, state);
             }
@@ -301,13 +313,19 @@ namespace Tsvrc.Editor
             EditorGUILayout.Space(4);
             using (new EditorGUI.DisabledScope(searching))
             if (GUILayout.Button("+ Add"))
-            {
-                int newIndex = entriesProp.arraySize;
-                entriesProp.InsertArrayElementAtIndex(newIndex);
-                var element = entriesProp.GetArrayElementAtIndex(newIndex);
-                element.FindPropertyRelative("Value").objectReferenceValue = null;
-                element.FindPropertyRelative("GroupId").intValue = state.SelectedGroupId;
-            }
+                AddEntry(entriesProp, state.SelectedGroupId);
+        }
+
+        internal static void AddEntry(SerializedProperty entriesProp, int groupId)
+        {
+            int newIndex = entriesProp.arraySize;
+            entriesProp.InsertArrayElementAtIndex(newIndex);
+            var element = entriesProp.GetArrayElementAtIndex(newIndex);
+            // InsertArrayElementAtIndex copies the previous element, so every field is reset
+            // explicitly to give a genuinely empty new entry rather than inheriting its neighbour.
+            element.FindPropertyRelative("Value").objectReferenceValue = null;
+            element.FindPropertyRelative("GroupId").intValue = groupId;
+            element.FindPropertyRelative("Name").stringValue = string.Empty;
         }
 
         // Dim line under an entry showing the member it generates: "_ts.Name" (Global/Construct) or
@@ -321,6 +339,43 @@ namespace Tsvrc.Editor
             string leaf = TsModule.SanitizeIdentifier(entry.FindPropertyRelative("Name").stringValue);
             string body = prefix + (leaf.Length > 0 ? leaf : "<auto>");
             EditorGUILayout.LabelField($"   ↳ {memberPrefix}{body}{memberSuffix}", EditorStyles.miniLabel);
+        }
+
+        // A cheap hash of everything the tree renders from: group structure and names, per-entry
+        // group membership, and the search text (plus entry object names while searching, since the
+        // subtree match reads them). Reloading only when this changes keeps typing responsive and
+        // stops the tree from reassigning IMGUI control ids under a field being edited.
+        internal static int ComputeTreeSignature(SerializedProperty groupsProp, SerializedProperty entriesProp, string search)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + (search != null ? search.GetHashCode() : 0);
+                bool searching = !string.IsNullOrEmpty(search);
+
+                hash = hash * 31 + groupsProp.arraySize;
+                for (int i = 0; i < groupsProp.arraySize; i++)
+                {
+                    var group = groupsProp.GetArrayElementAtIndex(i);
+                    hash = hash * 31 + group.FindPropertyRelative("Id").intValue;
+                    hash = hash * 31 + group.FindPropertyRelative("ParentId").intValue;
+                    string name = group.FindPropertyRelative("Name").stringValue;
+                    hash = hash * 31 + (name != null ? name.GetHashCode() : 0);
+                }
+
+                hash = hash * 31 + entriesProp.arraySize;
+                for (int i = 0; i < entriesProp.arraySize; i++)
+                {
+                    var entry = entriesProp.GetArrayElementAtIndex(i);
+                    hash = hash * 31 + entry.FindPropertyRelative("GroupId").intValue;
+                    if (searching)
+                    {
+                        var value = entry.FindPropertyRelative("Value").objectReferenceValue;
+                        hash = hash * 31 + (value != null ? value.name.GetHashCode() : 0);
+                    }
+                }
+                return hash;
+            }
         }
 
         // Same walk as TsModule.BuildGroupPrefix, over live SerializedProperty data, so the preview

@@ -73,6 +73,60 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
+        public void AddEntry_NewEntryIsBlank_DoesNotInheritPreviousName()
+        {
+            var marker = _scope.CreateGameObject("Marker");
+            _config.GlobalEntries = new[] { new TsGroupedEntry { Value = marker, GroupId = 1, Name = "Container" } };
+            _so.Update();
+
+            TsGroupTreeGUI.AddEntry(_entriesProp, 2);
+            _so.ApplyModifiedProperties();
+
+            Assert.AreEqual(2, _config.GlobalEntries.Length);
+            Assert.AreEqual(string.Empty, _config.GlobalEntries[1].Name, "A new entry must not inherit the previous entry's name.");
+            Assert.IsNull(_config.GlobalEntries[1].Value);
+            Assert.AreEqual(2, _config.GlobalEntries[1].GroupId, "The new entry belongs to the group it was added under.");
+        }
+
+        [Test]
+        public void ComputeTreeSignature_SameData_IsStable()
+        {
+            _config.GlobalGroups = new[] { new TsGroup { Id = 1, ParentId = 0, Name = "A" } };
+            _config.GlobalEntries = new[] { new TsGroupedEntry { Value = null, GroupId = 1 } };
+            _so.Update();
+
+            int first = TsGroupTreeGUI.ComputeTreeSignature(_groupsProp, _entriesProp, string.Empty);
+            int second = TsGroupTreeGUI.ComputeTreeSignature(_groupsProp, _entriesProp, string.Empty);
+
+            Assert.AreEqual(first, second);
+        }
+
+        [Test]
+        public void ComputeTreeSignature_ChangesOnRenameReparentAddAndSearch()
+        {
+            _config.GlobalGroups = new[] { new TsGroup { Id = 1, ParentId = 0, Name = "A" } };
+            _so.Update();
+            int baseline = TsGroupTreeGUI.ComputeTreeSignature(_groupsProp, _entriesProp, string.Empty);
+
+            _config.GlobalGroups[0].Name = "B";
+            _so.Update();
+            Assert.AreNotEqual(baseline, TsGroupTreeGUI.ComputeTreeSignature(_groupsProp, _entriesProp, string.Empty), "Rename must change the signature.");
+
+            _config.GlobalGroups = new[] { new TsGroup { Id = 1, ParentId = 9, Name = "A" } };
+            _so.Update();
+            Assert.AreNotEqual(baseline, TsGroupTreeGUI.ComputeTreeSignature(_groupsProp, _entriesProp, string.Empty), "Reparent must change the signature.");
+
+            _config.GlobalGroups = new[] { new TsGroup { Id = 1, ParentId = 0, Name = "A" } };
+            _config.GlobalEntries = new[] { new TsGroupedEntry { Value = null, GroupId = 1 } };
+            _so.Update();
+            Assert.AreNotEqual(baseline, TsGroupTreeGUI.ComputeTreeSignature(_groupsProp, _entriesProp, string.Empty), "Adding an entry must change the signature.");
+
+            _config.GlobalEntries = System.Array.Empty<TsGroupedEntry>();
+            _so.Update();
+            Assert.AreNotEqual(baseline, TsGroupTreeGUI.ComputeTreeSignature(_groupsProp, _entriesProp, "query"), "A different search must change the signature.");
+        }
+
+        [Test]
         public void IndexOfGroup_PresentId_ReturnsItsArrayIndex()
         {
             _config.GlobalGroups = new[]
