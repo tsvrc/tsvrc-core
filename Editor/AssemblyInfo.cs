@@ -5,6 +5,9 @@ using System.Runtime.CompilerServices;
 // reflection.
 [assembly: InternalsVisibleTo("Tsvrc.Tests.EditMode")]
 
-// Lets Tests/PlayMode reach TsGenerator.SuppressAutomaticTriggers(), the test-isolation seam
-// its own [SetUpFixture] uses to stop reactive codegen regeneration during a PlayMode run.
-[assembly: InternalsVisibleTo("Tsvrc.Tests.PlayMode")]
+// Lets AutomaticTriggersSetUpFixtureBase reach TsGenerator.SuppressAutomaticTriggers(), the
+// test-isolation seam every per-assembly [SetUpFixture] (Tsvrc's own two, and every consuming
+// world's own - see Tsvrc.Testing.Framework's README) uses to stop reactive codegen
+// regeneration during a test run. A single grant here, rather than one per consumer: nothing
+// outside Tsvrc.Testing.Framework calls TsGenerator directly for this anymore.
+[assembly: InternalsVisibleTo("Tsvrc.Testing.Framework")]

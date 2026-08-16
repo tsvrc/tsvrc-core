@@ -7,6 +7,8 @@
         "Tsvrc.Editor",
         "Tsvrc.Tests.Doubles",
         "Tsvrc.Testing.Framework",
+        "Tsvrc.Testing.UI",
+        "Tsvrc.Testing.Behaviours",
         "UdonSharp.Runtime",
         "UdonSharp.Editor",
         "Unity.TextMeshPro",

@@ -1,22 +1,17 @@
 {
-    "name": "Tsvrc.Testing.Framework",
-    "rootNamespace": "Tsvrc.Testing.Framework",
+    "name": "Tsvrc.Testing.UI",
+    "rootNamespace": "Tsvrc.Testing.UI",
     "references": [
-        "UnityEngine.TestRunner",
-        "Tsvrc.Editor",
-        "VRC.SDKBase",
-        "VRC.SDK3",
-        "VRC.ClientSim"
+        "Tsvrc.Runtime",
+        "Tsvrc.Testing.Framework",
+        "UdonSharp.Runtime",
+        "VRC.SDK3"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [
-        "nunit.framework.dll",
-        "VRCSDKBase.dll",
         "VRCSDK3.dll"
     ],
     "autoReferenced": false,

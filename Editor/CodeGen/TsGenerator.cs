@@ -80,10 +80,14 @@ namespace Tsvrc.Editor
         // whatever scene Unity Test Framework happens to have open are suppressed.
         internal static bool AutomaticTriggersSuppressed => _suppressionDepth > 0 || IsAutomatedTestProcess;
 
-        // Held by a [SetUpFixture] in each test assembly (Tsvrc.Tests.EditMode,
-        // Tsvrc.Tests.PlayMode) for the whole run, so no reactive trigger can regenerate
-        // TsGenerated against a test's temp/synthetic scene and corrupt a consuming project's
-        // real generated files. Safe to nest.
+        // Held by a [SetUpFixture] in each test assembly - Tsvrc's own (Tsvrc.Tests.EditMode,
+        // Tsvrc.Tests.PlayMode) and every consuming world's own test assemblies alike (see
+        // Tsvrc.Testing.Framework's README and the AssemblyInfo.cs InternalsVisibleTo list
+        // below) - for the whole run, so no reactive trigger can regenerate TsGenerated against
+        // a test's temp/synthetic scene and corrupt a consuming project's real generated files.
+        // Safe to nest. TsGenerator itself stays internal (it's an implementation-detail class,
+        // not a public API surface), so reaching this specific seam from another assembly goes
+        // through InternalsVisibleTo rather than making the member public.
         internal static IDisposable SuppressAutomaticTriggers() => new SuppressionScope();
 
         private sealed class SuppressionScope : IDisposable

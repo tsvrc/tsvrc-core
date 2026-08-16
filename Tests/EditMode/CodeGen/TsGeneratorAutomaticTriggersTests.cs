@@ -8,12 +8,12 @@ namespace Tsvrc.Tests.EditMode
     // AutomaticTriggersSuppressed: the single mechanism that stops TsGenerator's reactive
     // hierarchyChanged/asset-watcher triggers from regenerating TsGenerated against whatever
     // scene a test run happens to have open. See TsDomainReloadHandler and the two
-    // TsGeneratorAutomaticTriggersSetUpFixture classes (Tests/EditMode, Tests/PlayMode) for how
+    // AutomaticTriggersSetUpFixture classes (Tests/EditMode, Tests/PlayMode) for how
     // this is actually armed for a real test run - the tests below exercise the primitives
     // directly instead.
     //
     // AutomaticTriggersSuppressed is not directly assertable as false in this suite: this very
-    // assembly's own TsGeneratorAutomaticTriggersSetUpFixture holds a permanent scope for the
+    // assembly's own AutomaticTriggersSetUpFixture holds a permanent scope for the
     // whole run, and under a real -runTests batchmode invocation ComputeIsAutomatedTestProcess
     // would independently make it true anyway. Every test below is written to hold regardless of
     // that baseline, asserting relative changes in _suppressionDepth rather than an absolute

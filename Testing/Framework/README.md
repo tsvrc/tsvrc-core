@@ -77,6 +77,36 @@ other side effects from it.
   (e.g. once a future SDK version fixes it upstream) with
   `FixupRegistry.Disable<TFixup>()`, without forking this framework.
 
+## Companion package: `Tsvrc.Testing.Behaviours`
+
+This assembly is a plain C# library - none of its own types are `UdonSharpBehaviour`s
+meant to be `AddComponent`'d as real components. `TsCallbackRecorder` (a generic
+`TsSubscribe`/`TsEmit` listener double: records how many times `CallbackA`/`CallbackB`
+fired, and via its optional shared `Log`, the cross-listener firing order) *is* a real
+`UdonSharpBehaviour`, so it lives in its own sibling assembly, `Assets/Tsvrc/Testing/
+Behaviours` (same `Tsvrc.Testing.Framework` C# namespace, different assembly - nothing
+about how you `using` it changes). This split exists because UdonSharp only allows
+`AddComponent` for scripts belonging to an assembly registered as a U# assembly, and once
+registered, UdonSharp Udon-compiles *every* source file in that assembly - which would
+otherwise drag this assembly's own plain reflection/ClientSim helpers into a compilation
+context they were never meant to run under (some, like `AutomaticTriggersSetUpFixtureBase`,
+reach `internal` Tsvrc.Editor APIs that Udon's compiler can't resolve). Add
+`Tsvrc.Testing.Behaviours` to a test assembly's `references` alongside
+`Tsvrc.Testing.Framework` whenever a test needs `TsCallbackRecorder`; subscribe it directly
+with `publisher.TsSubscribe(recorder, eventName, nameof(TsCallbackRecorder.CallbackA))` -
+still no dependency on `Tsvrc.Runtime`, since `TsSubscribe`/`TsEmit` dispatch to any
+`UdonSharpBehaviour` by method name.
+
+## Companion package: `Tsvrc.Testing.UI`
+
+This assembly deliberately has no dependency on `Tsvrc.Runtime` (see above), so it can't
+offer helpers typed against tsvrc's own UI components. `Assets/Tsvrc/Testing/UI` is a
+separate, sibling package for exactly that: `TestListItem` (a generic `ListItem` double)
+and `TsvrcListTestBuilder.Build(...)` (wires a bare `TsvrcList`'s private item-container/
+prefab/page-size fields the same way every `TsvrcList` test in this repo does by hand).
+Add `Tsvrc.Testing.UI` to a test assembly's `references` alongside `Tsvrc.Testing.Framework`
+whenever a test needs to drive a real `TsvrcList`.
+
 ## What's not here
 
 `ProcessTestBase` (reflection-seeding helpers for `Process` subclasses) lives in this
