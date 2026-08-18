@@ -229,6 +229,19 @@ namespace Tsvrc.Session
         /// <summary>Each client calls this during the loading phase. When all lobby players have called it, the session transitions to InGame.</summary>
         public void SetReady() => _readyCheck.SetReady();
 
+        /// <summary>Grows the in-progress ready check with a player who wasn't part of the
+        /// roster <see cref="StartSession"/> snapshotted - e.g. a game that hands every instance
+        /// player the loading data can use this to let one of them join the round for real the
+        /// moment they become locally eligible, without waiting for the next round. A no-op
+        /// outside the Loading phase, and for a player already tracked (mirrors
+        /// <see cref="AddLobbyPlayer"/>'s underlying <c>AddTrackedPlayers</c>, which silently
+        /// ignores both).</summary>
+        public void AddLoadingParticipant(string playerId)
+        {
+            if (CurrentState != RankedGameSessionState.Loading) return;
+            _readyCheck.AddTrackedPlayers(new[] { playerId });
+        }
+
         /// <summary>Call before <see cref="StartSession"/> to override the inspector-configured duration at runtime.</summary>
         public void SetTimerDuration(int ms) { _timerDurationMs = ms; }
 

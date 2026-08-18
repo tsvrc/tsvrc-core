@@ -6,7 +6,7 @@ using UnityEngine.TestTools;
 namespace Tsvrc.Tests.EditMode
 {
     // Covers StartSession/StopSession, StartLobbyTracking/StopLobbyTracking,
-    // SetReady/SetTimerDuration/GetRemainingMilliseconds.
+    // SetReady/AddLoadingParticipant/SetTimerDuration/GetRemainingMilliseconds.
     public class RankedGameSessionStartStopTests : RankedGameSessionTestBase
     {
         [Test]
@@ -217,6 +217,89 @@ namespace Tsvrc.Tests.EditMode
             Assert.DoesNotThrow(() => h.Session.SetReady());
 
             Assert.AreEqual(RankedGameSessionState.Idle, h.Session.CurrentState);
+        }
+
+        [Test]
+        public void AddLoadingParticipant_DuringLoading_GrowsTheReadyCheckRoster()
+        {
+            var h = CreateWiredSession();
+            SetMasterOnly(h.Session, false);
+            h.Session.StartLobbyTracking();
+            h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
+            h.Session.StartSession();
+
+            h.Session.AddLoadingParticipant("B");
+
+            CollectionAssert.AreEqual(new[] { "A", "B" }, h.ReadyCheck.LastPlayerIds);
+        }
+
+        [Test]
+        public void AddLoadingParticipant_NewParticipantBecomingReady_CompletesTheCheckAlongsideTheOriginalRoster()
+        {
+            // Proves the late addition genuinely participates in completion, not just in the
+            // tracked list - the check must not complete until B is ready too, and must
+            // complete once both are.
+            var h = CreateWiredSession();
+            SetMasterOnly(h.Session, false);
+            h.Session.StartLobbyTracking();
+            h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
+            h.Session.StartSession();
+            h.Session.AddLoadingParticipant("B");
+            h.ReadyCheck.BroadcastAddReadyPlayer("A");
+
+            Assert.AreEqual(RankedGameSessionState.Loading, h.Session.CurrentState,
+                "B hasn't reported ready yet - the round must not start without them.");
+
+            h.ReadyCheck.BroadcastAddReadyPlayer("B");
+
+            Assert.AreEqual(RankedGameSessionState.InGame, h.Session.CurrentState);
+            CollectionAssert.AreEqual(new[] { "A", "B" }, h.Session.GamePlayerIds,
+                "A late-loading participant who becomes ready must end up in the actual game roster.");
+        }
+
+        [Test]
+        public void AddLoadingParticipant_WhileIdle_NoOps()
+        {
+            var h = CreateWiredSession();
+
+            Assert.DoesNotThrow(() => h.Session.AddLoadingParticipant("A"));
+
+            CollectionAssert.AreEqual(new string[0], h.ReadyCheck.LastPlayerIds);
+        }
+
+        [Test]
+        public void AddLoadingParticipant_WhileInGame_NoOps()
+        {
+            // A player entering the gaming area after the round has already started can't be
+            // caught up - the data transfer that would have given them the maze is long over.
+            var h = CreateWiredSession();
+            SetMasterOnly(h.Session, false);
+            h.Session.StartLobbyTracking();
+            h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
+            h.Session.StartSession();
+            h.ReadyCheck.BroadcastAddReadyPlayer("A");
+            Assert.AreEqual(RankedGameSessionState.InGame, h.Session.CurrentState);
+
+            h.Session.AddLoadingParticipant("B");
+
+            CollectionAssert.DoesNotContain(h.Session.GamePlayerIds, "B");
+        }
+
+        [Test]
+        public void AddLoadingParticipant_AlreadyTrackedPlayer_NoOps()
+        {
+            // Mirrors AddTrackedPlayers' own silent-ignore behavior for a duplicate id -
+            // calling this for a player already part of the original StartSession snapshot
+            // must not corrupt the roster or double-count them.
+            var h = CreateWiredSession();
+            SetMasterOnly(h.Session, false);
+            h.Session.StartLobbyTracking();
+            h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
+            h.Session.StartSession();
+
+            h.Session.AddLoadingParticipant("A");
+
+            CollectionAssert.AreEqual(new[] { "A" }, h.ReadyCheck.LastPlayerIds);
         }
 
         [Test]
