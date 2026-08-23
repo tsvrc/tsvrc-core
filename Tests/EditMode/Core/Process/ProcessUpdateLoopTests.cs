@@ -58,6 +58,7 @@ namespace Tsvrc.Tests.EditMode
             var process = CreateProcess<ProcessTestSubclass>();
             SeedAsOwner(process);
             PrivateFieldAccess.SetField(process, "_isRunning", true);
+            PrivateFieldAccess.SetField(process, "_useProcessUpdate", true);
             PrivateFieldAccess.SetField(process, "_updateLoopActive", true);
 
             process._TickProcessUpdate();
@@ -74,6 +75,7 @@ namespace Tsvrc.Tests.EditMode
             var process = CreateProcess<ProcessTestSubclass>();
             SeedAsOwner(process);
             PrivateFieldAccess.SetField(process, "_isRunning", true);
+            PrivateFieldAccess.SetField(process, "_useProcessUpdate", true);
             PrivateFieldAccess.SetField(process, "_updateLoopActive", true);
             process.OnProcessUpdateAction = () => PrivateFieldAccess.SetField(process, "_isRunning", false);
 
@@ -120,7 +122,7 @@ namespace Tsvrc.Tests.EditMode
             process._TickProcessUpdate();
 
             Assert.AreEqual(0, process.OnProcessUpdateCount);
-            // Still logically active — a premature call must not kill a legitimate loop.
+            // Still logically active - a premature call must not kill a legitimate loop.
             Assert.IsTrue(PrivateFieldAccess.GetField<bool>(process, "_updateLoopActive"));
         }
 
@@ -130,6 +132,7 @@ namespace Tsvrc.Tests.EditMode
             var process = CreateProcess<ProcessTestSubclass>();
             SeedAsOwner(process);
             PrivateFieldAccess.SetField(process, "_isRunning", true);
+            PrivateFieldAccess.SetField(process, "_useProcessUpdate", true);
             PrivateFieldAccess.SetField(process, "_updateLoopActive", true);
             PrivateFieldAccess.SetField(process, "_nextTickDueAtRealTime", 0f);
 
@@ -138,6 +141,60 @@ namespace Tsvrc.Tests.EditMode
             Assert.AreEqual(1, process.OnProcessUpdateCount);
             float dueAfter = PrivateFieldAccess.GetField<float>(process, "_nextTickDueAtRealTime");
             Assert.GreaterOrEqual(dueAfter, Time.realtimeSinceStartup);
+        }
+
+        // RequestSerialization() itself is an unobservable no-op stub in the Editor proxy (see
+        // StartProcess_AlreadyOwner_CallsRequestSerializationBranch_NotSetProcessOwnerBranch in
+        // ProcessLifecycleTests), so these pin down the resync heartbeat's scheduling decision
+        // via _nextResyncDueAtRealTime rather than the resync call itself.
+        [Test]
+        public void Tick_ResyncNotYetDue_LeavesTheResyncDeadlineUntouched()
+        {
+            var process = CreateProcess<ProcessTestSubclass>();
+            SeedAsOwner(process);
+            PrivateFieldAccess.SetField(process, "_isRunning", true);
+            PrivateFieldAccess.SetField(process, "_updateLoopActive", true);
+            float farFutureDeadline = Time.realtimeSinceStartup + 1000f;
+            PrivateFieldAccess.SetField(process, "_nextResyncDueAtRealTime", farFutureDeadline);
+
+            process._TickProcessUpdate();
+
+            Assert.AreEqual(farFutureDeadline,
+                PrivateFieldAccess.GetField<float>(process, "_nextResyncDueAtRealTime"),
+                "A tick before the resync deadline must not touch it - resync runs on its own, " +
+                "coarser cadence than the regular tick.");
+        }
+
+        [Test]
+        public void Tick_ResyncDueNowOrInThePast_AdvancesTheResyncDeadline()
+        {
+            var process = CreateProcess<ProcessTestSubclass>();
+            SeedAsOwner(process);
+            PrivateFieldAccess.SetField(process, "_isRunning", true);
+            PrivateFieldAccess.SetField(process, "_updateLoopActive", true);
+            PrivateFieldAccess.SetField(process, "_nextResyncDueAtRealTime", 0f);
+
+            process._TickProcessUpdate();
+
+            Assert.Greater(PrivateFieldAccess.GetField<float>(process, "_nextResyncDueAtRealTime"),
+                Time.realtimeSinceStartup,
+                "A due resync must reschedule itself into the future, the same way the regular " +
+                "tick deadline advances - otherwise it would fire every tick from then on.");
+        }
+
+        [Test]
+        public void StartProcess_UseProcessUpdateFalse_StillSchedulesAFutureResyncDeadline()
+        {
+            // The resync heartbeat exists to self-heal a missed discrete broadcast (see Process's
+            // class remarks) for ANY running, owned process, not just ones that opted into
+            // OnProcessUpdate - so it must be scheduled unconditionally by StartProcess.
+            var process = CreateProcess<ProcessTestSubclass>();
+            SeedAsOwner(process);
+
+            process.StartProcess();
+
+            Assert.Greater(PrivateFieldAccess.GetField<float>(process, "_nextResyncDueAtRealTime"),
+                Time.realtimeSinceStartup);
         }
 
         [Test]

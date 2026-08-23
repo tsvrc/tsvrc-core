@@ -32,15 +32,18 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void StartProcess_DefaultUseProcessUpdateFalse_NoTickLoopScheduled()
+        public void StartProcess_DefaultUseProcessUpdateFalse_TickLoopStillRunsButNeverCallsOnProcessUpdate()
         {
             var process = CreateProcess<ProcessTestSubclass>();
             SeedAsOwner(process);
 
             process.StartProcess();
 
+            // The tick loop always runs for a running, owned process - it drives the periodic
+            // resync heartbeat regardless of useProcessUpdate. Only the OnProcessUpdate callback
+            // itself is gated on that flag.
             Assert.IsFalse(PrivateFieldAccess.GetField<bool>(process, "_useProcessUpdate"));
-            Assert.IsFalse(PrivateFieldAccess.GetField<bool>(process, "_updateLoopActive"));
+            Assert.IsTrue(PrivateFieldAccess.GetField<bool>(process, "_updateLoopActive"));
             Assert.AreEqual(0, process.OnProcessUpdateCount);
         }
 

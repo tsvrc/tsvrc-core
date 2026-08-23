@@ -8,10 +8,16 @@ using VRC.Udon.Common.Interfaces;
 namespace Tsvrc.Core
 {
     /// <summary>
-    /// Base class for networked, owner-driven processes.
-    /// Manages start/stop/complete lifecycle, ownership transfer on player leave,
-    /// and optional periodic update ticks, all scoped to the process owner.
+    /// Base class for networked, owner-driven processes: start/stop/complete lifecycle,
+    /// ownership transfer on player leave, optional periodic update ticks, and a periodic
+    /// full-state resync, all scoped to the process owner.
     /// </summary>
+    /// <remarks>
+    /// Every <see cref="_autoResyncInterval"/> seconds, the owner re-broadcasts all of the
+    /// object's synced fields via <c>RequestSerialization</c>. This self-heals a client that
+    /// missed a discrete <c>[NetworkCallable]</c> broadcast - those aren't delivery-confirmed -
+    /// without needing any acknowledgement or retry logic of its own.
+    /// </remarks>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     [TsWorldExtensionPoint("TsProcess")]
     public class Process : TsvrcBehaviour
@@ -32,12 +38,22 @@ namespace Tsvrc.Core
         [UdonSynced] private bool _useProcessUpdate = false;
 
         private const float _processUpdateInterval = 0.5f;
+        // How often a running, owned process re-broadcasts its full synced state. See the class
+        // remarks above for why this exists. Short enough that a missed discrete event is only
+        // ever visibly wrong for a few seconds; long enough that idle processes cost negligible
+        // bandwidth.
+        private const float _autoResyncInterval = 5f;
 
-        // Tracks whether the update loop is currently scheduled to prevent scheduling it twice.
+        // Tracks whether the tick loop is currently scheduled to prevent scheduling it twice.
+        // Runs for every running, owned process regardless of _useProcessUpdate - it drives the
+        // resync heartbeat unconditionally and OnProcessUpdate only when a subclass opted in.
         private bool _updateLoopActive = false;
         // Real-time (Time.realtimeSinceStartup) deadline the next legitimate tick is due at.
         // See _TickProcessUpdate for how this is used to discard stale scheduled calls.
         private float _nextTickDueAtRealTime = 0f;
+        // Real-time deadline the next resync broadcast is due at. Advanced independently of
+        // _nextTickDueAtRealTime since the two run on different cadences.
+        private float _nextResyncDueAtRealTime = 0f;
 
         // Set to true just before and cleared just after every SendCustomNetworkEvent(All, ...) call.
         // On the sending client VRChat fires the event inline before returning, so the broadcast
@@ -153,15 +169,13 @@ namespace Tsvrc.Core
                 }
             }
 
-            // Restart the update loop if we are the owner and it is not currently running.
+            // Restart the tick loop if we are the owner and it is not currently running.
             // This covers stale-packet recovery and any other situation where the loop went
             // silent unexpectedly. See TakeOverAbandonedProcess for the one case this block
             // can't reach on its own.
-            if (IsProcessOwner() && IsProcessRunning() && _useProcessUpdate && !_updateLoopActive)
+            if (IsProcessOwner() && IsProcessRunning())
             {
-                _updateLoopActive = true;
-                _nextTickDueAtRealTime = Time.realtimeSinceStartup;
-                SendCustomEventDelayedSeconds(nameof(_TickProcessUpdate), 0f);
+                _StartTickLoopIfNeeded();
             }
         }
 
@@ -201,20 +215,29 @@ namespace Tsvrc.Core
 
             OnProcessStarted();
 
-            // !_updateLoopActive matters when OnProcessStarted() reentrantly stops and restarts
-            // the process (e.g. calling StopProcess() then StartProcess() again from its own
-            // hook): the inner StartProcess call already schedules a tick and sets this flag, so
-            // without the guard this outer call would schedule a redundant second one.
-            if (_useProcessUpdate && !_updateLoopActive)
-            {
-                // A 0-second delay defers the first tick to the next frame so that StartProcess
-                // returns to the caller before OnProcessUpdate fires. This prevents re-entrancy
-                // and lets callers set up additional state after this call.
-                // SendCustomEventDelayedSeconds is local-only and never routed over the network.
-                _updateLoopActive = true;
-                _nextTickDueAtRealTime = Time.realtimeSinceStartup;
-                SendCustomEventDelayedSeconds(nameof(_TickProcessUpdate), 0f);
-            }
+            _StartTickLoopIfNeeded();
+        }
+
+        // Schedules the tick loop if it is not already running. The loop always runs for any
+        // running, owned process - it drives the resync heartbeat (see the class remarks)
+        // unconditionally, and additionally calls OnProcessUpdate every tick if a subclass opted
+        // into that via StartProcess(useProcessUpdate: true).
+        //
+        // !_updateLoopActive matters when a caller (e.g. OnProcessStarted) reentrantly stops and
+        // restarts the process: the inner StartProcess call already schedules a tick and sets
+        // this flag, so without the guard an outer call would schedule a redundant second one.
+        private void _StartTickLoopIfNeeded()
+        {
+            if (_updateLoopActive) return;
+
+            // A 0-second delay defers the first tick to the next frame so that the caller
+            // returns before OnProcessUpdate fires. This prevents re-entrancy and lets callers
+            // set up additional state after starting the process.
+            // SendCustomEventDelayedSeconds is local-only and never routed over the network.
+            _updateLoopActive = true;
+            _nextTickDueAtRealTime = Time.realtimeSinceStartup;
+            _nextResyncDueAtRealTime = Time.realtimeSinceStartup + _autoResyncInterval;
+            SendCustomEventDelayedSeconds(nameof(_TickProcessUpdate), 0f);
         }
 
         /// <summary>
@@ -384,7 +407,8 @@ namespace Tsvrc.Core
         }
 
         /// <summary>
-        /// Called at regular intervals if the process is running and the local player is the owner.
+        /// Called at regular intervals if the process is running and the local player is the owner
+        /// and <c>useProcessUpdate: true</c> was passed to <see cref="StartProcess"/>.
         /// <b>Only invoked on the process owner.</b>
         /// </summary>
         protected virtual void OnProcessUpdate() { }
@@ -399,6 +423,10 @@ namespace Tsvrc.Core
         // any C#/UdonSharp-level design can opt out of. SendCustomEventDelayedSeconds is tracked
         // by Udon's own scheduler instead of Unity's native per-frame component dispatch, so it
         // keeps firing regardless of GameObject activity.
+        //
+        // Runs for every running, owned process, regardless of _useProcessUpdate: it always
+        // drives the resync heartbeat (see the class remarks), and additionally calls
+        // OnProcessUpdate on ticks where a subclass opted into that.
         public void _TickProcessUpdate()
         {
             // If InternalCleanup set _updateLoopActive to false, this call belongs to a loop that
@@ -425,7 +453,7 @@ namespace Tsvrc.Core
                 return;
             }
 
-            OnProcessUpdate();
+            if (_useProcessUpdate) OnProcessUpdate();
 
             // Check again after the callback since OnProcessUpdate() could stop the process
             // or transfer ownership. Without this, any ownership change inside the callback
@@ -434,6 +462,16 @@ namespace Tsvrc.Core
             {
                 _updateLoopActive = false;
                 return;
+            }
+
+            // Resync on its own, coarser cadence rather than every tick - see the class remarks
+            // for why this exists. RequestSerialization re-broadcasts every synced field a
+            // subclass declares, not just this class's own, so this alone recovers any subclass
+            // state a discrete event failed to deliver.
+            if (Time.realtimeSinceStartup >= _nextResyncDueAtRealTime)
+            {
+                RequestSerialization();
+                _nextResyncDueAtRealTime = Time.realtimeSinceStartup + _autoResyncInterval;
             }
 
             _nextTickDueAtRealTime = Time.realtimeSinceStartup + _processUpdateInterval;
@@ -494,12 +532,7 @@ namespace Tsvrc.Core
             // OnDeserialization does not fire for the player who called RequestSerialization,
             // so we restart the loop manually here. The 0-second delay keeps the behavior
             // consistent with StartProcess: the first tick runs on the next frame.
-            if (_useProcessUpdate && !_updateLoopActive)
-            {
-                _updateLoopActive = true;
-                _nextTickDueAtRealTime = Time.realtimeSinceStartup;
-                SendCustomEventDelayedSeconds(nameof(_TickProcessUpdate), 0f);
-            }
+            _StartTickLoopIfNeeded();
         }
 
         private void ExecuteStop()
