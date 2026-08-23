@@ -14,7 +14,6 @@ namespace Tsvrc.Tests.EditMode
         private Harness StartInGame(params string[] players)
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(players);
             h.Session.StartSession();
@@ -99,7 +98,6 @@ namespace Tsvrc.Tests.EditMode
         public void RemoveGamePlayer_LastPlayerLeaves_EndOnAllGamePlayersLeftFalse_SessionStaysInGame()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             SetEndOnAllGamePlayersLeft(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
@@ -185,7 +183,6 @@ namespace Tsvrc.Tests.EditMode
         public void AddCompletedPlayer_AllPlayersCompleted_EndOnAllPlayersCompletedFalse_SessionStaysInGame()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             SetEndOnAllPlayersCompleted(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
@@ -221,7 +218,6 @@ namespace Tsvrc.Tests.EditMode
             // together, each condition triggered in turn, none of them ending the
             // session.
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             SetEndOnAllGamePlayersLeft(h.Session, false);
             SetEndOnAllPlayersCompleted(h.Session, false);
             SetEndOnTimerComplete(h.Session, false);

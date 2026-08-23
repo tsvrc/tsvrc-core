@@ -58,7 +58,6 @@ namespace Tsvrc.Tests.PlayMode.Session
             PrivateFieldAccess.SetField(session, "_gameTracker", gameTracker);
             PrivateFieldAccess.SetField(session, "_completedTracker", completedTracker);
             PrivateFieldAccess.SetField(session, "_timer", timer);
-            PrivateFieldAccess.SetField(session, "_masterOnly", false);
 
             session.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
 

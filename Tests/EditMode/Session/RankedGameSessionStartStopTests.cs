@@ -65,42 +65,9 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void StartSession_MasterOnlyFalse_NonMasterStillStarts()
-        {
-            var h = CreateWiredSession(); // TestTsRoot: _ts.Instance is null, never dereferenced when _masterOnly is false
-            SetMasterOnly(h.Session, false);
-            h.Session.StartLobbyTracking();
-            h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
-
-            h.Session.StartSession();
-
-            Assert.AreEqual(RankedGameSessionState.Loading, h.Session.CurrentState);
-        }
-
-        [Test]
-        public void StartSession_MasterOnlyTrueWithRealTsInstance_DefaultIsTsMasterTrue_Starts()
-        {
-            // A real (non-subclassed) Instance's IsTsMaster defaults to
-            // Networking.IsMaster - confirmed here to be true with no real networking
-            // session established, not false as might be assumed from "no one is
-            // master yet". Only the master-only ALLOWED path is reachable this way;
-            // the denied (not master) path needs a real non-master ClientSim local
-            // player and lives in the Play Mode suite.
-            var root = new InstanceOnlyTsRootDouble { FakeInstance = CreateComponent<Tsvrc.Core.Instance>() };
-            var h = CreateWiredSession(root);
-            h.Session.StartLobbyTracking();
-            h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
-
-            h.Session.StartSession();
-
-            Assert.AreEqual(RankedGameSessionState.Loading, h.Session.CurrentState);
-        }
-
-        [Test]
         public void StartSession_AlreadyRunning_LogsErrorAndNoOps()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -118,7 +85,6 @@ namespace Tsvrc.Tests.EditMode
             // session stuck in Loading forever, since ReadyCheckProcess.CheckAllPlayersReady
             // never auto-completes with no tracked players.
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
 
             LogAssert.Expect(LogType.Error, "[TsVRC] [RankedGameSessionTestSubclass] StartSession: lobby is empty.");
@@ -133,7 +99,6 @@ namespace Tsvrc.Tests.EditMode
         public void StartSession_NonEmptyLobby_StartsReadyCheckWithLobbySnapshot()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A", "B" });
 
@@ -158,7 +123,6 @@ namespace Tsvrc.Tests.EditMode
         public void StopSession_DuringLoading_RoutesThroughStopReadyCheckBackToIdle()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -174,7 +138,6 @@ namespace Tsvrc.Tests.EditMode
         public void StopSession_DuringInGame_EndsSessionNonNaturally()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -189,13 +152,13 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsFalse(h.GameTracker.IsProcessRunning());
             Assert.IsFalse(h.CompletedTracker.IsProcessRunning());
             Assert.IsFalse(h.Timer.IsProcessRunning());
+            Assert.AreEqual(RankedGameSessionEndReason.Stopped, h.Session.LastEndReason);
         }
 
         [Test]
         public void SetReady_ForwardsToReadyCheck()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "TestOwner#777" });
             h.Session.StartSession();
@@ -223,7 +186,6 @@ namespace Tsvrc.Tests.EditMode
         public void AddLoadingParticipant_DuringLoading_GrowsTheReadyCheckRoster()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -240,7 +202,6 @@ namespace Tsvrc.Tests.EditMode
             // tracked list - the check must not complete until B is ready too, and must
             // complete once both are.
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -273,7 +234,6 @@ namespace Tsvrc.Tests.EditMode
             // A player entering the gaming area after the round has already started can't be
             // caught up - the data transfer that would have given them the maze is long over.
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -292,7 +252,6 @@ namespace Tsvrc.Tests.EditMode
             // calling this for a player already part of the original StartSession snapshot
             // must not corrupt the roster or double-count them.
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -324,7 +283,6 @@ namespace Tsvrc.Tests.EditMode
         public void SetTimerDuration_SetsFieldUsedByNextStartSession()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
 
             h.Session.SetTimerDuration(12345);
 
@@ -335,7 +293,6 @@ namespace Tsvrc.Tests.EditMode
         public void GetRemainingMilliseconds_ForwardsToTimer()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.SetTimerDuration(1000);

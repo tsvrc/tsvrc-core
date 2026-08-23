@@ -23,18 +23,13 @@ namespace Tsvrc.Tests.EditMode
             public TsTimerTestSubclass Timer;
         }
 
-        // Builds a fully-wired session with a TsRoot double that has no overridden
-        // Instance, and _masterOnly forced false so _ts.Instance.IsTsMaster is never
-        // dereferenced (Instance is null on this root - only tests of the master gate
-        // itself need a real, non-null Instance; see CreateWiredSession(TsRoot)).
-        protected Harness CreateWiredSession()
-        {
-            var h = CreateWiredSession(new TestTsRoot());
-            SetMasterOnly(h.Session, false);
-            return h;
-        }
+        // Builds a fully-wired session with a plain TsRoot double.
+        protected Harness CreateWiredSession() => CreateWiredSession(null);
 
-        protected Harness CreateWiredSession(TsRoot root)
+        // Same wiring, with a hook to run just before TsConstruct (and therefore before
+        // RankedGameSession.TsStart) - lets a test seed a sub-tracker as already running, to
+        // simulate a client joining mid-session, before CurrentState's one-time catch-up read.
+        protected Harness CreateWiredSession(System.Action<Harness> beforeConstruct)
         {
             var h = new Harness
             {
@@ -58,13 +53,12 @@ namespace Tsvrc.Tests.EditMode
             PrivateFieldAccess.SetField(h.Session, "_completedTracker", h.CompletedTracker);
             PrivateFieldAccess.SetField(h.Session, "_timer", h.Timer);
 
-            h.Session.TsConstruct(root);
+            beforeConstruct?.Invoke(h);
+
+            h.Session.TsConstruct(new TestTsRoot());
 
             return h;
         }
-
-        protected static void SetMasterOnly(RankedGameSessionTestSubclass s, bool v) =>
-            PrivateFieldAccess.SetField(s, "_masterOnly", v);
 
         protected static void SetEndOnTimerComplete(RankedGameSessionTestSubclass s, bool v) =>
             PrivateFieldAccess.SetField(s, "_endOnTimerComplete", v);

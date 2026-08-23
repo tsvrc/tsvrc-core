@@ -16,7 +16,6 @@ namespace Tsvrc.Tests.EditMode
         public void OnReadyCheckStarted_TransitionsToLoadingAndFiresHookThenEvent()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.CallLog.Clear();
@@ -32,7 +31,6 @@ namespace Tsvrc.Tests.EditMode
         public void OnReadyCheckCompleted_TransitionsToInGame_StartsGameCompletedTrackersAndTimer()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.SetTimerDuration(5000);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A", "B" });
@@ -57,7 +55,6 @@ namespace Tsvrc.Tests.EditMode
         public void OnReadyCheckStopped_DuringLoading_TransitionsToIdleAndStopsSubProcesses()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -74,7 +71,6 @@ namespace Tsvrc.Tests.EditMode
         public void OnTimerUpdated_ForwardsEvent()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.SetTimerDuration(1000);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
@@ -95,7 +91,6 @@ namespace Tsvrc.Tests.EditMode
         public void OnTimerCompleted_EndOnTimerCompleteTrue_EndsSessionNaturally()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.SetTimerDuration(1000);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
@@ -115,7 +110,6 @@ namespace Tsvrc.Tests.EditMode
         public void OnTimerCompleted_EndOnTimerCompleteFalse_SessionStaysInGame()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             SetEndOnTimerComplete(h.Session, false);
             h.Session.SetTimerDuration(1000);
             h.Session.StartLobbyTracking();
@@ -142,7 +136,6 @@ namespace Tsvrc.Tests.EditMode
             // rejected rather than double-firing OnSessionEnded/double-stopping already-
             // stopped sub-processes.
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.SetTimerDuration(1000);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
@@ -169,7 +162,6 @@ namespace Tsvrc.Tests.EditMode
         public void FullLifecycle_LoadingToInGameToEnded_ThenRestarts_DoesNotThrowAndEndsClean()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
 
             Assert.DoesNotThrow(() =>
             {
@@ -212,7 +204,6 @@ namespace Tsvrc.Tests.EditMode
             // already Idle and every sub-process already stopped by the time the hook
             // runs, exactly like a normal StartSession call would expect.
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -236,7 +227,6 @@ namespace Tsvrc.Tests.EditMode
         public void EventOrdering_SessionEnded_HookFiresBeforeEvent()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -262,7 +252,6 @@ namespace Tsvrc.Tests.EditMode
             // separate code path to the same OnSessionStoppedEvent, needing its own
             // ordering test.
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -276,19 +265,35 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void CurrentState_GameTrackerAlreadyRunning_ReportsInGameWithoutAnyTransitionEventEverFiring()
+        public void TsStart_GameTrackerAlreadyRunning_SeedsCurrentStateAsInGame()
         {
-            // Simulates a client that joined after InGame was already reached elsewhere: it only
-            // ever receives the tracker's live running state via ordinary deserialization, never
-            // the _OnReadyCheckCompleted event.
+            // Simulates a client that joins after InGame was already reached elsewhere: it never
+            // receives the one-shot _OnReadyCheckCompleted event, only the sub-trackers' already-
+            // running synced state by the time TsConstruct/TsStart runs for it - CurrentState's
+            // one-time catch-up read (not a live derivation - see its own doc comment) is what
+            // covers this case.
+            var h = CreateWiredSession(pre => pre.GameTracker.StartPlayerTracking(new[] { "A" }));
+
+            Assert.AreEqual(RankedGameSessionState.InGame, h.Session.CurrentState);
+            Assert.AreEqual(0, h.Session.OnSessionStartedCount,
+                "No RankedGameSession hook should have run - this is the one-time TsStart catch-up, not a transition.");
+        }
+
+        [Test]
+        public void GameTrackerStartedAfterConstruct_DoesNotChangeCurrentState()
+        {
+            // Unlike the TsStart-time catch-up above, CurrentState is not re-derived live on every
+            // read - starting the game tracker directly, bypassing RankedGameSession's own
+            // _OnReadyCheckCompleted transition, must not be observable through CurrentState. See
+            // its own doc comment for why: a sub-tracker's synced flag can be stale for whichever
+            // client doesn't own its Process, so CurrentState is tracked locally at RankedGameSession's
+            // own transition points instead.
             var h = CreateWiredSession();
             Assert.AreEqual(RankedGameSessionState.Idle, h.Session.CurrentState);
 
             h.GameTracker.StartPlayerTracking(new[] { "A" });
 
-            Assert.AreEqual(RankedGameSessionState.InGame, h.Session.CurrentState);
-            Assert.AreEqual(0, h.Session.OnSessionStartedCount,
-                "No RankedGameSession hook should have run - CurrentState must be correct from live tracker state alone.");
+            Assert.AreEqual(RankedGameSessionState.Idle, h.Session.CurrentState);
         }
 
         [Test]
@@ -310,7 +315,6 @@ namespace Tsvrc.Tests.EditMode
         public void EndSession_SnapshotsGameAndCompletedPlayerIdsBeforeTearingDownTrackers()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A", "B" });
             h.Session.StartSession();
@@ -335,7 +339,6 @@ namespace Tsvrc.Tests.EditMode
         {
             // Mirrors _endOnAllGamePlayersLeft's InGame-phase equivalent, one phase earlier.
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A", "B" });
             h.Session.StartSession();
@@ -355,7 +358,6 @@ namespace Tsvrc.Tests.EditMode
         public void LastLobbyPlayerLeavesDuringLoading_StopOnEmptyLobbyDuringLoadingFalse_SessionStaysInLoading()
         {
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             SetStopOnEmptyLobbyDuringLoading(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });

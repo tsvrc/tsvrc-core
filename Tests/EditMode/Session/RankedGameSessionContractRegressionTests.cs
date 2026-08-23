@@ -11,11 +11,11 @@ namespace Tsvrc.Tests.EditMode
     // Udon graphs/behaviours subscribe by literal string via TsSubscribe, not by the
     // C# constant identifier - a silent rename of the underlying value would break
     // them with nothing else here to catch it), the inspector-configured default
-    // values of the five [Header("Session")] fields (every behavioral test in this
-    // suite explicitly overrides them via SetMasterOnly/SetEndOnTimerComplete/etc.
-    // before exercising anything, so the actual field-initializer defaults were never
-    // independently confirmed), and that all five [WirePool] sub-behaviour fields are
-    // still attributed (the codegen wiring step depends on it).
+    // values of the four [Header("Session")] fields (every behavioral test in this
+    // suite explicitly overrides them via SetEndOnTimerComplete/etc. before exercising
+    // anything, so the actual field-initializer defaults were never independently
+    // confirmed), and that all five [WirePool] sub-behaviour fields are still
+    // attributed (the codegen wiring step depends on it).
     public class RankedGameSessionContractRegressionTests : RankedGameSessionTestBase
     {
         [Test]
@@ -43,12 +43,11 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void SerializedFieldDefaults_ArePinned()
         {
-            // A freshly created component, with none of the harness's SetMasterOnly/
-            // SetEndOn*/SetTimerDurationMs helpers ever called - the true C# field
-            // initializer defaults, not a test-forced value.
+            // A freshly created component, with none of the harness's SetEndOn*/
+            // SetTimerDurationMs helpers ever called - the true C# field initializer
+            // defaults, not a test-forced value.
             var session = CreateComponent<RankedGameSessionTestSubclass>();
 
-            Assert.IsTrue(PrivateFieldAccess.GetField<bool>(session, "_masterOnly"));
             Assert.IsTrue(PrivateFieldAccess.GetField<bool>(session, "_endOnTimerComplete"));
             Assert.IsTrue(PrivateFieldAccess.GetField<bool>(session, "_endOnAllGamePlayersLeft"));
             Assert.IsTrue(PrivateFieldAccess.GetField<bool>(session, "_endOnAllPlayersCompleted"));

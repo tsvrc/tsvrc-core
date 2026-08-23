@@ -59,7 +59,7 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void ForceStoppedByMaster_StopSessionDuringInGame_SetsLastEndReason()
+        public void Stopped_StopSessionDuringInGame_SetsLastEndReason()
         {
             var h = CreateWiredSession();
             h.Session.StartLobbyTracking();
@@ -69,11 +69,11 @@ namespace Tsvrc.Tests.EditMode
 
             h.Session.StopSession();
 
-            Assert.AreEqual(RankedGameSessionEndReason.ForceStoppedByMaster, h.Session.LastEndReason);
+            Assert.AreEqual(RankedGameSessionEndReason.Stopped, h.Session.LastEndReason);
         }
 
         [Test]
-        public void ForceStoppedByMaster_StopSessionDuringLoading_SetsLastEndReason()
+        public void Stopped_StopSessionDuringLoading_SetsLastEndReason()
         {
             var h = CreateWiredSession();
             h.Session.StartLobbyTracking();
@@ -82,7 +82,7 @@ namespace Tsvrc.Tests.EditMode
 
             h.Session.StopSession();
 
-            Assert.AreEqual(RankedGameSessionEndReason.ForceStoppedByMaster, h.Session.LastEndReason);
+            Assert.AreEqual(RankedGameSessionEndReason.Stopped, h.Session.LastEndReason);
         }
 
         [Test]

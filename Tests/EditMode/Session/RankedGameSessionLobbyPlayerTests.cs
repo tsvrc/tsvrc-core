@@ -71,7 +71,6 @@ namespace Tsvrc.Tests.EditMode
             // roster for the NEXT session can keep changing while the current one is
             // Loading/InGame.
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
             h.Session.StartSession();
@@ -90,7 +89,6 @@ namespace Tsvrc.Tests.EditMode
             // removing player B from the lobby (queued for the NEXT round) must not
             // touch the CURRENT round's already-locked-in game roster (still just A).
             var h = CreateWiredSession();
-            SetMasterOnly(h.Session, false);
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A", "B" });
             h.Session.StartSession();

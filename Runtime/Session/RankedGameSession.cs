@@ -34,14 +34,18 @@ namespace Tsvrc.Session
         public const int AllPlayersCompleted = 1;
         public const int AllPlayersLeft = 2;
         public const int TimerExpired = 3;
-        public const int ForceStoppedByMaster = 4;
+        public const int Stopped = 4;
         public const int EmptyLobbyDuringLoading = 5;
     }
 
     /// <summary>Handles the full lifecycle of a session based multiplayer game: tracks who is in the lobby,
     /// synchronizes game start across all clients, tracks players during the game, and ends the session
     /// when a condition is met. Subscribe to the On... event constants to react to each state change.
-    /// Call <see cref="StartLobbyTracking"/> before adding players with <see cref="AddLobbyPlayer"/>.</summary>
+    /// Call <see cref="StartLobbyTracking"/> before adding players with <see cref="AddLobbyPlayer"/>.
+    /// Carries no authorization policy of its own (who may start/stop) - that's the caller's concern.
+    /// <see cref="StopSession"/> only runs its effects on the calling client; a caller that wants a
+    /// stop to reach every client (e.g. a networked force-stop button) must broadcast the call to
+    /// it itself.</summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     [TsWorldExtensionPoint("TsRankedGameSession")]
     public class RankedGameSession : TsvrcBehaviour
@@ -74,7 +78,6 @@ namespace Tsvrc.Session
         [WirePool][SerializeField] private TsvrcTimer _timer;
 
         [Header("Session")]
-        [SerializeField] private bool _masterOnly = true;
         [SerializeField] private bool _endOnTimerComplete = true;
         [SerializeField] private bool _endOnAllGamePlayersLeft = true;
         [SerializeField] private bool _endOnAllPlayersCompleted = true;
@@ -83,13 +86,13 @@ namespace Tsvrc.Session
 
         /// <summary>
         /// Current session state, compared against <see cref="RankedGameSessionState"/> constants.
-        /// Derived from the sub-trackers' own synced running state, so it reads correctly for any
-        /// client at any moment, including one that joined mid-session.
+        /// Set locally at each phase transition, not re-derived from the sub-trackers' synced
+        /// flags - those only update instantly for whichever client owns that Process, so a live
+        /// read would go stale on every other client. TsStart seeds it once from that live read,
+        /// which is safe only there: a late joiner's sub-trackers are already current, not mid-flight.
         /// </summary>
-        public int CurrentState =>
-            _gameTracker.IsProcessRunning() ? RankedGameSessionState.InGame :
-            _readyCheck.IsProcessRunning() ? RankedGameSessionState.Loading :
-            RankedGameSessionState.Idle;
+        public int CurrentState => _currentState;
+        private int _currentState;
 
         public string[] LobbyPlayerIds => _lobbyTracker.LastPlayerIds;
         public string[] GamePlayerIds => _gameTracker.LastPlayerIds;
@@ -176,19 +179,20 @@ namespace Tsvrc.Session
 
             _timer.TsSubscribe(this, TsvrcTimer.OnTimerUpdatedEvent, nameof(_OnTimerUpdated));
             _timer.TsSubscribe(this, TsvrcTimer.OnTimerCompletedEvent, nameof(_OnTimerCompleted));
+
+            // One-time catch-up for a client joining mid-session - see CurrentState's own doc
+            // comment for why this live derivation is only safe here, not on every read.
+            _currentState =
+                _gameTracker.IsProcessRunning() ? RankedGameSessionState.InGame :
+                _readyCheck.IsProcessRunning() ? RankedGameSessionState.Loading :
+                RankedGameSessionState.Idle;
         }
 
         public void StartLobbyTracking() => _lobbyTracker.StartPlayerTracking(new string[0]);
         public void StopLobbyTracking() => _lobbyTracker.StopPlayerTracking();
 
-        /// <summary>Requires <c>_masterOnly</c> to be false or the local player to be TsMaster.</summary>
         public void StartSession()
         {
-            if (_masterOnly && !_ts.Instance.IsTsMaster)
-            {
-                LogWarning("StartSession: ignored, local player is not TsMaster.");
-                return;
-            }
             if (CurrentState != RankedGameSessionState.Idle)
             {
                 LogError("StartSession: session is already running.");
@@ -206,24 +210,27 @@ namespace Tsvrc.Session
             _readyCheck.StartReadyCheck(LobbyPlayerIds);
         }
 
-        /// <summary>During the Loading phase this cancels the ready check rather than ending the game directly.</summary>
-        public void StopSession() => StopSession(RankedGameSessionEndReason.ForceStoppedByMaster);
-
-        private void StopSession(int reason)
+        public void StopSession()
         {
             if (CurrentState == RankedGameSessionState.Idle)
             {
                 LogError("StopSession: no session is running.");
                 return;
             }
-            _pendingEndReason = reason;
             if (CurrentState == RankedGameSessionState.Loading)
             {
-                // StopReadyCheck fires _OnReadyCheckStopped which handles state reset.
-                _readyCheck.StopReadyCheck();
+                _StopLoadingSession(RankedGameSessionEndReason.Stopped);
                 return;
             }
+            _pendingEndReason = RankedGameSessionEndReason.Stopped;
             _EndSession(false);
+        }
+
+        // Shared by StopSession's Loading branch and _OnReadyCheckPlayersRemoved.
+        private void _StopLoadingSession(int reason)
+        {
+            _pendingEndReason = reason;
+            _readyCheck.StopReadyCheck();
         }
 
         /// <summary>Each client calls this during the loading phase. When all lobby players have called it, the session transitions to InGame.</summary>
@@ -312,12 +319,14 @@ namespace Tsvrc.Session
 
         public void _OnReadyCheckStarted()
         {
+            _currentState = RankedGameSessionState.Loading;
             OnSessionLoading();
             TsEmit(OnSessionLoadingEvent);
         }
 
         public void _OnReadyCheckCompleted()
         {
+            _currentState = RankedGameSessionState.InGame;
             _gameTracker.StartPlayerTracking(_readyCheck.LastPlayerIds);
             _completedTracker.StartPlayerTracking(new string[0]);
             _timer.StartTimer(_timerDurationMs);
@@ -327,6 +336,7 @@ namespace Tsvrc.Session
 
         public void _OnReadyCheckStopped()
         {
+            _currentState = RankedGameSessionState.Idle;
             LastEndReason = _pendingEndReason;
             _pendingEndReason = RankedGameSessionEndReason.None;
             _StopSubProcesses();
@@ -342,7 +352,7 @@ namespace Tsvrc.Session
         {
             if (_stopOnEmptyLobbyDuringLoading && CurrentState == RankedGameSessionState.Loading &&
                 _readyCheck.LastPlayerIds.Length == 0)
-                StopSession(RankedGameSessionEndReason.EmptyLobbyDuringLoading);
+                _StopLoadingSession(RankedGameSessionEndReason.EmptyLobbyDuringLoading);
         }
 
         public void _OnGamePlayersRemoved()
@@ -378,9 +388,9 @@ namespace Tsvrc.Session
             _EndSession(true);
         }
 
-        // CurrentState reads Idle once _StopSubProcesses() below stops _gameTracker, so if two
-        // end conditions fire at the same time (timer and all players leaving), the second call
-        // is rejected by the guard below.
+        // CurrentState is set to Idle below before _StopSubProcesses(), so if two end conditions
+        // fire at the same time (timer and all players leaving), the second call is rejected by
+        // the guard below.
         private void _EndSession(bool natural)
         {
             if (CurrentState != RankedGameSessionState.InGame)
@@ -388,6 +398,7 @@ namespace Tsvrc.Session
                 LogError("_EndSession: session is not in game state.");
                 return;
             }
+            _currentState = RankedGameSessionState.Idle;
             // Snapshot before _StopSubProcesses() clears the live trackers, so OnSessionEnded/
             // OnSessionStopped subscribers have accurate data to read - GamePlayerIds/
             // CompletedPlayerIds themselves would already read empty by the time those events fire.
