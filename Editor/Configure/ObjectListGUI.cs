@@ -5,11 +5,9 @@ using UnityEngine;
 
 namespace Tsvrc.Editor
 {
-    // Shared tab-drawing helpers for an Object[]-backed list. Every grouped module (Globals,
-    // Pool, Constructs, Factories) draws its entries through TsGroupTreeGUI instead, which reuses
-    // this class's row-rendering helpers (DeleteButton, DrawEntryHints) internally rather than
-    // the top-level DrawObjectList entry points below - those remain available for any future
-    // non-grouped Object[]-backed tab.
+    // Row-rendering helpers shared by TsGroupTreeGUI's grouped-entry rows - every grouped module
+    // (Globals, Pool, Constructs, Factories) draws its entries through TsGroupTreeGUI, which
+    // reuses DeleteButton/DrawEntryHints/IsSceneInstance/IsDuplicate from here.
     internal static class ObjectListGUI
     {
         internal static bool DeleteButton() => GUILayout.Button("✕", GUILayout.Width(22));
@@ -38,12 +36,8 @@ namespace Tsvrc.Editor
             EditorGUILayout.LabelField("   ↳ " + hint, EditorStyles.miniLabel);
         }
 
-        // A null slot renders as a bare, empty ObjectField with no other signal. Nothing
-        // distinguishes "never filled in" from "used to point at something that was deleted",
-        // since SerializedProperty carries no history either way, so this can only flag that the
-        // slot needs attention, not which case it is. The Console already logs a specific
-        // "Null entry..." warning at regenerate time (TsModule.TryAcceptEntry); this surfaces the
-        // same fact inline, while the user is already looking at the list.
+        // A null slot renders as a bare, empty ObjectField with no other signal - this flags it
+        // needs attention, since SerializedProperty carries no history to say why it's empty.
         private static void DrawNullSlotHint(Object obj)
         {
             if (obj != null) return;
@@ -52,11 +46,11 @@ namespace Tsvrc.Editor
                 EditorStyles.miniLabel);
         }
 
-        // The per-row hint/warning block shared by DrawObjectList and TsGroupTreeGUI's own
-        // grouped-entry rows: resolved-type hint, empty-slot hint, scene-instance warning
-        // (assetsOnly), duplicate-reference warning (warnDuplicates, seen mutated as a side
-        // effect exactly like DrawObjectList's own loop).
-        internal static void DrawEntryHints(Object obj, bool assetsOnly, bool warnDuplicates, HashSet<Object> seen)
+        // Per-row hint/warning block: resolved-type hint, empty-slot hint, scene-instance warning
+        // (assetsOnly), duplicate-reference warning (warnDuplicates). isDuplicate is precomputed
+        // by the caller across the whole filtered set, not just the current page - a caller that
+        // only scans part of the set would get a wrong answer from a fresh, partial seen set.
+        internal static void DrawEntryHints(Object obj, bool assetsOnly, bool warnDuplicates, bool isDuplicate)
         {
             DrawResolvedTypeHint(obj);
             DrawNullSlotHint(obj);
@@ -66,63 +60,10 @@ namespace Tsvrc.Editor
                     $"'{obj.name}' is a scene object, not a prefab asset - drag one in from the Project window instead.",
                     MessageType.Warning);
 
-            if (warnDuplicates && IsDuplicate(obj, seen))
+            if (warnDuplicates && isDuplicate)
                 TsEditorGUI.DrawStatusBox(
                     $"'{obj.name}' is already listed above - the duplicate will be dropped at regenerate.",
                     MessageType.Warning);
-        }
-
-        // Convenience overload for a top-level, non-grouped Object[] property.
-        internal static void DrawObjectList(SerializedObject so, string propertyName, string emptyHint = null,
-            bool assetsOnly = false, bool warnDuplicates = false)
-            => DrawObjectList(so.FindProperty(propertyName), emptyHint, assetsOnly, warnDuplicates);
-
-        // emptyHint: shown in place of an empty list so a first-time user sees what adding an entry does.
-        // assetsOnly: warns inline on a scene-object reference, the same mistake TsGenerator.Run()
-        // already catches - surfaced here at the moment it's made instead of only after a regenerate.
-        // warnDuplicates: warns inline on a repeated reference. Opt-in since duplicates are only a
-        // mistake for modules that dedupe at generate time (Globals, Constructs); Pool allows
-        // repeated slots of the same prefab type.
-        internal static void DrawObjectList(SerializedProperty prop, string emptyHint = null,
-            bool assetsOnly = false, bool warnDuplicates = false)
-        {
-            if (prop.arraySize == 0 && !string.IsNullOrEmpty(emptyHint))
-                TsEditorGUI.DrawStatusBox(emptyHint, MessageType.None);
-
-            var seen = warnDuplicates ? new HashSet<Object>() : null;
-            int toDelete = -1;
-            for (int i = 0; i < prop.arraySize; i++)
-            {
-                var element = prop.GetArrayElementAtIndex(i);
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.PropertyField(element, GUIContent.none);
-                if (DeleteButton())
-                    toDelete = i;
-                EditorGUILayout.EndHorizontal();
-
-                DrawEntryHints(element.objectReferenceValue, assetsOnly, warnDuplicates, seen);
-            }
-
-            // Deletion deferred outside the draw loop to avoid index invalidation.
-            if (toDelete >= 0)
-            {
-                // Two-step removal required for UnityEngine.Object arrays.
-                prop.GetArrayElementAtIndex(toDelete).objectReferenceValue = null;
-                prop.DeleteArrayElementAtIndex(toDelete);
-            }
-
-            EditorGUILayout.Space(4);
-            if (GUILayout.Button("+ Add"))
-            {
-                // InsertArrayElementAtIndex on an Object[] array copies the last element's
-                // reference into the new slot instead of leaving it empty (a well known
-                // SerializedProperty quirk for reference-type arrays) - cleared explicitly so
-                // "+ Add" always adds a genuinely empty slot, matching what FactoryModule's own
-                // "+ Add Factory Group" button already does for its own array.
-                int newIndex = prop.arraySize;
-                prop.InsertArrayElementAtIndex(newIndex);
-                prop.GetArrayElementAtIndex(newIndex).objectReferenceValue = null;
-            }
         }
     }
 }

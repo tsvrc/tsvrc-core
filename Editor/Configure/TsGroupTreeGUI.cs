@@ -17,19 +17,32 @@ namespace Tsvrc.Editor
         {
             internal TreeViewState TreeViewState = new TreeViewState();
 
-            // Lazy because SearchField's constructor calls GUIUtility.GetPermanentControlID,
-            // which Unity forbids during a ScriptableObject/Editor's constructor or field
-            // initializers.
+            // Lazy: SearchField's constructor calls GUIUtility.GetPermanentControlID, which
+            // Unity forbids during a ScriptableObject/Editor's constructor or field initializers.
             private SearchField _searchField;
             internal SearchField SearchField => _searchField ?? (_searchField = new SearchField());
 
             internal GroupTreeView TreeView;
             internal int SelectedGroupId; // 0 = the always-present "(ungrouped)" bucket
             internal string SearchText = string.Empty;
-            internal bool RenamePending;
 
-            // Signature of the data the tree renders from, so Reload() runs only when it actually
-            // changes rather than every repaint. Null until the first draw.
+            // Group whose rename field should claim focus, or null once it has. Re-requested
+            // every repaint (not consumed on the first) so a same-frame focus steal - e.g. the
+            // TreeView's own selection sync - can't drop an in-progress rename. See DrawRenameField.
+            internal int? PendingRenameGroupId;
+
+            // Keys SelectedGroupId/SearchText into SessionState so they survive a domain reload.
+            // Set once, the first time this State is drawn.
+            internal string SessionKey;
+
+            // Right pane: paginated, EntriesPerPage entries per page. Page resets to 0 whenever
+            // the selected group or search text changes. See DrawContents.
+            internal int EntriesPage;
+            internal int LastEntriesPageGroupId = int.MinValue;
+            internal string LastEntriesPageSearchText;
+
+            // Signature of the data the tree renders from, so Reload() only runs when it actually
+            // changed. Null until the first draw.
             internal int? LastTreeSignature;
         }
 
@@ -45,10 +58,27 @@ namespace Tsvrc.Editor
             var groupsProp = so.FindProperty(groupsPropertyName);
             var entriesProp = so.FindProperty(entriesPropertyName);
 
+            // Distinguishes TsWindow's TsConfig-backed trees from TsBuiltinConfigInspector's
+            // TsBuiltinConfig-backed ones, which otherwise share property names ("GlobalGroups"
+            // etc) and would collide on the same SessionState key.
+            if (state.SessionKey == null)
+            {
+                state.SessionKey = ComputeSessionKey(so.targetObject.GetType().Name, groupsPropertyName);
+                state.SelectedGroupId = SessionState.GetInt(state.SessionKey + ".Selected", 0);
+                state.SearchText = SessionState.GetString(state.SessionKey + ".Search", string.Empty);
+            }
+
             if (state.TreeView == null)
-                state.TreeView = new GroupTreeView(state.TreeViewState, groupsProp, entriesProp);
+            {
+                state.TreeView = new GroupTreeView(state.TreeViewState, groupsProp, entriesProp)
+                {
+                    searchString = state.SearchText,
+                };
+            }
             else
+            {
                 state.TreeView.SetProperties(groupsProp, entriesProp);
+            }
 
             EditorGUILayout.BeginHorizontal();
             string newSearch = state.SearchField.OnToolbarGUI(state.SearchText, GUILayout.ExpandWidth(true));
@@ -57,23 +87,39 @@ namespace Tsvrc.Editor
             {
                 state.SearchText = newSearch;
                 state.TreeView.searchString = newSearch;
+                SessionState.SetString(state.SessionKey + ".Search", newSearch);
             }
 
             int signature = ComputeTreeSignature(groupsProp, entriesProp, state.SearchText);
             if (state.LastTreeSignature != signature)
             {
+                // Capture/restore expand state around Reload() so a structural edit
+                // (rename/add/delete/reparent) doesn't collapse the whole tree.
+                var expandedIds = state.TreeView.GetExpanded();
                 state.TreeView.Reload();
+                state.TreeView.SetExpanded(expandedIds);
                 state.LastTreeSignature = signature;
             }
 
             EditorGUILayout.BeginHorizontal();
 
+            // Toolbar/rename field drawn above the tree, not below: the tree reserves
+            // ExpandHeight(true), so anything below it is only reachable by scrolling past it -
+            // which could hide a freshly created group's auto-focused rename field entirely. A
+            // "Groups" header plus a rule keeps the toolbar visually distinct from the tree rows.
             EditorGUILayout.BeginVertical(GUILayout.Width(200));
+            EditorGUILayout.LabelField("Groups", EditorStyles.boldLabel);
+            DrawGroupToolbar(groupsProp, entriesProp, state, groupNaming);
+            EditorGUILayout.Space(2);
+            EditorGUILayout.LabelField(string.Empty, GUI.skin.horizontalSlider);
             var treeRect = GUILayoutUtility.GetRect(200, 220, GUILayout.ExpandHeight(true));
             state.TreeView.OnGUI(treeRect);
-            if (state.TreeViewState.selectedIDs.Count > 0)
+            if (state.TreeViewState.selectedIDs.Count > 0 &&
+                state.TreeViewState.selectedIDs[0] != state.SelectedGroupId)
+            {
                 state.SelectedGroupId = state.TreeViewState.selectedIDs[0];
-            DrawGroupToolbar(groupsProp, entriesProp, state, groupNaming);
+                SessionState.SetInt(state.SessionKey + ".Selected", state.SelectedGroupId);
+            }
             EditorGUILayout.EndVertical();
 
             EditorGUILayout.BeginVertical();
@@ -105,11 +151,15 @@ namespace Tsvrc.Editor
             }
             EditorGUILayout.EndHorizontal();
 
+            // Boxed so the selected group's own settings read as distinct from the buttons above
+            // and the tree below.
             if (realGroupSelected)
             {
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 DrawRenameField(groupsProp, state);
                 if (groupNaming)
                     DrawIncludeInNameToggle(groupsProp, state);
+                EditorGUILayout.EndVertical();
             }
         }
 
@@ -129,6 +179,12 @@ namespace Tsvrc.Editor
                 includeProp.boolValue);
         }
 
+        // Includes the target's type name so TsWindow's TsConfig-backed trees and
+        // TsBuiltinConfigInspector's TsBuiltinConfig-backed ones never collide despite sharing
+        // property names like "GlobalGroups". Pure so it's directly unit-testable.
+        internal static string ComputeSessionKey(string targetTypeName, string groupsPropertyName) =>
+            $"Tsvrc.TsGroupTree.{targetTypeName}.{groupsPropertyName}";
+
         internal static void AddGroup(SerializedProperty groupsProp, State state, int parentId)
         {
             var so = groupsProp.serializedObject;
@@ -144,7 +200,9 @@ namespace Tsvrc.Editor
             element.FindPropertyRelative("Name").stringValue = "New Group";
 
             state.SelectedGroupId = newId;
-            state.RenamePending = true;
+            state.TreeViewState.selectedIDs = new List<int> { newId };
+            state.PendingRenameGroupId = newId;
+            SessionState.SetInt(state.SessionKey + ".Selected", newId);
         }
 
         // Every *Groups field has a sibling *NextGroupId counter, named by convention.
@@ -179,6 +237,8 @@ namespace Tsvrc.Editor
                 return;
 
             state.SelectedGroupId = ReparentContentsAndRemoveGroup(groupsProp, entriesProp, deletedId);
+            state.TreeViewState.selectedIDs = new List<int> { state.SelectedGroupId };
+            SessionState.SetInt(state.SessionKey + ".Selected", state.SelectedGroupId);
         }
 
         // Returns false if groupId no longer exists. hasContents is true if it has any direct
@@ -243,31 +303,64 @@ namespace Tsvrc.Editor
             if (committed != nameProp.stringValue)
                 nameProp.stringValue = committed;
 
-            if (state.RenamePending)
-            {
-                EditorGUI.FocusTextInControl("TsGroupRename");
-                state.RenamePending = false;
-            }
+            ApplyPendingRenameFocus(state);
         }
 
-        // Right pane: entries belonging to the selected group. While searching, widens to the
-        // selected group's entire subtree so a broad search from a parent group surfaces
-        // everything nested under it.
+        // Re-requests focus every repaint the pending group is the one being shown, rather than
+        // consuming the request on the first repaint after creation - a same-frame event (e.g.
+        // the TreeView's own selection sync) can steal focus before the user's first keystroke
+        // lands. Only clears once "TsGroupRename" is actually observed focused, or once the user
+        // navigates away from the pending group. Internal (not private) so its state-machine
+        // transitions are directly unit-testable - see TsGroupTreeGUITests.
+        internal static void ApplyPendingRenameFocus(State state)
+        {
+            if (!state.PendingRenameGroupId.HasValue) return;
+
+            if (state.PendingRenameGroupId.Value != state.SelectedGroupId)
+            {
+                state.PendingRenameGroupId = null;
+                return;
+            }
+
+            if (GUI.GetNameOfFocusedControl() == "TsGroupRename")
+            {
+                state.PendingRenameGroupId = null;
+                return;
+            }
+
+            EditorGUI.FocusTextInControl("TsGroupRename");
+        }
+
+        // Right pane: entries belonging to the selected group, never widened to its subtree - see
+        // the filter's own comment below for why.
+        //
+        // Paginated (EntriesPerPage rows drawn at a time) rather than virtualized: two earlier
+        // virtualization attempts (a hand-rolled scroll view, then a second TreeView) each fought
+        // IMGUI's event model in different ways with no fix that held up under real interaction.
+        // Pagination sidesteps that class of bug: a small, fixed number of plain EditorGUILayout
+        // rows per page needs no scroll view, no virtualization, no reasoning about IMGUI events.
+        // 10 rows/page sits at the low end of the generally-recommended 10-50 range - appropriate
+        // here since these are dense, multi-line editable rows in a compact side panel, closer to
+        // a data-grid row than a content-list item.
+        private const int EntriesPerPage = 10;
+
         private static void DrawContents(SerializedProperty entriesProp, SerializedProperty groupsProp, State state,
             string emptyHint, bool assetsOnly, bool warnDuplicates,
             string memberPrefix, string memberSuffix, bool prefixRespectsToggle)
         {
             bool showNames = memberPrefix != null;
             bool searching = !string.IsNullOrEmpty(state.SearchText);
-            var allowedGroupIds = searching
-                ? GroupTreeView.CollectSubtreeIds(groupsProp, state.SelectedGroupId)
-                : new HashSet<int> { state.SelectedGroupId };
 
+            // Always the selected group's own direct entries, never widened to its subtree - the
+            // tree's own search results are already flat (only groups that directly contain a
+            // match), so widening here used to pull in sibling/descendant groups' entries too.
+            bool scopeChanged = state.LastEntriesPageGroupId != state.SelectedGroupId ||
+                state.LastEntriesPageSearchText != state.SearchText;
             var indices = new List<int>();
             for (int i = 0; i < entriesProp.arraySize; i++)
             {
                 var entry = entriesProp.GetArrayElementAtIndex(i);
-                if (!allowedGroupIds.Contains(entry.FindPropertyRelative("GroupId").intValue)) continue;
+                if (entry.FindPropertyRelative("GroupId").intValue != state.SelectedGroupId) continue;
                 if (searching)
                 {
                     var value = entry.FindPropertyRelative("Value").objectReferenceValue;
@@ -277,31 +370,71 @@ namespace Tsvrc.Editor
                 indices.Add(i);
             }
 
+            // Header naming what's listed, with "+ Add" beside it - always visible regardless of
+            // scroll position. Disabled while searching, matching AddEntry's own requirement of
+            // an unambiguous single target group.
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(DescribeSelectedGroup(groupsProp, state.SelectedGroupId), EditorStyles.boldLabel);
+            GUILayout.FlexibleSpace();
+            using (new EditorGUI.DisabledScope(searching))
+            if (GUILayout.Button("+ Add", GUILayout.Width(60)))
+            {
+                // Prepended (see AddEntry's own comment), so the new entry always lands at the
+                // same fixed spot: page 1, row 1. No ExitGUI(): this runs nested inside
+                // TsWindow's DrawTab(), and it's the OUTER ApplyModifiedProperties() (after
+                // DrawTab() returns) that persists the insert - ExitGUI() would abort before that
+                // ever runs, silently discarding it. Instead, patch `indices` in place: AddEntry
+                // prepends at raw index 0, so every existing raw index shifts up by one.
+                AddEntry(entriesProp, state.SelectedGroupId);
+                for (int k = 0; k < indices.Count; k++) indices[k]++;
+                indices.Insert(0, 0);
+                state.EntriesPage = 0;
+            }
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Space(4);
+
             if (indices.Count == 0 && !string.IsNullOrEmpty(emptyHint))
                 TsEditorGUI.DrawStatusBox(emptyHint, MessageType.None);
 
-            var seen = warnDuplicates ? new HashSet<Object>() : null;
-            int toDelete = -1;
-            foreach (int i in indices)
+            // Group or search changed: back to page 1, since the old page number may not exist
+            // for the new set. Reuses scopeChanged from above - group/search don't change between
+            // the two checks. (The Add button above already resets the page itself.)
+            if (scopeChanged)
             {
-                var entry = entriesProp.GetArrayElementAtIndex(i);
-                var valueProp = entry.FindPropertyRelative("Value");
+                state.EntriesPage = 0;
+                state.LastEntriesPageGroupId = state.SelectedGroupId;
+                state.LastEntriesPageSearchText = state.SearchText;
+            }
 
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.PropertyField(valueProp, GUIContent.none);
-                if (showNames)
+            int pageCount = ComputePageCount(indices.Count, EntriesPerPage);
+            state.EntriesPage = ClampPage(state.EntriesPage, pageCount);
+
+            // Duplicate status is a property of the whole filtered set, not just the current
+            // page, so this still walks every filtered entry - but only reads a value, never
+            // draws a control, a small fraction of what drawing every row would cost.
+            bool[] isDuplicateByRow = null;
+            if (warnDuplicates)
+            {
+                isDuplicateByRow = new bool[indices.Count];
+                var seen = new HashSet<Object>();
+                for (int row = 0; row < indices.Count; row++)
                 {
-                    var nameProp = entry.FindPropertyRelative("Name");
-                    nameProp.stringValue = EditorGUILayout.DelayedTextField(nameProp.stringValue, GUILayout.Width(120));
+                    var value = entriesProp.GetArrayElementAtIndex(indices[row]).FindPropertyRelative("Value").objectReferenceValue;
+                    isDuplicateByRow[row] = ObjectListGUI.IsDuplicate(value, seen);
                 }
-                if (ObjectListGUI.DeleteButton())
-                    toDelete = i;
-                EditorGUILayout.EndHorizontal();
+            }
 
-                ObjectListGUI.DrawEntryHints(valueProp.objectReferenceValue, assetsOnly, warnDuplicates, seen);
+            int pageStart = state.EntriesPage * EntriesPerPage;
+            int pageEnd = Mathf.Min(pageStart + EntriesPerPage, indices.Count);
 
-                if (showNames)
-                    DrawMemberPreview(entry, groupsProp, memberPrefix, memberSuffix, prefixRespectsToggle);
+            int toDelete = -1;
+            for (int row = pageStart; row < pageEnd; row++)
+            {
+                int entryIndex = indices[row];
+                bool isDuplicate = isDuplicateByRow != null && isDuplicateByRow[row];
+                if (DrawEntryRow(entriesProp, entryIndex, groupsProp, isDuplicate, showNames, assetsOnly, warnDuplicates,
+                        memberPrefix, memberSuffix, prefixRespectsToggle))
+                    toDelete = entryIndex;
             }
 
             if (toDelete >= 0)
@@ -310,27 +443,99 @@ namespace Tsvrc.Editor
                 entriesProp.DeleteArrayElementAtIndex(toDelete);
             }
 
-            EditorGUILayout.Space(4);
-            using (new EditorGUI.DisabledScope(searching))
-            if (GUILayout.Button("+ Add"))
-                AddEntry(entriesProp, state.SelectedGroupId);
+            if (pageCount > 1)
+                DrawPaginationFooter(state, pageCount, indices.Count);
         }
 
+        // "(ungrouped)" for the root bucket, the group's own name ("(unnamed)" if blank)
+        // otherwise, falling back to "(ungrouped)" for a stale/removed id. Internal (not private)
+        // so it's directly unit-testable.
+        internal static string DescribeSelectedGroup(SerializedProperty groupsProp, int groupId)
+        {
+            if (groupId == 0) return "(ungrouped)";
+
+            int index = IndexOfGroup(groupsProp, groupId);
+            if (index < 0) return "(ungrouped)";
+
+            string name = groupsProp.GetArrayElementAtIndex(index).FindPropertyRelative("Name").stringValue;
+            return string.IsNullOrEmpty(name) ? "(unnamed)" : name;
+        }
+
+        // One entry's full row: object field, optional name field, delete button, hints, member
+        // preview. Returns true if delete was clicked (deferred - the caller mutates entriesProp
+        // only after every row for this page has drawn, to avoid invalidating indices mid-loop).
+        private static bool DrawEntryRow(SerializedProperty entriesProp, int entryIndex, SerializedProperty groupsProp,
+            bool isDuplicate, bool showNames, bool assetsOnly, bool warnDuplicates,
+            string memberPrefix, string memberSuffix, bool prefixRespectsToggle)
+        {
+            var entry = entriesProp.GetArrayElementAtIndex(entryIndex);
+            var valueProp = entry.FindPropertyRelative("Value");
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.PropertyField(valueProp, GUIContent.none);
+            if (showNames)
+            {
+                var nameProp = entry.FindPropertyRelative("Name");
+                nameProp.stringValue = EditorGUILayout.DelayedTextField(nameProp.stringValue, GUILayout.Width(120));
+            }
+            bool deleteClicked = ObjectListGUI.DeleteButton();
+            EditorGUILayout.EndHorizontal();
+
+            ObjectListGUI.DrawEntryHints(valueProp.objectReferenceValue, assetsOnly, warnDuplicates, isDuplicate);
+
+            if (showNames)
+                DrawMemberPreview(entry, groupsProp, memberPrefix, memberSuffix, prefixRespectsToggle);
+
+            return deleteClicked;
+        }
+
+        // Always at least 1 (an empty list still shows "Page 1 of 1"). Pure so it's directly
+        // unit-testable without driving OnGUI.
+        internal static int ComputePageCount(int totalCount, int pageSize) =>
+            Mathf.Max(1, Mathf.CeilToInt(totalCount / (float)pageSize));
+
+        // Keeps the current page in [0, pageCount) - needed whenever the filtered set shrinks
+        // (a delete, or switching to a smaller group/search result). Pure, directly unit-testable.
+        internal static int ClampPage(int page, int pageCount) => Mathf.Clamp(page, 0, pageCount - 1);
+
+        private static void DrawPaginationFooter(State state, int pageCount, int totalCount)
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(state.EntriesPage <= 0))
+                if (GUILayout.Button("< Prev", GUILayout.Width(60)))
+                    state.EntriesPage--;
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.LabelField($"Page {state.EntriesPage + 1} of {pageCount} ({totalCount} total)",
+                EditorStyles.centeredGreyMiniLabel, GUILayout.ExpandWidth(false));
+            GUILayout.FlexibleSpace();
+            using (new EditorGUI.DisabledScope(state.EntriesPage >= pageCount - 1))
+                if (GUILayout.Button("Next >", GUILayout.Width(60)))
+                    state.EntriesPage++;
+            EditorGUILayout.EndHorizontal();
+        }
+
+        // Inserted at the front, not appended - gives "+ Add" a predictable, always-visible
+        // landing spot (see DrawContents). Array position has no effect on generated output:
+        // every module reads *Entries via a plain foreach (GlobalModule, ConstructModule,
+        // FactoryModule) or groups by prefab type (PoolModule) - order only affects the cosmetic
+        // sequence generated members appear in, never correctness.
         internal static void AddEntry(SerializedProperty entriesProp, int groupId)
         {
-            int newIndex = entriesProp.arraySize;
+            const int newIndex = 0;
             entriesProp.InsertArrayElementAtIndex(newIndex);
             var element = entriesProp.GetArrayElementAtIndex(newIndex);
-            // InsertArrayElementAtIndex copies the previous element, so every field is reset
-            // explicitly to give a genuinely empty new entry rather than inheriting its neighbour.
+            // InsertArrayElementAtIndex copies a neighbouring element, so every field is reset
+            // explicitly to give a genuinely empty new entry.
             element.FindPropertyRelative("Value").objectReferenceValue = null;
             element.FindPropertyRelative("GroupId").intValue = groupId;
             element.FindPropertyRelative("Name").stringValue = string.Empty;
         }
 
-        // Dim line under an entry showing the member it generates: "_ts.Name" (Global/Construct) or
-        // "CreateName(parent)" (Factory), prefixed by its group chain. A blank Name shows "<auto>",
-        // since the derived default depends on the object's resolved type at generate time.
+        // Dim line under an entry showing the member it generates: "_ts.Name" (Global/Construct)
+        // or "CreateName(parent)" (Factory), prefixed by its group chain. A blank Name shows
+        // "<auto>", since the derived default depends on the object's resolved type at generate
+        // time.
         private static void DrawMemberPreview(SerializedProperty entry, SerializedProperty groupsProp,
             string memberPrefix, string memberSuffix, bool prefixRespectsToggle)
         {
@@ -341,10 +546,10 @@ namespace Tsvrc.Editor
             EditorGUILayout.LabelField($"   ↳ {memberPrefix}{body}{memberSuffix}", EditorStyles.miniLabel);
         }
 
-        // A cheap hash of everything the tree renders from: group structure and names, per-entry
-        // group membership, and the search text (plus entry object names while searching, since the
-        // subtree match reads them). Reloading only when this changes keeps typing responsive and
-        // stops the tree from reassigning IMGUI control ids under a field being edited.
+        // A cheap hash of everything the tree renders from: group structure/names, per-entry
+        // group membership, and the search text (plus entry names while searching). Reloading
+        // only when this changes keeps typing responsive and avoids reassigning IMGUI control
+        // ids under a field being edited.
         internal static int ComputeTreeSignature(SerializedProperty groupsProp, SerializedProperty entriesProp, string search)
         {
             unchecked
@@ -426,16 +631,32 @@ namespace Tsvrc.Editor
             {
                 var groups = ReadGroups(_groupsProp);
                 var entryCounts = CountEntriesByGroup(_entriesProp);
-                var childrenOf = groups.Values.GroupBy(g => g.ParentId).ToDictionary(g => g.Key, g => g.ToList());
-
-                bool searching = !string.IsNullOrEmpty(searchString);
-                var subtreeMatch = searching ? ComputeSubtreeMatches(groups, childrenOf, entryCounts, _entriesProp) : null;
-
                 var rows = new List<TreeViewItem>();
-                if (!searching || (subtreeMatch != null && subtreeMatch.TryGetValue(0, out bool m0) && m0))
-                    rows.Add(new TreeViewItem(0, 0, DisplayName("(ungrouped)", entryCounts, 0)));
 
-                AddChildren(0, 0, groups, childrenOf, entryCounts, subtreeMatch, rows);
+                if (!string.IsNullOrEmpty(searchString))
+                {
+                    // Flat results: only groups that *directly* match (own name, or a direct
+                    // entry's name) - not the whole ancestor chain, and not a group shown only
+                    // because some descendant matches. Each row's label carries its full path
+                    // instead (ComputeGroupDisplayPath), since a flat list can't show location
+                    // via nesting. Replaced showing the entire matching subtree, which used to
+                    // surface several unrelated groups for one search.
+                    var directMatches = ComputeDirectMatches(groups, _entriesProp, searchString);
+                    if (directMatches.Contains(0))
+                        rows.Add(new TreeViewItem(0, 0, DisplayName("(ungrouped)", entryCounts, 0)));
+                    foreach (var group in groups.Values.Where(g => directMatches.Contains(g.Id))
+                                 .OrderBy(g => g.Name, System.StringComparer.OrdinalIgnoreCase))
+                    {
+                        string path = ComputeGroupDisplayPath(groups, group.Id);
+                        rows.Add(new TreeViewItem(group.Id, 0, DisplayName(path, entryCounts, group.Id)));
+                    }
+                }
+                else
+                {
+                    var childrenOf = groups.Values.GroupBy(g => g.ParentId).ToDictionary(g => g.Key, g => g.ToList());
+                    rows.Add(new TreeViewItem(0, 0, DisplayName("(ungrouped)", entryCounts, 0)));
+                    AddChildren(0, 0, groups, childrenOf, entryCounts, rows);
+                }
 
                 if (rows.Count == 0)
                     rows.Add(new TreeViewItem(0, 0, "(ungrouped)"));
@@ -445,16 +666,14 @@ namespace Tsvrc.Editor
             }
 
             private static void AddChildren(int parentId, int depth, Dictionary<int, GroupInfo> groups,
-                Dictionary<int, List<GroupInfo>> childrenOf, Dictionary<int, int> entryCounts,
-                Dictionary<int, bool> subtreeMatch, List<TreeViewItem> rows)
+                Dictionary<int, List<GroupInfo>> childrenOf, Dictionary<int, int> entryCounts, List<TreeViewItem> rows)
             {
                 if (!childrenOf.TryGetValue(parentId, out var children)) return;
                 foreach (var group in children.OrderBy(g => g.Name, System.StringComparer.OrdinalIgnoreCase))
                 {
-                    if (subtreeMatch != null && !(subtreeMatch.TryGetValue(group.Id, out bool m) && m)) continue;
                     string name = string.IsNullOrEmpty(group.Name) ? "(unnamed)" : group.Name;
                     rows.Add(new TreeViewItem(group.Id, depth, DisplayName(name, entryCounts, group.Id)));
-                    AddChildren(group.Id, depth + 1, groups, childrenOf, entryCounts, subtreeMatch, rows);
+                    AddChildren(group.Id, depth + 1, groups, childrenOf, entryCounts, rows);
                 }
             }
 
@@ -464,42 +683,61 @@ namespace Tsvrc.Editor
                 return count > 0 ? $"{name} ({count})" : name;
             }
 
-            // A group matches if its own name matches, one of its direct entries matches, or any
-            // child's subtree matches. Computed bottom-up so a match anywhere in a subtree keeps
-            // every ancestor visible.
-            private Dictionary<int, bool> ComputeSubtreeMatches(Dictionary<int, GroupInfo> groups,
-                Dictionary<int, List<GroupInfo>> childrenOf, Dictionary<int, int> entryCounts, SerializedProperty entriesProp)
+            // A group is a search result if its own name matches, or it has a direct entry whose
+            // name matches - not "or a descendant matches" (see BuildRows' own comment). Internal
+            // (not private) and takes searchText as a parameter rather than reading the instance
+            // searchString, so it's directly unit-testable.
+            internal static HashSet<int> ComputeDirectMatches(Dictionary<int, GroupInfo> groups,
+                SerializedProperty entriesProp, string searchText)
             {
-                var result = new Dictionary<int, bool>();
                 var entryNamesByGroup = new Dictionary<int, List<string>>();
                 for (int i = 0; i < entriesProp.arraySize; i++)
                 {
                     var entry = entriesProp.GetArrayElementAtIndex(i);
                     int groupId = entry.FindPropertyRelative("GroupId").intValue;
                     var value = entry.FindPropertyRelative("Value").objectReferenceValue;
+                    if (value == null) continue;
                     if (!entryNamesByGroup.TryGetValue(groupId, out var list))
                         entryNamesByGroup[groupId] = list = new List<string>();
-                    if (value != null) list.Add(value.name);
+                    list.Add(value.name);
                 }
 
                 bool Matches(int id, string name)
                 {
-                    if (result.TryGetValue(id, out bool cached)) return cached;
-                    bool self = !string.IsNullOrEmpty(name) && name.IndexOf(searchString, System.StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool self = !string.IsNullOrEmpty(name) && name.IndexOf(searchText, System.StringComparison.OrdinalIgnoreCase) >= 0;
                     bool ownEntry = entryNamesByGroup.TryGetValue(id, out var names) &&
-                        names.Any(n => n.IndexOf(searchString, System.StringComparison.OrdinalIgnoreCase) >= 0);
-                    bool childMatch = childrenOf.TryGetValue(id, out var children) &&
-                        children.Any(c => Matches(c.Id, c.Name));
-                    bool value = self || ownEntry || childMatch;
-                    result[id] = value;
-                    return value;
+                        names.Any(n => n.IndexOf(searchText, System.StringComparison.OrdinalIgnoreCase) >= 0);
+                    return self || ownEntry;
                 }
 
-                Matches(0, "(ungrouped)");
+                var result = new HashSet<int>();
+                if (Matches(0, "(ungrouped)")) result.Add(0);
                 foreach (var group in groups.Values)
-                    Matches(group.Id, group.Name);
-
+                    if (Matches(group.Id, group.Name))
+                        result.Add(group.Id);
                 return result;
+            }
+
+            // Human-readable "Parent / Child / GroupName" path, labeling a flat search result row
+            // so its location stays legible without nesting. Unrelated to ComputeGroupPrefix (the
+            // generated-member-name preview), which only concatenates IncludeInName ancestors with
+            // no separator. Internal (not private) so it's directly unit-testable.
+            internal static string ComputeGroupDisplayPath(Dictionary<int, GroupInfo> groups, int groupId)
+            {
+                if (groupId == 0) return "(ungrouped)";
+
+                var chain = new List<string>();
+                var visited = new HashSet<int>();
+                int current = groupId;
+                while (current != 0 && visited.Add(current))
+                {
+                    if (!groups.TryGetValue(current, out var group)) break;
+                    chain.Add(string.IsNullOrEmpty(group.Name) ? "(unnamed)" : group.Name);
+                    current = group.ParentId;
+                }
+
+                chain.Reverse();
+                return string.Join(" / ", chain);
             }
 
             // Every group id reachable from startId, itself plus every descendant.
@@ -579,7 +817,9 @@ namespace Tsvrc.Editor
                 return DragAndDropVisualMode.Move;
             }
 
-            private struct GroupInfo
+            // Internal (not private) so ComputeDirectMatches/ComputeGroupDisplayPath can be
+            // driven directly from tests without a real SerializedProperty.
+            internal struct GroupInfo
             {
                 internal int Id;
                 internal int ParentId;

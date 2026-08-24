@@ -22,6 +22,13 @@ namespace Tsvrc.Editor
         private readonly TsGroupTreeGUI.State _factoryTreeState = new TsGroupTreeGUI.State();
         private readonly TsGroupTreeGUI.State _poolTreeState = new TsGroupTreeGUI.State();
 
+        // This asset isn't watched by TsGenerator (only TsConfig is - see TsGenerator.cs's
+        // watchedTypes set), so there is no automatic regenerate to hold back here the way
+        // TsWindow needs to. TsPendingConfigEdit is still used for the same Apply/Discard UX
+        // consistency: this is the designated editor for TsBuiltinConfig, not a bypass of one,
+        // so it gets the same batched-edit contract.
+        private readonly TsPendingConfigEdit _pending = new TsPendingConfigEdit();
+
         // The live group fields are drawn explicitly above via TsGroupTreeGUI instead of
         // DrawDefaultInspector's raw array view, so they're excluded here to avoid showing the
         // same data twice.
@@ -33,6 +40,13 @@ namespace Tsvrc.Editor
             "PoolEntries", "PoolGroups", "PoolNextGroupId",
         };
 
+        private void OnEnable() => _pending.BeginTracking(target);
+
+        // Not OnDisable: that also fires around a domain reload (see TsWindow.OnDestroy's own
+        // comment for why). OnDestroy only fires when this Editor instance is actually being
+        // torn down for good.
+        private void OnDestroy() => _pending.Cleanup();
+
         public override void OnInspectorGUI()
         {
             TsEditorGUI.DrawStatusBox(
@@ -43,6 +57,8 @@ namespace Tsvrc.Editor
                 MessageType.Info);
 
             serializedObject.Update();
+            _pending.BeginFrame();
+            EditorGUI.BeginChangeCheck();
 
             EditorGUILayout.LabelField("Globals", EditorStyles.boldLabel);
             TsGroupTreeGUI.Draw(serializedObject, "GlobalGroups", "GlobalEntries", _globalTreeState,
@@ -59,11 +75,39 @@ namespace Tsvrc.Editor
             TsGroupTreeGUI.Draw(serializedObject, "PoolGroups", "PoolEntries", _poolTreeState,
                 "No builtin pool prefabs registered yet.", assetsOnly: true);
 
-            serializedObject.ApplyModifiedProperties();
-
             EditorGUILayout.Space(10);
             DrawPropertiesExcluding(serializedObject, ManuallyDrawnProperties);
-            serializedObject.ApplyModifiedProperties();
+
+            // EndChangeCheck() catches a widget-driven edit even if TsGroupTreeGUI's own drag-
+            // and-drop reparenting already flushed it via its own ApplyModifiedProperties() call
+            // above - see TsWindow.OnGUI's matching comment for why this gate exists at all.
+            bool anyWidgetEdit = EditorGUI.EndChangeCheck();
+            bool anyChangesApplied = serializedObject.ApplyModifiedProperties() || anyWidgetEdit;
+            _pending.NotifyAppliedToSerializedObject(anyChangesApplied);
+            DrawPendingChangesFooter();
+        }
+
+        private void DrawPendingChangesFooter()
+        {
+            if (!_pending.HasPendingChanges) return;
+
+            EditorGUILayout.Space(8);
+            TsEditorGUI.DrawStatusBox(
+                "You have unapplied changes. Apply them, or discard them to revert.",
+                MessageType.Warning);
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Apply"))
+            {
+                _pending.Apply();
+                GUIUtility.ExitGUI();
+            }
+            if (GUILayout.Button("Discard"))
+            {
+                _pending.Discard(serializedObject);
+                GUIUtility.ExitGUI();
+            }
+            EditorGUILayout.EndHorizontal();
         }
     }
 }

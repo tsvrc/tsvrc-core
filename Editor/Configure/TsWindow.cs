@@ -17,9 +17,16 @@ namespace Tsvrc.Editor
         private string[] _tabLabels;
 
         private int _tabIndex;
+
+        // Survives a domain reload (a plain field does not - EditorWindow instances are
+        // re-deserialized across reload, but only [SerializeField] fields keep their value).
+        // Restored into _tabIndex in OnEnable, after ReloadTabs() rebuilds the tab list.
+        [SerializeField] private int _persistedTabIndex;
+
         private Vector2 _scroll;
         private TsConfig _config;
         private SerializedObject _so;
+        private readonly TsPendingConfigEdit _pending = new TsPendingConfigEdit();
 
         [MenuItem("Tsvrc/Configure", priority = 1)]
         private static void Open()
@@ -43,12 +50,22 @@ namespace Tsvrc.Editor
 
         private void OnEnable()
         {
+            saveChangesMessage = "This tab has changes that haven't been applied yet. " +
+                "Apply them to regenerate, or discard them to revert.";
             TsGenerator.StateChanged += HandleStateChanged;
             ReloadTabs();
             ReloadConfig();
+            if (_persistedTabIndex >= 0 && _persistedTabIndex < _tabs.Count)
+                _tabIndex = _persistedTabIndex;
         }
 
         private void OnDisable() => TsGenerator.StateChanged -= HandleStateChanged;
+
+        // Not OnDisable: that also fires around a domain reload, and cleaning up _pending there
+        // would drop a pending edit on every recompile. OnDestroy only fires when the window is
+        // actually closing for good, by which point Unity's own dialog has already resolved any
+        // pending edit via hasUnsavedChanges/SaveChanges/DiscardChanges.
+        private void OnDestroy() => _pending.Cleanup();
 
         private void HandleStateChanged()
         {
@@ -87,6 +104,27 @@ namespace Tsvrc.Editor
             // TsLinkedScene's own doc comment for why "whatever scene is open" isn't safe.
             _config = TsLinkedScene.Find<TsConfig>();
             _so = _config != null ? new SerializedObject(_config) : null;
+            _pending.BeginTracking(_config);
+            hasUnsavedChanges = _pending.HasPendingChanges;
+        }
+
+        // Unity's own "unsaved changes" contract: decorates the title bar/tab, and blocks the
+        // window from closing (Editor quit included) until the user picks Save or Discard via
+        // Unity's native dialog - see SaveChanges/DiscardChanges below. hasUnsavedChanges itself
+        // is a plain settable property (not overridden) per Unity's own documented usage - kept
+        // in sync with _pending.HasPendingChanges everywhere that can change it.
+        public override void SaveChanges()
+        {
+            _pending.Apply();
+            hasUnsavedChanges = _pending.HasPendingChanges;
+            base.SaveChanges();
+        }
+
+        public override void DiscardChanges()
+        {
+            _pending.Discard(_so);
+            hasUnsavedChanges = _pending.HasPendingChanges;
+            base.DiscardChanges();
         }
 
         private void OnGUI()
@@ -111,19 +149,56 @@ namespace Tsvrc.Editor
 
             int newIndex = GUILayout.Toolbar(_tabIndex, _tabLabels);
             if (newIndex != _tabIndex) { _tabIndex = newIndex; _scroll = Vector2.zero; }
+            _persistedTabIndex = _tabIndex;
 
             EditorGUILayout.LabelField(_tabs[_tabIndex].TabDescription, EditorStyles.wordWrappedMiniLabel);
             EditorGUILayout.Space(4);
 
             _so.Update();
+            _pending.BeginFrame();
+            EditorGUI.BeginChangeCheck();
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             _tabs[_tabIndex].DrawTab(_so);
             EditorGUILayout.EndScrollView();
-            _so.ApplyModifiedProperties();
+            // EndChangeCheck() catches a widget-driven edit even if nested code inside DrawTab
+            // already flushed it via its own ApplyModifiedProperties() call before this outer one
+            // runs (e.g. TsGroupTreeGUI's drag-and-drop reparenting) - unlike this call's own
+            // return value, which only reflects what was still unflushed by the time it ran.
+            bool anyWidgetEdit = EditorGUI.EndChangeCheck();
+            bool anyChangesApplied = _so.ApplyModifiedProperties() || anyWidgetEdit;
+            _pending.NotifyAppliedToSerializedObject(anyChangesApplied);
+            hasUnsavedChanges = _pending.HasPendingChanges;
 
             EditorGUILayout.Space(8);
+            DrawPendingChangesFooter();
             EditorGUILayout.LabelField(string.Empty, GUI.skin.horizontalSlider);
             DrawActionFooter();
+        }
+
+        // Shown only while there is a pending, unapplied edit - see TsPendingConfigEdit. Apply
+        // ends TsGenerator's suppression scope and fires exactly one regenerate pass; Discard
+        // reverts the tracked TsConfig to its last-applied state without regenerating at all.
+        private void DrawPendingChangesFooter()
+        {
+            if (!_pending.HasPendingChanges) return;
+
+            TsEditorGUI.DrawStatusBox(
+                "You have unapplied changes. Apply them to regenerate, or discard them to revert.",
+                MessageType.Warning);
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Apply"))
+            {
+                SaveChanges();
+                GUIUtility.ExitGUI();
+            }
+            if (GUILayout.Button("Discard"))
+            {
+                DiscardChanges();
+                GUIUtility.ExitGUI();
+            }
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Space(4);
         }
 
         // The one scene TsGenerator is allowed to read scene config from - see TsLinkedScene's
@@ -139,7 +214,7 @@ namespace Tsvrc.Editor
             var newAsset = (SceneAsset)EditorGUILayout.ObjectField(currentAsset, typeof(SceneAsset), false);
             EditorGUILayout.EndHorizontal();
 
-            if (newAsset != currentAsset)
+            if (newAsset != currentAsset && ResolvePendingChangesBeforeSwitch())
             {
                 TsLinkedScene.ScenePath = newAsset != null ? AssetDatabase.GetAssetPath(newAsset) : null;
                 ReloadConfig();
@@ -152,6 +227,27 @@ namespace Tsvrc.Editor
                 TsEditorGUI.DrawStatusBox(message, MessageType.Warning);
 
             EditorGUILayout.Space(4);
+        }
+
+        // Guards any action that would swap which TsConfig _pending tracks (switching the
+        // linked scene, opening it). hasUnsavedChanges/SaveChanges/DiscardChanges only protect
+        // the window's own close path - this covers the other way pending edits could otherwise
+        // be silently lost. Returns false (abort the caller's action) only if the user cancels.
+        private bool ResolvePendingChangesBeforeSwitch()
+        {
+            if (!_pending.HasPendingChanges) return true;
+
+            int choice = EditorUtility.DisplayDialogComplex(
+                "Unapplied changes",
+                "This tab has changes that haven't been applied yet. Apply them before switching, " +
+                "discard them, or cancel and stay here.",
+                "Apply", "Cancel", "Discard");
+            switch (choice)
+            {
+                case 0: SaveChanges(); return true;
+                case 2: DiscardChanges(); return true;
+                default: return false;
+            }
         }
 
         // Pure so it's directly unit-testable without driving OnGUI/EditorWindow. Returns null
@@ -293,11 +389,16 @@ namespace Tsvrc.Editor
         // Drawn only once a TsConfig exists (mirrors every tab below it): TreeShakeUnused and
         // ForceIncludeNames both live on TsConfig, one toggle per linked scene/project rather
         // than per module, so there's nothing to bind to before that.
+        //
+        // No Update()/ApplyModifiedProperties() of its own: this is only ever called from
+        // SettingsTabModule.DrawTab, itself always inside OnGUI's own Update()/
+        // ApplyModifiedProperties() bracket around the whole tab - a second, nested pair here
+        // used to flush this edit early, ahead of the outer one, which made the outer call's own
+        // "did anything change" return value unreliable for detecting it.
         private void DrawTreeShakingControls()
         {
             if (_so == null) return;
 
-            _so.Update();
             var treeShakeProp = _so.FindProperty("TreeShakeUnused");
             EditorGUILayout.PropertyField(treeShakeProp, new GUIContent("Tree-Shake Unused Globals/Factories (Experimental)"));
             if (treeShakeProp.boolValue)
@@ -308,7 +409,6 @@ namespace Tsvrc.Editor
                     "CreateName(...)) will be excluded on the next regenerate. List a name above to always keep it.",
                     MessageType.Info);
             }
-            _so.ApplyModifiedProperties();
             EditorGUILayout.Space(4);
         }
 
@@ -360,18 +460,26 @@ namespace Tsvrc.Editor
 
         // Disabled while a bootstrap triggered by an earlier click is still waiting on a recompile,
         // during play mode (TsGenerator.Run() itself is a no-op there - see ValidateManualGenerate
-        // on the equivalent menu item), or once the linked scene asset no longer exists at all:
-        // "Open Linked Scene" would just fail, so there is no action left to offer until a new
-        // scene is picked via the field above.
-        internal static bool IsActionEnabled(bool isBootstrapPending, bool isPlayMode, bool isConfiguredButMissing = false) =>
-            !isBootstrapPending && !isPlayMode && !isConfiguredButMissing;
+        // on the equivalent menu item), once the linked scene asset no longer exists at all
+        // ("Open Linked Scene" would just fail, so there is no action left to offer until a new
+        // scene is picked via the field above), or while there's a pending, unapplied edit: this
+        // button and the pending-changes footer's own Apply button would otherwise both trigger a
+        // regenerate through two different paths, only one of which (Apply) updates
+        // TsPendingConfigEdit's own bookkeeping - clicking this one instead while an edit was
+        // pending left the Apply/Discard footer stuck claiming changes were still unapplied right
+        // after a regenerate had, in fact, just run against them.
+        internal static bool IsActionEnabled(bool isBootstrapPending, bool isPlayMode, bool isConfiguredButMissing = false,
+            bool hasPendingChanges = false) =>
+            !isBootstrapPending && !isPlayMode && !isConfiguredButMissing && !hasPendingChanges;
 
         // Explains *why* the button above is disabled, shown as its tooltip. Null when enabled.
-        internal static string DetermineActionDisabledReason(bool isBootstrapPending, bool isPlayMode, bool isConfiguredButMissing = false)
+        internal static string DetermineActionDisabledReason(bool isBootstrapPending, bool isPlayMode, bool isConfiguredButMissing = false,
+            bool hasPendingChanges = false)
         {
             if (isPlayMode) return "Exit Play Mode before regenerating.";
             if (isBootstrapPending) return "Waiting for the current setup pass to finish compiling.";
             if (isConfiguredButMissing) return "The linked scene no longer exists - pick a new one above.";
+            if (hasPendingChanges) return "Apply or discard your pending changes above first.";
             return null;
         }
 
@@ -381,9 +489,10 @@ namespace Tsvrc.Editor
             bool playMode = EditorApplication.isPlayingOrWillChangePlaymode;
             bool missing = TsLinkedScene.IsConfiguredButMissing;
             bool notLoaded = TsLinkedScene.IsConfiguredButNotLoaded;
+            bool hasPendingChanges = _pending.HasPendingChanges;
             string label = DetermineActionLabel(_config != null, notLoaded, missing);
-            bool enabled = IsActionEnabled(pending, playMode, missing);
-            string disabledReason = DetermineActionDisabledReason(pending, playMode, missing);
+            bool enabled = IsActionEnabled(pending, playMode, missing, hasPendingChanges);
+            string disabledReason = DetermineActionDisabledReason(pending, playMode, missing, hasPendingChanges);
 
             if (TsEditorGUI.PrimaryButton(label, enabled, disabledReason))
             {

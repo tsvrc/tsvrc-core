@@ -189,6 +189,38 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsNull(TsWindow.DetermineActionDisabledReason(isBootstrapPending: false, isPlayMode: false));
         }
 
+        [Test]
+        public void IsActionEnabled_WhenPendingChanges_ReturnsFalse()
+        {
+            // Force Regenerate/Initialize Tsvrc and the pending-changes footer's own Apply button
+            // must never both be live triggers for a regenerate at once - see IsActionEnabled's
+            // own comment for why that used to leave the Apply/Discard footer stuck.
+            Assert.IsFalse(TsWindow.IsActionEnabled(isBootstrapPending: false, isPlayMode: false, hasPendingChanges: true));
+        }
+
+        [Test]
+        public void IsActionEnabled_NoPendingChanges_ReturnsTrue()
+        {
+            Assert.IsTrue(TsWindow.IsActionEnabled(isBootstrapPending: false, isPlayMode: false, hasPendingChanges: false));
+        }
+
+        [Test]
+        public void DetermineActionDisabledReason_PendingChangesOnly_MentionsApplyingOrDiscarding()
+        {
+            string reason = TsWindow.DetermineActionDisabledReason(isBootstrapPending: false, isPlayMode: false, hasPendingChanges: true);
+
+            StringAssert.Contains("Apply", reason);
+            StringAssert.Contains("discard", reason);
+        }
+
+        [Test]
+        public void DetermineActionDisabledReason_PlayModeTakesPrecedenceOverPendingChanges()
+        {
+            string reason = TsWindow.DetermineActionDisabledReason(isBootstrapPending: false, isPlayMode: true, hasPendingChanges: true);
+
+            StringAssert.Contains("Play Mode", reason);
+        }
+
         private static (string message, MessageType type) DetermineStatus(bool hasConfig, bool isBootstrapPending, bool isPlayMode) =>
             TsWindow.DetermineStatus(hasConfig, isBootstrapPending, isPlayMode);
 

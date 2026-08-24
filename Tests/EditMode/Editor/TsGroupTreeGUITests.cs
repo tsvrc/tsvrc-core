@@ -2,14 +2,17 @@ using NUnit.Framework;
 using Tsvrc.Config;
 using Tsvrc.Editor;
 using UnityEditor;
+using UnityEditor.IMGUI.Controls;
+using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
     // TsGroupTreeGUI's pure, non-rendering logic: AddGroup/GroupHasContents/
-    // ReparentContentsAndRemoveGroup/IndexOfGroup and GroupTreeView.CollectSubtreeIds. These are
-    // plain SerializedProperty manipulation with no OnGUI/TreeView rendering involved. Actual tree
-    // rendering, search-match row filtering, and drag-and-drop are not covered here; this
-    // codebase does not unit-test IMGUI drawing itself.
+    // ReparentContentsAndRemoveGroup/IndexOfGroup, GroupTreeView.CollectSubtreeIds, and the
+    // search-matching helpers (ComputeDirectMatches/ComputeGroupDisplayPath) that decide *which*
+    // groups a search matches and how to label them - all plain SerializedProperty/dictionary
+    // logic with no OnGUI/TreeView rendering involved. Actual tree rendering and drag-and-drop
+    // are not covered here; this codebase does not unit-test IMGUI drawing itself.
     public class TsGroupTreeGUITests
     {
         private TempSceneScope _scope;
@@ -45,7 +48,9 @@ namespace Tsvrc.Tests.EditMode
             Assert.AreEqual("New Group", _config.GlobalGroups[0].Name);
             Assert.AreEqual(2, _config.GlobalNextGroupId, "The counter must advance past the id it just assigned.");
             Assert.AreEqual(1, state.SelectedGroupId);
-            Assert.IsTrue(state.RenamePending, "A freshly created group should be ready to rename immediately.");
+            Assert.AreEqual(1, state.PendingRenameGroupId, "A freshly created group should be ready to rename immediately.");
+            CollectionAssert.AreEqual(new[] { 1 }, state.TreeViewState.selectedIDs,
+                "The TreeView's own selection must follow the new group too, or the next Draw() sync would clobber it back.");
         }
 
         [Test]
@@ -83,9 +88,27 @@ namespace Tsvrc.Tests.EditMode
             _so.ApplyModifiedProperties();
 
             Assert.AreEqual(2, _config.GlobalEntries.Length);
-            Assert.AreEqual(string.Empty, _config.GlobalEntries[1].Name, "A new entry must not inherit the previous entry's name.");
-            Assert.IsNull(_config.GlobalEntries[1].Value);
-            Assert.AreEqual(2, _config.GlobalEntries[1].GroupId, "The new entry belongs to the group it was added under.");
+            Assert.AreEqual(string.Empty, _config.GlobalEntries[0].Name, "A new entry must not inherit an existing entry's name.");
+            Assert.IsNull(_config.GlobalEntries[0].Value);
+            Assert.AreEqual(2, _config.GlobalEntries[0].GroupId, "The new entry belongs to the group it was added under.");
+        }
+
+        [Test]
+        public void AddEntry_ExistingEntry_IsPrepended_NotAppended()
+        {
+            // Landing at a fixed, predictable position (page 1, row 1) regardless of how many
+            // entries already exist is what lets "+ Add" stay clickable in place for repeated
+            // adds - see TsGroupTreeGUI.DrawContents' own comment on the button.
+            var marker = _scope.CreateGameObject("Existing");
+            _config.GlobalEntries = new[] { new TsGroupedEntry { Value = marker, GroupId = 1, Name = "Existing" } };
+            _so.Update();
+
+            TsGroupTreeGUI.AddEntry(_entriesProp, 1);
+            _so.ApplyModifiedProperties();
+
+            Assert.AreEqual(2, _config.GlobalEntries.Length);
+            Assert.AreEqual(string.Empty, _config.GlobalEntries[0].Name, "The new entry must be first.");
+            Assert.AreEqual("Existing", _config.GlobalEntries[1].Name, "The pre-existing entry must be pushed down, not overwritten.");
         }
 
         [Test]
@@ -283,6 +306,249 @@ namespace Tsvrc.Tests.EditMode
             var subtree = TsGroupTreeGUI.GroupTreeView.CollectSubtreeIds(_groupsProp, 0);
 
             CollectionAssert.AreEquivalent(new[] { 0, 1, 2, 3 }, subtree);
+        }
+
+        [Test]
+        public void ComputeSessionKey_DifferentTargetTypes_SamePropertyName_ProduceDifferentKeys()
+        {
+            // TsConfig and TsBuiltinConfig both have a "GlobalGroups" property - without the
+            // target type name in the key, TsWindow and TsBuiltinConfigInspector would share
+            // selection/search state for what are actually two independent trees.
+            string configKey = TsGroupTreeGUI.ComputeSessionKey("TsConfig", "GlobalGroups");
+            string builtinKey = TsGroupTreeGUI.ComputeSessionKey("TsBuiltinConfig", "GlobalGroups");
+
+            Assert.AreNotEqual(configKey, builtinKey);
+        }
+
+        [Test]
+        public void ComputeSessionKey_SameInputs_IsStable()
+        {
+            Assert.AreEqual(
+                TsGroupTreeGUI.ComputeSessionKey("TsConfig", "PoolGroups"),
+                TsGroupTreeGUI.ComputeSessionKey("TsConfig", "PoolGroups"));
+        }
+
+        [Test]
+        public void ApplyPendingRenameFocus_DifferentGroupSelected_ClearsPendingWithoutFocusing()
+        {
+            var state = new TsGroupTreeGUI.State { PendingRenameGroupId = 1, SelectedGroupId = 2 };
+
+            TsGroupTreeGUI.ApplyPendingRenameFocus(state);
+
+            Assert.IsNull(state.PendingRenameGroupId,
+                "Navigating away from the group pending rename must cancel the pending focus request.");
+        }
+
+        [Test]
+        public void ApplyPendingRenameFocus_SameGroupStillSelected_FocusNotYetObserved_StaysPending()
+        {
+            GUIUtility.keyboardControl = 0; // ensure "TsGroupRename" isn't already focused from a prior test
+            var state = new TsGroupTreeGUI.State { PendingRenameGroupId = 1, SelectedGroupId = 1 };
+
+            TsGroupTreeGUI.ApplyPendingRenameFocus(state);
+
+            Assert.AreEqual(1, state.PendingRenameGroupId,
+                "Must keep re-requesting focus every repaint until the rename control is actually observed " +
+                "focused - a same-frame event stealing focus first must not silently drop the rename.");
+        }
+
+        [Test]
+        public void ApplyPendingRenameFocus_NoPendingRename_IsNoOp()
+        {
+            var state = new TsGroupTreeGUI.State { PendingRenameGroupId = null, SelectedGroupId = 1 };
+
+            Assert.DoesNotThrow(() => TsGroupTreeGUI.ApplyPendingRenameFocus(state));
+            Assert.IsNull(state.PendingRenameGroupId);
+        }
+
+        [Test]
+        public void ExpandedIds_SurviveReload_WhenCapturedAndRestored()
+        {
+            _config.GlobalGroups = new[]
+            {
+                new TsGroup { Id = 1, ParentId = 0, Name = "Parent" },
+                new TsGroup { Id = 2, ParentId = 1, Name = "Child" },
+            };
+            _so.Update();
+            var treeState = new TreeViewState();
+            var tree = new TsGroupTreeGUI.GroupTreeView(treeState, _groupsProp, _entriesProp);
+            tree.SetExpanded(1, true);
+
+            var expandedBefore = tree.GetExpanded();
+            // Mirrors what TsGroupTreeGUI.Draw does around a signature-changing Reload(): capture,
+            // reload, restore - the direct fix for group/subgroup collapse not persisting.
+            tree.Reload();
+            tree.SetExpanded(expandedBefore);
+
+            CollectionAssert.Contains(tree.GetExpanded(), 1,
+                "Group 1's expanded state must survive a Reload() triggered by an unrelated edit.");
+        }
+
+        [Test]
+        public void DescribeSelectedGroup_UngroupedBucket_ReturnsUngroupedLabel()
+        {
+            Assert.AreEqual("(ungrouped)", TsGroupTreeGUI.DescribeSelectedGroup(_groupsProp, 0));
+        }
+
+        [Test]
+        public void DescribeSelectedGroup_NamedGroup_ReturnsItsName()
+        {
+            _config.GlobalGroups = new[] { new TsGroup { Id = 1, ParentId = 0, Name = "Enemies" } };
+            _so.Update();
+
+            Assert.AreEqual("Enemies", TsGroupTreeGUI.DescribeSelectedGroup(_groupsProp, 1));
+        }
+
+        [Test]
+        public void DescribeSelectedGroup_BlankName_ReturnsUnnamedLabel()
+        {
+            _config.GlobalGroups = new[] { new TsGroup { Id = 1, ParentId = 0, Name = "" } };
+            _so.Update();
+
+            Assert.AreEqual("(unnamed)", TsGroupTreeGUI.DescribeSelectedGroup(_groupsProp, 1));
+        }
+
+        [Test]
+        public void DescribeSelectedGroup_StaleGroupId_FallsBackToUngroupedLabel()
+        {
+            Assert.AreEqual("(ungrouped)", TsGroupTreeGUI.DescribeSelectedGroup(_groupsProp, 999));
+        }
+
+        [Test]
+        public void ComputeDirectMatches_EntryNameMatches_FlagsOnlyItsOwnDirectGroup()
+        {
+            // The bug this replaced: a match on an entry deep in a subtree used to also flag
+            // every ancestor group as a "match" (to keep them visible in the old nested-results
+            // tree) - callers that only care about "which group directly has this" (the entries
+            // pane, and the new flat search results) need just the one group back.
+            var marker = _scope.CreateGameObject("Widget");
+            _config.GlobalGroups = new[]
+            {
+                new TsGroup { Id = 1, ParentId = 0, Name = "Parent" },
+                new TsGroup { Id = 2, ParentId = 1, Name = "Child" },
+            };
+            _config.GlobalEntries = new[] { new TsGroupedEntry { Value = marker, GroupId = 2 } };
+            _so.Update();
+
+            var groups = new System.Collections.Generic.Dictionary<int, TsGroupTreeGUI.GroupTreeView.GroupInfo>
+            {
+                [1] = new TsGroupTreeGUI.GroupTreeView.GroupInfo { Id = 1, ParentId = 0, Name = "Parent" },
+                [2] = new TsGroupTreeGUI.GroupTreeView.GroupInfo { Id = 2, ParentId = 1, Name = "Child" },
+            };
+
+            var matches = TsGroupTreeGUI.GroupTreeView.ComputeDirectMatches(groups, _entriesProp, "Widget");
+
+            CollectionAssert.AreEquivalent(new[] { 2 }, matches,
+                "Only the group directly containing the matching entry should be flagged - not its ancestor.");
+        }
+
+        [Test]
+        public void ComputeDirectMatches_GroupNameMatches_FlagsThatGroup()
+        {
+            var groups = new System.Collections.Generic.Dictionary<int, TsGroupTreeGUI.GroupTreeView.GroupInfo>
+            {
+                [1] = new TsGroupTreeGUI.GroupTreeView.GroupInfo { Id = 1, ParentId = 0, Name = "Enemies" },
+            };
+            _so.Update();
+
+            var matches = TsGroupTreeGUI.GroupTreeView.ComputeDirectMatches(groups, _entriesProp, "enem");
+
+            CollectionAssert.Contains(matches, 1);
+        }
+
+        [Test]
+        public void ComputeDirectMatches_UngroupedBucketWithMatchingEntry_FlagsZero()
+        {
+            var marker = _scope.CreateGameObject("Widget");
+            _config.GlobalEntries = new[] { new TsGroupedEntry { Value = marker, GroupId = 0 } };
+            _so.Update();
+            var groups = new System.Collections.Generic.Dictionary<int, TsGroupTreeGUI.GroupTreeView.GroupInfo>();
+
+            var matches = TsGroupTreeGUI.GroupTreeView.ComputeDirectMatches(groups, _entriesProp, "Widget");
+
+            CollectionAssert.Contains(matches, 0);
+        }
+
+        [Test]
+        public void ComputeDirectMatches_NoMatch_ReturnsEmpty()
+        {
+            var marker = _scope.CreateGameObject("Widget");
+            _config.GlobalEntries = new[] { new TsGroupedEntry { Value = marker, GroupId = 0 } };
+            _so.Update();
+            var groups = new System.Collections.Generic.Dictionary<int, TsGroupTreeGUI.GroupTreeView.GroupInfo>();
+
+            var matches = TsGroupTreeGUI.GroupTreeView.ComputeDirectMatches(groups, _entriesProp, "NothingMatchesThis");
+
+            Assert.IsEmpty(matches);
+        }
+
+        [Test]
+        public void ComputeGroupDisplayPath_UngroupedBucket_ReturnsUngroupedLabel()
+        {
+            var groups = new System.Collections.Generic.Dictionary<int, TsGroupTreeGUI.GroupTreeView.GroupInfo>();
+
+            Assert.AreEqual("(ungrouped)", TsGroupTreeGUI.GroupTreeView.ComputeGroupDisplayPath(groups, 0));
+        }
+
+        [Test]
+        public void ComputeGroupDisplayPath_NestedGroup_JoinsAncestorChainWithSlashes()
+        {
+            var groups = new System.Collections.Generic.Dictionary<int, TsGroupTreeGUI.GroupTreeView.GroupInfo>
+            {
+                [1] = new TsGroupTreeGUI.GroupTreeView.GroupInfo { Id = 1, ParentId = 0, Name = "World" },
+                [2] = new TsGroupTreeGUI.GroupTreeView.GroupInfo { Id = 2, ParentId = 1, Name = "Enemies" },
+                [3] = new TsGroupTreeGUI.GroupTreeView.GroupInfo { Id = 3, ParentId = 2, Name = "Bosses" },
+            };
+
+            Assert.AreEqual("World / Enemies / Bosses", TsGroupTreeGUI.GroupTreeView.ComputeGroupDisplayPath(groups, 3));
+        }
+
+        [Test]
+        public void ComputeGroupDisplayPath_RootLevelGroup_ReturnsJustItsOwnName()
+        {
+            var groups = new System.Collections.Generic.Dictionary<int, TsGroupTreeGUI.GroupTreeView.GroupInfo>
+            {
+                [1] = new TsGroupTreeGUI.GroupTreeView.GroupInfo { Id = 1, ParentId = 0, Name = "World" },
+            };
+
+            Assert.AreEqual("World", TsGroupTreeGUI.GroupTreeView.ComputeGroupDisplayPath(groups, 1));
+        }
+
+        [Test]
+        public void ComputeGroupDisplayPath_CyclicParentChain_DoesNotHangOrThrow()
+        {
+            // BreakGroupCycles is the real defensive backstop for this (see TsModule), but a
+            // display helper reached before that runs must still terminate.
+            var groups = new System.Collections.Generic.Dictionary<int, TsGroupTreeGUI.GroupTreeView.GroupInfo>
+            {
+                [1] = new TsGroupTreeGUI.GroupTreeView.GroupInfo { Id = 1, ParentId = 2, Name = "A" },
+                [2] = new TsGroupTreeGUI.GroupTreeView.GroupInfo { Id = 2, ParentId = 1, Name = "B" },
+            };
+
+            Assert.DoesNotThrow(() => TsGroupTreeGUI.GroupTreeView.ComputeGroupDisplayPath(groups, 1));
+        }
+
+        [Test]
+        public void AddEntry_ButtonHandler_PatchesIndicesInPlace_MatchingSameFrameRender()
+        {
+            // Mirrors DrawContents' own "+ Add" handler: AddEntry prepends at raw index 0, so
+            // every existing raw index shifts up by one - keeps the same-frame render correct
+            // without a GUIUtility.ExitGUI() call, which would abort the draw before the outer
+            // ApplyModifiedProperties() could ever persist the insert.
+            var marker = _scope.CreateGameObject("Existing");
+            _config.GlobalEntries = new[] { new TsGroupedEntry { Value = marker, GroupId = 1, Name = "Existing" } };
+            _so.Update();
+
+            var indices = new System.Collections.Generic.List<int> { 0 };
+
+            TsGroupTreeGUI.AddEntry(_entriesProp, 1);
+            for (int k = 0; k < indices.Count; k++) indices[k]++;
+            indices.Insert(0, 0);
+            _so.ApplyModifiedProperties();
+
+            CollectionAssert.AreEqual(new[] { 0, 1 }, indices);
+            Assert.AreEqual(string.Empty, _config.GlobalEntries[indices[0]].Name);
+            Assert.AreEqual("Existing", _config.GlobalEntries[indices[1]].Name);
         }
     }
 }
