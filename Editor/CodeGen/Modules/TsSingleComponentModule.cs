@@ -52,6 +52,13 @@ namespace Tsvrc.Editor
 
         internal override IEnumerable<string> WatchedAssets() => new[] { AssetPath };
 
+        // PublicPropertyName is a reserved identifier regardless of the current tree-shaking
+        // state - reporting it unconditionally (not only while _isUsed) means a collision is
+        // caught even on a pass where this subsystem happens to be stubbed out, rather than only
+        // resurfacing the next time it becomes used again.
+        internal override IEnumerable<string> ExposedFieldNames() => new[] { PublicPropertyName };
+        internal override int FieldNamePrecedence => ReservedFieldNamePrecedence;
+
         // Reuses ApplyTreeShaking against a single-element list rather than hand-rolling its own
         // grace-period bookkeeping: this subsystem either is or isn't "used" as a whole, which is
         // exactly what a one-entry list resolves to.

@@ -29,7 +29,7 @@ namespace Tsvrc.Editor
         internal override string TabLabel => "Constructs";
         internal override string TabDescription =>
             "Register TsvrcBehaviours that are always active in the scene, not pooled. Each is initialized once at startup (TsConstruct) AND reachable as _ts.Name - one registration, both behaviours, so you don't also need a separate Global entry. Example: add your HudManager here and use _ts.HudManager anywhere. Groups are organizational by default; toggle 'Namespace with group name' on a group to prefix member names.";
-        internal override void DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "ConstructGroups", "ConstructEntries", _treeState,
+        internal override bool DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "ConstructGroups", "ConstructEntries", _treeState,
             "No constructs registered yet. Add a TsvrcBehaviour here to initialize it at startup and expose it as _ts.Name.",
             warnDuplicates: true, groupNaming: true, memberPrefix: "_ts.");
 

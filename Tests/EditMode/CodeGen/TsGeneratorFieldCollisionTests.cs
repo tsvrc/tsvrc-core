@@ -4,10 +4,10 @@ using Tsvrc.Editor;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // Tests TsGenerator.DetectAndExcludeFieldNameCollisions() in isolation from Run(). Only
-    // GlobalModule overrides ExposedFieldNames()/ExcludeFieldNames() among real modules, and its
-    // own Deduplicate() step prevents same-module collisions - so the cross-module path is only
-    // reachable through synthetic modules like these.
+    // Tests TsGenerator.DetectAndExcludeFieldNameCollisions() in isolation from Run(). Real
+    // modules that override ExposedFieldNames() each dedupe their own entries first, so the
+    // cross-module path is mostly exercised through synthetic modules like RecordingModule below,
+    // except where a test targets a real module's own ExposedFieldNames()/FieldNamePrecedence.
     public class TsGeneratorFieldCollisionTests
     {
         private class RecordingModule : TsModule
@@ -143,8 +143,9 @@ namespace Tsvrc.Tests.EditMode
         public void ModuleThatDoesNotOverrideExposedFieldNames_NeverParticipates()
         {
             // The default TsModule.ExposedFieldNames() is Enumerable.Empty<string>() -
-            // a module that doesn't override it (like ConstructModule/FactoryModule/
-            // PoolModule in production) can never collide with anything through this path.
+            // a module that doesn't override it (like FactoryModule/PoolModule in production,
+            // whose generated members are methods, not fields) can never collide with anything
+            // through this path.
             var defaultModule = new RecordingModuleWithDefaultExposedNames();
             var other = new RecordingModule("AnyName");
 
@@ -156,6 +157,49 @@ namespace Tsvrc.Tests.EditMode
         private class RecordingModuleWithDefaultExposedNames : TsModule
         {
             internal override void LoadConfig() { }
+        }
+
+        // "Instance"/"Log"/"Memory" are unconditional, reserved identifiers, always present in
+        // generated code. Guards against a Global entry auto-deriving the same name (e.g. a
+        // GameObject literally named "Instance") producing a silent duplicate-member compile
+        // error instead of a normal, reported collision.
+        [Test]
+        public void InstanceModule_ExposesInstance_AtReservedPrecedence()
+        {
+            var instanceModule = new InstanceModule();
+
+            CollectionAssert.AreEqual(new[] { "Instance" }, instanceModule.ExposedFieldNames());
+            Assert.AreEqual(TsModule.ReservedFieldNamePrecedence, instanceModule.FieldNamePrecedence);
+        }
+
+        [Test]
+        public void LogModule_ExposesLog_AtReservedPrecedence()
+        {
+            var logModule = new LogModule();
+
+            CollectionAssert.AreEqual(new[] { "Log" }, logModule.ExposedFieldNames());
+            Assert.AreEqual(TsModule.ReservedFieldNamePrecedence, logModule.FieldNamePrecedence);
+        }
+
+        [Test]
+        public void MemoryModule_ExposesMemory_AtReservedPrecedence()
+        {
+            var memoryModule = new MemoryModule();
+
+            CollectionAssert.AreEqual(new[] { "Memory" }, memoryModule.ExposedFieldNames());
+            Assert.AreEqual(TsModule.ReservedFieldNamePrecedence, memoryModule.FieldNamePrecedence);
+        }
+
+        [Test]
+        public void GlobalEntryNamedInstance_CollidesWithInstanceModule_GlobalLoses()
+        {
+            var instanceModule = new InstanceModule();
+            var globalLikeModule = new RecordingModule(0, "Instance");
+
+            TsGenerator.DetectAndExcludeFieldNameCollisions(new List<TsModule> { instanceModule, globalLikeModule });
+
+            CollectionAssert.Contains(globalLikeModule.ExcludedNames, "Instance");
+            CollectionAssert.DoesNotContain(TsGenerator.LastFieldNameCollisions, "Instance");
         }
     }
 }

@@ -32,8 +32,12 @@ namespace Tsvrc.Editor
             DestroyBaselineClone();
             _target = target;
             HasPendingChanges = false;
+            // Re-armed immediately rather than left null until the caller's next BeginFrame():
+            // BeginTracking can run outside OnGUI (e.g. via TsGenerator.StateChanged, fired by a
+            // regenerate completing), and leaving suppression down until the next OnGUI call
+            // would open a real window for an automatic trigger to slip through unsuppressed.
             _suppression?.Dispose();
-            _suppression = null;
+            _suppression = _target != null ? TsGenerator.SuppressAutomaticTriggers() : null;
 
             if (_target != null)
             {

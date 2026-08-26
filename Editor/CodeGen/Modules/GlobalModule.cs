@@ -32,7 +32,7 @@ namespace Tsvrc.Editor
         internal override string TabLabel => "Globals";
         internal override string TabDescription =>
             "Register any scene object or component as a named field on _ts. After compiling, access it from any TsvrcBehaviour via _ts.FieldName. Example: drag your GameManager here, then use _ts.GameManager from any behaviour. Groups are organizational by default; toggle 'Namespace with group name' on a group to prefix its entries' member names (e.g. _ts.EnemiesSpawner).";
-        internal override void DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "GlobalGroups", "GlobalEntries", _treeState,
+        internal override bool DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "GlobalGroups", "GlobalEntries", _treeState,
             "No globals registered yet. Add a scene object here to expose it as a field on TsGenerated.",
             warnDuplicates: true, groupNaming: true, memberPrefix: "_ts.");
 

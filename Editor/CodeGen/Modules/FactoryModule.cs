@@ -32,7 +32,7 @@ namespace Tsvrc.Editor
         internal override string TabDescription =>
             "Register prefabs organized into nested groups. Generates a Create{Group}{SubGroup}...{Name}(Transform parent) method for each entry, prefixed by its full group ancestor chain. WARNING: instantiated objects do not receive a VRChat network ID and cannot send or receive network events. Use Pool for networked objects.";
 
-        internal override void DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "FactoryGroups", "FactoryEntries", _treeState,
+        internal override bool DrawTab(SerializedObject so) => TsGroupTreeGUI.Draw(so, "FactoryGroups", "FactoryEntries", _treeState,
             "No factory prefabs registered yet. Add a group on the left, then add prefabs inside it for on-demand instantiation.",
             assetsOnly: true, memberPrefix: "Create", memberSuffix: "(parent)", prefixRespectsToggle: false);
 

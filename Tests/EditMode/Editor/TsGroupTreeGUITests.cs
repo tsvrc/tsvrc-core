@@ -527,28 +527,5 @@ namespace Tsvrc.Tests.EditMode
 
             Assert.DoesNotThrow(() => TsGroupTreeGUI.GroupTreeView.ComputeGroupDisplayPath(groups, 1));
         }
-
-        [Test]
-        public void AddEntry_ButtonHandler_PatchesIndicesInPlace_MatchingSameFrameRender()
-        {
-            // Mirrors DrawContents' own "+ Add" handler: AddEntry prepends at raw index 0, so
-            // every existing raw index shifts up by one - keeps the same-frame render correct
-            // without a GUIUtility.ExitGUI() call, which would abort the draw before the outer
-            // ApplyModifiedProperties() could ever persist the insert.
-            var marker = _scope.CreateGameObject("Existing");
-            _config.GlobalEntries = new[] { new TsGroupedEntry { Value = marker, GroupId = 1, Name = "Existing" } };
-            _so.Update();
-
-            var indices = new System.Collections.Generic.List<int> { 0 };
-
-            TsGroupTreeGUI.AddEntry(_entriesProp, 1);
-            for (int k = 0; k < indices.Count; k++) indices[k]++;
-            indices.Insert(0, 0);
-            _so.ApplyModifiedProperties();
-
-            CollectionAssert.AreEqual(new[] { 0, 1 }, indices);
-            Assert.AreEqual(string.Empty, _config.GlobalEntries[indices[0]].Name);
-            Assert.AreEqual("Existing", _config.GlobalEntries[indices[1]].Name);
-        }
     }
 }

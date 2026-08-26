@@ -58,11 +58,28 @@ namespace Tsvrc.Editor
         // Global field of the same name.
         internal virtual int FieldNamePrecedence => 0;
 
+        // For a module whose GenerateCode() declares an unconditionally-present member (e.g.
+        // InstanceModule's "Instance" property, TsSingleComponentModule's "Log"/"Memory") - a
+        // reserved identifier that must always win a collision, since it exists in generated code
+        // regardless of what any entry is named. Without reporting it via ExposedFieldNames() at
+        // this precedence, an entry that happens to auto-derive the same name (e.g. a Global
+        // referencing a plain GameObject named "Instance") silently produces a duplicate-member
+        // compile error instead of being caught and excluded like any other name collision.
+        internal const int ReservedFieldNamePrecedence = int.MaxValue;
+
         // Non-null shows this module as a tab in TsWindow, labeled TabLabel, described by
         // TabDescription, drawn by DrawTab.
         internal virtual string TabLabel => null;
         internal virtual string TabDescription => null;
-        internal virtual void DrawTab(SerializedObject so) { }
+
+        // Returns true if drawing this tab committed a nested SerializedObject.
+        // ApplyModifiedProperties() call directly against so (e.g. TsGroupTreeGUI's own drag-
+        // and-drop reparenting) - the caller must OR this into its own "did anything change"
+        // tracking, since a raw SerializedProperty assignment never sets GUI.changed, and the
+        // caller's own later ApplyModifiedProperties() call has nothing left to report once a
+        // nested one already flushed it. False for a module with no group-tree UI, or one (like
+        // LogModule) that edits a target other than so through its own separate tracking.
+        internal virtual bool DrawTab(SerializedObject so) => false;
 
         // Names ApplyTreeShaking excluded this pass, empty when tree-shaking is off or nothing was
         // excluded. TsGenerator aggregates every module's list for TsWindow to display.

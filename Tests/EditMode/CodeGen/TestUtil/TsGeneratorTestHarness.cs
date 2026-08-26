@@ -20,16 +20,19 @@ namespace Tsvrc.Tests.EditMode
     // scratch, not yet compiled" pathway, see TsGeneratorBootstrapPersistenceTests.
     internal sealed class TsGeneratorTestHarness : IDisposable
     {
-        // Duplicated from TsGenerator's own private PendingBootstrapKey const, since it isn't
-        // exposed, and every pre-existing test in this suite that touches SessionState directly
-        // already duplicates this same literal rather than reflecting it out.
+        // Duplicated from TsGenerator's own private PendingBootstrapKey/PendingRegenerateKey
+        // consts, since neither is exposed, and every pre-existing test in this suite that
+        // touches SessionState directly already duplicates this same literal rather than
+        // reflecting it out.
         private const string PendingBootstrapKey = "Tsvrc.PendingBootstrap";
+        private const string PendingRegenerateKey = "Tsvrc.PendingRegenerate";
 
         internal TempSceneScope Scope { get; }
 
         internal TsGeneratorTestHarness()
         {
             SessionState.EraseBool(PendingBootstrapKey);
+            SessionState.EraseBool(PendingRegenerateKey);
             Scope = new TempSceneScope();
             ScratchAssets.EnsureFolder();
             TsPaths.GeneratedFolder = ScratchAssets.Folder + "/GeneratedScratch";
@@ -52,6 +55,7 @@ namespace Tsvrc.Tests.EditMode
             Scope.Dispose(); // also resets TsPaths (GeneratedFolder, CompiledClassName, ...) to defaults
             ScratchAssets.DeleteAll();
             SessionState.EraseBool(PendingBootstrapKey);
+            SessionState.EraseBool(PendingRegenerateKey);
         }
     }
 }

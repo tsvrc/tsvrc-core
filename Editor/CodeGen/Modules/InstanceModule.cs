@@ -49,6 +49,14 @@ namespace Tsvrc.Editor
                 yield return $"{TsPaths.GeneratedFolder}/{_detectedType.Name}.asset";
         }
 
+        // The "Instance" property GenerateCode() declares below is unconditional and reserved -
+        // reported here so a Global/Construct/Factory entry that happens to auto-derive the same
+        // name (e.g. referencing a plain GameObject literally named "Instance") gets caught and
+        // excluded by TsGenerator's own collision detection instead of silently producing a
+        // duplicate-member compile error.
+        internal override IEnumerable<string> ExposedFieldNames() => new[] { "Instance" };
+        internal override int FieldNamePrecedence => ReservedFieldNamePrecedence;
+
         internal override string GenerateCode()
         {
             var w = new UdonWriter();

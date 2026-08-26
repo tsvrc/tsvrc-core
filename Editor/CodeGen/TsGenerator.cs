@@ -20,6 +20,7 @@ namespace Tsvrc.Editor
     internal static class TsGenerator
     {
         private const string PendingBootstrapKey = "Tsvrc.PendingBootstrap";
+        private const string PendingRegenerateKey = "Tsvrc.PendingRegenerate";
 
         internal static HashSet<string> WatchedPaths { get; private set; } = new HashSet<string>();
 
@@ -28,6 +29,18 @@ namespace Tsvrc.Editor
         // scoped by design: it only needs to survive the domain reload that follows a write, never
         // a full editor restart. Consumed and cleared by the very next AfterDomainReload() call.
         internal static bool IsBootstrapPending => SessionState.GetBool(PendingBootstrapKey, false);
+
+        // True while ANY pass - bootstrap or not, including one TsPendingConfigEdit.Apply()
+        // triggers - has written changed .cs content and is waiting for the recompile it caused
+        // to settle. Unlike IsBootstrapPending, this arms regardless of allowBootstrap: an Apply
+        // that regenerates real code (e.g. a newly referenced entry) can just as easily need a
+        // recompile to finish wiring as a first-time bootstrap does, and until that settles, the
+        // live TsConfig/TsBuiltinConfig must not accept further edits - Wire()'s eventual
+        // AfterDomainReload() continuation reads whatever is currently on the object, unconditionally
+        // and regardless of any window's own suppression scope, so an edit made during this window
+        // would otherwise be silently swept into that continuation instead of staying held for the
+        // user's next explicit Apply. Session scoped and cleared the same way as IsBootstrapPending.
+        internal static bool IsRegeneratePending => SessionState.GetBool(PendingRegenerateKey, false);
 
         // Fired at the end of every Run() pass, regardless of which branch it exited through, so
         // editor windows can react to "something may have changed" instead of polling on OnFocus.
@@ -272,6 +285,7 @@ namespace Tsvrc.Editor
                 // AfterDomainReload() again with the now current type, and that pass is what
                 // actually wires.
                 if (allowBootstrap) SessionState.SetBool(PendingBootstrapKey, true);
+                SessionState.SetBool(PendingRegenerateKey, true);
                 if (!skipRefresh) AssetDatabase.Refresh();
                 return;
             }
@@ -284,6 +298,7 @@ namespace Tsvrc.Editor
             if (filesWritten)
             {
                 if (allowBootstrap) SessionState.SetBool(PendingBootstrapKey, true);
+                SessionState.SetBool(PendingRegenerateKey, true);
                 if (!skipRefresh) AssetDatabase.Refresh();
                 return;
             }
@@ -306,10 +321,12 @@ namespace Tsvrc.Editor
             }
 
             // Reached only when nothing needed writing or stabilizing. Self-clearing the pending
-            // flag here, not only in AfterDomainReload(), means any pass that reaches settlement
-            // resolves it, regardless of what triggered the pass.
+            // flags here, not only in AfterDomainReload(), means any pass that reaches settlement
+            // resolves them, regardless of what triggered the pass.
             if (SessionState.GetBool(PendingBootstrapKey, false))
                 SessionState.SetBool(PendingBootstrapKey, false);
+            if (SessionState.GetBool(PendingRegenerateKey, false))
+                SessionState.SetBool(PendingRegenerateKey, false);
 
             // Scoped to the linked scene: an unrelated compiled-type instance in an additively-
             // loaded scene must never gate Wire() open or shut for the scene actually being edited.

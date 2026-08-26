@@ -46,11 +46,18 @@ namespace Tsvrc.Editor
             internal int? LastTreeSignature;
         }
 
+        // Fixed height for the left-pane group tree - see Draw()'s own comment on why this can't
+        // be GUILayout.ExpandHeight(true) while nested inside TsWindow's outer scroll view.
+        private const int TreeHeight = 220;
+
         // memberPrefix/memberSuffix enable the per-entry Name field and a live member preview:
         // "_ts." (Global/Construct) or "Create"/"(parent)" (Factory). Null (Pool) hides both.
         // prefixRespectsToggle mirrors BuildGroupPrefix: true honors each group's IncludeInName,
         // false always prefixes (Factory).
-        internal static void Draw(SerializedObject so, string groupsPropertyName, string entriesPropertyName,
+        // Returns true if a drag-and-drop reparent already flushed its own nested
+        // ApplyModifiedProperties() this draw - callers must OR this into their own "did anything
+        // change" tracking, since that raw SerializedProperty write never sets GUI.changed.
+        internal static bool Draw(SerializedObject so, string groupsPropertyName, string entriesPropertyName,
             State state, string emptyHint = null, bool assetsOnly = false, bool warnDuplicates = false,
             bool groupNaming = false, string memberPrefix = null, string memberSuffix = null,
             bool prefixRespectsToggle = true)
@@ -103,17 +110,21 @@ namespace Tsvrc.Editor
 
             EditorGUILayout.BeginHorizontal();
 
-            // Toolbar/rename field drawn above the tree, not below: the tree reserves
-            // ExpandHeight(true), so anything below it is only reachable by scrolling past it -
-            // which could hide a freshly created group's auto-focused rename field entirely. A
-            // "Groups" header plus a rule keeps the toolbar visually distinct from the tree rows.
+            // Toolbar/rename field drawn above the tree, not below it. A "Groups" header plus a
+            // rule keeps the toolbar visually distinct from the tree rows.
+            //
+            // Fixed height (TreeHeight), not GUILayout.ExpandHeight(true): nested inside
+            // TsWindow's own outer scroll view, an ExpandHeight rect has no properly bounded
+            // "available height" to expand to.
             EditorGUILayout.BeginVertical(GUILayout.Width(200));
             EditorGUILayout.LabelField("Groups", EditorStyles.boldLabel);
             DrawGroupToolbar(groupsProp, entriesProp, state, groupNaming);
             EditorGUILayout.Space(2);
             EditorGUILayout.LabelField(string.Empty, GUI.skin.horizontalSlider);
-            var treeRect = GUILayoutUtility.GetRect(200, 220, GUILayout.ExpandHeight(true));
+            var treeRect = GUILayoutUtility.GetRect(200, TreeHeight);
             state.TreeView.OnGUI(treeRect);
+            bool didReparent = state.TreeView.DidReparent;
+            state.TreeView.DidReparent = false;
             if (state.TreeViewState.selectedIDs.Count > 0 &&
                 state.TreeViewState.selectedIDs[0] != state.SelectedGroupId)
             {
@@ -128,6 +139,7 @@ namespace Tsvrc.Editor
             EditorGUILayout.EndVertical();
 
             EditorGUILayout.EndHorizontal();
+            return didReparent;
         }
 
         // Deleting a group never deletes its contents: child groups and entries are reparented
@@ -336,13 +348,9 @@ namespace Tsvrc.Editor
         //
         // Paginated (EntriesPerPage rows drawn at a time) rather than virtualized: two earlier
         // virtualization attempts (a hand-rolled scroll view, then a second TreeView) each fought
-        // IMGUI's event model in different ways with no fix that held up under real interaction.
-        // Pagination sidesteps that class of bug: a small, fixed number of plain EditorGUILayout
-        // rows per page needs no scroll view, no virtualization, no reasoning about IMGUI events.
-        // 10 rows/page sits at the low end of the generally-recommended 10-50 range - appropriate
-        // here since these are dense, multi-line editable rows in a compact side panel, closer to
-        // a data-grid row than a content-list item.
-        private const int EntriesPerPage = 10;
+        // IMGUI's event model with no fix that held up under real interaction. A small, fixed
+        // page of plain EditorGUILayout rows needs neither.
+        private const int EntriesPerPage = 8;
 
         private static void DrawContents(SerializedProperty entriesProp, SerializedProperty groupsProp, State state,
             string emptyHint, bool assetsOnly, bool warnDuplicates,
@@ -376,20 +384,9 @@ namespace Tsvrc.Editor
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(DescribeSelectedGroup(groupsProp, state.SelectedGroupId), EditorStyles.boldLabel);
             GUILayout.FlexibleSpace();
+            bool addClicked;
             using (new EditorGUI.DisabledScope(searching))
-            if (GUILayout.Button("+ Add", GUILayout.Width(60)))
-            {
-                // Prepended (see AddEntry's own comment), so the new entry always lands at the
-                // same fixed spot: page 1, row 1. No ExitGUI(): this runs nested inside
-                // TsWindow's DrawTab(), and it's the OUTER ApplyModifiedProperties() (after
-                // DrawTab() returns) that persists the insert - ExitGUI() would abort before that
-                // ever runs, silently discarding it. Instead, patch `indices` in place: AddEntry
-                // prepends at raw index 0, so every existing raw index shifts up by one.
-                AddEntry(entriesProp, state.SelectedGroupId);
-                for (int k = 0; k < indices.Count; k++) indices[k]++;
-                indices.Insert(0, 0);
-                state.EntriesPage = 0;
-            }
+                addClicked = GUILayout.Button("+ Add", GUILayout.Width(60));
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Space(4);
 
@@ -398,7 +395,7 @@ namespace Tsvrc.Editor
 
             // Group or search changed: back to page 1, since the old page number may not exist
             // for the new set. Reuses scopeChanged from above - group/search don't change between
-            // the two checks. (The Add button above already resets the page itself.)
+            // the two checks. (A pending "+ Add" click resets the page itself too, below.)
             if (scopeChanged)
             {
                 state.EntriesPage = 0;
@@ -441,6 +438,19 @@ namespace Tsvrc.Editor
             {
                 entriesProp.GetArrayElementAtIndex(toDelete).FindPropertyRelative("Value").objectReferenceValue = null;
                 entriesProp.DeleteArrayElementAtIndex(toDelete);
+                // Rows after the deleted one shift up to occupy the previous row's IMGUI control
+                // ids (assigned by draw order, not entry identity) - dropping focus here prevents
+                // a leftover editing state from bleeding onto whichever row shifts into that id.
+                GUIUtility.keyboardControl = 0;
+            }
+
+            if (addClicked)
+            {
+                // Prepended (see AddEntry's own comment), so the new entry always lands at the
+                // same fixed spot: page 1, row 1 - lets repeated adds stay clickable in place.
+                AddEntry(entriesProp, state.SelectedGroupId);
+                state.EntriesPage = 0;
+                GUIUtility.keyboardControl = 0;
             }
 
             if (pageCount > 1)
@@ -476,7 +486,13 @@ namespace Tsvrc.Editor
             if (showNames)
             {
                 var nameProp = entry.FindPropertyRelative("Name");
-                nameProp.stringValue = EditorGUILayout.DelayedTextField(nameProp.stringValue, GUILayout.Width(120));
+                // A plain TextField, not DelayedTextField: a delayed field buffers what you're
+                // typing separately from the bound value until you commit, keyed to this row's
+                // IMGUI control id (assigned by draw order). Prepending a new entry shifts every
+                // later row's id by one, so a stale buffer could get handed to whichever entry now
+                // occupies that id - duplicating a rename onto the new entry while blanking the
+                // original. A plain TextField has no separate buffer to go stale.
+                nameProp.stringValue = EditorGUILayout.TextField(nameProp.stringValue, GUILayout.Width(120));
             }
             bool deleteClicked = ObjectListGUI.DeleteButton();
             EditorGUILayout.EndHorizontal();
@@ -813,9 +829,16 @@ namespace Tsvrc.Editor
                     if (index >= 0)
                         _groupsProp.GetArrayElementAtIndex(index).FindPropertyRelative("ParentId").intValue = targetId;
                     _groupsProp.serializedObject.ApplyModifiedProperties();
+                    // Consumed by Draw() right after this OnGUI call returns, and OR'd into the
+                    // caller's own "did anything change" tracking - see Draw()'s own doc comment.
+                    DidReparent = true;
                 }
                 return DragAndDropVisualMode.Move;
             }
+
+            // Set when a drag-and-drop reparent commits its own nested ApplyModifiedProperties()
+            // call; consumed and cleared by Draw() right after TreeView.OnGUI returns.
+            internal bool DidReparent;
 
             // Internal (not private) so ComputeDirectMatches/ComputeGroupDisplayPath can be
             // driven directly from tests without a real SerializedProperty.

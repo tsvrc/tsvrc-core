@@ -56,33 +56,47 @@ namespace Tsvrc.Editor
                 "Tsvrc > Configure instead, unless you specifically intend to add a library-wide builtin.",
                 MessageType.Info);
 
+            bool regeneratePending = TsGenerator.IsRegeneratePending;
+            if (regeneratePending)
+                TsEditorGUI.DrawStatusBox(
+                    "Waiting for a regenerate triggered by your last Apply to finish compiling - " +
+                    "further edits are disabled until it settles.",
+                    MessageType.Info);
+
             serializedObject.Update();
             _pending.BeginFrame();
             EditorGUI.BeginChangeCheck();
 
-            EditorGUILayout.LabelField("Globals", EditorStyles.boldLabel);
-            TsGroupTreeGUI.Draw(serializedObject, "GlobalGroups", "GlobalEntries", _globalTreeState,
-                "No builtin globals registered yet.", warnDuplicates: true, memberPrefix: "_ts.");
+            // Disabled while a regenerate this inspector's own Apply triggered is still waiting
+            // on a recompile - see TsWindow.OnGUI's matching comment for why.
+            bool didReparent;
+            using (new EditorGUI.DisabledScope(regeneratePending))
+            {
+                EditorGUILayout.LabelField("Globals", EditorStyles.boldLabel);
+                didReparent = TsGroupTreeGUI.Draw(serializedObject, "GlobalGroups", "GlobalEntries", _globalTreeState,
+                    "No builtin globals registered yet.", warnDuplicates: true, memberPrefix: "_ts.");
 
-            EditorGUILayout.Space(10);
-            EditorGUILayout.LabelField("Factories", EditorStyles.boldLabel);
-            TsGroupTreeGUI.Draw(serializedObject, "FactoryGroups", "FactoryEntries", _factoryTreeState,
-                "No builtin factory prefabs registered yet.", assetsOnly: true,
-                memberPrefix: "Create", memberSuffix: "(parent)", prefixRespectsToggle: false);
+                EditorGUILayout.Space(10);
+                EditorGUILayout.LabelField("Factories", EditorStyles.boldLabel);
+                didReparent |= TsGroupTreeGUI.Draw(serializedObject, "FactoryGroups", "FactoryEntries", _factoryTreeState,
+                    "No builtin factory prefabs registered yet.", assetsOnly: true,
+                    memberPrefix: "Create", memberSuffix: "(parent)", prefixRespectsToggle: false);
 
-            EditorGUILayout.Space(10);
-            EditorGUILayout.LabelField("Pool", EditorStyles.boldLabel);
-            TsGroupTreeGUI.Draw(serializedObject, "PoolGroups", "PoolEntries", _poolTreeState,
-                "No builtin pool prefabs registered yet.", assetsOnly: true);
+                EditorGUILayout.Space(10);
+                EditorGUILayout.LabelField("Pool", EditorStyles.boldLabel);
+                didReparent |= TsGroupTreeGUI.Draw(serializedObject, "PoolGroups", "PoolEntries", _poolTreeState,
+                    "No builtin pool prefabs registered yet.", assetsOnly: true);
 
-            EditorGUILayout.Space(10);
-            DrawPropertiesExcluding(serializedObject, ManuallyDrawnProperties);
+                EditorGUILayout.Space(10);
+                DrawPropertiesExcluding(serializedObject, ManuallyDrawnProperties);
+            }
 
             // EndChangeCheck() catches a widget-driven edit even if TsGroupTreeGUI's own drag-
             // and-drop reparenting already flushed it via its own ApplyModifiedProperties() call
-            // above - see TsWindow.OnGUI's matching comment for why this gate exists at all.
+            // above (reported back via Draw's own return value) - see TsWindow.OnGUI's matching
+            // comment for why this gate exists at all.
             bool anyWidgetEdit = EditorGUI.EndChangeCheck();
-            bool anyChangesApplied = serializedObject.ApplyModifiedProperties() || anyWidgetEdit;
+            bool anyChangesApplied = serializedObject.ApplyModifiedProperties() || anyWidgetEdit || didReparent;
             _pending.NotifyAppliedToSerializedObject(anyChangesApplied);
             DrawPendingChangesFooter();
         }

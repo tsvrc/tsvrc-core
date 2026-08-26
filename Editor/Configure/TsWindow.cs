@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Tsvrc.Config;
+using Tsvrc.Utils;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -27,6 +28,13 @@ namespace Tsvrc.Editor
         private TsConfig _config;
         private SerializedObject _so;
         private readonly TsPendingConfigEdit _pending = new TsPendingConfigEdit();
+
+        // The Settings tab's Log section edits a second live object (TsvrcLogger, not TsConfig) -
+        // its own SerializedObject/TsPendingConfigEdit pair, batched like _so/_pending but folded
+        // into the same footer/hasUnsavedChanges. See DrawLogSection.
+        private TsvrcLogger _logger;
+        private SerializedObject _logSo;
+        private readonly TsPendingConfigEdit _logPending = new TsPendingConfigEdit();
 
         [MenuItem("Tsvrc/Configure", priority = 1)]
         private static void Open()
@@ -65,7 +73,11 @@ namespace Tsvrc.Editor
         // would drop a pending edit on every recompile. OnDestroy only fires when the window is
         // actually closing for good, by which point Unity's own dialog has already resolved any
         // pending edit via hasUnsavedChanges/SaveChanges/DiscardChanges.
-        private void OnDestroy() => _pending.Cleanup();
+        private void OnDestroy()
+        {
+            _pending.Cleanup();
+            _logPending.Cleanup();
+        }
 
         private void HandleStateChanged()
         {
@@ -116,14 +128,16 @@ namespace Tsvrc.Editor
         public override void SaveChanges()
         {
             _pending.Apply();
-            hasUnsavedChanges = _pending.HasPendingChanges;
+            _logPending.Apply();
+            hasUnsavedChanges = _pending.HasPendingChanges || _logPending.HasPendingChanges;
             base.SaveChanges();
         }
 
         public override void DiscardChanges()
         {
             _pending.Discard(_so);
-            hasUnsavedChanges = _pending.HasPendingChanges;
+            _logPending.Discard(_logSo);
+            hasUnsavedChanges = _pending.HasPendingChanges || _logPending.HasPendingChanges;
             base.DiscardChanges();
         }
 
@@ -158,16 +172,23 @@ namespace Tsvrc.Editor
             _pending.BeginFrame();
             EditorGUI.BeginChangeCheck();
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
-            _tabs[_tabIndex].DrawTab(_so);
+            // Disabled while a prior Apply's regenerate is still waiting on a recompile
+            // (IsRegeneratePending) - its AfterDomainReload() continuation reads TsConfig
+            // unconditionally, so an edit made here in the meantime would get silently swept into
+            // it instead of staying held for the user's next explicit Apply.
+            bool didNestedApply;
+            using (new EditorGUI.DisabledScope(TsGenerator.IsRegeneratePending))
+                didNestedApply = _tabs[_tabIndex].DrawTab(_so);
             EditorGUILayout.EndScrollView();
             // EndChangeCheck() catches a widget-driven edit even if nested code inside DrawTab
             // already flushed it via its own ApplyModifiedProperties() call before this outer one
-            // runs (e.g. TsGroupTreeGUI's drag-and-drop reparenting) - unlike this call's own
-            // return value, which only reflects what was still unflushed by the time it ran.
+            // runs (e.g. TsGroupTreeGUI's drag-and-drop reparenting, reported back via DrawTab's
+            // own return value) - unlike this call's own return value, which only reflects what
+            // was still unflushed by the time it ran.
             bool anyWidgetEdit = EditorGUI.EndChangeCheck();
-            bool anyChangesApplied = _so.ApplyModifiedProperties() || anyWidgetEdit;
+            bool anyChangesApplied = _so.ApplyModifiedProperties() || anyWidgetEdit || didNestedApply;
             _pending.NotifyAppliedToSerializedObject(anyChangesApplied);
-            hasUnsavedChanges = _pending.HasPendingChanges;
+            hasUnsavedChanges = _pending.HasPendingChanges || _logPending.HasPendingChanges;
 
             EditorGUILayout.Space(8);
             DrawPendingChangesFooter();
@@ -175,12 +196,13 @@ namespace Tsvrc.Editor
             DrawActionFooter();
         }
 
-        // Shown only while there is a pending, unapplied edit - see TsPendingConfigEdit. Apply
-        // ends TsGenerator's suppression scope and fires exactly one regenerate pass; Discard
-        // reverts the tracked TsConfig to its last-applied state without regenerating at all.
+        // Shown only while there is a pending, unapplied edit (TsConfig or the Log section's
+        // TsvrcLogger - see TsPendingConfigEdit). Apply ends TsGenerator's suppression scope and
+        // fires exactly one regenerate pass; Discard reverts both tracked objects to their last-
+        // applied state without regenerating at all.
         private void DrawPendingChangesFooter()
         {
-            if (!_pending.HasPendingChanges) return;
+            if (!_pending.HasPendingChanges && !_logPending.HasPendingChanges) return;
 
             TsEditorGUI.DrawStatusBox(
                 "You have unapplied changes. Apply them to regenerate, or discard them to revert.",
@@ -235,7 +257,7 @@ namespace Tsvrc.Editor
         // be silently lost. Returns false (abort the caller's action) only if the user cancels.
         private bool ResolvePendingChangesBeforeSwitch()
         {
-            if (!_pending.HasPendingChanges) return true;
+            if (!_pending.HasPendingChanges && !_logPending.HasPendingChanges) return true;
 
             int choice = EditorUtility.DisplayDialogComplex(
                 "Unapplied changes",
@@ -277,7 +299,9 @@ namespace Tsvrc.Editor
 
         private void DrawStatus()
         {
-            bool pending = TsGenerator.IsBootstrapPending;
+            // IsRegeneratePending shares the same "waiting for scripts to compile" status as
+            // IsBootstrapPending - same disabled reason, different trigger (bootstrap vs. Apply).
+            bool pending = TsGenerator.IsBootstrapPending || TsGenerator.IsRegeneratePending;
             bool playMode = EditorApplication.isPlayingOrWillChangePlaymode;
             var (message, type) = DetermineStatus(_config != null, pending, playMode, TsLinkedScene.IsConfiguredButNotLoaded, TsLinkedScene.IsConfigured);
             if (message != null)
@@ -386,6 +410,36 @@ namespace Tsvrc.Editor
                 $"(or add {pronoun} to Force Include Names below), or {pronoun} may be excluded on a future regenerate.";
         }
 
+        // Edits TsvrcLogger (not TsConfig) via its own _logSo/_logPending pair, batched the same
+        // way as _so/_pending. Called only from SettingsTabModule.DrawTab.
+        private void DrawLogSection(LogModule logModule)
+        {
+            var logger = LogModule.FindLogger();
+            if (logger == null)
+            {
+                EditorGUILayout.HelpBox(logModule.DetermineNotFoundMessage(), MessageType.Info);
+                _logger = null;
+                _logSo = null;
+                _logPending.BeginTracking(null);
+                return;
+            }
+
+            if (!ReferenceEquals(logger, _logger))
+            {
+                _logger = logger;
+                _logSo = new SerializedObject(logger);
+            }
+            _logPending.BeginTracking(_logger);
+
+            _logSo.Update();
+            _logPending.BeginFrame();
+            EditorGUI.BeginChangeCheck();
+            LogModule.DrawFields(_logSo);
+            bool anyWidgetEdit = EditorGUI.EndChangeCheck();
+            bool anyChangesApplied = _logSo.ApplyModifiedProperties() || anyWidgetEdit;
+            _logPending.NotifyAppliedToSerializedObject(anyChangesApplied);
+        }
+
         // Drawn only once a TsConfig exists (mirrors every tab below it): TreeShakeUnused and
         // ForceIncludeNames both live on TsConfig, one toggle per linked scene/project rather
         // than per module, so there's nothing to bind to before that.
@@ -485,11 +539,11 @@ namespace Tsvrc.Editor
 
         private void DrawActionFooter()
         {
-            bool pending = TsGenerator.IsBootstrapPending;
+            bool pending = TsGenerator.IsBootstrapPending || TsGenerator.IsRegeneratePending;
             bool playMode = EditorApplication.isPlayingOrWillChangePlaymode;
             bool missing = TsLinkedScene.IsConfiguredButMissing;
             bool notLoaded = TsLinkedScene.IsConfiguredButNotLoaded;
-            bool hasPendingChanges = _pending.HasPendingChanges;
+            bool hasPendingChanges = _pending.HasPendingChanges || _logPending.HasPendingChanges;
             string label = DetermineActionLabel(_config != null, notLoaded, missing);
             bool enabled = IsActionEnabled(pending, playMode, missing, hasPendingChanges);
             string disabledReason = DetermineActionDisabledReason(pending, playMode, missing, hasPendingChanges);
@@ -521,9 +575,9 @@ namespace Tsvrc.Editor
         private sealed class SettingsTabModule : TsModule
         {
             private readonly TsWindow _window;
-            private readonly TsModule _logModule;
+            private readonly LogModule _logModule;
 
-            internal SettingsTabModule(TsWindow window, TsModule logModule)
+            internal SettingsTabModule(TsWindow window, LogModule logModule)
             {
                 _window = window;
                 _logModule = logModule;
@@ -536,15 +590,20 @@ namespace Tsvrc.Editor
 
             internal override void LoadConfig() { }
 
-            internal override void DrawTab(SerializedObject so)
+            // Log's own edits go through _window.DrawLogSection, which owns a separate
+            // SerializedObject/TsPendingConfigEdit pair for TsvrcLogger - never through so
+            // (TsConfig's), so this always returns false (no nested apply against so itself).
+            internal override bool DrawTab(SerializedObject so)
             {
                 EditorGUILayout.LabelField("Logging", EditorStyles.boldLabel);
-                _logModule?.DrawTab(so);
+                if (_logModule != null)
+                    _window.DrawLogSection(_logModule);
 
                 EditorGUILayout.Space(12);
                 EditorGUILayout.LabelField("Tree-Shaking (generate only what's used)", EditorStyles.boldLabel);
                 _window.DrawTreeShakingControls();
                 _window.DrawTreeShakingSummary();
+                return false;
             }
         }
     }
