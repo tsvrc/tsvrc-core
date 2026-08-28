@@ -122,7 +122,13 @@ namespace Tsvrc.Editor
             EditorGUILayout.Space(2);
             EditorGUILayout.LabelField(string.Empty, GUI.skin.horizontalSlider);
             var treeRect = GUILayoutUtility.GetRect(200, TreeHeight);
+            // Selection/fold clicks set GUI.changed like any IMGUI control, which would otherwise
+            // trigger TsPendingConfigEdit's expensive full-object diff on plain browsing. Real
+            // tree edits (reparent) are reported separately via DidReparent below.
+            bool guiChangedBeforeTree = GUI.changed;
+            GUI.changed = false;
             state.TreeView.OnGUI(treeRect);
+            GUI.changed = guiChangedBeforeTree;
             bool didReparent = state.TreeView.DidReparent;
             state.TreeView.DidReparent = false;
             if (state.TreeViewState.selectedIDs.Count > 0 &&
@@ -678,7 +684,20 @@ namespace Tsvrc.Editor
                     rows.Add(new TreeViewItem(0, 0, "(ungrouped)"));
 
                 SetupParentsAndChildrenFromDepths(root, rows);
-                return rows;
+
+                // AddChildren always adds every descendant so .children (and the foldout arrow)
+                // stays correct; filter to the collapse-aware visible set here instead.
+                var visible = new List<TreeViewItem>();
+                AddVisibleRecursive(root, visible);
+                return visible;
+            }
+
+            private void AddVisibleRecursive(TreeViewItem item, List<TreeViewItem> visible)
+            {
+                if (item.depth >= 0) visible.Add(item);
+                if (item.hasChildren && (item.depth < 0 || IsExpanded(item.id)))
+                    foreach (var child in item.children)
+                        AddVisibleRecursive(child, visible);
             }
 
             private static void AddChildren(int parentId, int depth, Dictionary<int, GroupInfo> groups,
