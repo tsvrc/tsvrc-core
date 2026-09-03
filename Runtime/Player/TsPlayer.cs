@@ -15,6 +15,26 @@ namespace Tsvrc.Player
         }
 
         /// <summary>
+        /// Extracts the numeric id after the last '#' in a <see cref="GetPlayerID"/> string.
+        /// Parsed manually, not with <c>int.Parse</c>, for UdonSharp compatibility. Returns 0
+        /// instead of throwing if there's no '#' or no digits after it.
+        /// </summary>
+        public static int GetNumericPlayerId(string playerId)
+        {
+            int result = 0;
+            int multiplier = 1;
+            for (int i = playerId.Length - 1; i >= 0; i--)
+            {
+                char c = playerId[i];
+                if (c == '#') return result;
+                if (c < '0' || c > '9') return 0;
+                result += (c - '0') * multiplier;
+                multiplier *= 10;
+            }
+            return 0;
+        }
+
+        /// <summary>
         /// Finds a player by their unique identifier.
         /// It expects the identifier to be the one returned by GetPlayerID.
         /// </summary>

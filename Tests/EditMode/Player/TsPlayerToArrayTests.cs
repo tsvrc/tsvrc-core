@@ -3,9 +3,9 @@ using Tsvrc.Player;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TsPlayer.ToArray is the only member of TsPlayer with zero VRCPlayerApi dependency —
-    // everything else needs a live player list (see Tests/PlayMode/Player/TsPlayerTests.cs)
-    // and can't run in Edit Mode.
+    // TsPlayer.ToArray has zero VRCPlayerApi dependency, unlike most of TsPlayer, which needs a
+    // live player list (see Tests/PlayMode/Player/TsPlayerTests.cs) and can't run in Edit Mode.
+    // GetNumericPlayerId is the other pure-string exception - see TsPlayerGetNumericPlayerIdTests.
     public class TsPlayerToArrayTests
     {
         [Test]
