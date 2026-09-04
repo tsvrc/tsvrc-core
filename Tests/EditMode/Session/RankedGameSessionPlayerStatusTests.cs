@@ -66,6 +66,22 @@ namespace Tsvrc.Tests.EditMode
             Assert.AreEqual(RankedGamePlayerStatus.Playing, h.Session.GetPlayerStatus("B"));
         }
 
+        // Regression test: status must reflect the ready check's actual roster (LoadingPlayerIds),
+        // not the possibly-lagging LobbyPlayerIds.
+        [Test]
+        public void GetPlayerStatus_KnownPresentButNotYetInLobbyTracker_StillReturnsLoading()
+        {
+            var h = CreateWiredSession();
+            h.Session.StartLobbyTracking();
+            h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
+
+            h.Session.StartSession(new[] { "A", "B" });
+
+            CollectionAssert.DoesNotContain(h.Session.LobbyPlayerIds, "B",
+                "Sanity check: B was never added to the lobby tracker itself.");
+            Assert.AreEqual(RankedGamePlayerStatus.Loading, h.Session.GetPlayerStatus("B"));
+        }
+
         [Test]
         public void GetPlayerStatus_PlayerNeverInLobby_ReturnsNotInSessionEvenDuringActiveGame()
         {

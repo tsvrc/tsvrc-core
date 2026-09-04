@@ -108,6 +108,48 @@ namespace Tsvrc.Tests.EditMode
             CollectionAssert.AreEqual(new[] { "A", "B" }, h.ReadyCheck.LastPlayerIds);
         }
 
+        // Regression test: a caller that already knows a player is present can union them into
+        // the snapshot without waiting on LobbyPlayerIds' network round-trip.
+        [Test]
+        public void StartSession_AdditionalKnownPresentPlayerIds_UnionedIntoSnapshot()
+        {
+            var h = CreateWiredSession();
+            h.Session.StartLobbyTracking();
+            h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
+
+            h.Session.StartSession(new[] { "A", "B" });
+
+            Assert.IsTrue(h.ReadyCheck.IsProcessRunning());
+            CollectionAssert.AreEquivalent(new[] { "A", "B" }, h.ReadyCheck.LastPlayerIds);
+        }
+
+        // LobbyPlayerIds is empty (lagging), but the caller already knows who's present -
+        // StartSession must not error "lobby is empty".
+        [Test]
+        public void StartSession_EmptyLobbyButKnownPresentPlayerIds_StartsReadyCheck()
+        {
+            var h = CreateWiredSession();
+            h.Session.StartLobbyTracking();
+
+            h.Session.StartSession(new[] { "A" });
+
+            Assert.IsTrue(h.ReadyCheck.IsProcessRunning());
+            CollectionAssert.AreEqual(new[] { "A" }, h.ReadyCheck.LastPlayerIds);
+        }
+
+        [Test]
+        public void StartSession_NullAdditionalKnownPresentPlayerIds_BehavesLikeNoArgOverload()
+        {
+            var h = CreateWiredSession();
+            h.Session.StartLobbyTracking();
+            h.LobbyTracker.AddTrackedPlayers(new[] { "A", "B" });
+
+            h.Session.StartSession(null);
+
+            Assert.IsTrue(h.ReadyCheck.IsProcessRunning());
+            CollectionAssert.AreEqual(new[] { "A", "B" }, h.ReadyCheck.LastPlayerIds);
+        }
+
         [Test]
         public void StopSession_Idle_LogsErrorAndNoOps()
         {

@@ -97,6 +97,12 @@ namespace Tsvrc.Session
         public string[] LobbyPlayerIds => _lobbyTracker.LastPlayerIds;
         public string[] GamePlayerIds => _gameTracker.LastPlayerIds;
         public string[] CompletedPlayerIds => _completedTracker.LastPlayerIds;
+        /// <summary>The ready check's own tracked roster, grown since <see cref="StartSession"/>
+        /// by any <see cref="AddLoadingParticipant"/> calls. Use this, not
+        /// <see cref="LobbyPlayerIds"/>, to check whether a player is part of the round currently
+        /// loading - <c>StartSession</c>'s <c>additionalKnownPresentPlayerIds</c> can include
+        /// players <c>_lobbyTracker</c> hasn't synced yet.</summary>
+        public string[] LoadingPlayerIds => _readyCheck.LastPlayerIds;
 
         /// <summary>Players added in the most recent <see cref="OnLobbyPlayerAddedEvent"/>.</summary>
         public string[] LastAddedLobbyPlayerIds { get; private set; } = new string[0];
@@ -129,7 +135,7 @@ namespace Tsvrc.Session
         {
             if (TsArray.Contains(CompletedPlayerIds, playerId)) return RankedGamePlayerStatus.Completed;
             if (TsArray.Contains(GamePlayerIds, playerId)) return RankedGamePlayerStatus.Playing;
-            if (CurrentState == RankedGameSessionState.Loading && TsArray.Contains(LobbyPlayerIds, playerId))
+            if (CurrentState == RankedGameSessionState.Loading && TsArray.Contains(LoadingPlayerIds, playerId))
                 return RankedGamePlayerStatus.Loading;
             if (TsArray.Contains(LobbyPlayerIds, playerId)) return RankedGamePlayerStatus.InLobby;
             return RankedGamePlayerStatus.NotInSession;
@@ -191,23 +197,34 @@ namespace Tsvrc.Session
         public void StartLobbyTracking() => _lobbyTracker.StartPlayerTracking(new string[0]);
         public void StopLobbyTracking() => _lobbyTracker.StopPlayerTracking();
 
-        public void StartSession()
+        /// <param name="additionalKnownPresentPlayerIds">Extra player IDs unioned into the ready
+        /// check's initial snapshot, even if <see cref="LobbyPlayerIds"/> doesn't have them yet -
+        /// <c>_lobbyTracker</c>'s network sync can lag behind a caller's own local knowledge (e.g.
+        /// a trigger-area roster). Purely additive; optional.</param>
+        public void StartSession(string[] additionalKnownPresentPlayerIds = null)
         {
             if (CurrentState != RankedGameSessionState.Idle)
             {
                 LogError("StartSession: session is already running.");
                 return;
             }
+
+            string[] roster = LobbyPlayerIds;
+            if (additionalKnownPresentPlayerIds != null)
+                foreach (string id in additionalKnownPresentPlayerIds)
+                    if (id != null && !TsArray.Contains(roster, id))
+                        roster = TsArray.Add(roster, new[] { id });
+
             // ReadyCheckProcess.CheckAllPlayersReady returns early (never auto-completes)
             // when zero players are tracked, so starting with an empty lobby would leave
             // the session stuck in Loading forever with no player able to ever complete
             // the check - only StopSession could recover it.
-            if (LobbyPlayerIds.Length == 0)
+            if (roster.Length == 0)
             {
                 LogError("StartSession: lobby is empty.");
                 return;
             }
-            _readyCheck.StartReadyCheck(LobbyPlayerIds);
+            _readyCheck.StartReadyCheck(roster);
         }
 
         public void StopSession()

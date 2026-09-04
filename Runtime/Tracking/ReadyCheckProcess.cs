@@ -231,7 +231,14 @@ namespace Tsvrc.Tracking
             // Use _readyCheckActive instead of IsProcessRunning(). IsProcessRunning reads the
             // synced _isRunning which may not have arrived yet when called from inside a network
             // event handler. _readyCheckActive is driven by ordered events and is reliable here.
-            if (!_readyCheckActive) return;
+            if (!_readyCheckActive)
+            {
+                // Local-only return - never reaches the network, so a stuck _readyCheckActive
+                // (e.g. a missed OnReadyCheckStarted broadcast) hangs the check with no trace
+                // anywhere else.
+                LogWarning("SetReady: ready check is not active on this client - ignoring.");
+                return;
+            }
 
             string playerId = _localPlayerId;
 
@@ -244,10 +251,22 @@ namespace Tsvrc.Tracking
             // the true process state on the owner.
             if (IsProcessOwner())
             {
-                if (!IsProcessRunning()) return;
+                // Reached if the owner's own process already stopped/completed by the time
+                // SetReady was called - see Process.RequestStopProcess's race.
+                if (!IsProcessRunning())
+                {
+                    LogWarning("SetReady: process is not running on the owner - ignoring.");
+                    return;
+                }
                 if (ready)
                 {
-                    if (!IsTrackedPlayer(playerId) || IsPlayerReady(playerId)) return;
+                    if (IsPlayerReady(playerId)) return;
+                    // Same silent-hang risk as BroadcastAddReadyPlayer below.
+                    if (!IsTrackedPlayer(playerId))
+                    {
+                        LogWarning("SetReady: " + playerId + " is not part of this ready check's tracked players - ignoring.");
+                        return;
+                    }
                     _readyPlayerIds = TsArray.Add(_readyPlayerIds, TsPlayer.ToArray(playerId));
                     RequestSerialization();
                     CheckAllPlayersReady();
@@ -304,13 +323,27 @@ namespace Tsvrc.Tracking
         [NetworkCallable(maxEventsPerSecond: 2)]
         public void BroadcastAddReadyPlayer(string playerId)
         {
-            if (!IsProcessRunning() || !IsProcessOwner()) return;
+            // Not running here usually means this call arrived after the round already stopped -
+            // see Process.RequestStopProcess's race.
+            if (!IsProcessRunning())
+            {
+                LogWarning("BroadcastAddReadyPlayer: process is not running - ignoring ready mark for " + playerId + ".");
+                return;
+            }
+            if (!IsProcessOwner()) return;
             if (string.IsNullOrEmpty(playerId)) return;
             // Only allow a player to mark themselves as ready. CallingPlayer is null for
             // direct local calls so the check is skipped in that case.
             var caller = NetworkCalling.CallingPlayer;
             if (caller != null && TsPlayer.GetPlayerID(caller) != playerId) return;
-            if (!IsTrackedPlayer(playerId) || IsPlayerReady(playerId)) return;
+            if (IsPlayerReady(playerId)) return;
+            // An untracked player's ready mark would otherwise be dropped silently -
+            // CheckAllPlayersReady only ever looks at GetTrackedPlayerIds().
+            if (!IsTrackedPlayer(playerId))
+            {
+                LogWarning("BroadcastAddReadyPlayer: " + playerId + " is not part of this ready check's tracked players - ignoring.");
+                return;
+            }
 
             _readyPlayerIds = TsArray.Add(_readyPlayerIds, TsPlayer.ToArray(playerId));
             RequestSerialization();

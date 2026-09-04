@@ -635,7 +635,12 @@ namespace Tsvrc.Tracking
                 }
             }
 
-            if (validCount == 0) return;
+            // Otherwise-silent signal that the caller's view has drifted from this tracker's.
+            if (validCount == 0)
+            {
+                LogInfo("BroadcastRemoveTrackedPlayers: none of the requested IDs are tracked - no-op.");
+                return;
+            }
 
             if (validCount < playerIds.Length)
             {
