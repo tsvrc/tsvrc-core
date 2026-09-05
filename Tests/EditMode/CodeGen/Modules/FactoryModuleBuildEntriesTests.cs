@@ -119,7 +119,7 @@ namespace Tsvrc.Tests.EditMode
             // drop the second occurrence the way PoolModule.ResolveConfig now does.
             var prefab = CreateScratchPrefab("SharedAcrossGroups");
             SetFlatGroups(_userConfig,
-                ("Maze", new Object[] { prefab }),
+                ("Dungeon", new Object[] { prefab }),
                 ("Boss", new Object[] { prefab }));
 
             var result = BuildEntries(_userConfig, null);

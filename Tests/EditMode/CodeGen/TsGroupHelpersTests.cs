@@ -94,13 +94,13 @@ namespace Tsvrc.Tests.EditMode
         {
             var groups = new[]
             {
-                new TsGroup { Id = 1, ParentId = 0, Name = "Maze", IncludeInName = false },
+                new TsGroup { Id = 1, ParentId = 0, Name = "Dungeon", IncludeInName = false },
                 new TsGroup { Id = 2, ParentId = 1, Name = "Skybox", IncludeInName = false },
             };
 
             string prefix = TsModuleTestHarness.CallBuildGroupPrefix(2, groups, s => s, respectToggle: false);
 
-            Assert.AreEqual("MazeSkybox", prefix, "The Factory case (respectToggle off) always uses the full path.");
+            Assert.AreEqual("DungeonSkybox", prefix, "The Factory case (respectToggle off) always uses the full path.");
         }
 
         [Test]

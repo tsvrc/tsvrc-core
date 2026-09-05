@@ -127,7 +127,7 @@ namespace Tsvrc.Tests.EditMode
             var cached = new System.Collections.Generic.List<ModuleEntrySnapshot.Entry>();
             for (int i = 0; i < RealBuiltinFactoryCount(); i++)
                 cached.Add(new ModuleEntrySnapshot.Entry { Name = $"Padding{i}", TypeName = "GameObject", Namespace = "" });
-            cached.Add(new ModuleEntrySnapshot.Entry { Name = "MazeWallStoneFantasy", TypeName = "GameObject", Namespace = "" });
+            cached.Add(new ModuleEntrySnapshot.Entry { Name = "DungeonWallStoneFantasy", TypeName = "GameObject", Namespace = "" });
             ModuleEntrySnapshot.Save(SnapshotKey, cached);
             // There is no user TsConfig in this scene, simulating every Factories prefab reference having
             // gone null because the assembly declaring it (or the scene itself) is unreadable.
@@ -136,7 +136,7 @@ namespace Tsvrc.Tests.EditMode
             var module = new FactoryModule();
             module.LoadConfig();
 
-            StringAssert.Contains("CreateMazeWallStoneFantasy", module.GenerateCode());
+            StringAssert.Contains("CreateDungeonWallStoneFantasy", module.GenerateCode());
         }
 
         [Test]

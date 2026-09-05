@@ -114,7 +114,7 @@ namespace Tsvrc.Tests.EditMode
             TsConfig config = go.AddComponent<TsConfig>();
             config.GlobalGroups = new[]
             {
-                new TsGroup { Id = 1, ParentId = 0, Name = "Maze" },
+                new TsGroup { Id = 1, ParentId = 0, Name = "Dungeon" },
                 new TsGroup { Id = 2, ParentId = 1, Name = "Arena" },
             };
 
@@ -125,7 +125,7 @@ namespace Tsvrc.Tests.EditMode
             string firstName = groups.GetArrayElementAtIndex(0).FindPropertyRelative(nameof(TsGroup.Name)).stringValue;
             string secondName = groups.GetArrayElementAtIndex(1).FindPropertyRelative(nameof(TsGroup.Name)).stringValue;
 
-            Assert.AreEqual("Maze", firstName);
+            Assert.AreEqual("Dungeon", firstName);
             Assert.AreEqual("Arena", secondName);
         }
     }

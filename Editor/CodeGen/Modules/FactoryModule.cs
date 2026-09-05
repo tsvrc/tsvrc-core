@@ -202,7 +202,7 @@ namespace Tsvrc.Editor
                 // A deleted prefab reference (a null slot) logs, matching Global/Construct/
                 // Pool's wording. Deliberately does not route through the shared TryAcceptEntry
                 // helper the way Pool does: the same prefab registered twice here (once per
-                // differently-named group, e.g. "Maze" and "Boss" both spawning the same bullet
+                // differently-named group, e.g. "Dungeon" and "Boss" both spawning the same bullet
                 // prefab) is a legitimate use case, not a mistake, so duplicate-reference
                 // detection would be a false positive.
                 var obj = entry?.Value;

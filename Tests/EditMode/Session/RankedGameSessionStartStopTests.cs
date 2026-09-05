@@ -274,7 +274,7 @@ namespace Tsvrc.Tests.EditMode
         public void AddLoadingParticipant_WhileInGame_NoOps()
         {
             // A player entering the gaming area after the round has already started can't be
-            // caught up - the data transfer that would have given them the maze is long over.
+            // caught up - the data transfer that would have given them the level layout is long over.
             var h = CreateWiredSession();
             h.Session.StartLobbyTracking();
             h.LobbyTracker.AddTrackedPlayers(new[] { "A" });
