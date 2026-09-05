@@ -1,11 +1,11 @@
 {
   "name": "com.tsvrc.core",
-  "displayName": "Tsvrc Core",
+  "displayName": "TsVRC Core",
   "version": "0.1.0",
   "unity": "2022.3",
-  "description": "Tsvrc's core framework for VRChat UdonSharp worlds: structured initialization, dependency wiring, and editor codegen tooling.",
+  "description": "TsVRC's core framework for building VRChat worlds with UdonSharp: structured initialization, dependency wiring, and editor codegen tooling. Independent, community-maintained — not affiliated with VRChat Inc.",
   "author": {
-    "name": "Tsvrc",
+    "name": "TsVRC",
     "url": "https://tsvrc.com"
   },
   "vpmDependencies": {
