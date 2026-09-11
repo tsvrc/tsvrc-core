@@ -52,10 +52,8 @@ namespace Tsvrc.Editor
         // Called with the set of conflicting names so the module can remove them and log errors.
         internal virtual void ExcludeFieldNames(IEnumerable<string> names) { }
 
-        // Tie-breaker when two modules expose the same field name: the highest-precedence module
-        // keeps it and the others drop it. An exact tie at the top is a real collision and strips
-        // the name from all. Default 0; ConstructModule raises it so its accessor supersedes a
-        // Global field of the same name.
+        // On a field name collision, highest precedence wins and the rest drop the name. A tie
+        // at the top drops it everywhere. Default 0 - see ReservedFieldNamePrecedence.
         internal virtual int FieldNamePrecedence => 0;
 
         // For a module whose GenerateCode() declares an unconditionally-present member (e.g.
@@ -527,8 +525,8 @@ namespace Tsvrc.Editor
             return true;
         }
 
-        // A resolved, named registration shared by Global and Construct: a scene object exposed on
-        // _ts under a stable identifier.
+        // A scene object plus the stable name its field is generated under. Global also exposes
+        // that name as _ts.Name; Construct keeps it private.
         protected struct ResolvedEntry
         {
             public string Name;

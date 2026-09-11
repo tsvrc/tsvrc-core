@@ -5,9 +5,9 @@ using Tsvrc.Editor;
 namespace Tsvrc.Tests.EditMode
 {
     // Tests TsGenerator.DetectAndExcludeFieldNameCollisions() in isolation from Run(). Real
-    // modules that override ExposedFieldNames() each dedupe their own entries first, so the
-    // cross-module path is mostly exercised through synthetic modules like RecordingModule below,
-    // except where a test targets a real module's own ExposedFieldNames()/FieldNamePrecedence.
+    // modules dedupe their own entries first, so the cross-module path is mostly exercised
+    // through synthetic modules like RecordingModule below - except for the real
+    // ReservedFieldNamePrecedence modules (Instance/Log/Memory), tested directly further down.
     public class TsGeneratorFieldCollisionTests
     {
         private class RecordingModule : TsModule
@@ -58,16 +58,14 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void HigherPrecedenceModuleKeepsName_LowerPrecedenceModuleDropsIt()
         {
-            // The Construct-supersedes-Global case: a construct (high precedence) exposing the same
-            // name as a global (default precedence) keeps it; the global drops it, and it is NOT
-            // reported as a genuine collision.
-            var global = new RecordingModule(0, "GameManager");
-            var construct = new RecordingModule(100, "GameManager");
+            // Higher precedence keeps the name, lower precedence drops it - not a genuine collision.
+            var lower = new RecordingModule(0, "GameManager");
+            var higher = new RecordingModule(100, "GameManager");
 
-            TsGenerator.DetectAndExcludeFieldNameCollisions(new List<TsModule> { global, construct });
+            TsGenerator.DetectAndExcludeFieldNameCollisions(new List<TsModule> { lower, higher });
 
-            CollectionAssert.Contains(global.ExcludedNames, "GameManager");
-            CollectionAssert.DoesNotContain(construct.ExcludedNames, "GameManager");
+            CollectionAssert.Contains(lower.ExcludedNames, "GameManager");
+            CollectionAssert.DoesNotContain(higher.ExcludedNames, "GameManager");
             CollectionAssert.DoesNotContain(TsGenerator.LastFieldNameCollisions, "GameManager");
         }
 

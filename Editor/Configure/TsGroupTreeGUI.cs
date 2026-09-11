@@ -554,10 +554,9 @@ namespace Tsvrc.Editor
             element.FindPropertyRelative("Name").stringValue = string.Empty;
         }
 
-        // Dim line under an entry showing the member it generates: "_ts.Name" (Global/Construct)
-        // or "CreateName(parent)" (Factory), prefixed by its group chain. A blank Name shows
-        // "<auto>", since the derived default depends on the object's resolved type at generate
-        // time.
+        // Dim line under an entry showing the member it generates, e.g. "_ts.Name" (Global) or
+        // "CreateName(parent)" (Factory), prefixed by its group chain. Blank Name shows "<auto>" -
+        // the derived default depends on the object's resolved type at generate time.
         private static void DrawMemberPreview(SerializedProperty entry, SerializedProperty groupsProp,
             string memberPrefix, string memberSuffix, bool prefixRespectsToggle)
         {
