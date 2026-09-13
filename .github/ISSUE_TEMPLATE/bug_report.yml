@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in TsVRC isn't working as documented.
+labels: [bug]
+body:
+  - type: input
+    id: tsvrc-version
+    attributes:
+      label: TsVRC version
+      description: The version shown in VCC or your package.json's vpmDependencies lock.
+    validations:
+      required: true
+  - type: input
+    id: unity-version
+    attributes:
+      label: Unity version
+    validations:
+      required: true
+  - type: input
+    id: sdk-version
+    attributes:
+      label: VRChat Worlds SDK version
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps starting from a fresh project, if possible.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the exact error/log output if there is one.
+    validations:
+      required: true
