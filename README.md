@@ -20,4 +20,11 @@ Found a security issue? See [SECURITY.md](SECURITY.md) rather than opening a pub
 
 ## License
 
-Apache-2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Apache-2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE). The TsVRC name and logo are
+governed separately, see
+[TRADEMARK.md](https://github.com/tsvrc/.github/blob/main/TRADEMARK.md).
+
+## Governance
+
+See [GOVERNANCE.md](https://github.com/tsvrc/.github/blob/main/GOVERNANCE.md) for how
+decisions get made and how to become a maintainer.
