@@ -51,6 +51,8 @@ jobs:
             ~/.nuget/packages
           key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/*.csproj') }}
 
+      # Reads source.json at the repo root, since this repo's root is the package
+      # itself, not a "Packages/<name>" subfolder.
       - name: Build Package Version Listing
         run: ${{ env.pathToCi }}/build.cmd BuildRepoListing --root ${{ env.pathToCi }} --list-publish-directory $GITHUB_WORKSPACE/${{ env.listPublishDirectory }} --current-package-name ${{ vars.PACKAGE_NAME }}
         env:
