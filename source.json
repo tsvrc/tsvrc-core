@@ -8,6 +8,7 @@
   },
   "url": "https://tsvrc.github.io/tsvrc-core/index.json",
   "description": "Package listing for TsVRC",
+  "bannerUrl": "banner.png",
   "githubRepos": [
     "tsvrc/tsvrc-core"
   ]
