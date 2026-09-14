@@ -6,6 +6,8 @@ All notable changes to this package are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.1.1]
+
 ### Changed
 
 - `vpmDependencies`'s VRChat Worlds SDK requirement raised from `3.5.x` to `3.10.x`.
@@ -14,5 +16,6 @@ All notable changes to this package are documented here. Format follows
 
 Initial release.
 
-[Unreleased]: https://github.com/tsvrc/tsvrc-core/compare/0.1.0...HEAD
+[Unreleased]: https://github.com/tsvrc/tsvrc-core/compare/0.1.1...HEAD
+[0.1.1]: https://github.com/tsvrc/tsvrc-core/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/tsvrc/tsvrc-core/releases/tag/0.1.0
