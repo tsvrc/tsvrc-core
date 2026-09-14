@@ -76,3 +76,11 @@ jobs:
             ${{ env.unityPackage }}
             ${{ env.packagePath }}/package.json
           tag_name: ${{ env.version }}
+
+      - name: Notify VPM listing
+        run: |
+          curl -sf -X POST \
+            -H "Authorization: Bearer ${{ secrets.VPM_LISTING_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/tsvrc/vpm/dispatches \
+            -d '{"event_type":"package-released"}'
