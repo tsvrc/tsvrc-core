@@ -6,6 +6,10 @@ All notable changes to this package are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed
+
+- `vpmDependencies`'s VRChat Worlds SDK requirement raised from `3.5.x` to `3.10.x`.
+
 ## [0.1.0]
 
 Initial release.
