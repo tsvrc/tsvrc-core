@@ -7,9 +7,11 @@
   "license": "Apache-2.0",
   "author": {
     "name": "TsVRC",
+    "email": "contact@tsvrc.com",
     "url": "https://tsvrc.com"
   },
   "vpmDependencies": {
     "com.vrchat.worlds": "3.5.x"
-  }
+  },
+  "changelogUrl": "https://github.com/tsvrc/tsvrc-core/blob/main/CHANGELOG.md"
 }

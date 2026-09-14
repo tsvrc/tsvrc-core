@@ -1,0 +1,78 @@
+name: Build Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  # Ensure the PACKAGE_NAME repository variable has been created
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      config_package: ${{ steps.config_package.outputs.configPackage }}
+    steps:
+      - name: Validate Package Config
+        id: config_package
+        run: |
+          if [ "${{ vars.PACKAGE_NAME }}" != "" ]; then
+            echo "configPackage=true" >> $GITHUB_OUTPUT;
+          else
+            echo "configPackage=false" >> $GITHUB_OUTPUT;
+          fi
+
+  # Build and release the package. Skipped if PACKAGE_NAME isn't configured.
+  #
+  # Adapted from https://github.com/vrchat-community/template-package's release.yml:
+  # that template assumes the package lives in a "Packages/<name>" subfolder of a
+  # full Unity project. This repo's root IS the package (package.json lives at the
+  # repo root), since it's added to a Unity project as a local VPM package rather
+  # than checked out as a project itself, so packagePath is "." instead.
+  build:
+    needs: config
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      packagePath: .
+    if: needs.config.outputs.config_package == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+
+      - name: Get Version
+        id: version
+        run: echo "value=$(jq -r .version "${{ env.packagePath }}/package.json")" >> "$GITHUB_OUTPUT"
+
+      - name: Set Environment Variables
+        run: |
+          echo "zipFile=${{ vars.PACKAGE_NAME }}-${{ steps.version.outputs.value }}".zip >> $GITHUB_ENV
+          echo "unityPackage=${{ vars.PACKAGE_NAME }}-${{ steps.version.outputs.value }}.unitypackage" >> $GITHUB_ENV
+          echo "version=${{ steps.version.outputs.value }}" >> $GITHUB_ENV
+
+      - name: Create Package Zip
+        working-directory: "${{ env.packagePath }}"
+        # Exclude repo/CI plumbing that isn't part of the Unity package itself.
+        run: zip -r "${{ github.workspace }}/${{ env.zipFile }}" . -x ".git/*" ".github/*"
+
+      - name: Track Package Meta Files
+        run: find "${{ env.packagePath }}/" -name \*.meta >> metaList
+
+      - name: Create UnityPackage
+        uses: pCYSl5EDgo/create-unitypackage@v1.2.3
+        with:
+          package-path: ${{ env.unityPackage }}
+          include-files: metaList
+
+      - name: Create Tag
+        id: tag_version
+        uses: rickstaa/action-create-tag@88dbf7ff6fe2405f8e8f6c6fdfd78829bc631f83
+        with:
+          tag: "${{ env.version }}"
+
+      - name: Make Release
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844
+        with:
+          files: |
+            ${{ env.zipFile }}
+            ${{ env.unityPackage }}
+            ${{ env.packagePath }}/package.json
+          tag_name: ${{ env.version }}
