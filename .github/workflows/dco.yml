@@ -13,3 +13,6 @@ jobs:
         uses: christophebedard/dco-check@0.5.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A bot (Dependabot, etc.) can't certify the DCO itself; the maintainer
+          # merging the PR is the one taking responsibility for it.
+          DCO_CHECK_EXCLUDE_PATTERN: '\[bot\]@users\.noreply\.github\.com$'
