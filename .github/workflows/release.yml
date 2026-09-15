@@ -50,8 +50,13 @@ jobs:
 
       - name: Create Package Zip
         working-directory: "${{ env.packagePath }}"
-        # Exclude repo/CI plumbing that isn't part of the Unity package itself.
-        run: zip -r "${{ github.workspace }}/${{ env.zipFile }}" . -x ".git/*" ".github/*"
+        # Exclude repo/CI plumbing, tsvrc's own internal test suite, and dev-only docs -
+        # none of it is needed to run the package (see Testing/ for the public test API).
+        run: |
+          zip -r "${{ github.workspace }}/${{ env.zipFile }}" . \
+            -x ".git/*" ".github/*" \
+            -x "Tests/*" "Tests.meta" \
+            -x "AGENTS.md" "CONTRIBUTING.md" "SECURITY.md" "OPEN_SOURCE_PLAN.md"
 
       - name: Track Package Meta Files
         run: find "${{ env.packagePath }}/" -name \*.meta >> metaList

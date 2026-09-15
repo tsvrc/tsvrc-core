@@ -10,6 +10,15 @@ namespace Tsvrc.Editor
     {
         static TsDomainReloadHandler() => EditorApplication.delayCall += () =>
         {
+            // Exactly one install must exist. A second one collides GUIDs and silently orphans
+            // every existing reference. Checked first since this assembly still runs even if that breaks the build.
+            if (OtherInstallPathExists(out string otherPath))
+                Debug.LogError($"[Tsvrc] Both '{PackagePaths.Root}' and '{otherPath}' exist - only one " +
+                    "install (.unitypackage or VPM package) may be present at a time. Having both makes " +
+                    "Unity assign a fresh GUID to one copy's scripts, silently breaking every existing " +
+                    $"reference to them (scenes, prefabs, TsConfig entries). Delete '{otherPath}' completely " +
+                    "(folder and .meta), then let Unity reimport.");
+
             // Checked eagerly, before anything else below, and deliberately not gated by
             // AutomaticTriggersSuppressed: a totally missing scaffold file looks like any other
             // compile break to the compiler, so a project that lost Assets/TsGenerated entirely
@@ -38,6 +47,12 @@ namespace Tsvrc.Editor
             if (TsGenerator.AutomaticTriggersSuppressed) return;
             TsGenerator.AfterDomainReload();
         };
+
+        private static bool OtherInstallPathExists(out string otherPath)
+        {
+            otherPath = PackagePaths.Root == "Assets/Tsvrc" ? "Packages/com.tsvrc.core" : "Assets/Tsvrc";
+            return System.IO.File.Exists(TsPaths.ToFullPath(otherPath) + "/package.json");
+        }
     }
 }
 #endif

@@ -2,6 +2,7 @@
 using System.IO;
 using System.Runtime.CompilerServices;
 using UnityEditor;
+using UnityEngine;
 
 namespace Tsvrc.Editor
 {
@@ -17,7 +18,14 @@ namespace Tsvrc.Editor
     {
         private static string _root;
 
-        internal static string Root => _root ??= ComputeRoot();
+        internal static string Root
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_root)) _root = ComputeRoot();
+                return _root;
+            }
+        }
 
         private static string ComputeRoot([CallerFilePath] string thisFilePath = "")
         {
@@ -25,7 +33,10 @@ namespace Tsvrc.Editor
             string codeGenDir = Path.GetDirectoryName(thisFilePath);
             string editorDir = Path.GetDirectoryName(codeGenDir);
             string packageRoot = Path.GetDirectoryName(editorDir);
-            return FileUtil.GetProjectRelativePath(packageRoot.Replace('\\', '/') + "/").TrimEnd('/');
+
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string absoluteRoot = Path.GetFullPath(Path.Combine(projectRoot, packageRoot));
+            return FileUtil.GetProjectRelativePath(absoluteRoot.Replace('\\', '/') + "/").TrimEnd('/');
         }
     }
 }
