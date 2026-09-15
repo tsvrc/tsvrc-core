@@ -1,7 +1,7 @@
 {
   "name": "com.tsvrc.core",
   "displayName": "TsVRC",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "unity": "2022.3",
   "description": "Open-source UdonSharp framework for VRChat worlds: structured initialization, dependency wiring, and editor codegen.",
   "license": "Apache-2.0",
