@@ -13,5 +13,5 @@
   "vpmDependencies": {
     "com.vrchat.worlds": "3.10.x"
   },
-  "changelogUrl": "https://github.com/tsvrc/tsvrc-core/blob/main/CHANGELOG.md"
+  "changelogUrl": "https://github.com/tsvrc/tsvrc-core/releases"
 }

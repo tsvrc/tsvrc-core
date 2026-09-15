@@ -42,6 +42,16 @@ jobs:
         id: version
         run: echo "value=$(jq -r .version "${{ env.packagePath }}/package.json")" >> "$GITHUB_OUTPUT"
 
+      - name: Require Version Bump
+        # Fails before any build work starts if package.json's version wasn't bumped
+        # since the last release, so re-running this workflow is a no-op, never a
+        # duplicate or overwritten release.
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${{ steps.version.outputs.value }}" >/dev/null; then
+            echo "::error::Version ${{ steps.version.outputs.value }} is already released - bump package.json's version first."
+            exit 1
+          fi
+
       - name: Set Environment Variables
         run: |
           echo "zipFile=${{ vars.PACKAGE_NAME }}-${{ steps.version.outputs.value }}".zip >> $GITHUB_ENV
@@ -76,6 +86,7 @@ jobs:
       - name: Make Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
+          generate_release_notes: true
           files: |
             ${{ env.zipFile }}
             ${{ env.unityPackage }}
