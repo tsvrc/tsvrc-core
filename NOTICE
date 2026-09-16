@@ -1,11 +1,12 @@
 TsVRC
 Copyright 2025-2026 Antony Seas
 
-This product includes software developed by Antony Seas (https://tsvrc.com).
+This repository (tsvrc-core) is the UdonSharp framework distributed as "TsVRC". It's one
+project under the tsvrc GitHub organization (https://github.com/tsvrc). TsVRC is
+open-source and community-maintained. It isn't affiliated with, endorsed by, or
+sponsored by VRChat Inc.
 
-TsVRC is an open-source, community-maintained project and is not affiliated with,
-endorsed by, or sponsored by VRChat Inc.
-
-"TsVRC" and any associated logos are trademarks of Antony Seas. Use of the TsVRC name
-or logo in forks or derivative works is subject to the project's trademark policy
-(see TRADEMARK.md) and is not covered by the Apache License 2.0 grant above.
+"TsVRC" and any associated logos aren't registered trademarks, they're the name and logo
+used across the tsvrc organization, not just this repository. See TRADEMARK.md for how
+they can be used. This repository's Apache License 2.0 (see LICENSE) covers the code, not
+the name or logo.
