@@ -14,8 +14,9 @@ dependency-injection container. TsVRC resolves them once, at edit time: an edito
 reads your project's configuration and writes plain C# with direct references already
 baked in. Nothing gets looked up while the world is actually running.
 
-Docs: [tsvrc.com](https://tsvrc.com). Not affiliated with, endorsed by, or sponsored by
-VRChat Inc.
+Docs: [tsvrc.com](https://tsvrc.com).
+
+*TsVRC is not affiliated with, endorsed by, or sponsored by VRChat Inc.*
 
 ## Quick look
 
@@ -67,6 +68,8 @@ flowchart LR
 
 Full explanation: [How TsVRC fits
 together](https://tsvrc.com/docs/tsvrc/core-concepts/how-it-fits-together).
+
+*Is this overcomplicated? idk, but I like it.*
 
 ## What's included
 
