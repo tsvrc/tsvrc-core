@@ -9,31 +9,16 @@ namespace Tsvrc.Core
 {
     /// <summary>
     /// Base class for networked, owner-driven processes: start/stop/complete lifecycle,
-    /// ownership transfer on player leave, optional periodic update ticks, and a periodic
-    /// full-state resync, all scoped to the process owner.
+    /// ownership handoff, and periodic ticks, scoped to the process owner.
     /// </summary>
-    /// <remarks>
-    /// Every <see cref="_autoResyncInterval"/> seconds, the owner re-broadcasts all of the
-    /// object's synced fields via <c>RequestSerialization</c>. This self-heals a client that
-    /// missed a discrete <c>[NetworkCallable]</c> broadcast - those aren't delivery-confirmed -
-    /// without needing any acknowledgement or retry logic of its own.
-    /// </remarks>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     [TsWorldExtensionPoint("TsProcess")]
     public class Process : TsvrcBehaviour
     {
-        // Covers the entire Process subtree (PlayerTracker, ReadyCheckProcess,
-        // and so on) with a single override, so none of them need their own.
         protected override bool IsTsvrcInternal => true;
 
         [UdonSynced] private bool _isRunning = false;
-        // The full string ID of the current process owner, formatted as "DisplayName#playerId".
-        // Only used for FindPlayerByID lookups. All equality comparisons use _ownerPlayerIdInt
-        // instead to avoid string allocations.
         [UdonSynced] private string _ownerId = "";
-        // The numeric player ID of the current process owner, synced alongside _ownerId.
-        // Lets every client check ownership without building the "DisplayName#playerId" string.
-        // Always updated together with _ownerId inside SetProcessOwner.
         [UdonSynced] private int _ownerPlayerIdInt = 0;
         [UdonSynced] private bool _useProcessUpdate = false;
 
