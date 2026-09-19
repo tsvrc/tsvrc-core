@@ -18,7 +18,7 @@ namespace Tsvrc.Core
         protected override bool IsTsvrcInternal => true;
 
         [UdonSynced] private bool _isRunning = false;
-        [UdonSynced] private string _ownerId = "";
+        [UdonSynced] private string _tsOwnerId = "";
         [UdonSynced] private int _ownerPlayerIdInt = 0;
         [UdonSynced] private bool _useProcessUpdate = false;
 
@@ -90,9 +90,9 @@ namespace Tsvrc.Core
             // and we skip this block entirely. Third, when the old owner is suspended they are
             // still findable in the instance, so we also check isSuspended below.
             if (!Networking.IsOwner(gameObject) || !IsProcessRunning() || IsProcessOwner()) return;
-            if (_ownerId == "") return;
+            if (_tsOwnerId == "") return;
 
-            var oldOwner = TsPlayer.FindPlayerByID(_ownerId);
+            var oldOwner = TsPlayer.FindPlayerByID(_tsOwnerId);
             if (oldOwner != null && !oldOwner.isSuspended) return;
 
             TakeOverAbandonedProcess();
@@ -142,9 +142,9 @@ namespace Tsvrc.Core
                 // IsProcessOwner() is already false and the loop-restart block below would
                 // not fire anyway. We still return early to prevent FindPlayerByID("") from
                 // returning null and triggering a spurious ownership claim.
-                if (_ownerId == "") return;
+                if (_tsOwnerId == "") return;
 
-                var namedOwner = TsPlayer.FindPlayerByID(_ownerId);
+                var namedOwner = TsPlayer.FindPlayerByID(_tsOwnerId);
                 if (namedOwner == null || namedOwner.isSuspended)
                 {
                     // Intentionally no return. We fall through to the loop-restart block so
@@ -287,7 +287,7 @@ namespace Tsvrc.Core
         /// </summary>
         protected void SetProcessOwner(VRCPlayerApi newOwner)
         {
-            _ownerId = TsPlayer.GetPlayerID(newOwner);
+            _tsOwnerId = TsPlayer.GetPlayerID(newOwner);
             _ownerPlayerIdInt = newOwner.playerId;
             Networking.SetOwner(newOwner, gameObject);
             RequestSerialization();
@@ -370,7 +370,7 @@ namespace Tsvrc.Core
             // OnProcessStarted() already fired.
             if (!_isRunning)
             {
-                _ownerId = "";
+                _tsOwnerId = "";
                 _ownerPlayerIdInt = 0;
                 _useProcessUpdate = false;
                 _updateLoopActive = false;
