@@ -18,8 +18,12 @@ namespace Tsvrc.Core
         protected override bool IsTsvrcInternal => true;
 
         [UdonSynced] private bool _isRunning = false;
-        [UdonSynced] private string _tsOwnerId = "";
-        [UdonSynced] private int _ownerPlayerIdInt = 0;
+
+        private int _localPlayerId = -1;
+
+        // Blocks TakeOverAbandonedProcess from re-firing once ownership is settled
+        private bool _ownershipEstablished = false;
+
         [UdonSynced] private bool _useProcessUpdate = false;
 
         private const float _processUpdateInterval = 0.5f;
@@ -47,35 +51,18 @@ namespace Tsvrc.Core
         // outer event context. This is safe because Udon is single-threaded.
         protected bool _isBroadcasting = false;
 
-        // The local player's string ID, cached once in TsStart. Accessible by subclasses to avoid
-        // calling TsPlayer.GetPlayerID(Networking.LocalPlayer) on every event.
-        protected string _localPlayerId = "";
-        // The local player's numeric ID, cached once in TsStart. Used for allocation-free
-        // comparisons against _ownerPlayerIdInt.
-        private int _localPlayerIdInt = 0;
-
         protected override void TsStart()
         {
             base.TsStart();
 
-            _localPlayerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
-            _localPlayerIdInt = Networking.LocalPlayer.playerId;
+            _localPlayerId = Networking.LocalPlayer.playerId;
         }
 
         public override void OnPlayerLeft(VRCPlayerApi player)
         {
             base.OnPlayerLeft(player);
 
-            if (!IsProcessRunning()) return;
-
-            // Skip if this player is not the current process owner. Comparing ints instead of
-            // strings avoids allocation; it is equivalent because player IDs are unique per session.
-            if (player.playerId != _ownerPlayerIdInt) return;
-
-            // VRChat normally transfers Unity ownership before OnPlayerLeft fires. There is a known
-            // engine bug where OnOwnershipTransferred fires after OnPlayerLeft instead. If that
-            // happens, OnOwnershipTransferred handles the takeover as a fallback.
-            if (!Networking.IsOwner(gameObject)) return;
+            if (!IsProcessRunning() || !IsProcessOwner()) return;
 
             TakeOverAbandonedProcess();
         }
@@ -84,16 +71,8 @@ namespace Tsvrc.Core
         {
             base.OnOwnershipTransferred(player);
 
-            // This handles three cases. First, if OnPlayerLeft ran but found IsOwner=false and
-            // did nothing, we check here whether the named owner is truly gone. Second, if
-            // OnPlayerLeft already ran TakeOverAbandonedProcess, IsProcessOwner() returns true
-            // and we skip this block entirely. Third, when the old owner is suspended they are
-            // still findable in the instance, so we also check isSuspended below.
-            if (!Networking.IsOwner(gameObject) || !IsProcessRunning() || IsProcessOwner()) return;
-            if (_tsOwnerId == "") return;
-
-            var oldOwner = TsPlayer.FindPlayerByID(_tsOwnerId);
-            if (oldOwner != null && !oldOwner.isSuspended) return;
+            // Backstop for OnPlayerLeft, in case it ran before ownership actually landed.
+            if (!IsProcessRunning() || !IsProcessOwner()) return;
 
             TakeOverAbandonedProcess();
         }
@@ -102,21 +81,10 @@ namespace Tsvrc.Core
         {
             base.OnPlayerSuspendChanged(player);
 
-            // A suspended process owner cannot run Udon code or receive network events, so the
-            // tick loop would stall permanently. We need to transfer ownership away from them.
-            //
-            // We only react to the suspend event (isSuspended=true). On wakeup, the player
-            // receives buffered deserialization packets that restore the correct _ownerId, so
-            // no action is needed on wakeup.
-            //
-            // All non-suspended clients see this event simultaneously and each calls
-            // Networking.SetOwner. VRChat picks one winner. OnOwnershipTransferred then fires
-            // for all clients and only the actual new Unity owner runs TakeOverAbandonedProcess.
-            if (!player.isSuspended || !IsProcessRunning()) return;
-            // Same int comparison as OnPlayerLeft.
-            if (player.playerId != _ownerPlayerIdInt) return;
-            // Already the Unity owner, nothing to do.
-            if (Networking.IsOwner(gameObject)) return;
+            // A suspended device stops running Udon and stops responding to network events:
+            // https://creators.vrchat.com/worlds/udon/players/#get-issuspended
+            // If the owner suspends, the tick loop stalls with nobody left able to restart it.
+            if (!player.isSuspended || !IsProcessRunning() || !Networking.IsOwner(player, gameObject)) return;
 
             Networking.SetOwner(Networking.LocalPlayer, gameObject);
         }
@@ -285,32 +253,22 @@ namespace Tsvrc.Core
         /// Transfers process ownership to <paramref name="newOwner"/> and syncs the change
         /// to all clients. Prefer this over <c>Networking.SetOwner</c> directly.
         /// </summary>
+        /// <remarks>
+        /// Don't write synced fields right after this call: the old owner needs to ack the
+        /// transfer first, or the write can silently drop.
+        /// https://udonsharp.docs.vrchat.com/networking-tips-&-tricks#known-issues
+        /// </remarks>
         protected void SetProcessOwner(VRCPlayerApi newOwner)
         {
-            _tsOwnerId = TsPlayer.GetPlayerID(newOwner);
-            _ownerPlayerIdInt = newOwner.playerId;
             Networking.SetOwner(newOwner, gameObject);
-            RequestSerialization();
         }
 
         /// <summary>
         /// Returns <c>true</c> if the local player is the current process owner.
         /// </summary>
-        /// <remarks>
-        /// We compare <c>_ownerPlayerIdInt</c> instead of calling <c>Networking.IsOwner()</c>
-        /// because <c>Networking.SetOwner</c> is not reflected locally right away. Our own
-        /// <c>_ownerPlayerIdInt</c> is written synchronously in <c>SetProcessOwner</c> and
-        /// arrives together with <c>_isRunning</c> for remote clients via <c>OnDeserialization</c>.
-        /// The <c>_ownerPlayerIdInt != 0</c> guard prevents a false positive when no process is
-        /// running. 0 is used as the no-owner sentinel because valid VRChat player IDs start at 1.
-        /// If <c>TsStart</c> was never called, <c>_localPlayerIdInt</c> is also 0, which would
-        /// otherwise cause this to return <c>true</c> with no active process.
-        /// </remarks>
         protected bool IsProcessOwner()
         {
-            // Equivalent to: _ownerId != "" && _ownerId == _localPlayerId, without the
-            // string allocation.
-            return _ownerPlayerIdInt != 0 && _ownerPlayerIdInt == _localPlayerIdInt;
+            return Networking.IsOwner(gameObject);
         }
 
         /// <summary>
@@ -506,17 +464,12 @@ namespace Tsvrc.Core
 
         private void TakeOverAbandonedProcess()
         {
-            SetProcessOwner(Networking.LocalPlayer);
+            if (_ownershipEstablished) return;
+            _ownershipEstablished = true;
 
-            // Call OnOwnerAbandonedProcess before starting the tick loop, consistent with
-            // how StartProcess calls OnProcessStarted before scheduling the first tick.
-            // Subclasses that set up state in OnOwnerAbandonedProcess need it to run before
-            // the first OnProcessUpdate call.
+            // Fires before the tick loop starts, same ordering as StartProcess/OnProcessStarted.
             OnOwnerAbandonedProcess();
 
-            // OnDeserialization does not fire for the player who called RequestSerialization,
-            // so we restart the loop manually here. The 0-second delay keeps the behavior
-            // consistent with StartProcess: the first tick runs on the next frame.
             _StartTickLoopIfNeeded();
         }
 
