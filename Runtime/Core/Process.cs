@@ -310,7 +310,7 @@ namespace Tsvrc.Core
         /// <remarks>
         /// Don't write synced fields right after this call: the old owner needs to ack the
         /// transfer first, or the write can silently drop.
-        /// https://udonsharp.docs.vrchat.com/networking-tips-&-tricks#known-issues
+        /// <c>https://udonsharp.docs.vrchat.com/networking-tips-&amp;-tricks/#known-issues</c>
         /// </remarks>
         protected void SetProcessOwner(VRCPlayerApi newOwner)
         {
