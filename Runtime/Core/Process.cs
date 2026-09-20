@@ -19,8 +19,6 @@ namespace Tsvrc.Core
 
         [UdonSynced] private bool _isRunning = false;
 
-        private int _localPlayerId = -1;
-
         // Blocks TakeOverRunningProcess from re-firing once ownership is settled
         private bool _ownershipEstablished = false;
 
@@ -54,8 +52,6 @@ namespace Tsvrc.Core
         protected override void TsStart()
         {
             base.TsStart();
-
-            _localPlayerId = Networking.LocalPlayer.playerId;
         }
 
         public override void OnPlayerLeft(VRCPlayerApi player)
