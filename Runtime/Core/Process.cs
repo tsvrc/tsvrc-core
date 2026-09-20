@@ -130,7 +130,7 @@ namespace Tsvrc.Core
         [NetworkCallable(maxEventsPerSecond: 1)]
         public void RequestStartProcess(bool useProcessUpdate = false)
         {
-            if (!IsProcessOwner() || _isRunning)
+            if (!IsProcessOwner() || IsProcessRunning())
             {
                 LogWarning("RequestStartProcess rejected: not the owner or already running.");
                 return;
