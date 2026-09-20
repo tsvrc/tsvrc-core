@@ -228,7 +228,21 @@ namespace Tsvrc.Core
         {
             _isRunning = false;
             OnProcessCompleted();
-            InternalCleanup(true);
+            ExecuteCleanup(true);
+        }
+
+        private void ExecuteCleanup(bool isCompleted)
+        {
+            if (!IsProcessRunning())
+            {
+                _useProcessUpdate = false;
+                _updateLoopActive = false;
+                _ownershipEstablished = false;
+
+                OnProcessCleanup(isCompleted);
+            }
+
+            RequestSerialization();
         }
 
         /// <summary>
@@ -378,51 +392,6 @@ namespace Tsvrc.Core
         /// the local player stops being the owner.
         /// </remarks>
         protected virtual void OnProcessUpdate() { }
-
-        /// <summary>
-        /// Clears synced process state, calls the <see cref="OnProcessCleanup"/> subclass hook,
-        /// then serializes everything in one packet. Always called by <see cref="ExecuteStop"/>
-        /// and <see cref="ExecuteComplete"/> so critical resets are never skipped even if a
-        /// subclass overrides <see cref="OnProcessCleanup"/> without calling base.
-        /// </summary>
-        private void InternalCleanup(bool isCompleted)
-        {
-            // If a listener reacts to OnProcessStopped or OnProcessCompleted by calling
-            // StartProcess synchronously (which is possible because VRChat fires
-            // SendCustomNetworkEvent(All,...) inline on the sender), _isRunning will be true
-            // again by the time we reach this point. In that case _ownerId, _useProcessUpdate,
-            // and _updateLoopActive already belong to the new process and must not be cleared.
-            // Clearing _ownerId would make IsProcessOwner() return false, causing subclass
-            // broadcast handlers to reject all incoming acks. Clearing _updateLoopActive would
-            // kill the new process tick loop on the next invocation.
-            //
-            // OnProcessCleanup is skipped in that same case, for the same reason: it
-            // belongs to the process that just stopped/completed, and subclasses are
-            // documented to clear their own synced state inside it. Running it here
-            // would clobber the new process's just-set state one line after its own
-            // OnProcessStarted() already fired.
-            if (!_isRunning)
-            {
-                _tsOwnerId = "";
-                _ownerPlayerIdInt = 0;
-                _useProcessUpdate = false;
-                _updateLoopActive = false;
-
-                // Call OnProcessCleanup before RequestSerialization so that any synced
-                // variables a subclass clears in that hook are already zeroed when the
-                // packet goes out. If we serialized first, remote clients would receive
-                // _isRunning=false alongside stale subclass array values, and unless the
-                // subclass calls RequestSerialization itself in OnProcessCleanup, no
-                // corrective packet would ever follow.
-                OnProcessCleanup(isCompleted);
-            }
-
-            // Serialize the final state so remote clients see the cleared owner and running flag.
-            // If a subclass already called RequestSerialization inside OnProcessCleanup, this
-            // second call is harmless. If a new process was started from an inline callback,
-            // _isRunning is true and we serialize the new process state instead.
-            RequestSerialization();
-        }
 
         private void TakeOverAbandonedProcess()
         {
