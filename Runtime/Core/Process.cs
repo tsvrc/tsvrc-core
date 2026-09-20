@@ -102,40 +102,51 @@ namespace Tsvrc.Core
         }
 
         /// <summary>
-        /// Starts the process, claiming ownership of the object for the local player.
+        /// Starts the process. Safe to call from anyone: if the local player is not the owner, this just
+        /// asks the owner to start it.
         /// </summary>
-        /// <param name="useProcessUpdate">When <c>true</c>, <see cref="OnProcessUpdate"/> fires every 0.5 s while the process runs.</param>
         /// <remarks>
-        /// If two clients call <c>StartProcess</c> before either's <c>RequestSerialization</c>
-        /// packet is received, both pass the <c>_isRunning</c> guard and both fire
-        /// <c>OnProcessStarted</c>. One client's packet eventually overwrites the other via
-        /// <c>OnDeserialization</c>, leaving the losing client with a locally running process
-        /// the network has already discarded. Protect against this at a higher level, for example
-        /// by only calling this from the instance master or through a coordinated network event.
+        /// Does not change who owns the object. If you want the local player to become the
+        /// owner, call <see cref="SetProcessOwner"/> yourself before calling this.
         /// </remarks>
+        /// <param name="useProcessUpdate">Pass <c>true</c> to get an update tick every 0.5s while running.</param>
         public virtual void StartProcess(bool useProcessUpdate = false)
         {
-            if (_isRunning)
+            if (IsProcessRunning())
             {
-                LogWarning("Process is already running.");
+                LogWarning("Process is already running, ignoring start call.");
                 return;
             }
 
-            // Set _isRunning and _useProcessUpdate before calling SetProcessOwner so the
-            // RequestSerialization inside it sends one packet containing all updated state.
-            _isRunning = true;
-            _useProcessUpdate = useProcessUpdate;
-
             if (!IsProcessOwner())
             {
-                SetProcessOwner(Networking.LocalPlayer);
-            }
-            else
-            {
-                RequestSerialization();
+                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestStartProcess), useProcessUpdate);
+                return;
             }
 
+            ExecuteStart(useProcessUpdate);
+        }
+
+        [NetworkCallable(maxEventsPerSecond: 1)]
+        public void RequestStartProcess(bool useProcessUpdate = false)
+        {
+            if (!IsProcessOwner() || _isRunning)
+            {
+                LogWarning("RequestStartProcess rejected: not the owner or already running.");
+                return;
+            }
+
+            ExecuteStart(useProcessUpdate);
+        }
+
+        private void ExecuteStart(bool useProcessUpdate)
+        {
+            _isRunning = true;
+            _useProcessUpdate = useProcessUpdate;
+            _ownershipEstablished = true;
+
             OnProcessStarted();
+            RequestSerialization();
 
             _StartTickLoopIfNeeded();
         }
