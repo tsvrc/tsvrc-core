@@ -1,4 +1,3 @@
-using Tsvrc.Player;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.UdonNetworkCalling;
@@ -18,28 +17,18 @@ namespace Tsvrc.Core
         protected override bool IsTsvrcInternal => true;
 
         [UdonSynced] private bool _isRunning = false;
+        [UdonSynced] private bool _useProcessUpdate = false;
 
         // Blocks TakeOverRunningProcess from re-firing once ownership is settled
         private bool _ownershipEstablished = false;
 
-        [UdonSynced] private bool _useProcessUpdate = false;
-
         private const float _processUpdateInterval = 0.5f;
-        // How often a running, owned process re-broadcasts its full synced state. See the class
-        // remarks above for why this exists. Short enough that a missed discrete event is only
-        // ever visibly wrong for a few seconds; long enough that idle processes cost negligible
-        // bandwidth.
+        // Tradeoff: short enough that a missed event is only briefly wrong; long enough to stay cheap.
         private const float _autoResyncInterval = 5f;
-
-        // Tracks whether the tick loop is currently scheduled to prevent scheduling it twice.
-        // Runs for every running, owned process regardless of _useProcessUpdate - it drives the
-        // resync heartbeat unconditionally and OnProcessUpdate only when a subclass opted in.
+        // Gates both the always-on resync heartbeat and the opt-in OnProcessUpdate call.
         private bool _updateLoopActive = false;
-        // Real-time (Time.realtimeSinceStartup) deadline the next legitimate tick is due at.
-        // See _TickProcessUpdate for how this is used to discard stale scheduled calls.
         private float _nextTickDueAtRealTime = 0f;
-        // Real-time deadline the next resync broadcast is due at. Advanced independently of
-        // _nextTickDueAtRealTime since the two run on different cadences.
+        // Separate from _nextTickDueAtRealTime since the two run on different cadences.
         private float _nextResyncDueAtRealTime = 0f;
 
         // Set to true just before and cleared just after every SendCustomNetworkEvent(All, ...) call.
@@ -109,7 +98,7 @@ namespace Tsvrc.Core
         }
 
         /// <summary>
-        /// Starts the process. Safe to call from anyone: if the local player is not the owner, this just
+        /// Starts the Process. Safe to call from anyone: if the local player is not the owner, this just
         /// asks the owner to start it.
         /// </summary>
         /// <remarks>
@@ -270,7 +259,7 @@ namespace Tsvrc.Core
         /// </summary>
         /// <remarks>
         /// Internal only, public only because <c>SendCustomEventDelayedSeconds</c> requires a
-        /// public target. Never call this directly outside <see cref="Process"/>.
+        /// public target. Never call this directly, including from subclasses.
         /// </remarks>
         public void _TickProcessUpdate()
         {
