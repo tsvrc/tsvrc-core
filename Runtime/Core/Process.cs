@@ -93,39 +93,8 @@ namespace Tsvrc.Core
         {
             base.OnDeserialization();
 
-            // In Manual sync mode, a reliable packet queued by a departed or suspended owner
-            // can arrive after TakeOverAbandonedProcess has already run, overwriting _ownerId
-            // with the old owner's ID. Two problems follow from that:
-            //   a) _TickProcessUpdate sees IsProcessOwner() as false and kills the tick loop.
-            //   b) A later OnOwnershipTransferred sees IsProcessOwner() as false and
-            //      FindPlayerByID returns null, causing TakeOverAbandonedProcess to run again.
-            //
-            // To recover: if we hold Unity ownership, the process is still running, but _ownerId
-            // names a player who is gone or suspended, we reassert ownership here.
-            // VRChat removes departed players from GetPlayers() before OnPlayerLeft fires, so
-            // FindPlayerByID returns null for them. Suspended players remain with isSuspended=true.
-            if (Networking.IsOwner(gameObject) && _isRunning && !IsProcessOwner())
-            {
-                // _ownerId="" is always written together with _ownerPlayerIdInt=0, so
-                // IsProcessOwner() is already false and the loop-restart block below would
-                // not fire anyway. We still return early to prevent FindPlayerByID("") from
-                // returning null and triggering a spurious ownership claim.
-                if (_tsOwnerId == "") return;
-
-                var namedOwner = TsPlayer.FindPlayerByID(_tsOwnerId);
-                if (namedOwner == null || namedOwner.isSuspended)
-                {
-                    // Intentionally no return. We fall through to the loop-restart block so
-                    // that if the stale packet already killed the loop before this event fired,
-                    // the loop gets recovered in the same OnDeserialization call.
-                    SetProcessOwner(Networking.LocalPlayer);
-                }
-            }
-
-            // Restart the tick loop if we are the owner and it is not currently running.
-            // This covers stale-packet recovery and any other situation where the loop went
-            // silent unexpectedly. See TakeOverAbandonedProcess for the one case this block
-            // can't reach on its own.
+            // Restart the tick loop if the local player is the owner and it is not currently running.
+            // Covers stale-packet recovery and any other situation where the loop went silent.
             if (IsProcessOwner() && IsProcessRunning())
             {
                 _StartTickLoopIfNeeded();
