@@ -31,11 +31,6 @@ namespace Tsvrc.Core
         // Separate from _nextTickDueAtRealTime since the two run on different cadences.
         private float _nextResyncDueAtRealTime = 0f;
 
-        protected override void TsStart()
-        {
-            base.TsStart();
-        }
-
         public override void OnPlayerLeft(VRCPlayerApi player)
         {
             base.OnPlayerLeft(player);
