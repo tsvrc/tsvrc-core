@@ -359,13 +359,25 @@ namespace Tsvrc.Core
         protected virtual void OnOwnerAbandonedProcess() { }
 
         /// <summary>
-        /// Called when a cleanup of the process data is requested.
-        /// <b>Only invoked on the process owner.</b>
-        /// Override to add subclass-specific cleanup. No base call required.
-        /// Mandatory state resets and serialization are handled by <see cref="InternalCleanup"/>.
+        /// Called while the process is being cleaned up after a stop or a completion. Override
+        /// this to clear any synced state your subclass owns.
         /// </summary>
+        /// <remarks>
+        /// Runs only on the process owner, before the cleanup packet is serialized, so state you
+        /// clear here is reflected in that packet.
+        /// </remarks>
         /// <param name="isCompleted">True if cleanup is after successful completion, false if after stop/abort.</param>
         protected virtual void OnProcessCleanup(bool isCompleted) { }
+
+        /// <summary>
+        /// Called on a fixed interval while the process is running, if <see cref="StartProcess"/>
+        /// was called with <c>useProcessUpdate</c> set to <c>true</c>.
+        /// </summary>
+        /// <remarks>
+        /// Runs only on the process owner, roughly every half second, until the process ends or
+        /// the local player stops being the owner.
+        /// </remarks>
+        protected virtual void OnProcessUpdate() { }
 
         /// <summary>
         /// Clears synced process state, calls the <see cref="OnProcessCleanup"/> subclass hook,
@@ -411,13 +423,6 @@ namespace Tsvrc.Core
             // _isRunning is true and we serialize the new process state instead.
             RequestSerialization();
         }
-
-        /// <summary>
-        /// Called at regular intervals if the process is running and the local player is the owner
-        /// and <c>useProcessUpdate: true</c> was passed to <see cref="StartProcess"/>.
-        /// <b>Only invoked on the process owner.</b>
-        /// </summary>
-        protected virtual void OnProcessUpdate() { }
 
         private void TakeOverAbandonedProcess()
         {
