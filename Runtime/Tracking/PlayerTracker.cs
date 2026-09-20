@@ -53,6 +53,13 @@ namespace Tsvrc.Tracking
         // Temporary storage for initial player IDs during process start.
         protected string[] _initialTrackerPlayerIds = new string[0];
 
+        // Set to true just before and cleared just after every SendCustomNetworkEvent(All, ...) call.
+        // On the sending client VRChat fires the event inline before returning, so the broadcast
+        // handler runs inside our own call stack. This flag lets the handler's CallingPlayer guard
+        // know the inline execution is legitimate, even when CallingPlayer carries a value from an
+        // outer event context. This is safe because Udon is single-threaded.
+        protected bool _isBroadcasting = false;
+
         /// <summary>The tracked player IDs at the time of the last received broadcast or deserialization.</summary>
         public string[] LastPlayerIds { get; private set; } = new string[0];
         /// <summary>The player IDs added in the last <see cref="BroadcastAddTrackedPlayers"/> broadcast.</summary>

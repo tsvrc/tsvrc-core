@@ -31,13 +31,6 @@ namespace Tsvrc.Core
         // Separate from _nextTickDueAtRealTime since the two run on different cadences.
         private float _nextResyncDueAtRealTime = 0f;
 
-        // Set to true just before and cleared just after every SendCustomNetworkEvent(All, ...) call.
-        // On the sending client VRChat fires the event inline before returning, so the broadcast
-        // handler runs inside our own call stack. This flag lets the handler's CallingPlayer guard
-        // know the inline execution is legitimate, even when CallingPlayer carries a value from an
-        // outer event context. This is safe because Udon is single-threaded.
-        protected bool _isBroadcasting = false;
-
         protected override void TsStart()
         {
             base.TsStart();
