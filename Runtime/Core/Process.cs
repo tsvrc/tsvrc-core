@@ -151,6 +151,86 @@ namespace Tsvrc.Core
             _StartTickLoopIfNeeded();
         }
 
+        /// <summary>
+        /// Forcibly stops the Process before completion.
+        /// If called by a non-owner, the request is forwarded to the owner via a network event.
+        /// </summary>
+        public virtual void StopProcess()
+        {
+            if (!IsProcessRunning())
+            {
+                LogWarning("Process is not running, ignoring stop call.");
+                return;
+            }
+
+            if (!IsProcessOwner())
+            {
+                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestStopProcess));
+                return;
+            }
+
+            ExecuteStop();
+        }
+
+        [NetworkCallable(maxEventsPerSecond: 1)]
+        public void RequestStopProcess()
+        {
+            if (!IsProcessOwner() || !IsProcessRunning())
+            {
+                LogWarning("RequestStopProcess rejected: not the owner or not running.");
+                return;
+            }
+
+            ExecuteStop();
+        }
+
+        private void ExecuteStop()
+        {
+            _isRunning = false;
+            OnProcessStopped();
+            InternalCleanup(false);
+        }
+
+        /// <summary>
+        /// Completes the Process successfully.
+        /// If called by a non-owner, the request is forwarded to the owner via a network event.
+        /// </summary>
+        public virtual void CompleteProcess()
+        {
+            if (!IsProcessRunning())
+            {
+                LogWarning("Process is not running, ignoring complete call.");
+                return;
+            }
+
+            if (!IsProcessOwner())
+            {
+                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestCompleteProcess));
+                return;
+            }
+
+            ExecuteComplete();
+        }
+
+        [NetworkCallable(maxEventsPerSecond: 1)]
+        public void RequestCompleteProcess()
+        {
+            if (!IsProcessOwner() || !IsProcessRunning())
+            {
+                LogWarning("RequestCompleteProcess rejected: not the owner or not running.");
+                return;
+            }
+
+            ExecuteComplete();
+        }
+
+        private void ExecuteComplete()
+        {
+            _isRunning = false;
+            OnProcessCompleted();
+            InternalCleanup(true);
+        }
+
         // Schedules the tick loop if it is not already running. The loop always runs for any
         // running, owned process - it drives the resync heartbeat (see the class remarks)
         // unconditionally, and additionally calls OnProcessUpdate every tick if a subclass opted
@@ -173,55 +253,6 @@ namespace Tsvrc.Core
             SendCustomEventDelayedSeconds(nameof(_TickProcessUpdate), 0f);
         }
 
-        /// <summary>
-        /// Forcibly stops the Tsvrc Process before completion.
-        /// If called by a non-owner, the request is forwarded to the owner via a network event.
-        /// </summary>
-        public virtual void StopProcess()
-        {
-            if (!_isRunning)
-            {
-                LogWarning("Process is not running.");
-                return;
-            }
-
-            // We accept authority if we are either the process owner by ID or the Unity owner.
-            // The Unity owner fallback covers a timing window where the previous owner just left,
-            // VRChat transferred Unity ownership to us, but our _ownerId has not been updated yet
-            // by the incoming deserialization packet. Without this fallback we would unnecessarily
-            // forward the stop request back to ourselves over the network.
-            if (!IsProcessOwner() && !Networking.IsOwner(gameObject))
-            {
-                // Not the owner, so forward to whoever currently owns the object.
-                // RequestStopProcess has its own guard to discard stale arrivals.
-                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestStopProcess));
-                return;
-            }
-
-            ExecuteStop();
-        }
-
-        /// <summary>
-        /// Completes the Tsvrc Process successfully.
-        /// If called by a non-owner, the request is forwarded to the owner via a network event.
-        /// </summary>
-        public virtual void CompleteProcess()
-        {
-            if (!_isRunning)
-            {
-                LogWarning("Process is not running.");
-                return;
-            }
-
-            // Same dual-authority check as StopProcess.
-            if (!IsProcessOwner() && !Networking.IsOwner(gameObject))
-            {
-                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestCompleteProcess));
-                return;
-            }
-
-            ExecuteComplete();
-        }
 
         /// <summary>Returns <c>true</c> if the process is currently running.</summary>
         public bool IsProcessRunning()
@@ -401,47 +432,6 @@ namespace Tsvrc.Core
             SendCustomEventDelayedSeconds(nameof(_TickProcessUpdate), _processUpdateInterval);
         }
 
-        /// <summary>
-        /// Received by the owner when a non-owner calls <see cref="StopProcess"/>.
-        /// Guard checks discard the event if ownership disagreement caused misrouting,
-        /// or if no process is running at all by the time the packet arrives.
-        /// </summary>
-        /// <remarks>
-        /// Rate-limited to 1 call per second. Any player in the instance can invoke this directly
-        /// as a network event because VRChat cannot restrict callers of <c>[NetworkCallable]</c>
-        /// methods. Authorization beyond the owner guard below is the responsibility of subclasses.
-        /// Calls beyond the rate limit are queued, not dropped, and can arrive up to roughly a
-        /// second late. There is no per-run generation token, so a stale call arriving after the
-        /// same owner has already stopped and restarted the process (a new, unrelated run) is
-        /// indistinguishable from a legitimate call for the current run, and incorrectly stops it.
-        /// Callers that stop and restart in quick succession need to coordinate that at a higher
-        /// level, the same way <see cref="StartProcess"/>'s own remarks require for its race.
-        /// </remarks>
-        [NetworkCallable(maxEventsPerSecond: 1)]
-        public void RequestStopProcess()
-        {
-            // Same dual-authority fallback as StopProcess, for the same timing window.
-            if ((!IsProcessOwner() && !Networking.IsOwner(gameObject)) || !_isRunning) return;
-            ExecuteStop();
-        }
-
-        /// <summary>
-        /// Received by the owner when a non-owner calls <see cref="CompleteProcess"/>.
-        /// Guard checks discard the event if ownership disagreement caused misrouting,
-        /// or if no process is running at all by the time the packet arrives.
-        /// </summary>
-        /// <remarks>
-        /// Rate-limited to 1 call per second. Same caller-authorization note and the same
-        /// stale-call-targets-a-new-run limitation as <see cref="RequestStopProcess"/>.
-        /// </remarks>
-        [NetworkCallable(maxEventsPerSecond: 1)]
-        public void RequestCompleteProcess()
-        {
-            // Same dual-authority guard as RequestStopProcess.
-            if ((!IsProcessOwner() && !Networking.IsOwner(gameObject)) || !_isRunning) return;
-            ExecuteComplete();
-        }
-
         private void TakeOverAbandonedProcess()
         {
             if (_ownershipEstablished) return;
@@ -451,20 +441,6 @@ namespace Tsvrc.Core
             OnOwnerAbandonedProcess();
 
             _StartTickLoopIfNeeded();
-        }
-
-        private void ExecuteStop()
-        {
-            _isRunning = false;
-            OnProcessStopped();
-            InternalCleanup(false);
-        }
-
-        private void ExecuteComplete()
-        {
-            _isRunning = false;
-            OnProcessCompleted();
-            InternalCleanup(true);
         }
     }
 }
