@@ -326,21 +326,30 @@ namespace Tsvrc.Core
         }
 
         /// <summary>
-        /// Called when the process is started.
-        /// <b>Only invoked on the process owner.</b>
+        /// Called after the process has started.
         /// </summary>
+        /// <remarks>
+        /// This runs only on the process owner, and before the first network packet goes out, so
+        /// any synced fields you set here are included in that packet.
+        /// </remarks>
         protected virtual void OnProcessStarted() { }
 
         /// <summary>
-        /// Called when the process is stopped before completion.
-        /// <b>Only invoked on the process owner.</b>
+        /// Called when the process is stopped before it completes.
         /// </summary>
+        /// <remarks>
+        /// This runs only on the process owner, and only for a stop. A successful completion
+        /// calls <see cref="OnProcessCompleted"/> instead, never this method.
+        /// </remarks>
         protected virtual void OnProcessStopped() { }
 
         /// <summary>
-        /// Called when the process is completed successfully.
-        /// <b>Only invoked on the process owner.</b>
+        /// Called when the process finishes successfully.
         /// </summary>
+        /// <remarks>
+        /// This runs only on the process owner, and only for a successful completion. A forced
+        /// stop calls <see cref="OnProcessStopped"/> instead, never this method.
+        /// </remarks>
         protected virtual void OnProcessCompleted() { }
 
         /// <summary>
