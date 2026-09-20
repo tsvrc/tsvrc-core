@@ -21,7 +21,7 @@ namespace Tsvrc.Tests.EditMode
         public int OnProcessStartedCount;
         public int OnProcessStoppedCount;
         public int OnProcessCompletedCount;
-        public int OnOwnerAbandonedProcessCount;
+        public int OnBecameProcessOwnerCount;
         public int OnProcessUpdateCount;
         public readonly List<bool> OnProcessCleanupArgs = new List<bool>();
 
@@ -59,10 +59,10 @@ namespace Tsvrc.Tests.EditMode
             OnProcessCompletedAction?.Invoke();
         }
 
-        protected override void OnOwnerAbandonedProcess()
+        protected override void OnBecameProcessOwner()
         {
-            OnOwnerAbandonedProcessCount++;
-            CallLog.Add("OnOwnerAbandonedProcess");
+            OnBecameProcessOwnerCount++;
+            CallLog.Add("OnBecameProcessOwner");
         }
 
         protected override void OnProcessCleanup(bool isCompleted)

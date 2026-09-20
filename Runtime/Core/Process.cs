@@ -21,7 +21,7 @@ namespace Tsvrc.Core
 
         private int _localPlayerId = -1;
 
-        // Blocks TakeOverAbandonedProcess from re-firing once ownership is settled
+        // Blocks TakeOverRunningProcess from re-firing once ownership is settled
         private bool _ownershipEstablished = false;
 
         [UdonSynced] private bool _useProcessUpdate = false;
@@ -64,7 +64,7 @@ namespace Tsvrc.Core
 
             if (!IsProcessRunning() || !IsProcessOwner()) return;
 
-            TakeOverAbandonedProcess();
+            TakeOverRunningProcess();
         }
 
         public override void OnOwnershipTransferred(VRCPlayerApi player)
@@ -74,7 +74,7 @@ namespace Tsvrc.Core
             // Backstop for OnPlayerLeft, in case it ran before ownership actually landed.
             if (!IsProcessRunning() || !IsProcessOwner()) return;
 
-            TakeOverAbandonedProcess();
+            TakeOverRunningProcess();
         }
 
         public override void OnPlayerSuspendChanged(VRCPlayerApi player)
@@ -87,6 +87,17 @@ namespace Tsvrc.Core
             if (!player.isSuspended || !IsProcessRunning() || !Networking.IsOwner(player, gameObject)) return;
 
             Networking.SetOwner(Networking.LocalPlayer, gameObject);
+        }
+
+        private void TakeOverRunningProcess()
+        {
+            if (_ownershipEstablished) return;
+            _ownershipEstablished = true;
+
+            // Fires before the tick loop starts, same ordering as StartProcess/OnProcessStarted.
+            OnBecameProcessOwner();
+
+            StartTickLoopIfNeeded();
         }
 
         public override void OnDeserialization()
@@ -188,7 +199,7 @@ namespace Tsvrc.Core
         {
             _isRunning = false;
             OnProcessStopped();
-            InternalCleanup(false);
+            ExecuteCleanup(false);
         }
 
         /// <summary>
@@ -367,10 +378,16 @@ namespace Tsvrc.Core
         protected virtual void OnProcessCompleted() { }
 
         /// <summary>
-        /// Called when the process owner leaves the instance and the process is still running.
-        /// <b>Only invoked on the new owner.</b>
+        /// Called when the local player becomes the new owner of a process that was already
+        /// running under a different owner.
         /// </summary>
-        protected virtual void OnOwnerAbandonedProcess() { }
+        /// <remarks>
+        /// This can happen because the previous owner left the instance, but also for an
+        /// intentional handoff, such as the explicit <c>SetOwner</c> call this class makes when
+        /// the previous owner's client is suspended. Runs once, before the tick loop restarts,
+        /// even though more than one VRChat callback can each attempt to detect the same handoff.
+        /// </remarks>
+        protected virtual void OnBecameProcessOwner() { }
 
         /// <summary>
         /// Called while the process is being cleaned up after a stop or a completion. Override
@@ -392,16 +409,5 @@ namespace Tsvrc.Core
         /// the local player stops being the owner.
         /// </remarks>
         protected virtual void OnProcessUpdate() { }
-
-        private void TakeOverAbandonedProcess()
-        {
-            if (_ownershipEstablished) return;
-            _ownershipEstablished = true;
-
-            // Fires before the tick loop starts, same ordering as StartProcess/OnProcessStarted.
-            OnOwnerAbandonedProcess();
-
-            StartTickLoopIfNeeded();
-        }
     }
 }

@@ -63,10 +63,10 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
             Players.RemovePlayer(remote);
             process.OnPlayerLeft(remote);
 
-            Assert.AreEqual(1, process.OnOwnerAbandonedProcessCount);
+            Assert.AreEqual(1, process.OnBecameProcessOwnerCount);
             Assert.AreEqual(Networking.LocalPlayer.playerId,
                 PrivateFieldAccess.GetField<int>(process, "_ownerPlayerIdInt"),
-                "TakeOverAbandonedProcess must hand ownership to the real local player.");
+                "TakeOverRunningProcess must hand ownership to the real local player.");
         }
 
         [UnityTest]

@@ -156,12 +156,12 @@ namespace Tsvrc.Tracking
             LastRemovedPlayerIds = new string[0];
         }
 
-        protected override void OnOwnerAbandonedProcess()
+        protected override void OnBecameProcessOwner()
         {
-            base.OnOwnerAbandonedProcess();
+            base.OnBecameProcessOwner();
 
             // This covers two event ordering cases when the tracked process owner leaves.
-            // In the normal flow, base.OnPlayerLeft already ran TakeOverAbandonedProcess so
+            // In the normal flow, base.OnPlayerLeft already ran TakeOverRunningProcess so
             // IsTrackedPlayer() is false when we arrive here, preventing a double removal.
             // In a known VRChat bug case, OnPlayerLeft found IsProcessOwner()=false and skipped
             // the removal entirely; this scan catches that via the OnOwnershipTransferred fallback.
@@ -170,7 +170,7 @@ namespace Tsvrc.Tracking
             // players while the process is running, but only on the CURRENT owner because it
             // guards with IsProcessOwner(). When the process owner themselves suspends, all
             // non-owner clients see IsProcessOwner()=false and skip the removal. By the time
-            // TakeOverAbandonedProcess promotes a new owner, the suspended player is still in
+            // TakeOverRunningProcess promotes a new owner, the suspended player is still in
             // _trackedPlayerIds. A suspended player cannot respond to any network events
             // (VRChat docs: "While suspended, devices don't run Udon code or respond to network
             // events"), so leaving them tracked would permanently block any subclass logic
@@ -247,7 +247,7 @@ namespace Tsvrc.Tracking
             // Deduplicate the initial list to match the invariant that BroadcastAddTrackedPlayers
             // enforces at runtime: no ID appears more than once. Without this, a caller passing
             // repeated IDs would produce duplicates in _trackedPlayerIds, which corrupts
-            // LastPlayerIds on all clients and causes OnOwnerAbandonedProcess to broadcast
+            // LastPlayerIds on all clients and causes OnBecameProcessOwner to broadcast
             // spurious duplicate entries in the removed list.
             playerIds = TsArray.Dedupe(playerIds);
 

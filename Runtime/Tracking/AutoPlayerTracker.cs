@@ -114,7 +114,7 @@ namespace Tsvrc.Tracking
         // treats waking up as a no-op on the assumption a player was already removed on the way
         // in. A player already suspended before this snapshot runs has no transition left to
         // produce, so it must never enter _trackedPlayerIds here - the same invariant
-        // PlayerTracker.OnOwnerAbandonedProcess and ChunkedTransferSession._StartNextReadyCheck
+        // PlayerTracker.OnBecameProcessOwner and ChunkedTransferSession._StartNextReadyCheck
         // already enforce for their own tracked-player scans.
         private static string[] GetActiveNonSuspendedPlayerIDs()
         {

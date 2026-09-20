@@ -96,11 +96,11 @@ namespace Tsvrc.Tracking
             CheckAllPlayersReady();
         }
 
-        protected override void OnOwnerAbandonedProcess()
+        protected override void OnBecameProcessOwner()
         {
-            base.OnOwnerAbandonedProcess();
+            base.OnBecameProcessOwner();
 
-            // TakeOverAbandonedProcess (Process) has no knowledge of this class's
+            // TakeOverRunningProcess (Process) has no knowledge of this class's
             // _readyCheckActive flag and never corrects it. Before taking over, this client
             // was a non-owner whose _readyCheckActive is only ever corrected by
             // OnTrackingDeserialization, on receipt of a sync packet or the started network
@@ -161,7 +161,7 @@ namespace Tsvrc.Tracking
             // Doing one removal per player would allocate a new array each time and iterate
             // _readyPlayerIds on every call. Batching reduces this to two passes and two
             // allocations regardless of how many players are removed. This matters because
-            // OnOwnerAbandonedProcess can remove up to 79 players at once.
+            // OnBecameProcessOwner can remove up to 79 players at once.
             string[] readyToRemove = new string[removedPlayerIds.Length];
             int removeCount = 0;
             foreach (string playerId in removedPlayerIds)

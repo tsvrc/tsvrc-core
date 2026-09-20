@@ -10,7 +10,7 @@ namespace Tsvrc.Tests.EditMode
     // outside Play Mode (see ProcessTestBase), so that branch stays permanently
     // PlayMode-only. Its other three early returns don't depend on Networking.IsOwner
     // at all and are safe to reach directly. The path beyond all of them —
-    // TakeOverAbandonedProcess via SetProcessOwner(Networking.LocalPlayer) — is not
+    // TakeOverRunningProcess via SetProcessOwner(Networking.LocalPlayer) — is not
     // covered here either: Networking.LocalPlayer is null outside Play Mode, so calling
     // it would throw. That leaves the _ownerId == "" guard as the one that matters most:
     // without it, FindPlayerByID("") returning null (GetAllPlayers() is empty here) would
@@ -42,7 +42,7 @@ namespace Tsvrc.Tests.EditMode
 
             InvokeOnOwnershipTransferred(process);
 
-            Assert.AreEqual(0, process.OnOwnerAbandonedProcessCount);
+            Assert.AreEqual(0, process.OnBecameProcessOwnerCount);
         }
 
         [Test]
@@ -54,7 +54,7 @@ namespace Tsvrc.Tests.EditMode
 
             InvokeOnOwnershipTransferred(process);
 
-            Assert.AreEqual(0, process.OnOwnerAbandonedProcessCount);
+            Assert.AreEqual(0, process.OnBecameProcessOwnerCount);
         }
 
         [Test]
@@ -66,7 +66,7 @@ namespace Tsvrc.Tests.EditMode
 
             InvokeOnOwnershipTransferred(process);
 
-            Assert.AreEqual(0, process.OnOwnerAbandonedProcessCount);
+            Assert.AreEqual(0, process.OnBecameProcessOwnerCount);
         }
     }
 }

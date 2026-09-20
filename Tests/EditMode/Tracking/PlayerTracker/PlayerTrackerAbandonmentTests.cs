@@ -3,11 +3,11 @@ using Tsvrc.Testing.Framework;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // OnPlayerLeft/OnPlayerSuspendChanged/OnOwnerAbandonedProcess all fundamentally need a
+    // OnPlayerLeft/OnPlayerSuspendChanged/OnBecameProcessOwner all fundamentally need a
     // real VRCPlayerApi or a live player list to exercise their interesting branches - those
     // are covered in Tests/PlayMode/Tracking/PlayerTracker/ with ClientSim. This file only
     // covers the one branch genuinely reachable without any of that:
-    // OnOwnerAbandonedProcess's empty-tracked-list early return, which returns before ever
+    // OnBecameProcessOwner's empty-tracked-list early return, which returns before ever
     // calling TsPlayer.GetAllPlayers().
     //
     // OnPlayerLeft/OnPlayerSuspendChanged are NOT tested here at all, even for their
@@ -20,12 +20,12 @@ namespace Tsvrc.Tests.EditMode
     public class PlayerTrackerAbandonmentTests : PlayerTrackerTestBase
     {
         [Test]
-        public void OnOwnerAbandonedProcess_EmptyTrackedList_ReturnsBeforeTouchingGetAllPlayers()
+        public void OnBecameProcessOwner_EmptyTrackedList_ReturnsBeforeTouchingGetAllPlayers()
         {
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
             SetTrackedPlayerIds(tracker, new string[0]);
 
-            Assert.DoesNotThrow(() => PrivateFieldAccess.InvokeInstance(tracker, "OnOwnerAbandonedProcess"));
+            Assert.DoesNotThrow(() => PrivateFieldAccess.InvokeInstance(tracker, "OnBecameProcessOwner"));
         }
     }
 }

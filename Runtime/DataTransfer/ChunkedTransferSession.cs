@@ -182,7 +182,7 @@ namespace Tsvrc.DataTransfer
                 CancelDataTransfer();
         }
 
-        protected override void OnOwnerAbandonedProcess()
+        protected override void OnBecameProcessOwner()
         {
             // Transfer state is owner-only and unsynced, so the new owner starts with empty
             // _dataChunks and zeroed indices. Stop any active ready check to avoid a false
@@ -201,7 +201,7 @@ namespace Tsvrc.DataTransfer
                 OnChunkSequenceStopped();
                 RequestSerialization();
             }
-            base.OnOwnerAbandonedProcess();
+            base.OnBecameProcessOwner();
         }
 
         public override void OnDeserialization()
@@ -209,7 +209,7 @@ namespace Tsvrc.DataTransfer
             base.OnDeserialization();
 
             // Late-packet race: the old owner's InternalCleanup packet (_pendingNextChunk=true,
-            // _isRunning=false) can arrive after OnOwnerAbandonedProcess already ran and saw
+            // _isRunning=false) can arrive after OnBecameProcessOwner already ran and saw
             // _pendingNextChunk=false, so no stopped event was broadcast yet.
             //
             // Networking.IsOwner is used instead of IsProcessOwner because the stale packet may
@@ -233,7 +233,7 @@ namespace Tsvrc.DataTransfer
             //   Packet A (InternalCleanup): _isRunning=false, _pendingNextChunk=true
             //   Packet B (StartReadyCheck): _isRunning=true,  _pendingNextChunk=false
             //
-            // If both arrive after TakeOverAbandonedProcess, Process.OnDeserialization
+            // If both arrive after TakeOverRunningProcess, Process.OnDeserialization
             // sees packet B and restores _isRunning=true with us as owner. We now have a zombie
             // process: _isRunning=true but _dataChunks is empty because it is unsynced. The
             // next tick would false-complete and broadcast a spurious OnChunkSequenceCompleted.
@@ -291,7 +291,7 @@ namespace Tsvrc.DataTransfer
         // chunk's OnProcessStarted until ResetInternalTransferData clears it, covering both the
         // actively-in-flight and inter-chunk-gap windows. RemoveTrackedPlayers has no equivalent
         // guard: removing a tracked player mid-transfer is the normal departure path, already
-        // handled by OnPlayerLeft/OnOwnerAbandonedProcess/_StartNextReadyCheck's own filtering.
+        // handled by OnPlayerLeft/OnBecameProcessOwner/_StartNextReadyCheck's own filtering.
         protected override bool CanAcceptTrackedPlayerAdditions()
         {
             if (_currentChunkIndex > 0)
