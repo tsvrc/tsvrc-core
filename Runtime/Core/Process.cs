@@ -18,6 +18,8 @@ namespace Tsvrc.Core
 
         [UdonSynced] private bool _isRunning = false;
         [UdonSynced] private bool _useProcessUpdate = false;
+        // Bumped once per run in ExecuteStart, never reset, so a stale Request*Process call gets caught.
+        [UdonSynced] private int _runGeneration = 0;
 
         // Blocks TakeOverRunningProcess from re-firing once ownership is settled
         private bool _ownershipEstablished = false;
@@ -128,6 +130,7 @@ namespace Tsvrc.Core
             _isRunning = true;
             _useProcessUpdate = useProcessUpdate;
             _ownershipEstablished = true;
+            _runGeneration++;
 
             OnProcessStarted();
             RequestSerialization();
@@ -149,7 +152,7 @@ namespace Tsvrc.Core
 
             if (!IsProcessOwner())
             {
-                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestStopProcess));
+                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestStopProcess), _runGeneration);
                 return;
             }
 
@@ -157,11 +160,23 @@ namespace Tsvrc.Core
         }
 
         [NetworkCallable(maxEventsPerSecond: 1)]
-        public void RequestStopProcess()
+        public void RequestStopProcess(int requestedGeneration)
         {
-            if (!IsProcessOwner() || !IsProcessRunning())
+            if (!IsProcessOwner())
             {
-                LogWarning("RequestStopProcess rejected: not the owner or not running.");
+                LogWarning("RequestStopProcess rejected: not the owner.");
+                return;
+            }
+
+            if (!IsProcessRunning())
+            {
+                LogWarning("RequestStopProcess rejected: not running.");
+                return;
+            }
+
+            if (requestedGeneration != _runGeneration)
+            {
+                LogWarning("RequestStopProcess rejected: stale run.");
                 return;
             }
 
@@ -189,7 +204,7 @@ namespace Tsvrc.Core
 
             if (!IsProcessOwner())
             {
-                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestCompleteProcess));
+                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestCompleteProcess), _runGeneration);
                 return;
             }
 
@@ -197,11 +212,23 @@ namespace Tsvrc.Core
         }
 
         [NetworkCallable(maxEventsPerSecond: 1)]
-        public void RequestCompleteProcess()
+        public void RequestCompleteProcess(int requestedGeneration)
         {
-            if (!IsProcessOwner() || !IsProcessRunning())
+            if (!IsProcessOwner())
             {
-                LogWarning("RequestCompleteProcess rejected: not the owner or not running.");
+                LogWarning("RequestCompleteProcess rejected: not the owner.");
+                return;
+            }
+
+            if (!IsProcessRunning())
+            {
+                LogWarning("RequestCompleteProcess rejected: not running.");
+                return;
+            }
+
+            if (requestedGeneration != _runGeneration)
+            {
+                LogWarning("RequestCompleteProcess rejected: stale run.");
                 return;
             }
 
