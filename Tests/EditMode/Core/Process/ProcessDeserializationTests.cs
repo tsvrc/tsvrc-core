@@ -1,6 +1,8 @@
 using NUnit.Framework;
 using Tsvrc.Testing.Framework;
 
+using Tsvrc.Tests.Doubles;
+
 namespace Tsvrc.Tests.EditMode
 {
     public class ProcessDeserializationTests : ProcessTestBase

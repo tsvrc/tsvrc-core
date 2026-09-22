@@ -5,6 +5,8 @@ using UdonSharp;
 using UnityEngine;
 using UnityEngine.TestTools;
 
+using Tsvrc.Tests.Doubles;
+
 namespace Tsvrc.Tests.EditMode
 {
     // The "rejected because not the owner" half of each guard can't be reached here (see

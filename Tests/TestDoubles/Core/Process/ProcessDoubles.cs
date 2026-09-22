@@ -2,18 +2,13 @@ using System;
 using System.Collections.Generic;
 using Tsvrc.Core;
 
-namespace Tsvrc.Tests.EditMode
+namespace Tsvrc.Tests.Doubles
 {
-    // Process carries [UdonBehaviourSyncMode], and AddComponent() silently
-    // returns null for a script with that attribute when it's defined in an
-    // Editor-platform-restricted assembly — this double lives in Tsvrc.Tests.Doubles
-    // instead, which has no such restriction.
+    // Used by both EditMode and PlayMode
+    // Process tests, and PlayMode's asmdef doesn't reference the EditMode assembly.
     //
-    // Records every subclass-hook invocation (call count + ordered call log) so tests
-    // can assert both "did it fire" and "in what order relative to other hooks/state
-    // changes." The *Action hooks let a test inject synchronous reentrant behavior
-    // (e.g. calling StartProcess() from inside OnProcessStopped) without needing a
-    // fresh subclass per scenario.
+    // Tracks hook call counts and order via CallLog. The *Action hooks let a test inject
+    // reentrant behavior (e.g. StartProcess() from inside OnProcessStopped) without a new subclass.
     public class ProcessTestSubclass : Process
     {
         public readonly List<string> CallLog = new List<string>();
@@ -25,9 +20,8 @@ namespace Tsvrc.Tests.EditMode
         public int OnProcessUpdateCount;
         public readonly List<bool> OnProcessCleanupArgs = new List<bool>();
 
-        // Captures IsProcessRunning()/IsProcessOwner() as observed from inside a hook,
-        // for ordering assertions (e.g. "_isRunning is already false by the time
-        // OnProcessStopped fires").
+        // IsProcessRunning() as seen from inside the hook, e.g. to confirm _isRunning
+        // is already false by the time OnProcessStopped fires.
         public bool? RunningStateInsideOnProcessStopped;
         public bool? RunningStateInsideOnProcessCompleted;
 
@@ -79,9 +73,8 @@ namespace Tsvrc.Tests.EditMode
         }
     }
 
-    // Proves the inherited TsvrcBehaviour pub/sub system works from within a
-    // Process subclass's own hook. Lives here rather than nested inside a test
-    // class for the same AddComponent/Editor-assembly reason as above.
+    // Proves TsvrcBehaviour's pub/sub works from inside a Process subclass hook.
+    // Lives here, not nested in a test class, for the same reason as above.
     public class EventingProcess : ProcessTestSubclass
     {
         public const string DoneEvent = "Done";

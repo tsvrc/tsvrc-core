@@ -2,6 +2,8 @@ using NUnit.Framework;
 using Tsvrc.Core;
 using Tsvrc.Testing.Framework;
 
+using Tsvrc.Tests.Doubles;
+
 namespace Tsvrc.Tests.EditMode
 {
     public class ProcessIntegrationTests : ProcessTestBase

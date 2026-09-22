@@ -3,6 +3,8 @@ using Tsvrc.Testing.Framework;
 using UnityEngine.TestTools;
 using UnityEngine;
 
+using Tsvrc.Tests.Doubles;
+
 namespace Tsvrc.Tests.EditMode
 {
     public class ProcessLifecycleTests : ProcessTestBase
