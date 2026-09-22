@@ -1,0 +1,74 @@
+name: Tests
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.testMode }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        testMode:
+          - EditMode
+          - PlayMode
+    steps:
+      - name: Checkout tsvrc-core
+        uses: actions/checkout@v7
+
+      - name: Cache Library
+        uses: actions/cache@v6
+        with:
+          path: TestProject/Library
+          key: Library-tsvrc-core-${{ matrix.testMode }}-${{ hashFiles('TestProject/Packages/vpm-manifest.json') }}
+          restore-keys: |
+            Library-tsvrc-core-${{ matrix.testMode }}-
+            Library-tsvrc-core-
+
+      # VRChat's own vpm CLI is Windows-only, so use vrc-get to resolve packages on Linux.
+      - name: Resolve VPM packages (com.vrchat.worlds + UdonSharp)
+        uses: anatawa12/sh-actions/resolve-vpm-packages@master
+        with:
+          project-path: TestProject
+          repos: |
+            https://vrchat.github.io/packages/index.json
+
+      - name: Run ${{ matrix.testMode }} tests
+        id: tests
+        uses: game-ci/unity-test-runner@v4.3.2
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: TestProject
+          testMode: ${{ matrix.testMode }}
+          # Scope to this package's own suite; the host project carries no other tests.
+          customParameters: -assemblyNames "Tsvrc.Tests.${{ matrix.testMode }}"
+          artifactsPath: ${{ matrix.testMode }}-artifacts
+          coverageEnabled: false
+
+      - name: Summarize failures
+        if: always()
+        shell: bash
+        run: |
+          FILE=$(find "${{ steps.tests.outputs.artifactsPath }}" -name '*.xml' | head -1)
+          [ -z "$FILE" ] && { echo "No results file found." >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          echo "## ${{ matrix.testMode }} failures" >> "$GITHUB_STEP_SUMMARY"
+          python3 .github/scripts/summarize-failures.py "$FILE" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ${{ matrix.testMode }} test results
+          path: ${{ steps.tests.outputs.artifactsPath }}
