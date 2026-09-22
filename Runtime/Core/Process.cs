@@ -59,9 +59,9 @@ namespace Tsvrc.Core
             // A suspended device stops running Udon and stops responding to network events:
             // https://creators.vrchat.com/worlds/udon/players/#get-issuspended
             // If the owner suspends, the tick loop stalls with nobody left able to restart it.
-            if (!player.isSuspended || !IsProcessRunning() || !Networking.IsOwner(player, gameObject)) return;
+            if (!player.isSuspended || !IsProcessRunning() || !IsProcessOwnedBy(player)) return;
 
-            Networking.SetOwner(Networking.LocalPlayer, gameObject);
+            SetProcessOwner(Networking.LocalPlayer);
         }
 
         private void TakeOverRunningProcess()
@@ -348,6 +348,14 @@ namespace Tsvrc.Core
         protected bool IsProcessOwner()
         {
             return Networking.IsOwner(gameObject);
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> if <paramref name="player"/> is the current process owner.
+        /// </summary>
+        protected bool IsProcessOwnedBy(VRCPlayerApi player)
+        {
+            return Networking.IsOwner(player, gameObject);
         }
 
         /// <summary>
