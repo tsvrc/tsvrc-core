@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Tsvrc.Core;
 using Tsvrc.Testing.Framework;
 
 namespace Tsvrc.Tests.EditMode
@@ -6,10 +7,30 @@ namespace Tsvrc.Tests.EditMode
     public class ProcessIntegrationTests : ProcessTestBase
     {
         [Test]
+        public void BareProcess_FullStartStopLifecycle_NoOverridesRequired_DoesNotThrow()
+        {
+            var process = CreateProcess<Process>();
+
+            Assert.DoesNotThrow(() =>
+            {
+                process.StartProcess(useProcessUpdate: true);
+                process._TickProcessUpdate();
+                process.StopProcess();
+            });
+            Assert.IsFalse(process.IsProcessRunning());
+
+            Assert.DoesNotThrow(() =>
+            {
+                process.StartProcess();
+                process.CompleteProcess();
+            });
+            Assert.IsFalse(process.IsProcessRunning());
+        }
+
+        [Test]
         public void GoldenPath_StartWithUpdatesThenComplete_FullHookOrderAndFinalState()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
 
             process.StartProcess(useProcessUpdate: true);
             process._TickProcessUpdate();
@@ -31,14 +52,13 @@ namespace Tsvrc.Tests.EditMode
                 },
                 process.CallLog);
             Assert.IsFalse(process.IsProcessRunning());
-            Assert.AreEqual("", PrivateFieldAccess.GetField<string>(process, "_ownerId"));
+            Assert.IsFalse(PrivateFieldAccess.GetField<bool>(process, "_ownershipEstablished"));
         }
 
         [Test]
         public void GoldenPath_StartThenStopBeforeCompletion_OnlyStoppedHookFires()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
 
             process.StartProcess();
             process.StopProcess();
@@ -51,54 +71,9 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void TwoIndependentClients_BothStartProcessBeforeSyncArrives_LaterPacketOverwritesLoser()
-        {
-            // Two independent Process C# instances stand in for two real clients
-            // — each is just an object with its own fields. Packet delivery is
-            // simulated by copying the [UdonSynced] fields from the "winning"
-            // instance onto the other, exactly what a real deserialization packet
-            // would overwrite.
-            var clientA = CreateProcess<ProcessTestSubclass>("ClientA");
-            var clientB = CreateProcess<ProcessTestSubclass>("ClientB");
-            SeedAsOwner(clientA, 100);
-            SeedAsOwner(clientB, 200);
-
-            // The race: both clients call StartProcess() while each still sees the
-            // object as not-running (only "who owns it" was seeded, not _isRunning) —
-            // neither has received the other's packet yet.
-            clientA.StartProcess();
-            clientB.StartProcess();
-
-            Assert.IsTrue(clientA.IsProcessRunning());
-            Assert.IsTrue(clientB.IsProcessRunning());
-            Assert.AreEqual(1, clientA.OnProcessStartedCount);
-            Assert.AreEqual(1, clientB.OnProcessStartedCount);
-            Assert.IsTrue((bool)PrivateFieldAccess.InvokeInstance(clientA, "IsProcessOwner"),
-                "Both clients pass the _isRunning guard and both fire OnProcessStarted.");
-            Assert.IsTrue((bool)PrivateFieldAccess.InvokeInstance(clientB, "IsProcessOwner"));
-
-            // Simulate A's packet (the eventual network authority) finally arriving
-            // at B, overwriting B's local synced state exactly as OnDeserialization's
-            // incoming packet would.
-            PrivateFieldAccess.SetField(clientB, "_isRunning", PrivateFieldAccess.GetField<bool>(clientA, "_isRunning"));
-            PrivateFieldAccess.SetField(clientB, "_ownerId", PrivateFieldAccess.GetField<string>(clientA, "_ownerId"));
-            PrivateFieldAccess.SetField(clientB, "_ownerPlayerIdInt", PrivateFieldAccess.GetField<int>(clientA, "_ownerPlayerIdInt"));
-            PrivateFieldAccess.SetField(clientB, "_useProcessUpdate", PrivateFieldAccess.GetField<bool>(clientA, "_useProcessUpdate"));
-
-            // _isRunning still says true (A's packet says so too), but B is no longer the owner.
-            Assert.IsTrue(clientB.IsProcessRunning(),
-                "B still locally believes the process is running — the synced flag from A's packet says so too.");
-            Assert.IsFalse((bool)PrivateFieldAccess.InvokeInstance(clientB, "IsProcessOwner"),
-                "B lost the ownership race once A's packet overwrote its local state.");
-            Assert.IsTrue((bool)PrivateFieldAccess.InvokeInstance(clientA, "IsProcessOwner"),
-                "A's own state is unaffected by B's now-discarded packet.");
-        }
-
-        [Test]
         public void ProcessSubclass_CanUseInheritedPubSub_FromWithinItsOwnHook()
         {
             var process = CreateProcess<EventingProcess>();
-            SeedAsOwner(process);
             var listenerDouble = CreateComponent<TsListenerDouble>("Listener");
             process.TsSubscribe(listenerDouble, EventingProcess.DoneEvent, nameof(TsListenerDouble.CallbackA));
 
