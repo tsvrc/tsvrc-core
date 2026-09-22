@@ -40,8 +40,6 @@ jobs:
         uses: anatawa12/sh-actions/resolve-vpm-packages@master
         with:
           project-path: TestProject
-          repos: |
-            https://vrchat.github.io/packages/index.json
 
       - name: Run ${{ matrix.testMode }} tests
         id: tests
