@@ -3,6 +3,7 @@ using Tsvrc.Player;
 using Tsvrc.Utils;
 using UdonSharp;
 using VRC.SDK3.UdonNetworkCalling;
+using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Tracking
@@ -240,7 +241,7 @@ namespace Tsvrc.Tracking
                 return;
             }
 
-            string playerId = _localPlayerId;
+            string playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
 
             // On the owner, routing through SendCustomNetworkEvent would be rejected by the
             // spoofing guard in BroadcastAddReadyPlayer. VRChat keeps CallingPlayer active for
