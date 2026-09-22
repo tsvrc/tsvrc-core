@@ -3,26 +3,21 @@ using NUnit.Framework;
 using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.Doubles;
 using UnityEngine.TestTools;
-using VRC.SDK3.ClientSim;
 using VRC.SDKBase;
 
 namespace Tsvrc.Tests.PlayMode.Core.Process
 {
-    // Covers the "local player is genuinely not the Unity owner" half of StartProcess/StopProcess/
-    // CompleteProcess and their Request* counterparts - the half that can't be reached in EditMode
-    // (see ProcessTestBase and ProcessNetworkCallableTests). The "owner" half of every one of these
-    // guards lives in EditMode's ProcessLifecycleTests/ProcessNetworkCallableTests instead - no
-    // overlap between the two.
+    // The not-owner half of Start/Stop/CompleteProcess and their Request* counterparts.
+    // Can't be reached in EditMode, where IsOwner defaults true - that owner half lives in
+    // ProcessLifecycleTests/ProcessNetworkCallableTests instead.
     //
-    // A bare AddComponent<Process>() GameObject has no IClientSimSyncable component, so
-    // ClientSimPlayerManager.IsOwner (what Networking.IsOwner routes to) falls back to comparing
-    // against the instance master - always true for the local client by default. Every test here
-    // attaches FakeOwnershipSyncable (via ProcessPlayModeTestBase.MakeGenuinelyNotUnityOwner) to
-    // override that fallback for real.
+    // A bare AddComponent<Process>() has no IClientSimSyncable, so ClientSimPlayerManager.IsOwner
+    // falls back to comparing against the instance master, true by default for the local client.
+    // Each test attaches FakeOwnershipSyncable via MakeGenuinelyNotOwner to override that.
     public class ProcessNotOwnerRoutingPlayModeTests : ProcessPlayModeTestBase
     {
         [UnityTest]
-        public IEnumerator StartProcess_GenuinelyNotUnityOwner_ForwardsInsteadOfExecutingLocally()
+        public IEnumerator StartProcess_GenuinelyNotOwner_ForwardsInsteadOfExecutingLocally()
         {
             yield return StartClientSim();
             Players.SpawnRemotePlayer("RemoteOwner");
@@ -33,7 +28,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotUnityOwner(process, remote);
+            MakeGenuinelyNotOwner(process, remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
 
@@ -46,7 +41,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
         }
 
         [UnityTest]
-        public IEnumerator RequestStartProcess_GenuinelyNotUnityOwner_DiscardsWithoutExecuting()
+        public IEnumerator RequestStartProcess_GenuinelyNotOwner_DiscardsWithoutExecuting()
         {
             yield return StartClientSim();
             Players.SpawnRemotePlayer("RemoteOwner");
@@ -57,7 +52,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotUnityOwner(process, remote);
+            MakeGenuinelyNotOwner(process, remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
 
@@ -65,11 +60,11 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
 
             Assert.AreEqual(0, process.OnProcessStartedCount,
                 "A misrouted RequestStartProcess call must be discarded when the local player is genuinely " +
-                "not the real Unity owner.");
+                "not the real owner.");
         }
 
         [UnityTest]
-        public IEnumerator StopProcess_GenuinelyNotProcessOwnerAndNotUnityOwner_ForwardsInsteadOfExecutingLocally()
+        public IEnumerator StopProcess_GenuinelyNotProcessOwnerAndNotOwner_ForwardsInsteadOfExecutingLocally()
         {
             yield return StartClientSim();
             Players.SpawnRemotePlayer("RemoteOwner");
@@ -80,7 +75,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotUnityOwner(process, remote);
+            MakeGenuinelyNotOwner(process, remote);
             process.StartProcess(useProcessUpdate: false);
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
@@ -95,7 +90,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
         }
 
         [UnityTest]
-        public IEnumerator RequestStopProcess_GenuinelyNotProcessOwnerAndNotUnityOwner_DiscardsWithoutExecuting()
+        public IEnumerator RequestStopProcess_GenuinelyNotProcessOwnerAndNotOwner_DiscardsWithoutExecuting()
         {
             yield return StartClientSim();
             Players.SpawnRemotePlayer("RemoteOwner");
@@ -106,7 +101,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotUnityOwner(process, remote);
+            MakeGenuinelyNotOwner(process, remote);
             process.StartProcess(useProcessUpdate: false);
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
@@ -116,12 +111,12 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
 
             Assert.IsTrue(process.IsProcessRunning(),
                 "A misrouted RequestStopProcess call must be discarded when the local player is genuinely " +
-                "neither the named process owner nor the real Unity owner.");
+                "neither the named process owner nor the real owner.");
             Assert.AreEqual(0, process.OnProcessStoppedCount);
         }
 
         [UnityTest]
-        public IEnumerator CompleteProcess_GenuinelyNotProcessOwnerAndNotUnityOwner_ForwardsInsteadOfExecutingLocally()
+        public IEnumerator CompleteProcess_GenuinelyNotProcessOwnerAndNotOwner_ForwardsInsteadOfExecutingLocally()
         {
             yield return StartClientSim();
             Players.SpawnRemotePlayer("RemoteOwner");
@@ -132,7 +127,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotUnityOwner(process, remote);
+            MakeGenuinelyNotOwner(process, remote);
             process.StartProcess(useProcessUpdate: false);
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
@@ -147,7 +142,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
         }
 
         [UnityTest]
-        public IEnumerator RequestCompleteProcess_GenuinelyNotProcessOwnerAndNotUnityOwner_DiscardsWithoutExecuting()
+        public IEnumerator RequestCompleteProcess_GenuinelyNotProcessOwnerAndNotOwner_DiscardsWithoutExecuting()
         {
             yield return StartClientSim();
             Players.SpawnRemotePlayer("RemoteOwner");
@@ -158,7 +153,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotUnityOwner(process, remote);
+            MakeGenuinelyNotOwner(process, remote);
             process.StartProcess(useProcessUpdate: false);
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
@@ -168,7 +163,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
 
             Assert.IsTrue(process.IsProcessRunning(),
                 "A misrouted RequestCompleteProcess call must be discarded when the local player is genuinely " +
-                "neither the named process owner nor the real Unity owner.");
+                "neither the named process owner nor the real owner.");
             Assert.AreEqual(0, process.OnProcessCompletedCount);
         }
     }
