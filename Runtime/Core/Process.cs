@@ -114,7 +114,7 @@ namespace Tsvrc.Core
         }
 
         [NetworkCallable(maxEventsPerSecond: 1)]
-        public void RequestStartProcess(bool useProcessUpdate = false)
+        public void RequestStartProcess(bool useProcessUpdate)
         {
             if (!IsProcessOwner() || IsProcessRunning())
             {

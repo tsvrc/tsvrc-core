@@ -56,7 +56,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
 
-            process.RequestStartProcess();
+            process.RequestStartProcess(false);
 
             Assert.AreEqual(0, process.OnProcessStartedCount,
                 "A misrouted RequestStartProcess call must be discarded when the local player is genuinely " +
