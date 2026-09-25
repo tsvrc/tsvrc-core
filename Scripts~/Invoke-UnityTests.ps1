@@ -137,7 +137,15 @@ foreach ($mode in $modes) {
     $unityArgs += @('-assemblyNames', $assemblies)
 
     Write-Host "$mode" -ForegroundColor Cyan
-    Start-Process -FilePath $UnityPath -ArgumentList $unityArgs -Wait -NoNewWindow
+    $process = Start-Process -FilePath $UnityPath -ArgumentList $unityArgs -NoNewWindow -PassThru
+    $spinner = '|', '/', '-', '\'
+    $frame = 0
+    while (-not $process.HasExited) {
+        Write-Host -NoNewline "`r  $($spinner[$frame % 4]) running..."
+        Start-Sleep -Milliseconds 200
+        $frame++
+    }
+    Write-Host "`r                    `r" -NoNewline
 
     if (-not (Test-Path $resultsFile)) {
         Write-Host "  No results were written. See the log: $logFile" -ForegroundColor Red
