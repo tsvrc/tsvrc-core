@@ -168,7 +168,7 @@ foreach ($mode in $modes) {
             $failed++
             Write-Host "  FAIL  $($testCase.fullname)" -ForegroundColor Red
             if ($testCase.failure -and $testCase.failure.message) {
-                Write-Host "      $($testCase.failure.message.Trim())" -ForegroundColor DarkGray
+                Write-Host "      $(([string] $testCase.failure.message).Trim())" -ForegroundColor DarkGray
             }
         }
     }
