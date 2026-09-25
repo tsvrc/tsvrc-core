@@ -8,6 +8,9 @@
     parameter. Not tied to any particular project: point -ProjectPath at whichever Unity
     project you want tested.
 
+    Only failures print by default, each with its failure message; passes are just counted.
+    Pass -Verbose to see every test.
+
 .PARAMETER ProjectPath
     Unity project to test. Defaults to the nearest ancestor folder that has a ProjectSettings
     folder, searching from this script's own location first, then the current directory.
@@ -159,7 +162,7 @@ foreach ($mode in $modes) {
     foreach ($testCase in $results.SelectNodes('//test-case')) {
         if ($testCase.result -eq 'Passed') {
             $passed++
-            Write-Host "  PASS  $($testCase.fullname)" -ForegroundColor Green
+            Write-Verbose "  PASS  $($testCase.fullname)"
         }
         elseif ($testCase.result -eq 'Failed') {
             $failed++

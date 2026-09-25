@@ -38,12 +38,12 @@ Then:
 .\Assets\Tsvrc\Scripts~\Invoke-UnityTests.ps1
 ```
 
-This runs both of TsVRC's own suites (`Tsvrc.Tests.EditMode` / `Tsvrc.Tests.PlayMode`)
-and prints a pass/fail line per test, so you don't need the Editor open. It finds your
-project by walking up from its own location, and finds the Unity Editor by checking the
-version pinned in that project's `ProjectVersion.txt` against Unity Hub's default install
-folder, falling back to the registry; if it still can't find one, it asks for the path
-instead of failing outright.
+This runs both of TsVRC's own suites (`Tsvrc.Tests.EditMode` / `Tsvrc.Tests.PlayMode`) so
+you don't need the Editor open. It only prints failures, each with its message, and counts
+the rest. It finds your project by walking up from its own location, and finds the Unity
+Editor by checking the version pinned in that project's `ProjectVersion.txt` against Unity
+Hub's default install folder, falling back to the registry; if it still can't find one, it
+asks for the path instead of failing outright.
 
 | Parameter        | Default                                    | Use it to                                  |
 | ----------------- | ------------------------------------------ | ------------------------------------------- |
@@ -52,6 +52,7 @@ instead of failing outright.
 | `-TestMode`        | `All`                                      | run only `EditMode` or only `PlayMode`      |
 | `-AssemblyNames`   | `Tsvrc.Tests.EditMode` / `Tsvrc.Tests.PlayMode` | test a different assembly instead      |
 | `-ResultsPath`     | a timestamped folder under `$env:TEMP`     | keep the NUnit XML somewhere specific       |
+| `-Verbose`         | off                                        | print every test, not just failures         |
 
 ```powershell
 .\Assets\Tsvrc\Scripts~\Invoke-UnityTests.ps1 -ProjectPath C:\path\to\your\project -AssemblyNames "YourWorld.Tests.EditMode"
