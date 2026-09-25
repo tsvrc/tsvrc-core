@@ -167,8 +167,9 @@ foreach ($mode in $modes) {
         elseif ($testCase.result -eq 'Failed') {
             $failed++
             Write-Host "  FAIL  $($testCase.fullname)" -ForegroundColor Red
-            if ($testCase.failure -and $testCase.failure.message) {
-                Write-Host "      $(([string] $testCase.failure.message).Trim())" -ForegroundColor DarkGray
+            $messageNode = $testCase.SelectSingleNode('failure/message')
+            if ($messageNode) {
+                Write-Host "      $($messageNode.InnerText.Trim())" -ForegroundColor DarkGray
             }
         }
     }
