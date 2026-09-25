@@ -2,21 +2,61 @@
 
 ## Setup
 
-- **Unity 2022.3**, matching `package.json`'s manifest target.
-- Open this repo as a Unity project (it's a VPM package, not a full project on its own,
-  so you'll typically want it installed into a test world project via the [VRChat Creator
-  Companion](https://vcc.docs.vrchat.com/) rather than opened standalone). See [Add TsVRC
-  to your project](https://tsvrc.com/docs/tsvrc/add-to-your-project) for the general
-  install flow, and point VCC at a local checkout of this repo instead of the published
-  package if you're testing a change.
+This repo is a VPM package, not a full project on its own (see `package.json`), so you
+need a world project to develop it in:
+
+1. Create a new VRChat World project through the [VRChat Creator
+   Companion](https://vcc.docs.vrchat.com/), matching **Unity 2022.3** (`package.json`'s
+   manifest target).
+2. Clone this repo into that project's `Assets` folder.
+3. Open the project in Unity.
 
 ## Running tests
 
-Tests live under `Tests/EditMode` and `Tests/PlayMode`, already wired into their own
-assemblies referencing `Tsvrc.Runtime`/`Tsvrc.Editor`. Open **Window > General > Test
-Runner** in Unity and run the EditMode and PlayMode suites from there. See [Testing your
+Tests live under `Tests/EditMode` and `Tests/PlayMode`, wired into their own assemblies
+referencing `Tsvrc.Runtime`/`Tsvrc.Editor`. See [Testing your
 world](https://tsvrc.com/docs/tsvrc/testing/testing-your-world) for background on the
 testing helpers themselves (`TsPlayModeTestBase`, `PrivateFieldAccess`, ClientSim).
+
+### From the Editor
+
+Open **Window > General > Test Runner** and run the EditMode and PlayMode suites from
+there.
+
+### From the command line (Windows)
+
+Windows blocks unsigned scripts by default. If you haven't already allowed local scripts
+to run, do this once:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Then:
+
+```powershell
+.\Assets\Tsvrc\Scripts~\Invoke-UnityTests.ps1
+```
+
+This runs both of TsVRC's own suites (`Tsvrc.Tests.EditMode` / `Tsvrc.Tests.PlayMode`) so
+you don't need the Editor open. It only prints failures, each with its message, and counts
+the rest. It finds your project by walking up from its own location, and finds the Unity
+Editor by checking the version pinned in that project's `ProjectVersion.txt` against Unity
+Hub's default install folder, falling back to the registry; if it still can't find one, it
+asks for the path instead of failing outright.
+
+| Parameter        | Default                                    | Use it to                                  |
+| ----------------- | ------------------------------------------ | ------------------------------------------- |
+| `-ProjectPath`     | nearest parent folder with `ProjectSettings` | point at a different Unity project         |
+| `-UnityPath`       | auto-detected                              | use a specific Unity install                |
+| `-TestMode`        | `All`                                      | run only `EditMode` or only `PlayMode`      |
+| `-AssemblyNames`   | `Tsvrc.Tests.EditMode` / `Tsvrc.Tests.PlayMode` | test a different assembly instead      |
+| `-ResultsPath`     | a timestamped folder under `$env:TEMP`     | keep the NUnit XML somewhere specific       |
+| `-Verbose`         | off                                        | print every test, not just failures         |
+
+```powershell
+.\Assets\Tsvrc\Scripts~\Invoke-UnityTests.ps1 -ProjectPath C:\path\to\your\project -AssemblyNames "YourWorld.Tests.EditMode"
+```
 
 Add tests for new behavior; a PR that changes runtime or codegen behavior without a
 matching test is unlikely to be merged.
