@@ -13,7 +13,7 @@ Runtime code lives in `Runtime/`, editor/codegen tooling in `Editor/`, tests in 
 ## Test
 
 - Open **Window > General > Test Runner** in Unity and run the EditMode and PlayMode
-  suites. There is no CLI test command here, tests require the Unity Editor.
+  suites, or on Windows run `Scripts~/Invoke-UnityTests.ps1`. See `CONTRIBUTING.md`.
 
 ## Code style
 
