@@ -8,44 +8,15 @@ using VRC.Udon.Common.Interfaces;
 
 namespace Tsvrc.Tracking
 {
-    /// <summary>
-    /// A <see cref="Process"/> that tracks a set of players by ID.
-    /// The owner manages the list; all clients receive network events when the set changes.
-    /// Subscribe via the <c>OnTracking*Event</c> string constants and read the <c>Last*</c> properties in your callback.
-    /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     [TsWorldExtensionPoint("TsPlayerTracker")]
     public class PlayerTracker : Process
     {
-        /// <summary>
-        /// Emitted when tracking starts.
-        /// Read <c>LastPlayerIds</c> in your callback.
-        /// </summary>
         public const string OnTrackingStartedEvent = "OnTrackingStarted";
-        /// <summary>
-        /// Emitted when tracking stops.
-        /// Read <c>LastPlayerIds</c> in your callback.
-        /// </summary>
         public const string OnTrackingStoppedEvent = "OnTrackingStopped";
-        /// <summary>
-        /// Emitted when tracking completes.
-        /// Read <c>LastPlayerIds</c> in your callback.
-        /// </summary>
         public const string OnTrackingCompletedEvent = "OnTrackingCompleted";
-        /// <summary>
-        /// Emitted on deserialization.
-        /// Read <c>LastPlayerIds</c> in your callback.
-        /// </summary>
         public const string OnTrackingDeserializationEvent = "OnTrackingDeserialization";
-        /// <summary>
-        /// Emitted when players are added.
-        /// Read <c>LastAddedPlayerIds</c> in your callback.
-        /// </summary>
         public const string OnTrackingPlayersAddedEvent = "OnTrackingPlayersAdded";
-        /// <summary>
-        /// Emitted when players are removed.
-        /// Read <c>LastRemovedPlayerIds</c> in your callback.
-        /// </summary>
         public const string OnTrackingPlayersRemovedEvent = "OnTrackingPlayersRemoved";
 
         [UdonSynced] private string[] _trackedPlayerIds = new string[0];
