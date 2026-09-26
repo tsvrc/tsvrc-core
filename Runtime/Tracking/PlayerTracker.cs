@@ -15,39 +15,20 @@ namespace Tsvrc.Tracking
         public const string OnTrackingStartedEvent = "OnTrackingStarted";
         public const string OnTrackingStoppedEvent = "OnTrackingStopped";
         public const string OnTrackingCompletedEvent = "OnTrackingCompleted";
-        public const string OnTrackingDeserializationEvent = "OnTrackingDeserialization";
         public const string OnTrackingPlayersAddedEvent = "OnTrackingPlayersAdded";
         public const string OnTrackingPlayersRemovedEvent = "OnTrackingPlayersRemoved";
 
-        [UdonSynced] private string[] _trackedPlayerIds = new string[0];
+        [UdonSynced] private int[] _trackedPlayerIds = new int[0];
 
-        // Temporary storage for initial player IDs during process start.
-        protected string[] _initialTrackerPlayerIds = new string[0];
+        public int[] TrackedPlayerIds
+        {
+            get => _trackedPlayerIds;
+        }
 
-        // Set to true just before and cleared just after every SendCustomNetworkEvent(All, ...) call.
-        // On the sending client VRChat fires the event inline before returning, so the broadcast
-        // handler runs inside our own call stack. This flag lets the handler's CallingPlayer guard
-        // know the inline execution is legitimate, even when CallingPlayer carries a value from an
-        // outer event context. This is safe because Udon is single-threaded.
-        protected bool _isBroadcasting = false;
-
-        /// <summary>The tracked player IDs at the time of the last received broadcast or deserialization.</summary>
-        public string[] LastPlayerIds { get; private set; } = new string[0];
-        /// <summary>The player IDs added in the last <see cref="BroadcastAddTrackedPlayers"/> broadcast.</summary>
         public string[] LastAddedPlayerIds { get; private set; } = new string[0];
-        /// <summary>The player IDs removed in the last <see cref="BroadcastRemoveTrackedPlayers"/> broadcast.</summary>
         public string[] LastRemovedPlayerIds { get; private set; } = new string[0];
 
-        public override void OnDeserialization()
-        {
-            base.OnDeserialization();
-
-            // Update LastPlayerIds from the synced array so late joiners have an accurate
-            // snapshot even though they never received the NotifyTrackedPlayersProcessStarted event.
-            LastPlayerIds = _trackedPlayerIds;
-            OnTrackingDeserialization();
-            TsEmit(OnTrackingDeserializationEvent);
-        }
+        protected bool _isBroadcasting = false;
 
         public override void OnPlayerLeft(VRCPlayerApi player)
         {
@@ -321,9 +302,6 @@ namespace Tsvrc.Tracking
         /// <summary>Called on all clients when tracking completes. Read <see cref="LastPlayerIds"/> in this callback.</summary>
         /// <param name="playerIds">The tracked player IDs at the time of completion.</param>
         protected virtual void OnTrackingCompleted(string[] playerIds) { }
-
-        /// <summary>Called on non-owner clients when synced state is received. Read <see cref="LastPlayerIds"/> in this callback.</summary>
-        protected virtual void OnTrackingDeserialization() { }
 
         /// <summary>Called on all clients when players are added. Read <see cref="LastAddedPlayerIds"/> in this callback.</summary>
         /// <param name="addedPlayerIds">The player IDs that were added.</param>
