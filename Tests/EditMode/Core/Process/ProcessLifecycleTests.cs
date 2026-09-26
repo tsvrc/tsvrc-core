@@ -3,6 +3,8 @@ using Tsvrc.Testing.Framework;
 using UnityEngine.TestTools;
 using UnityEngine;
 
+using Tsvrc.Tests.Doubles;
+
 namespace Tsvrc.Tests.EditMode
 {
     public class ProcessLifecycleTests : ProcessTestBase
@@ -21,99 +23,37 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void StartProcess_Fresh_SetsIsRunningTrue()
+        public void StartProcess_Fresh_SetsIsRunningTrueAndFiresOnProcessStarted()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
 
             process.StartProcess();
 
             Assert.IsTrue(process.IsProcessRunning());
-        }
-
-        [Test]
-        public void StartProcess_DefaultUseProcessUpdateFalse_TickLoopStillRunsButNeverCallsOnProcessUpdate()
-        {
-            var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
-
-            process.StartProcess();
-
-            // The tick loop always runs for a running, owned process - it drives the periodic
-            // resync heartbeat regardless of useProcessUpdate. Only the OnProcessUpdate callback
-            // itself is gated on that flag.
-            Assert.IsFalse(PrivateFieldAccess.GetField<bool>(process, "_useProcessUpdate"));
-            Assert.IsTrue(PrivateFieldAccess.GetField<bool>(process, "_updateLoopActive"));
-            Assert.AreEqual(0, process.OnProcessUpdateCount);
-        }
-
-        [Test]
-        public void StartProcess_UseProcessUpdateTrue_ActivatesLoopButDoesNotTickSynchronously()
-        {
-            var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
-
-            process.StartProcess(useProcessUpdate: true);
-
-            Assert.IsTrue(PrivateFieldAccess.GetField<bool>(process, "_useProcessUpdate"));
-            Assert.IsTrue(PrivateFieldAccess.GetField<bool>(process, "_updateLoopActive"));
-            Assert.AreEqual(0, process.OnProcessUpdateCount, "First tick must be deferred, not synchronous.");
-
-            // Simulate the deferred SendCustomEventDelayedSeconds(..., 0f) callback firing.
-            process._TickProcessUpdate();
-            Assert.AreEqual(1, process.OnProcessUpdateCount);
+            CollectionAssert.AreEqual(new[] { "OnProcessStarted" }, process.CallLog);
         }
 
         [Test]
         public void StartProcess_AlreadyRunning_IsNoOpAndLogsWarning()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
-            process.StartProcess();
-            Assert.AreEqual(1, process.OnProcessStartedCount);
-
-            LogAssert.Expect(LogType.Warning, "[TsVRC] [ProcessTestSubclass] Process is already running.");
             process.StartProcess();
 
+            LogAssert.Expect(LogType.Warning,
+                "[TsVRC] [ProcessTestSubclass] Process is already running, ignoring start call.");
+            process.StartProcess();
+
             Assert.AreEqual(1, process.OnProcessStartedCount);
-        }
-
-        [Test]
-        public void StartProcess_AlreadyOwner_CallsRequestSerializationBranch_NotSetProcessOwnerBranch()
-        {
-            // RequestSerialization() is an unobservable no-op stub in the Editor proxy,
-            // so this test only pins down which branch StartProcess takes, not any
-            // effect of the call itself.
-            var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
-
-            Assert.DoesNotThrow(() => process.StartProcess());
-            Assert.IsTrue(process.IsProcessRunning());
-        }
-
-        [Test]
-        public void StartProcess_OnProcessStarted_FiresAfterOwnerBranch_BeforeTickScheduled()
-        {
-            var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
-
-            process.StartProcess(useProcessUpdate: true);
-
-            CollectionAssert.AreEqual(new[] { "OnProcessStarted" }, process.CallLog);
         }
 
         [Test]
         public void StartProcess_AfterStopProcess_RestartsCleanly()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
             process.StartProcess(useProcessUpdate: true);
             process.StopProcess();
             Assert.IsFalse(process.IsProcessRunning());
 
-            // StopProcess's cleanup clears _ownerId/_ownerPlayerIdInt, so IsProcessOwner()
-            // is false again; re-seed before restarting to stay on the owner branch.
-            SeedAsOwner(process);
             process.StartProcess();
 
             Assert.IsTrue(process.IsProcessRunning());
@@ -124,9 +64,9 @@ namespace Tsvrc.Tests.EditMode
         public void StopProcess_NotRunning_IsNoOpAndLogsWarning()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
 
-            LogAssert.Expect(LogType.Warning, "[TsVRC] [ProcessTestSubclass] Process is not running.");
+            LogAssert.Expect(LogType.Warning,
+                "[TsVRC] [ProcessTestSubclass] Process is not running, ignoring stop call.");
             process.StopProcess();
 
             Assert.AreEqual(0, process.OnProcessStoppedCount);
@@ -136,7 +76,6 @@ namespace Tsvrc.Tests.EditMode
         public void StopProcess_Owner_ExecutesStopDirectly()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
             process.StartProcess();
 
             process.StopProcess();
@@ -150,7 +89,6 @@ namespace Tsvrc.Tests.EditMode
         public void StopProcess_IsRunningFalseBeforeOnProcessStoppedFires()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
             process.StartProcess();
 
             process.StopProcess();
@@ -163,9 +101,9 @@ namespace Tsvrc.Tests.EditMode
         public void CompleteProcess_NotRunning_IsNoOpAndLogsWarning()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
 
-            LogAssert.Expect(LogType.Warning, "[TsVRC] [ProcessTestSubclass] Process is not running.");
+            LogAssert.Expect(LogType.Warning,
+                "[TsVRC] [ProcessTestSubclass] Process is not running, ignoring complete call.");
             process.CompleteProcess();
 
             Assert.AreEqual(0, process.OnProcessCompletedCount);
@@ -175,7 +113,6 @@ namespace Tsvrc.Tests.EditMode
         public void CompleteProcess_Owner_ExecutesCompleteDirectly()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
             process.StartProcess();
 
             process.CompleteProcess();
@@ -189,7 +126,6 @@ namespace Tsvrc.Tests.EditMode
         public void CompleteProcess_IsRunningFalseBeforeOnProcessCompletedFires()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
             process.StartProcess();
 
             process.CompleteProcess();

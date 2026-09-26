@@ -1,3 +1,4 @@
+using Tsvrc.Player;
 using Tsvrc.Utils;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
@@ -213,9 +214,7 @@ namespace Tsvrc.DataTransfer
             // TsArray.Contains crashes on null.Length without this check.
             if (playerIds == null) return;
 
-            // _localPlayerId is cached once in Process.TsStart(); VRChat guarantees
-            // displayName and playerId are immutable for the duration of a session.
-            var playerId = _localPlayerId;
+            var playerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
             if (!TsArray.Contains(playerIds, playerId)) return;
 
             // null dataChunk is stored silently (StringBuilder.Append(null) is a no-op),

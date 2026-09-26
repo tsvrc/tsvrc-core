@@ -10,7 +10,7 @@ using VRC.SDKBase;
 
 namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
 {
-    // OnPlayerLeft/OnPlayerSuspendChanged need a real VRCPlayerApi, and OnOwnerAbandonedProcess's
+    // OnPlayerLeft/OnPlayerSuspendChanged need a real VRCPlayerApi, and OnBecameProcessOwner's
     // non-empty-tracked-list scan needs a live player list. ClientSim never organically dispatches
     // VRC lifecycle callbacks to a plain UdonSharpBehaviour, so these tests call the overrides
     // directly instead.
@@ -129,7 +129,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         }
 
         [UnityTest]
-        public IEnumerator OnOwnerAbandonedProcess_RealMixOfDepartedSuspendedAndActiveTrackedPlayers_RemovesOnlyInactiveOnes()
+        public IEnumerator OnBecameProcessOwner_RealMixOfDepartedSuspendedAndActiveTrackedPlayers_RemovesOnlyInactiveOnes()
         {
             yield return StartClientSim();
             Players.SpawnRemotePlayer("Departed");
@@ -154,7 +154,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
             suspended.GetClientSimPlayer().isSuspended = true;
             Players.RemovePlayer(departed);
 
-            PrivateFieldAccess.InvokeInstance(tracker, "OnOwnerAbandonedProcess");
+            PrivateFieldAccess.InvokeInstance(tracker, "OnBecameProcessOwner");
 
             Assert.IsFalse(Array.IndexOf(tracker.LastPlayerIds, departedId) >= 0,
                 "The departed player must be removed by the real GetAllPlayers() scan.");
@@ -165,7 +165,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         }
 
         [UnityTest]
-        public IEnumerator OnOwnerAbandonedProcess_RealAllTrackedPlayersStillActive_NoRemoval()
+        public IEnumerator OnBecameProcessOwner_RealAllTrackedPlayersStillActive_NoRemoval()
         {
             yield return StartClientSim();
             Players.SpawnRemotePlayer("Active1");
@@ -183,7 +183,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
             tracker.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             tracker.StartPlayerTracking(new[] { active1Id, active2Id });
 
-            PrivateFieldAccess.InvokeInstance(tracker, "OnOwnerAbandonedProcess");
+            PrivateFieldAccess.InvokeInstance(tracker, "OnBecameProcessOwner");
 
             Assert.AreEqual(0, tracker.OnTrackingPlayersRemovedCount,
                 "No removal must happen when every tracked player is still active and not suspended.");

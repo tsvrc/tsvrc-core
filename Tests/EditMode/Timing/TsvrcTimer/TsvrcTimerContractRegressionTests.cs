@@ -103,13 +103,13 @@ namespace Tsvrc.Tests.EditMode
         // Mirrors InstanceTests.TsStart_IsNotOverriddenByTsInstance's own
         // reflection-based "prove a non-override, not just assume it" pattern.
         [Test]
-        public void DoesNotOverride_OnOwnerAbandonedProcess()
+        public void DoesNotOverride_OnBecameProcessOwner()
         {
-            MethodInfo method = typeof(TsvrcTimer).GetMethod("OnOwnerAbandonedProcess",
+            MethodInfo method = typeof(TsvrcTimer).GetMethod("OnBecameProcessOwner",
                 BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.IsNotNull(method);
             Assert.AreEqual(typeof(Tsvrc.Core.Process), method.DeclaringType,
-                "TsvrcTimer must not override OnOwnerAbandonedProcess - if it ever does, the " +
+                "TsvrcTimer must not override OnBecameProcessOwner - if it ever does, the " +
                 "ownership-handover Play Mode tests' premise (no timer-specific override to break) " +
                 "silently stops holding.");
         }

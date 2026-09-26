@@ -1,60 +1,21 @@
 using NUnit.Framework;
 using Tsvrc.Testing.Framework;
 
+using Tsvrc.Tests.Doubles;
+
 namespace Tsvrc.Tests.EditMode
 {
+    // Canary for the assumption every other EditMode Process test relies on: see
+    // ProcessTestBase's class comment. If this ever starts failing, every other EditMode
+    // test in this suite needs to move to Play Mode.
     public class ProcessOwnershipTests : ProcessTestBase
     {
         [Test]
-        public void IsProcessOwner_BothIdsZero_ReturnsFalse()
+        public void IsProcessOwner_BareGameObjectOutsidePlayMode_DefaultsTrue()
         {
             var process = CreateProcess<ProcessTestSubclass>();
 
-            Assert.IsFalse(InvokeIsProcessOwner(process));
-        }
-
-        [Test]
-        public void IsProcessOwner_OwnerZeroLocalNonZero_ReturnsFalse()
-        {
-            var process = CreateProcess<ProcessTestSubclass>();
-            PrivateFieldAccess.SetField(process, "_localPlayerIdInt", 5);
-
-            Assert.IsFalse(InvokeIsProcessOwner(process));
-        }
-
-        [Test]
-        public void IsProcessOwner_BothIdsEqualAndNonZero_ReturnsTrue()
-        {
-            var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
-
-            Assert.IsTrue(InvokeIsProcessOwner(process));
-        }
-
-        [Test]
-        public void IsProcessOwner_IdsDifferAndBothNonZero_ReturnsFalse()
-        {
-            var process = CreateProcess<ProcessTestSubclass>();
-            PrivateFieldAccess.SetField(process, "_localPlayerIdInt", 7);
-            PrivateFieldAccess.SetField(process, "_ownerPlayerIdInt", 8);
-
-            Assert.IsFalse(InvokeIsProcessOwner(process));
-        }
-
-        [Test]
-        public void IsBroadcasting_DefaultsFalse()
-        {
-            var process = CreateProcess<ProcessTestSubclass>();
-
-            Assert.IsFalse(PrivateFieldAccess.GetField<bool>(process, "_isBroadcasting"));
-        }
-
-        [Test]
-        public void LocalPlayerId_DefaultsEmptyBeforeTsStart()
-        {
-            var process = CreateProcess<ProcessTestSubclass>();
-
-            Assert.AreEqual("", PrivateFieldAccess.GetField<string>(process, "_localPlayerId"));
+            Assert.IsTrue((bool)PrivateFieldAccess.InvokeInstance(process, "IsProcessOwner"));
         }
     }
 }

@@ -9,10 +9,8 @@ namespace Tsvrc.Tests.EditMode
     // rather than always through the leaf DataTransferer, so a lower layer's tests observe only
     // that layer's own overrides, not behavior a higher layer might add on top.
     //
-    // All of these carry Process's [UdonBehaviourSyncMode] attribute (inherited through
-    // PlayerTracker), so - same reason as every other test double in this project - they live in
-    // Tsvrc.Tests.Doubles, not Tests/Editor: AddComponent() silently returns null for such a
-    // script defined in an Editor-platform-restricted assembly.
+    // Same reason as every other test double in this project: used by both EditMode and
+    // PlayMode DataTransfer tests, so they live in Tsvrc.Tests.Doubles, not Tests/EditMode.
 
     /// <summary>Exposes DataChunker's protected pure-logic members for direct testing.</summary>
     public class DataChunkerTestSubclass : DataChunker

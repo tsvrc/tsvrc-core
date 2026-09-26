@@ -44,7 +44,7 @@ namespace Tsvrc.Tests.PlayMode.Timing.TsvrcTimer
 
             var timer = CreateProcess<TsTimerTestSubclass>();
             timer.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotUnityOwner(timer, remote);
+            MakeGenuinelyNotOwner(timer, remote);
             timer.StartTimer();
             PrivateFieldAccess.InvokeInstance(timer, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(timer.gameObject),
@@ -70,7 +70,7 @@ namespace Tsvrc.Tests.PlayMode.Timing.TsvrcTimer
             timer.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             timer.StartTimer();
             PrivateFieldAccess.SetField(timer, "_isPaused", true);
-            MakeGenuinelyNotUnityOwner(timer, remote);
+            MakeGenuinelyNotOwner(timer, remote);
             PrivateFieldAccess.InvokeInstance(timer, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(timer.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
