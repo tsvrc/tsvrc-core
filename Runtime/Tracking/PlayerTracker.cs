@@ -28,89 +28,56 @@ namespace Tsvrc.Tracking
         public string[] LastAddedPlayerIds { get; private set; } = new string[0];
         public string[] LastRemovedPlayerIds { get; private set; } = new string[0];
 
-        protected bool _isBroadcasting = false;
-
         public override void OnPlayerLeft(VRCPlayerApi player)
         {
             base.OnPlayerLeft(player);
 
             if (!IsProcessRunning() || !IsProcessOwner()) return;
 
-            var playerId = TsPlayer.GetPlayerID(player);
+            var playerId = player.playerId;
             if (!IsTrackedPlayer(playerId)) return;
-            // Already confirmed as the process owner, so call directly to avoid the self loop
-            // overhead of SendCustomNetworkEvent(Owner,...) firing back to us synchronously.
-            BroadcastRemoveTrackedPlayers(TsPlayer.ToArray(playerId));
+            RequestRemoveTrackedPlayers(playerId);
         }
 
         public override void OnPlayerSuspendChanged(VRCPlayerApi player)
         {
             base.OnPlayerSuspendChanged(player);
 
-            // Mirror OnPlayerLeft: a suspended tracked player cannot respond to any network
-            // event (VRChat docs, creators.vrchat.com/worlds/udon/players/:
-            // "While suspended, devices don't run Udon code or respond to network events until
-            // the player reopens VRChat"). Leaving them in the tracked list would permanently
-            // block any subclass logic that waits for all tracked players to respond.
-            // The base class already handles the case where the *process owner* suspends
-            // (ownership transfer via Networking.SetOwner); this guard covers non-owner
-            // tracked players.
-            // Only act on the suspend event (isSuspended=true). Wakeup (isSuspended=false) does
-            // not require action: the player has already been removed from tracking.
             if (!player.isSuspended || !IsProcessRunning() || !IsProcessOwner()) return;
 
-            var playerId = TsPlayer.GetPlayerID(player);
+            var playerId = player.playerId;
             if (!IsTrackedPlayer(playerId)) return;
-            BroadcastRemoveTrackedPlayers(TsPlayer.ToArray(playerId));
+            RequestRemoveTrackedPlayers(playerId);
         }
 
         protected override void OnProcessStarted()
         {
             base.OnProcessStarted();
 
-            _trackedPlayerIds = _initialTrackerPlayerIds;
-            _initialTrackerPlayerIds = new string[0];
-            // base.StartProcess() serialized before OnProcessStarted was called, so _trackedPlayerIds
-            // was still empty at that point. Serialize now so late joiners receive the correct list.
-            RequestSerialization();
-
-            _isBroadcasting = true;
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessStarted), _trackedPlayerIds);
-            _isBroadcasting = false;
         }
 
         protected override void OnProcessStopped()
         {
             base.OnProcessStopped();
 
-            _isBroadcasting = true;
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessStopped), _trackedPlayerIds);
-            _isBroadcasting = false;
         }
 
         protected override void OnProcessCompleted()
         {
             base.OnProcessCompleted();
 
-            _isBroadcasting = true;
             SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersProcessCompleted), _trackedPlayerIds);
-            _isBroadcasting = false;
         }
 
         protected override void OnProcessCleanup(bool isCompleted)
         {
             base.OnProcessCleanup(isCompleted);
 
-            // If a new process was started from an inline callback (see Process.InternalCleanup
-            // for the full explanation), it will have already written the correct _trackedPlayerIds
-            // in PlayerTracker.OnProcessStarted. Clearing them here would overwrite that state before
-            // InternalCleanup's RequestSerialization serializes it, which would send an empty list
-            // to all remote clients and permanently break the new process's tracked player set.
             if (IsProcessRunning()) return;
 
-            _trackedPlayerIds = new string[0];
-            _initialTrackerPlayerIds = new string[0];
-            LastPlayerIds = new string[0];
+            _trackedPlayerIds = new int[0];
             LastAddedPlayerIds = new string[0];
             LastRemovedPlayerIds = new string[0];
         }
@@ -119,24 +86,6 @@ namespace Tsvrc.Tracking
         {
             base.OnBecameProcessOwner();
 
-            // This covers two event ordering cases when the tracked process owner leaves.
-            // In the normal flow, base.OnPlayerLeft already ran TakeOverRunningProcess so
-            // IsTrackedPlayer() is false when we arrive here, preventing a double removal.
-            // In a known VRChat bug case, OnPlayerLeft found IsProcessOwner()=false and skipped
-            // the removal entirely; this scan catches that via the OnOwnershipTransferred fallback.
-            //
-            // Also removes suspended tracked players. OnPlayerSuspendChanged removes suspended
-            // players while the process is running, but only on the CURRENT owner because it
-            // guards with IsProcessOwner(). When the process owner themselves suspends, all
-            // non-owner clients see IsProcessOwner()=false and skip the removal. By the time
-            // TakeOverRunningProcess promotes a new owner, the suspended player is still in
-            // _trackedPlayerIds. A suspended player cannot respond to any network events
-            // (VRChat docs: "While suspended, devices don't run Udon code or respond to network
-            // events"), so leaving them tracked would permanently block any subclass logic
-            // that waits for all tracked players to respond on the new owner.
-            //
-            // GetAllPlayers() is called once to check both departure and suspension in one pass,
-            // avoiding a separate FindPlayerByID call per tracked player.
             if (_trackedPlayerIds.Length == 0) return;
 
             VRCPlayerApi[] allPlayers = TsPlayer.GetAllPlayers();
@@ -171,7 +120,7 @@ namespace Tsvrc.Tracking
                 toRemove = trimmed;
             }
 
-            BroadcastRemoveTrackedPlayers(toRemove);
+            RequestRemoveTrackedPlayers(toRemove);
         }
 
         /// <summary>
@@ -266,11 +215,11 @@ namespace Tsvrc.Tracking
             // Owner fast path: avoid the self loop overhead of SendCustomNetworkEvent(Owner,...).
             if (IsProcessOwner())
             {
-                BroadcastRemoveTrackedPlayers(playerIds);
+                RequestRemoveTrackedPlayers(playerIds);
                 return;
             }
 
-            SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(BroadcastRemoveTrackedPlayers), playerIds);
+            SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestRemoveTrackedPlayers), playerIds);
         }
 
         /// <summary>
@@ -569,16 +518,25 @@ namespace Tsvrc.Tracking
             _isBroadcasting = false;
         }
 
-        /// <summary>
-        /// Removes players from the tracked list. Silently ignores IDs not currently tracked.
-        /// Non-owners should call <see cref="RemoveTrackedPlayers"/> instead.
-        /// </summary>
         [NetworkCallable]
-        public void BroadcastRemoveTrackedPlayers(string[] playerIds)
+        public void RequestRemoveTrackedPlayers(string[] playerIds)
         {
-            // Same guard rationale as BroadcastAddTrackedPlayers; see its comment.
-            if (!IsProcessRunning() || !IsProcessOwner()) return;
-            if (playerIds == null || playerIds.Length == 0) return;
+            if (!IsProcessOwner())
+            {
+                LogWarning("RequestRemoveTrackedPlayers rejected: not the owner.");
+                return;
+            }
+
+            if (!IsProcessRunning())
+            {
+                LogWarning("RequestRemoveTrackedPlayers rejected: not running.");
+                return;
+            }
+
+            if (playerIds == null || playerIds.Length == 0)
+            {
+                LogWarning("Ignoring ")
+            }
 
             string[] validPlayerIds = new string[playerIds.Length];
             int validCount = 0;

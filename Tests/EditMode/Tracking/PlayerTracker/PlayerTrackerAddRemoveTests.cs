@@ -217,7 +217,7 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(tracker);
             SetTrackedPlayerIds(tracker, new[] { "A" });
 
-            tracker.BroadcastRemoveTrackedPlayers(new[] { "A" });
+            tracker.RequestRemoveTrackedPlayers(new[] { "A" });
 
             CollectionAssert.AreEqual(new[] { "A" }, GetTrackedPlayerIds(tracker));
         }
@@ -230,7 +230,7 @@ namespace Tsvrc.Tests.EditMode
             tracker.StartPlayerTracking(new[] { "A" });
             PrivateFieldAccess.SetField(tracker, "_localPlayerIdInt", OwnerPlayerId + 1);
 
-            tracker.BroadcastRemoveTrackedPlayers(new[] { "A" });
+            tracker.RequestRemoveTrackedPlayers(new[] { "A" });
 
             CollectionAssert.AreEqual(new[] { "A" }, GetTrackedPlayerIds(tracker));
         }
@@ -242,8 +242,8 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(tracker);
             tracker.StartPlayerTracking(new[] { "A" });
 
-            Assert.DoesNotThrow(() => tracker.BroadcastRemoveTrackedPlayers(null));
-            Assert.DoesNotThrow(() => tracker.BroadcastRemoveTrackedPlayers(new string[0]));
+            Assert.DoesNotThrow(() => tracker.RequestRemoveTrackedPlayers(null));
+            Assert.DoesNotThrow(() => tracker.RequestRemoveTrackedPlayers(new string[0]));
 
             Assert.AreEqual(0, tracker.OnTrackingPlayersRemovedCount);
         }
@@ -255,7 +255,7 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(tracker);
             tracker.StartPlayerTracking(new[] { "A" });
 
-            tracker.BroadcastRemoveTrackedPlayers(new[] { "A", "Z" });
+            tracker.RequestRemoveTrackedPlayers(new[] { "A", "Z" });
 
             CollectionAssert.AreEqual(new string[0], GetTrackedPlayerIds(tracker));
             CollectionAssert.AreEqual(new[] { "A" }, tracker.OnTrackingPlayersRemovedArgs[0],
@@ -269,7 +269,7 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(tracker);
             tracker.StartPlayerTracking(new[] { "A" });
 
-            tracker.BroadcastRemoveTrackedPlayers(new[] { "Z" });
+            tracker.RequestRemoveTrackedPlayers(new[] { "Z" });
 
             Assert.AreEqual(0, tracker.OnTrackingPlayersRemovedCount);
         }
@@ -281,7 +281,7 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(tracker);
             tracker.StartPlayerTracking(new[] { "A", "B" });
 
-            tracker.BroadcastRemoveTrackedPlayers(new[] { "A", "A" });
+            tracker.RequestRemoveTrackedPlayers(new[] { "A", "A" });
 
             CollectionAssert.AreEqual(new[] { "B" }, GetTrackedPlayerIds(tracker));
             CollectionAssert.AreEqual(new[] { "A" }, tracker.LastRemovedPlayerIds,
