@@ -148,11 +148,10 @@ namespace Tsvrc.Tracking
             // tracked" everywhere else in this class (TsArray.Contains/IsTrackedPlayer are
             // null-safe but not null-*rejecting*) and silently become a permanently-tracked
             // "null player", corrupting any consumer of LastPlayerIds/LastAddedPlayerIds that
-            // assumes non-null entries. Mirrors the equivalent filter in BroadcastAddTrackedPlayers,
-            // the other entry point into _trackedPlayerIds.
+            // assumes non-null entries.
             playerIds = TsArray.Remove(playerIds, new string[] { null });
 
-            // Deduplicate the initial list to match the invariant that BroadcastAddTrackedPlayers
+            // Deduplicate the initial list to match the invariant that RequestAddTrackedPlayers
             // enforces at runtime: no ID appears more than once. Without this, a caller passing
             // repeated IDs would produce duplicates in _trackedPlayerIds, which corrupts
             // LastPlayerIds on all clients and causes OnBecameProcessOwner to broadcast
@@ -194,11 +193,11 @@ namespace Tsvrc.Tracking
             // Owner fast path: avoid the self loop overhead of SendCustomNetworkEvent(Owner,...).
             if (IsProcessOwner())
             {
-                BroadcastAddTrackedPlayers(playerIds);
+                RequestAddTrackedPlayers(playerIds);
                 return;
             }
 
-            SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(BroadcastAddTrackedPlayers), playerIds);
+            SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestAddTrackedPlayers), playerIds);
         }
 
         /// <summary>
@@ -223,19 +222,10 @@ namespace Tsvrc.Tracking
         }
 
         /// <summary>
-        /// Gets the list of currently tracked player IDs.
+        /// Returns true if <paramref name="playerId"/> is in this player's copy of the synced
+        /// tracked list.
         /// </summary>
-        protected string[] GetTrackedPlayerIds()
-        {
-            return _trackedPlayerIds;
-        }
-
-        /// <summary>
-        /// Checks if a player with the given ID is being tracked.
-        /// On non-owner clients this reflects the last deserialized state, which may lag behind
-        /// network event callbacks. Use <c>LastPlayerIds</c> for an accurate snapshot within <c>Notify*</c> callbacks.
-        /// </summary>
-        protected bool IsTrackedPlayer(string playerId)
+        protected bool IsTrackedPlayer(int playerId)
         {
             return TsArray.Contains(_trackedPlayerIds, playerId);
         }
@@ -259,19 +249,6 @@ namespace Tsvrc.Tracking
         /// <summary>Called on all clients when players are removed. Read <see cref="LastRemovedPlayerIds"/> in this callback.</summary>
         /// <param name="removedPlayerIds">The player IDs that were removed.</param>
         protected virtual void OnTrackingPlayersRemoved(string[] removedPlayerIds) { }
-
-        /// <summary>
-        /// Called by <see cref="BroadcastAddTrackedPlayers"/> on the owner, after the running/owner
-        /// guards but before any state mutation. Return <c>false</c> to reject the addition.
-        /// </summary>
-        /// <remarks>
-        /// This runs for BOTH call paths that reach <see cref="BroadcastAddTrackedPlayers"/>: the
-        /// owner's own local fast-path call from <see cref="AddTrackedPlayers"/>, and a non-owner's
-        /// remote <c>[NetworkCallable]</c> call. <see cref="BroadcastAddTrackedPlayers"/> cannot be
-        /// <c>virtual</c>/<c>override</c> itself (VRChat forbids that on <c>[NetworkCallable]</c>
-        /// methods), so this hook is the only point that can intercept both paths at once.
-        /// </remarks>
-        protected virtual bool CanAcceptTrackedPlayerAdditions() { return true; }
 
         /// <summary>
         /// Broadcast target: fires on all instance players when the process starts.
@@ -378,7 +355,7 @@ namespace Tsvrc.Tracking
         public void NotifyTrackedPlayersAdded(string[] addedPlayerIds)
         {
             // A non-null but empty array represents no actual change; every sender already
-            // guards against this before broadcasting (BroadcastAddTrackedPlayers returns early
+            // guards against this before broadcasting (RequestAddTrackedPlayers returns early
             // when its filtered validCount is 0), but this method is public and network-callable,
             // so a direct call could otherwise still fire a spurious "players added" notification
             // for zero players.
@@ -392,7 +369,7 @@ namespace Tsvrc.Tracking
                 var owner = Networking.GetOwner(gameObject);
                 if (caller == null || owner == null || caller.playerId != owner.playerId) return;
             }
-            // Sanitize independently of the sender: BroadcastAddTrackedPlayers already dedupes
+            // Sanitize independently of the sender: RequestAddTrackedPlayers already dedupes
             // and null-filters before broadcasting, but this method is itself public and
             // [NetworkCallable], so a direct call from the real owner (passing the guard above)
             // could still bypass that. Strip nulls first, then dedupe (order matters: dedupe
@@ -406,7 +383,7 @@ namespace Tsvrc.Tracking
             // Apply the delta so LastPlayerIds is current when the callback fires.
             // Serialization packets and network events have no relative ordering guarantee
             // (VRChat docs), so LastPlayerIds may already include some of these entries;
-            // deduplicate to match the invariant enforced by BroadcastAddTrackedPlayers.
+            // deduplicate to match the invariant enforced by RequestAddTrackedPlayers.
             string[] toAdd = new string[addedPlayerIds.Length];
             int toAddCount = 0;
             for (int i = 0; i < addedPlayerIds.Length; i++)
@@ -464,121 +441,63 @@ namespace Tsvrc.Tracking
             TsEmit(OnTrackingPlayersRemovedEvent);
         }
 
-        /// <summary>
-        /// Adds players to the tracked list. Silently ignores IDs already tracked.
-        /// Non-owners should call <see cref="AddTrackedPlayers"/> instead.
-        /// </summary>
         [NetworkCallable]
-        public void BroadcastAddTrackedPlayers(string[] playerIds)
+        public void RequestAddTrackedPlayers(int[] playerIds)
         {
-            // IsProcessRunning() guards the window between ExecuteStop setting _isRunning=false
-            // and InternalCleanup clearing _ownerId. During that window IsProcessOwner() is still
-            // true, so a subscriber callback from OnProcessStopped/OnProcessCompleted that calls
-            // AddTrackedPlayers would pass the IsProcessOwner() check alone and mutate
-            // _trackedPlayerIds and fire a spurious NotifyTrackedPlayersAdded event to all clients.
-            if (!IsProcessRunning() || !IsProcessOwner()) return;
-            if (playerIds == null || playerIds.Length == 0) return;
-            if (!CanAcceptTrackedPlayerAdditions()) return;
+            if (!CanHandleTrackedPlayersRequest(nameof(RequestAddTrackedPlayers), playerIds)) return;
 
-            string[] validPlayerIds = new string[playerIds.Length];
-            int validCount = 0;
-
-            for (int i = 0; i < playerIds.Length; i++)
+            int[] newPlayerIds = TsArray.Dedupe(TsArray.Remove(playerIds, _trackedPlayerIds));
+            if (newPlayerIds.Length == 0)
             {
-                // Reject null entries here too: IsTrackedPlayer(null) is false (nothing tracked
-                // is ever null once this guard exists), so an unfiltered null would otherwise
-                // pass as "not already tracked" and become a permanently-tracked null player id.
-                if (playerIds[i] != null && !IsTrackedPlayer(playerIds[i]))
-                {
-                    validPlayerIds[validCount++] = playerIds[i];
-                }
+                LogInfo("RequestAddTrackedPlayers ignored: all of the given player IDs are already tracked.");
+                return;
             }
 
-            if (validCount == 0) return;
-
-            if (validCount < playerIds.Length)
-            {
-                string[] trimmed = new string[validCount];
-                System.Array.Copy(validPlayerIds, trimmed, validCount);
-                validPlayerIds = trimmed;
-            }
-
-            // The filter above only excludes IDs already present in _trackedPlayerIds; it does
-            // not catch repeats within playerIds itself. Without this, a caller passing the same
-            // new ID twice in one call would add it to _trackedPlayerIds twice, breaking the
-            // "no ID appears more than once" invariant StartPlayerTracking establishes and
-            // documents, and the broadcast payload would carry the duplicate to every client.
-            validPlayerIds = TsArray.Dedupe(validPlayerIds);
-
-            _trackedPlayerIds = TsArray.Add(_trackedPlayerIds, validPlayerIds);
+            _trackedPlayerIds = TsArray.Add(_trackedPlayerIds, newPlayerIds);
             RequestSerialization();
 
-            _isBroadcasting = true;
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersAdded), validPlayerIds);
-            _isBroadcasting = false;
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersAdded), newPlayerIds);
         }
 
         [NetworkCallable]
-        public void RequestRemoveTrackedPlayers(string[] playerIds)
+        public void RequestRemoveTrackedPlayers(int[] playerIds)
+        {
+            if (!CanHandleTrackedPlayersRequest(nameof(RequestRemoveTrackedPlayers), playerIds)) return;
+
+            int[] removedPlayerIds = TsArray.Dedupe(TsArray.Intersect(playerIds, _trackedPlayerIds));
+            if (removedPlayerIds.Length == 0)
+            {
+                LogInfo("RequestRemoveTrackedPlayers ignored: none of the given player IDs are tracked.");
+                return;
+            }
+
+            _trackedPlayerIds = TsArray.Remove(_trackedPlayerIds, removedPlayerIds);
+            RequestSerialization();
+
+            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersRemoved), removedPlayerIds);
+        }
+
+        private bool CanHandleTrackedPlayersRequest(string methodName, int[] playerIds)
         {
             if (!IsProcessOwner())
             {
-                LogWarning("RequestRemoveTrackedPlayers rejected: not the owner.");
-                return;
+                LogWarning(methodName + " rejected: not the owner.");
+                return false;
             }
 
             if (!IsProcessRunning())
             {
-                LogWarning("RequestRemoveTrackedPlayers rejected: not running.");
-                return;
+                LogWarning(methodName + " rejected: not running.");
+                return false;
             }
 
             if (playerIds == null || playerIds.Length == 0)
             {
-                LogWarning("Ignoring ")
+                LogWarning(methodName + " ignored: no player IDs given.");
+                return false;
             }
 
-            string[] validPlayerIds = new string[playerIds.Length];
-            int validCount = 0;
-
-            for (int i = 0; i < playerIds.Length; i++)
-            {
-                if (IsTrackedPlayer(playerIds[i]))
-                {
-                    validPlayerIds[validCount++] = playerIds[i];
-                }
-            }
-
-            // Otherwise-silent signal that the caller's view has drifted from this tracker's.
-            if (validCount == 0)
-            {
-                LogInfo("BroadcastRemoveTrackedPlayers: none of the requested IDs are tracked - no-op.");
-                return;
-            }
-
-            if (validCount < playerIds.Length)
-            {
-                string[] trimmed = new string[validCount];
-                System.Array.Copy(validPlayerIds, trimmed, validCount);
-                validPlayerIds = trimmed;
-            }
-
-            // Same reasoning as BroadcastAddTrackedPlayers: the filter above only checks against
-            // the current tracked set, not repeats within playerIds itself. TsArray.Remove already
-            // tolerates duplicate entries in its "items" argument without corrupting
-            // _trackedPlayerIds, but without this the broadcast payload (and thus
-            // LastRemovedPlayerIds on every client) would misreport the same ID as removed more
-            // than once.
-            validPlayerIds = TsArray.Dedupe(validPlayerIds);
-
-            var remainingPlayerIds = TsArray.Remove(_trackedPlayerIds, validPlayerIds);
-
-            _trackedPlayerIds = remainingPlayerIds;
-            RequestSerialization();
-
-            _isBroadcasting = true;
-            SendCustomNetworkEvent(NetworkEventTarget.All, nameof(NotifyTrackedPlayersRemoved), validPlayerIds);
-            _isBroadcasting = false;
+            return true;
         }
     }
 }

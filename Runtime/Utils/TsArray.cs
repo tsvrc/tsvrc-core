@@ -48,6 +48,29 @@ namespace Tsvrc.Utils
             return result;
         }
 
+        /// <summary>
+        /// Returns a new array with only the elements of <paramref name="original"/> that also
+        /// appear in <paramref name="items"/>. Order is preserved. Repeats in
+        /// <paramref name="original"/> are kept.
+        /// </summary>
+        public static string[] Intersect(string[] original, string[] items)
+        {
+            int originalLen = original.Length;
+            int itemsLen = items.Length;
+            string[] buffer = new string[originalLen];
+            int count = 0;
+            for (int i = 0; i < originalLen; i++)
+            {
+                string current = original[i];
+                for (int j = 0; j < itemsLen; j++)
+                    if (current == items[j]) { buffer[count++] = current; break; }
+            }
+            if (count == originalLen) return buffer;
+            string[] result = new string[count];
+            System.Array.Copy(buffer, result, count);
+            return result;
+        }
+
         /// <summary>Returns true if <paramref name="value"/> exists in <paramref name="array"/>.</summary>
         public static bool Contains(string[] array, string value)
         {
@@ -87,6 +110,112 @@ namespace Tsvrc.Utils
             if (dedupedCount == originalLen) return deduped;
 
             string[] trimmed = new string[dedupedCount];
+            System.Array.Copy(deduped, trimmed, dedupedCount);
+            return trimmed;
+        }
+
+        /// <summary>
+        /// Returns a new array containing all elements of <paramref name="original"/>
+        /// followed by all elements of <paramref name="items"/>.
+        /// </summary>
+        public static int[] Add(int[] original, int[] items)
+        {
+            int originalLen = original.Length;
+            int itemsLen = items.Length;
+            int[] result = new int[originalLen + itemsLen];
+            for (int i = 0; i < originalLen; i++)
+                result[i] = original[i];
+            for (int i = 0; i < itemsLen; i++)
+                result[originalLen + i] = items[i];
+            return result;
+        }
+
+        /// <summary>
+        /// Returns a new array with every element that appears in <paramref name="items"/> removed
+        /// from <paramref name="original"/>. Order is preserved. All matching occurrences are removed.
+        /// </summary>
+        public static int[] Remove(int[] original, int[] items)
+        {
+            int originalLen = original.Length;
+            int itemsLen = items.Length;
+            int[] buffer = new int[originalLen];
+            int count = 0;
+            for (int i = 0; i < originalLen; i++)
+            {
+                int current = original[i];
+                bool shouldRemove = false;
+                for (int j = 0; j < itemsLen; j++)
+                    if (current == items[j]) { shouldRemove = true; break; }
+                if (!shouldRemove) buffer[count++] = current;
+            }
+            if (count == originalLen) return buffer;
+            int[] result = new int[count];
+            System.Array.Copy(buffer, result, count);
+            return result;
+        }
+
+        /// <summary>
+        /// Returns a new array with only the elements of <paramref name="original"/> that also
+        /// appear in <paramref name="items"/>. Order is preserved. Repeats in
+        /// <paramref name="original"/> are kept.
+        /// </summary>
+        public static int[] Intersect(int[] original, int[] items)
+        {
+            int originalLen = original.Length;
+            int itemsLen = items.Length;
+            int[] buffer = new int[originalLen];
+            int count = 0;
+            for (int i = 0; i < originalLen; i++)
+            {
+                int current = original[i];
+                for (int j = 0; j < itemsLen; j++)
+                    if (current == items[j]) { buffer[count++] = current; break; }
+            }
+            if (count == originalLen) return buffer;
+            int[] result = new int[count];
+            System.Array.Copy(buffer, result, count);
+            return result;
+        }
+
+        /// <summary>Returns true if <paramref name="value"/> exists in <paramref name="array"/>.</summary>
+        public static bool Contains(int[] array, int value)
+        {
+            int len = array.Length;
+            for (int i = 0; i < len; i++)
+                if (array[i] == value) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Returns a new array with repeated values collapsed to their first occurrence.
+        /// Order is preserved.
+        /// </summary>
+        public static int[] Dedupe(int[] original)
+        {
+            int originalLen = original.Length;
+            if (originalLen < 2)
+            {
+                int[] copy = new int[originalLen];
+                System.Array.Copy(original, copy, originalLen);
+                return copy;
+            }
+
+            int[] deduped = new int[originalLen];
+            int dedupedCount = 0;
+            for (int i = 0; i < originalLen; i++)
+            {
+                bool isDuplicate = false;
+                for (int j = 0; j < dedupedCount; j++)
+                {
+                    if (deduped[j] == original[i]) { isDuplicate = true; break; }
+                }
+                if (!isDuplicate)
+                    deduped[dedupedCount++] = original[i];
+            }
+
+            if (dedupedCount == originalLen) return deduped;
+
+            int[] trimmed = new int[dedupedCount];
             System.Array.Copy(deduped, trimmed, dedupedCount);
             return trimmed;
         }
