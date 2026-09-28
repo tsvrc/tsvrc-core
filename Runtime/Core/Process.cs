@@ -123,7 +123,11 @@ namespace Tsvrc.Core
             ExecuteProcessStart();
         }
 
-        protected void ExecuteProcessStart()
+        /// <summary>
+        /// Runs the start logic, once the process has validated the start call.
+        /// </summary>
+        /// <remarks>Overrides must call <c>base</c>.</remarks>
+        protected virtual void ExecuteProcessStart()
         {
             _isRunning = true;
             _ownershipEstablished = true;
@@ -180,7 +184,11 @@ namespace Tsvrc.Core
             ExecuteProcessStop();
         }
 
-        protected void ExecuteProcessStop()
+        /// <summary>
+        /// Runs the stop logic, once the process has validated the stop call.
+        /// </summary>
+        /// <remarks>Overrides must call <c>base</c>.</remarks>
+        protected virtual void ExecuteProcessStop()
         {
             _isRunning = false;
             OnProcessStopped();
@@ -232,7 +240,11 @@ namespace Tsvrc.Core
             ExecuteProcessComplete();
         }
 
-        protected void ExecuteProcessComplete()
+        /// <summary>
+        /// Runs the complete logic, once the process has validated the complete call.
+        /// </summary>
+        /// <remarks>Overrides must call <c>base</c>.</remarks>
+        protected virtual void ExecuteProcessComplete()
         {
             _isRunning = false;
             OnProcessCompleted();
