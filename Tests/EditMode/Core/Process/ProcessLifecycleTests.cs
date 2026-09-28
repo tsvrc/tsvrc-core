@@ -50,7 +50,7 @@ namespace Tsvrc.Tests.EditMode
         public void StartProcess_AfterStopProcess_RestartsCleanly()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            process.StartProcess(useProcessUpdate: true);
+            process.StartProcess();
             process.StopProcess();
             Assert.IsFalse(process.IsProcessRunning());
 

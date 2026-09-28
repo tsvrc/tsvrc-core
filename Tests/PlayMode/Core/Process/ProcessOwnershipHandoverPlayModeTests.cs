@@ -51,7 +51,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            process.StartProcess(useProcessUpdate: false);
+            process.StartProcess();
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
 
             Players.RemovePlayer(remote);
@@ -66,7 +66,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
         public IEnumerator OnPlayerLeft_RealRemoteOwnerRemoved_RunGenerationSurvivesTheHandoverUnchanged()
         {
             // TakeOverRunningProcess continues the existing run, not a new one, so _runGeneration
-            // (only ExecuteStart touches it) must be unchanged after the handover - otherwise an
+            // (only ExecuteProcessStart touches it) must be unchanged after the handover - otherwise an
             // in-flight request for this run would look stale to the new owner.
             yield return StartClientSim();
             Players.SpawnRemotePlayer("RemoteOwner");
@@ -77,7 +77,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            process.StartProcess(useProcessUpdate: false);
+            process.StartProcess();
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             int generationBeforeHandover = PrivateFieldAccess.GetField<int>(process, "_runGeneration");
 
@@ -102,7 +102,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             MakeGenuinelyNotOwner(process, remote);
-            process.StartProcess(useProcessUpdate: false);
+            process.StartProcess();
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
@@ -128,7 +128,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             MakeGenuinelyNotOwner(process, remote);
-            process.StartProcess(useProcessUpdate: false);
+            process.StartProcess();
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
@@ -181,7 +181,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             MakeGenuinelyNotOwner(process, remote);
-            process.StartProcess(useProcessUpdate: false);
+            process.StartProcess();
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");

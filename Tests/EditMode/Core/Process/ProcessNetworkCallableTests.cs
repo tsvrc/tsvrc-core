@@ -33,7 +33,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var process = CreateProcess<ProcessTestSubclass>();
 
-            process.RequestStartProcess(false);
+            process.RequestStartProcess();
 
             Assert.AreEqual(1, process.OnProcessStartedCount);
         }
@@ -46,7 +46,7 @@ namespace Tsvrc.Tests.EditMode
 
             LogAssert.Expect(LogType.Warning,
                 "[TsVRC] [ProcessTestSubclass] RequestStartProcess rejected: not the owner or already running.");
-            process.RequestStartProcess(false);
+            process.RequestStartProcess();
 
             Assert.AreEqual(1, process.OnProcessStartedCount);
         }

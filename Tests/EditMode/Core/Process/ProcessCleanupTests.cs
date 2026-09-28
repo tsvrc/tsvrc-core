@@ -11,11 +11,10 @@ namespace Tsvrc.Tests.EditMode
         public void Stop_NormalCase_ClearsUpdateAndOwnershipFields()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            process.StartProcess(useProcessUpdate: true);
+            process.StartProcess();
 
             process.StopProcess();
 
-            Assert.IsFalse(PrivateFieldAccess.GetField<bool>(process, "_useProcessUpdate"));
             Assert.IsFalse(PrivateFieldAccess.GetField<bool>(process, "_updateLoopActive"));
             Assert.IsFalse(PrivateFieldAccess.GetField<bool>(process, "_ownershipEstablished"));
         }
@@ -48,12 +47,11 @@ namespace Tsvrc.Tests.EditMode
             var process = CreateProcess<ProcessTestSubclass>();
             process.StartProcess();
             process.CallLog.Clear();
-            process.OnProcessStoppedAction = () => process.StartProcess(useProcessUpdate: true);
+            process.OnProcessStoppedAction = () => process.StartProcess();
 
             process.StopProcess();
 
             Assert.IsTrue(process.IsProcessRunning(), "Reentrant StartProcess should leave a new process running.");
-            Assert.IsTrue(PrivateFieldAccess.GetField<bool>(process, "_useProcessUpdate"));
             Assert.IsTrue(PrivateFieldAccess.GetField<bool>(process, "_ownershipEstablished"),
                 "Ownership fields must not be cleared out from under the reentrant new process.");
             CollectionAssert.AreEqual(

@@ -15,7 +15,7 @@ namespace Tsvrc.Tests.EditMode
 
             Assert.DoesNotThrow(() =>
             {
-                process.StartProcess(useProcessUpdate: true);
+                process.StartProcess();
                 process._TickProcessUpdate();
                 process.StopProcess();
             });
@@ -34,7 +34,7 @@ namespace Tsvrc.Tests.EditMode
         {
             var process = CreateProcess<ProcessTestSubclass>();
 
-            process.StartProcess(useProcessUpdate: true);
+            process.StartProcess();
             process._TickProcessUpdate();
             ForceNextTickDueNow(process);
             process._TickProcessUpdate();

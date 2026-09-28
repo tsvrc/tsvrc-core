@@ -14,26 +14,13 @@ namespace Tsvrc.Tests.EditMode
     public class ProcessUpdateLoopTests : ProcessTestBase
     {
         [Test]
-        public void StartProcess_DefaultUseProcessUpdateFalse_TickLoopStillRunsButNeverCallsOnProcessUpdate()
+        public void StartProcess_ActivatesLoopButDoesNotTickSynchronously()
         {
             var process = CreateProcess<ProcessTestSubclass>();
 
             process.StartProcess();
 
-            // The loop always runs for the resync heartbeat; only OnProcessUpdate is gated on the flag.
-            Assert.IsFalse(PrivateFieldAccess.GetField<bool>(process, "_useProcessUpdate"));
             Assert.IsTrue(PrivateFieldAccess.GetField<bool>(process, "_updateLoopActive"));
-            Assert.AreEqual(0, process.OnProcessUpdateCount);
-        }
-
-        [Test]
-        public void StartProcess_UseProcessUpdateTrue_ActivatesLoopButDoesNotTickSynchronously()
-        {
-            var process = CreateProcess<ProcessTestSubclass>();
-
-            process.StartProcess(useProcessUpdate: true);
-
-            Assert.IsTrue(PrivateFieldAccess.GetField<bool>(process, "_useProcessUpdate"));
             Assert.AreEqual(0, process.OnProcessUpdateCount, "First tick must be deferred, not synchronous.");
 
             // Simulate the deferred SendCustomEventDelayedSeconds(..., 0f) callback firing.
@@ -72,7 +59,6 @@ namespace Tsvrc.Tests.EditMode
         {
             var process = CreateProcess<ProcessTestSubclass>();
             PrivateFieldAccess.SetField(process, "_isRunning", true);
-            PrivateFieldAccess.SetField(process, "_useProcessUpdate", true);
             PrivateFieldAccess.SetField(process, "_updateLoopActive", true);
 
             process._TickProcessUpdate();
@@ -88,7 +74,6 @@ namespace Tsvrc.Tests.EditMode
             // tested above; this proves the exit check works independently.
             var process = CreateProcess<ProcessTestSubclass>();
             PrivateFieldAccess.SetField(process, "_isRunning", true);
-            PrivateFieldAccess.SetField(process, "_useProcessUpdate", true);
             PrivateFieldAccess.SetField(process, "_updateLoopActive", true);
             process.OnProcessUpdateAction = () => PrivateFieldAccess.SetField(process, "_isRunning", false);
 
@@ -102,7 +87,7 @@ namespace Tsvrc.Tests.EditMode
         public void Tick_RepeatedDirectInvocations_SimulateContinuousLoopThenStopHaltsIt()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            process.StartProcess(useProcessUpdate: true);
+            process.StartProcess();
 
             process._TickProcessUpdate();
             ForceNextTickDueNow(process);
@@ -142,7 +127,6 @@ namespace Tsvrc.Tests.EditMode
         {
             var process = CreateProcess<ProcessTestSubclass>();
             PrivateFieldAccess.SetField(process, "_isRunning", true);
-            PrivateFieldAccess.SetField(process, "_useProcessUpdate", true);
             PrivateFieldAccess.SetField(process, "_updateLoopActive", true);
             PrivateFieldAccess.SetField(process, "_nextTickDueAtRealTime", 0f);
 
@@ -187,11 +171,8 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void StartProcess_UseProcessUpdateFalse_StillSchedulesAFutureResyncDeadline()
+        public void StartProcess_SchedulesAFutureResyncDeadline()
         {
-            // The resync heartbeat self-heals a missed discrete broadcast for ANY running, owned
-            // process, not just ones that opted into OnProcessUpdate - so StartProcess must
-            // schedule it unconditionally.
             var process = CreateProcess<ProcessTestSubclass>();
 
             process.StartProcess();
@@ -208,13 +189,13 @@ namespace Tsvrc.Tests.EditMode
             // Stop+Start, new loop "B"'s legitimate first tick, and finally A's
             // already-scheduled next call ("A-next") arriving late.
             var process = CreateProcess<ProcessTestSubclass>();
-            process.StartProcess(useProcessUpdate: true); // Loop A starts.
+            process.StartProcess(); // Loop A starts.
 
             process._TickProcessUpdate(); // A's first (legitimate) tick fires.
             Assert.AreEqual(1, process.OnProcessUpdateCount);
 
             process.StopProcess(); // Same frame: A stopped...
-            process.StartProcess(useProcessUpdate: true); // ...then B starts.
+            process.StartProcess(); // ...then B starts.
 
             process._TickProcessUpdate(); // B's first (legitimate) tick fires.
             Assert.AreEqual(2, process.OnProcessUpdateCount);
@@ -233,10 +214,10 @@ namespace Tsvrc.Tests.EditMode
             {
                 process.OnProcessStartedAction = null; // avoid recursing into this same hook again
                 process.StopProcess();
-                process.StartProcess(useProcessUpdate: true);
+                process.StartProcess();
             };
 
-            process.StartProcess(useProcessUpdate: true);
+            process.StartProcess();
 
             Assert.IsTrue(process.IsProcessRunning());
             Assert.IsTrue(PrivateFieldAccess.GetField<bool>(process, "_updateLoopActive"));

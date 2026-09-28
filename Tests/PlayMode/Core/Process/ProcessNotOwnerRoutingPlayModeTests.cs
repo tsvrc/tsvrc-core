@@ -56,7 +56,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
 
-            process.RequestStartProcess(false);
+            process.RequestStartProcess();
 
             Assert.AreEqual(0, process.OnProcessStartedCount,
                 "A misrouted RequestStartProcess call must be discarded when the local player is genuinely " +
@@ -76,7 +76,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             MakeGenuinelyNotOwner(process, remote);
-            process.StartProcess(useProcessUpdate: false);
+            process.StartProcess();
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
@@ -102,7 +102,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             MakeGenuinelyNotOwner(process, remote);
-            process.StartProcess(useProcessUpdate: false);
+            process.StartProcess();
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
@@ -128,7 +128,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             MakeGenuinelyNotOwner(process, remote);
-            process.StartProcess(useProcessUpdate: false);
+            process.StartProcess();
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
@@ -154,7 +154,7 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             MakeGenuinelyNotOwner(process, remote);
-            process.StartProcess(useProcessUpdate: false);
+            process.StartProcess();
             PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
             Assert.IsFalse(Networking.IsOwner(process.gameObject),
                 "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");

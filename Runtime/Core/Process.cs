@@ -17,8 +17,7 @@ namespace Tsvrc.Core
         protected override bool IsTsvrcInternal => true;
 
         [UdonSynced] private bool _isRunning = false;
-        [UdonSynced] private bool _useProcessUpdate = false;
-        // Bumped once per run in ExecuteStart, never reset, so a stale Request*Process call gets caught.
+        // Bumped once per run in ExecuteProcessStart, never reset, so a stale Request*Process call gets caught.
         [UdonSynced] private int _runGeneration = 0;
 
         // Blocks TakeOverRunningProcess from re-firing once ownership is settled
@@ -27,7 +26,7 @@ namespace Tsvrc.Core
         private const float _processUpdateInterval = 0.5f;
         // Tradeoff: short enough that a missed event is only briefly wrong; long enough to stay cheap.
         private const float _autoResyncInterval = 5f;
-        // Gates both the always-on resync heartbeat and the opt-in OnProcessUpdate call.
+        // Gates the tick loop: OnProcessUpdate and the resync heartbeat.
         private bool _updateLoopActive = false;
         private float _nextTickDueAtRealTime = 0f;
         // Separate from _nextTickDueAtRealTime since the two run on different cadences.
@@ -95,8 +94,7 @@ namespace Tsvrc.Core
         /// Does not change who owns the object. If you want the local player to become the
         /// owner, call <see cref="SetProcessOwner"/> yourself before calling this.
         /// </remarks>
-        /// <param name="useProcessUpdate">Pass <c>true</c> to get an update tick every 0.5s while running.</param>
-        public virtual void StartProcess(bool useProcessUpdate = false)
+        public virtual void StartProcess()
         {
             if (IsProcessRunning())
             {
@@ -106,15 +104,15 @@ namespace Tsvrc.Core
 
             if (!IsProcessOwner())
             {
-                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestStartProcess), useProcessUpdate);
+                SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestStartProcess));
                 return;
             }
 
-            ExecuteStart(useProcessUpdate);
+            ExecuteProcessStart();
         }
 
         [NetworkCallable(maxEventsPerSecond: 1)]
-        public void RequestStartProcess(bool useProcessUpdate)
+        public void RequestStartProcess()
         {
             if (!IsProcessOwner() || IsProcessRunning())
             {
@@ -122,13 +120,12 @@ namespace Tsvrc.Core
                 return;
             }
 
-            ExecuteStart(useProcessUpdate);
+            ExecuteProcessStart();
         }
 
-        private void ExecuteStart(bool useProcessUpdate)
+        protected void ExecuteProcessStart()
         {
             _isRunning = true;
-            _useProcessUpdate = useProcessUpdate;
             _ownershipEstablished = true;
             _runGeneration++;
 
@@ -156,7 +153,7 @@ namespace Tsvrc.Core
                 return;
             }
 
-            ExecuteStop();
+            ExecuteProcessStop();
         }
 
         [NetworkCallable(maxEventsPerSecond: 1)]
@@ -180,10 +177,10 @@ namespace Tsvrc.Core
                 return;
             }
 
-            ExecuteStop();
+            ExecuteProcessStop();
         }
 
-        private void ExecuteStop()
+        protected void ExecuteProcessStop()
         {
             _isRunning = false;
             OnProcessStopped();
@@ -208,7 +205,7 @@ namespace Tsvrc.Core
                 return;
             }
 
-            ExecuteComplete();
+            ExecuteProcessComplete();
         }
 
         [NetworkCallable(maxEventsPerSecond: 1)]
@@ -232,10 +229,10 @@ namespace Tsvrc.Core
                 return;
             }
 
-            ExecuteComplete();
+            ExecuteProcessComplete();
         }
 
-        private void ExecuteComplete()
+        protected void ExecuteProcessComplete()
         {
             _isRunning = false;
             OnProcessCompleted();
@@ -246,7 +243,6 @@ namespace Tsvrc.Core
         {
             if (!IsProcessRunning())
             {
-                _useProcessUpdate = false;
                 _updateLoopActive = false;
                 _ownershipEstablished = false;
 
@@ -270,7 +266,7 @@ namespace Tsvrc.Core
         }
 
         /// <summary>
-        /// Runs one tick: drives the resync heartbeat and, if enabled, <see cref="OnProcessUpdate"/>.
+        /// Runs one tick: calls <see cref="OnProcessUpdate"/> and drives the resync heartbeat.
         /// </summary>
         /// <remarks>
         /// Internal only, public only because <c>SendCustomEventDelayedSeconds</c> requires a
@@ -296,10 +292,7 @@ namespace Tsvrc.Core
                 return;
             }
 
-            if (_useProcessUpdate)
-            {
-                OnProcessUpdate();
-            }
+            OnProcessUpdate();
 
             // Re-check since OnProcessUpdate() could have stopped the process or ownership.
             if (!IsProcessRunning() || !IsProcessOwner())
@@ -409,8 +402,7 @@ namespace Tsvrc.Core
         protected virtual void OnProcessCleanup(bool isCompleted) { }
 
         /// <summary>
-        /// Called on a fixed interval while the process is running, if <see cref="StartProcess"/>
-        /// was called with <c>useProcessUpdate</c> set to <c>true</c>.
+        /// Called on a fixed interval while the process is running.
         /// </summary>
         /// <remarks>
         /// Runs only on the process owner, roughly every half second, until the process ends or
