@@ -123,44 +123,22 @@ namespace Tsvrc.Tracking
             RequestRemoveTrackedPlayers(toRemove);
         }
 
-        /// <summary>
-        /// Starts the process from the tracker with the specified player IDs.
-        /// </summary>
-        /// <param name="useProcessUpdate">When <c>true</c>, <see cref="OnProcessUpdate"/> fires every 0.5 s while the process runs.</param>
-        public virtual void StartPlayerTracking(string[] playerIds, bool useProcessUpdate = false)
+        public virtual void StartPlayerTracking(int[] playerIds)
         {
-            // If a process is already running, base.StartProcess will just log a warning
-            // and no-op; skip the dedup work and, critically, don't touch
-            // _initialTrackerPlayerIds at all in that case. Writing it here unconditionally
-            // would leave a stale, never-consumed value behind (OnProcessStarted is the only
-            // consumer, and it only runs on an actual fresh start) that could silently corrupt
-            // the *next* legitimate start's initial tracked set, since OnProcessCleanup's own
-            // reset of this field is skipped entirely on a reentrant restart.
-            if (IsProcessRunning())
-            {
-                base.StartProcess(useProcessUpdate);
-                return;
-            }
+            base.StartProcess();
+        }
 
+        protected override void ExecuteProcessStart()
+        {
             if (playerIds == null) playerIds = new string[0];
 
-            // Strip null entries: an unfiltered null would otherwise be treated as "not already
-            // tracked" everywhere else in this class (TsArray.Contains/IsTrackedPlayer are
-            // null-safe but not null-*rejecting*) and silently become a permanently-tracked
-            // "null player", corrupting any consumer of LastPlayerIds/LastAddedPlayerIds that
-            // assumes non-null entries.
             playerIds = TsArray.Remove(playerIds, new string[] { null });
 
-            // Deduplicate the initial list to match the invariant that RequestAddTrackedPlayers
-            // enforces at runtime: no ID appears more than once. Without this, a caller passing
-            // repeated IDs would produce duplicates in _trackedPlayerIds, which corrupts
-            // LastPlayerIds on all clients and causes OnBecameProcessOwner to broadcast
-            // spurious duplicate entries in the removed list.
             playerIds = TsArray.Dedupe(playerIds);
 
             _initialTrackerPlayerIds = playerIds;
 
-            base.StartProcess(useProcessUpdate);
+            base.ExecuteProcessStart();
         }
 
         /// <summary>
