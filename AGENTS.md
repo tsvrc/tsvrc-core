@@ -17,7 +17,7 @@ Runtime code lives in `Runtime/`, editor/codegen tooling in `Editor/`, tests in 
   suites, or on Windows, with the Editor closed, run
   `Tests/UdonTestKit/Scripts~/Invoke-UnityTests.ps1 -AssemblyNames "Tsvrc.Tests.EditMode;Tsvrc.Tests.PlayMode"`.
   See `CONTRIBUTING.md`.
-- Tests use Udon Test Kit (`Tsvrc.UdonTestKit`) directly; TsVRC has no testing helpers of
+- Tests use Udon Test Kit (`Tsvrc.UdonTestKit`) directly; Core has no testing helpers of
   its own.
 
 ## Code style

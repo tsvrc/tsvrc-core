@@ -11,13 +11,13 @@ If that's not accessible to you for some reason, contact
 
 ## Scope
 
-This covers vulnerabilities in TsVRC's own code (`Runtime/`, `Editor/`). It doesn't cover
+This covers vulnerabilities in Core's own code (`Runtime/`, `Editor/`). It doesn't cover
 the VRChat platform, the VRChat Worlds SDK, or UdonSharp itself, those go to
 [VRChat's own support channels](https://hello.vrchat.com/) instead.
 
 ## Supported versions
 
-TsVRC is pre-1.0. Only the latest published version is supported; there's no backport
+Core is pre-1.0. Only the latest published version is supported; there's no backport
 policy for older versions yet.
 
 ## Response

@@ -1,12 +1,12 @@
 name: Feature request
-description: Propose something TsVRC doesn't do yet.
+description: Propose something Core doesn't do yet.
 labels: [enhancement]
 body:
   - type: textarea
     id: problem
     attributes:
       label: What problem does this solve?
-      description: What are you trying to do that TsVRC doesn't support today?
+      description: What are you trying to do that Core doesn't support today?
     validations:
       required: true
   - type: textarea

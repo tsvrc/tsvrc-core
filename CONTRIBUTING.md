@@ -1,4 +1,4 @@
-# Contributing to TsVRC
+# Contributing to TsVRC Core
 
 ## Setup
 
@@ -19,7 +19,7 @@ need a world project to develop it in:
 3. Open the project in Unity.
 
 The submodule is [Udon Test Kit](https://tsvrc.com/docs/udon-test-kit/intro), at
-`Tests/UdonTestKit`, pinned to the commit TsVRC is tested with. TsVRC's editor code and tests
+`Tests/UdonTestKit`, pinned to the commit Core is tested with. Core's editor code and tests
 build on it, and a release lists it as a dependency instead of shipping it. Don't also install
 the kit through the Creator Companion in the same project: two copies stop it compiling.
 
@@ -40,7 +40,7 @@ run **Tools > TsVRC > Udon Test Kit > Fix ClientSim Project Settings** once in y
 
 ### From the command line (Windows)
 
-Close the Unity Editor, then run the kit's script with TsVRC's two test assemblies:
+Close the Unity Editor, then run the kit's script with Core's two test assemblies:
 
 ```powershell
 .\Assets\Tsvrc\Tests\UdonTestKit\Scripts~\Invoke-UnityTests.ps1 -AssemblyNames "Tsvrc.Tests.EditMode;Tsvrc.Tests.PlayMode"
