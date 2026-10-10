@@ -4,10 +4,8 @@ using Tsvrc.Tracking;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // ReadyCheckProcess inherits Process's [UdonBehaviourSyncMode] attribute (through
-    // PlayerTracker), so this double lives in Tsvrc.Tests.Doubles for the same reason
-    // PlayerTrackerTestSubclass/ProcessTestSubclass do - AddComponent() silently returns
-    // null for such a script when it's defined in an Editor-platform-restricted assembly.
+    // Lives in Tsvrc.Tests.Doubles for the same reason PlayerTrackerTestSubclass/
+    // ProcessTestSubclass do: used by both EditMode and PlayMode ReadyCheckProcess tests.
     //
     // Records every OnReadyCheck* hook invocation (call count + ordered args where relevant)
     // and the OnTrackingPlayersRemoved override so tests can assert both "did it fire" and

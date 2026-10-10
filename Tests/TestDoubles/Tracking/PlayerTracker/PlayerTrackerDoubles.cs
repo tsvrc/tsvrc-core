@@ -4,10 +4,8 @@ using Tsvrc.Tracking;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // PlayerTracker inherits Process's [UdonBehaviourSyncMode] attribute, so this
-    // double lives in Tsvrc.Tests.Doubles for the same reason ProcessTestSubclass
-    // does (see that file's header comment) - AddComponent() silently returns null for
-    // such a script when it's defined in an Editor-platform-restricted assembly.
+    // Lives in Tsvrc.Tests.Doubles for the same reason ProcessTestSubclass does (see that
+    // file's header comment): used by both EditMode and PlayMode PlayerTracker tests.
     //
     // Records every OnTracking* hook invocation (call count + ordered args) so tests can
     // assert both "did it fire" and "with what payload", mirroring ProcessTestSubclass's

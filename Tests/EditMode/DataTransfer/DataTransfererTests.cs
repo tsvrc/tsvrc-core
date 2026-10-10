@@ -132,17 +132,17 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void OnOwnerAbandonedProcess_EmptyTrackedList_DoesNotThrow()
+        public void OnBecameProcessOwner_EmptyTrackedList_DoesNotThrow()
         {
             // DataTransferer's own override is a single base call (kept only for an explanatory
             // comment per the source) - this pins that the whole inherited chain remains
             // Edit-Mode-safe through this class's own override too, using the same
             // empty-tracked-list early-return established throughout this suite for
-            // OnOwnerAbandonedProcess (see PlayerTrackerAbandonmentTests.cs).
+            // OnBecameProcessOwner (see PlayerTrackerAbandonmentTests.cs).
             var transferer = CreateProcess<DataTransfererTestSubclass>();
             SetTrackedPlayerIds(transferer, new string[0]);
 
-            Assert.DoesNotThrow(() => PrivateFieldAccess.InvokeInstance(transferer, "OnOwnerAbandonedProcess"));
+            Assert.DoesNotThrow(() => PrivateFieldAccess.InvokeInstance(transferer, "OnBecameProcessOwner"));
         }
     }
 }

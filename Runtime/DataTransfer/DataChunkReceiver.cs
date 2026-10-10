@@ -213,8 +213,6 @@ namespace Tsvrc.DataTransfer
             // TsArray.Contains crashes on null.Length without this check.
             if (playerIds == null) return;
 
-            // _localPlayerId is cached once in Process.TsStart(); VRChat guarantees
-            // displayName and playerId are immutable for the duration of a session.
             var playerId = _localPlayerId;
             if (!TsArray.Contains(playerIds, playerId)) return;
 

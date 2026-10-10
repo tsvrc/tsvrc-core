@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -54,23 +53,6 @@ namespace Tsvrc.Tests.EditMode
 
             Assert.AreEqual(0, tracker.OnReadyCheckCompletedCount);
             Assert.IsTrue(tracker.IsProcessRunning());
-        }
-
-        [Test]
-        public void OnProcessUpdate_NonOwnerTick_NeverPollsForCompletion()
-        {
-            var tracker = CreateProcess<ReadyCheckProcessTestSubclass>();
-            SeedAsOwner(tracker);
-            tracker.StartReadyCheck(new[] { "A", "B" });
-            SetReadyPlayerIds(tracker, new[] { "A", "B" });
-            // Flip away from owner without stopping - _TickProcessUpdate's own guard must
-            // stop the loop and never reach OnProcessUpdate/CheckAllPlayersReady.
-            PrivateFieldAccess.SetField(tracker, "_localPlayerIdInt", OwnerPlayerId + 1);
-
-            ForceNextTickDueNow(tracker);
-            tracker._TickProcessUpdate();
-
-            Assert.AreEqual(0, tracker.OnReadyCheckCompletedCount);
         }
     }
 }

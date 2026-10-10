@@ -1,33 +1,13 @@
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // Covers OnTrackingPlayersRemoved: the owner-only guard (this hook runs on every client,
-    // but only the owner's _readyPlayerIds is authoritative), the batch removal of ready
-    // players among the untracked set, and the re-check-completion-even-for-non-ready-removals
-    // behavior documented on the source.
+    // Covers OnTrackingPlayersRemoved on the owner: the batch removal of ready players among the
+    // untracked set, and the re-check-completion-even-for-non-ready-removals behavior documented
+    // on the source. The non-owner half of its owner-only guard lives in
+    // ReadyCheckProcessNotOwnerPlayModeTests, since Edit Mode can't produce a non-owner.
     public class ReadyCheckProcessPlayersRemovedTests : ReadyCheckProcessTestBase
     {
-        [Test]
-        public void OnTrackingPlayersRemoved_NonOwnerClient_DoesNotMutateLocalReadyPlayerIds()
-        {
-            // Simulates a genuine remote (non-owner) client receiving the
-            // NotifyTrackedPlayersRemoved broadcast: _isBroadcasting bypasses the caller
-            // guard the same way it would for the real owner's inline self-delivery, but this
-            // client's own IsProcessOwner() is false, so OnTrackingPlayersRemoved's own guard
-            // must reject the mutation regardless.
-            var tracker = CreateProcess<ReadyCheckProcessTestSubclass>();
-            SetReadyPlayerIds(tracker, new[] { "A" });
-            PrivateFieldAccess.SetField(tracker, "_isBroadcasting", true);
-
-            tracker.NotifyTrackedPlayersRemoved(new[] { "A" });
-
-            PrivateFieldAccess.SetField(tracker, "_isBroadcasting", false);
-            CollectionAssert.AreEqual(new[] { "A" }, GetReadyPlayerIds(tracker),
-                "A non-owner client must never mutate its own _readyPlayerIds from this hook.");
-        }
-
         [Test]
         public void OnTrackingPlayersRemoved_Owner_RemovesReadyPlayersAmongRemoved()
         {

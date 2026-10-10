@@ -36,9 +36,9 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void AddComponent_FromThisAssembly_Succeeds()
         {
-            // AddComponent silently returns null for a script under a folder
-            // literally named "Editor", since such scripts are excluded from the
-            // runtime assembly. TsConfig deliberately isn't under one.
+            // A folder literally named "Editor" compiles into an editor-only assembly,
+            // excluded from player builds. TsConfig is read by runtime code (see
+            // WirePoolAttribute), so it must stay out of one.
             TsConfig config = CreateConfig();
 
             Assert.IsNotNull(config);

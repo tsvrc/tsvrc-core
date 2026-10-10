@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using NUnit.Framework;
 using Tsvrc.Testing.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -8,8 +7,8 @@ using VRC.SDKBase;
 
 namespace Tsvrc.Tests.PlayMode.Core.Process
 {
-    // Real, ClientSim-backed base for Process PlayMode tests: real VRCPlayerApi identity and
-    // real ownership routing, neither of which reflection-based Edit Mode tests can produce.
+    // ClientSim-backed base for Process PlayMode tests: real VRCPlayerApi identity and
+    // ownership routing, neither reachable from EditMode's reflection-based tests.
     public abstract class ProcessPlayModeTestBase : TsPlayModeTestBase
     {
         private readonly List<GameObject> _spawned = new List<GameObject>();
@@ -19,10 +18,9 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
         {
             foreach (GameObject go in _spawned)
                 if (go != null)
-                    // allowDestroyingAssets: true - teardown ordering across multiple
-                    // [UnityTearDown] methods in this base/derived pair isn't guaranteed relative
-                    // to ClientSim's own session teardown, so this GameObject may already be in a
-                    // torn-down session context by the time this runs.
+                    // allowDestroyingAssets: true - [UnityTearDown] order between this base and
+                    // derived class isn't guaranteed relative to ClientSim's own teardown, so the
+                    // session may already be torn down by the time this runs.
                     Object.DestroyImmediate(go, true);
             _spawned.Clear();
             yield return null;
@@ -35,13 +33,11 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
             return go.AddComponent<T>();
         }
 
-        // ClientSimPlayerManager.IsOwner/SetOwner - what Networking.IsOwner/SetOwner route to
-        // under ClientSim - fall back to comparing against the instance master only when the
-        // GameObject has no IClientSimSyncable component. Attaching FakeOwnershipSyncable gives
-        // process's GameObject an explicit, independent owner, so Networking.IsOwner(gameObject)
-        // genuinely returns false for the local player once otherOwner isn't it - a state a bare
-        // AddComponent<Process>() GameObject can never produce in Play Mode on its own.
-        protected static FakeOwnershipSyncable MakeGenuinelyNotUnityOwner(
+        // ClientSimPlayerManager.IsOwner/SetOwner (what Networking routes to under ClientSim)
+        // falls back to the instance master when the GameObject has no IClientSimSyncable.
+        // FakeOwnershipSyncable gives it a real, independent owner instead, so IsOwner
+        // genuinely returns false for the local player - unreachable with a bare AddComponent.
+        protected static FakeOwnershipSyncable MakeGenuinelyNotOwner(
             Tsvrc.Core.Process process, VRCPlayerApi otherOwner)
         {
             var syncable = process.gameObject.AddComponent<FakeOwnershipSyncable>();

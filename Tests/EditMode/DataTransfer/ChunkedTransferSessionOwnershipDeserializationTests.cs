@@ -3,8 +3,8 @@ using Tsvrc.Testing.Framework;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // Covers ChunkedTransferSession's OnOwnerAbandonedProcess and OnDeserialization overrides.
-    // PlayerTracker.OnOwnerAbandonedProcess's own scan (reached via the base call at the end of
+    // Covers ChunkedTransferSession's OnBecameProcessOwner and OnDeserialization overrides.
+    // PlayerTracker.OnBecameProcessOwner's own scan (reached via the base call at the end of
     // ChunkedTransferSession's override) only reaches TsPlayer.GetAllPlayers() when
     // _trackedPlayerIds is non-empty - see PlayerTrackerAbandonmentTests.cs. In every branch
     // below, _trackedPlayerIds is already empty by the time the base call runs (either the ready
@@ -16,20 +16,20 @@ namespace Tsvrc.Tests.EditMode
     public class ChunkedTransferSessionOwnershipDeserializationTests : DataTransferTestBase
     {
         [Test]
-        public void OnOwnerAbandonedProcess_ProcessRunning_StopsTheActiveReadyCheck()
+        public void OnBecameProcessOwner_ProcessRunning_StopsTheActiveReadyCheck()
         {
             var session = CreateProcess<ChunkedTransferSessionTestSubclass>();
             SeedAsOwner(session);
             PrivateFieldAccess.SetField(session, "_isRunning", true);
 
-            PrivateFieldAccess.InvokeInstance(session, "OnOwnerAbandonedProcess");
+            PrivateFieldAccess.InvokeInstance(session, "OnBecameProcessOwner");
 
             Assert.AreEqual(1, session.OnChunkSequenceStoppedCount);
             Assert.IsFalse(session.IsProcessRunning());
         }
 
         [Test]
-        public void OnOwnerAbandonedProcess_PendingNextChunk_ResetsAndBroadcastsStopped()
+        public void OnBecameProcessOwner_PendingNextChunk_ResetsAndBroadcastsStopped()
         {
             var session = CreateProcess<ChunkedTransferSessionTestSubclass>();
             SeedAsOwner(session);
@@ -37,7 +37,7 @@ namespace Tsvrc.Tests.EditMode
             SetCurrentChunkIndex(session, 2);
             SetTotalChunksField(session, 3);
 
-            PrivateFieldAccess.InvokeInstance(session, "OnOwnerAbandonedProcess");
+            PrivateFieldAccess.InvokeInstance(session, "OnBecameProcessOwner");
 
             Assert.AreEqual(1, session.OnChunkSequenceStoppedCount);
             Assert.IsFalse(GetPendingNextChunk(session));
@@ -45,13 +45,13 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void OnOwnerAbandonedProcess_NeitherRunningNorPending_IsANoOpForChunkState()
+        public void OnBecameProcessOwner_NeitherRunningNorPending_IsANoOpForChunkState()
         {
             var session = CreateProcess<ChunkedTransferSessionTestSubclass>();
             SeedAsOwner(session);
             // Idle: never transferred anything.
 
-            Assert.DoesNotThrow(() => PrivateFieldAccess.InvokeInstance(session, "OnOwnerAbandonedProcess"));
+            Assert.DoesNotThrow(() => PrivateFieldAccess.InvokeInstance(session, "OnBecameProcessOwner"));
 
             Assert.AreEqual(0, session.OnChunkSequenceStoppedCount);
         }
@@ -104,7 +104,7 @@ namespace Tsvrc.Tests.EditMode
         {
             // Networking.IsOwner(gameObject) is unconditionally true in this environment, both
             // here in Edit Mode and under ClientSim in Play Mode, so this branch (recovery from
-            // a late InternalCleanup packet arriving after OnOwnerAbandonedProcess already ran)
+            // a late InternalCleanup packet arriving after OnBecameProcessOwner already ran)
             // is reachable and tested directly here.
             var session = CreateProcess<ChunkedTransferSessionTestSubclass>();
             SeedAsOwner(session);

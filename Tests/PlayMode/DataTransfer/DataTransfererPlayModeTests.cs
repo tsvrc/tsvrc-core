@@ -54,6 +54,33 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         }
 
         [UnityTest]
+        public IEnumerator TransferData_GenuinelyNotOwner_ClaimsOwnershipAndSendsTheFirstChunk()
+        {
+            yield return StartClientSim();
+            Players.SpawnRemotePlayer("RemoteOwner");
+            yield return null;
+            yield return null;
+            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
+            Assert.IsNotNull(remote, "Setup sanity check: RemoteOwner was not found.");
+            string localId = PlayerId(Networking.LocalPlayer);
+
+            var transferer = CreateProcess<DataTransfererTestSubclass>();
+            transferer.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
+            transferer.SubscribeToAllTransferEvents();
+            MakeGenuinelyNotOwner(transferer, remote);
+            Assert.IsFalse(Networking.IsOwner(transferer.gameObject),
+                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+
+            transferer.TransferData("hello real world", new[] { localId });
+
+            Assert.IsTrue(Networking.IsOwner(transferer.gameObject),
+                "A non-owner's TransferData must claim ownership, since the data it stages never reaches the owner.");
+            Assert.AreEqual(1, transferer.OnTransferStartedEventCount);
+            Assert.AreEqual(1, transferer.OnTransferChunkEventCount);
+            Assert.AreEqual(1, transferer.LastChunkIndex);
+        }
+
+        [UnityTest]
         public IEnumerator TransferData_RealOwnerMultiChunkMessage_AdvancesThroughEachChunkToCompletion()
         {
             yield return StartClientSim();
@@ -205,7 +232,7 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         }
 
         [UnityTest]
-        public IEnumerator OnOwnerAbandonedProcess_RealNewOwnerMidTransfer_StopsReadyCheckForRealTakeover()
+        public IEnumerator OnBecameProcessOwner_RealNewOwnerMidTransfer_StopsReadyCheckForRealTakeover()
         {
             yield return StartClientSim();
             Players.SpawnRemotePlayer("PendingTarget");
@@ -224,7 +251,7 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
             Assert.IsTrue(PrivateFieldAccess.GetField<bool>(transferer, "_isRunning"),
                 "Setup sanity check: the ready check must still be pending (the target never acked).");
 
-            PrivateFieldAccess.InvokeInstance(transferer, "OnOwnerAbandonedProcess");
+            PrivateFieldAccess.InvokeInstance(transferer, "OnBecameProcessOwner");
 
             Assert.IsFalse(PrivateFieldAccess.GetField<bool>(transferer, "_isRunning"),
                 "A real new owner taking over mid-transfer must stop the stalled ready check, not leave a zombie process running.");
@@ -234,7 +261,7 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         }
 
         [UnityTest]
-        public IEnumerator OnOwnerAbandonedProcess_RealNewOwnerDuringInterChunkGap_StopsThePendingTransfer()
+        public IEnumerator OnBecameProcessOwner_RealNewOwnerDuringInterChunkGap_StopsThePendingTransfer()
         {
             yield return StartClientSim();
             string localId = PlayerId(Networking.LocalPlayer);
@@ -252,7 +279,7 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
             Assert.IsTrue(PrivateFieldAccess.GetField<bool>(transferer, "_pendingNextChunk"),
                 "Setup sanity check: the deferred _StartNextReadyCheck call must be genuinely pending.");
 
-            PrivateFieldAccess.InvokeInstance(transferer, "OnOwnerAbandonedProcess");
+            PrivateFieldAccess.InvokeInstance(transferer, "OnBecameProcessOwner");
 
             Assert.IsFalse(PrivateFieldAccess.GetField<bool>(transferer, "_pendingNextChunk"),
                 "A real new owner taking over during the inter-chunk gap must not let the old owner's " +

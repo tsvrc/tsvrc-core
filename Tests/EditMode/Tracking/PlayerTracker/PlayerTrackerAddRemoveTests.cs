@@ -131,20 +131,6 @@ namespace Tsvrc.Tests.EditMode
         }
 
         [Test]
-        public void BroadcastAddTrackedPlayers_NotOwner_Rejected()
-        {
-            var tracker = CreateProcess<PlayerTrackerTestSubclass>();
-            SeedAsOwner(tracker);
-            tracker.StartPlayerTracking(new string[0]);
-            // Flip local identity away from owner without stopping the process.
-            PrivateFieldAccess.SetField(tracker, "_localPlayerIdInt", OwnerPlayerId + 1);
-
-            tracker.BroadcastAddTrackedPlayers(new[] { "A" });
-
-            CollectionAssert.AreEqual(new string[0], GetTrackedPlayerIds(tracker));
-        }
-
-        [Test]
         public void BroadcastAddTrackedPlayers_NullOrEmpty_IsNoOp()
         {
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
@@ -216,19 +202,6 @@ namespace Tsvrc.Tests.EditMode
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
             SeedAsOwner(tracker);
             SetTrackedPlayerIds(tracker, new[] { "A" });
-
-            tracker.BroadcastRemoveTrackedPlayers(new[] { "A" });
-
-            CollectionAssert.AreEqual(new[] { "A" }, GetTrackedPlayerIds(tracker));
-        }
-
-        [Test]
-        public void BroadcastRemoveTrackedPlayers_NotOwner_Rejected()
-        {
-            var tracker = CreateProcess<PlayerTrackerTestSubclass>();
-            SeedAsOwner(tracker);
-            tracker.StartPlayerTracking(new[] { "A" });
-            PrivateFieldAccess.SetField(tracker, "_localPlayerIdInt", OwnerPlayerId + 1);
 
             tracker.BroadcastRemoveTrackedPlayers(new[] { "A" });
 

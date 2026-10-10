@@ -9,15 +9,15 @@ using VRC.SDKBase;
 
 namespace Tsvrc.Tests.PlayMode.Tracking.ReadyCheckProcess
 {
-    // PlayerTracker.OnOwnerAbandonedProcess's real GetAllPlayers() scan needs a live VRCPlayerApi
+    // PlayerTracker.OnBecameProcessOwner's real GetAllPlayers() scan needs a live VRCPlayerApi
     // list, exercised here together with ReadyCheckProcess's own reaction to it
     // (OnTrackingPlayersRemoved trimming _readyPlayerIds, and _readyCheckActive's correction for
     // a real new owner). ClientSim never organically dispatches VRC lifecycle callbacks to a
-    // plain UdonSharpBehaviour, so OnOwnerAbandonedProcess is invoked directly via reflection.
+    // plain UdonSharpBehaviour, so OnBecameProcessOwner is invoked directly via reflection.
     public class ReadyCheckProcessAbandonmentPlayModeTests : ProcessPlayModeTestBase
     {
         [UnityTest]
-        public IEnumerator OnOwnerAbandonedProcess_RealDepartedReadyPlayer_RemovedFromBothTrackedAndReadySets()
+        public IEnumerator OnBecameProcessOwner_RealDepartedReadyPlayer_RemovedFromBothTrackedAndReadySets()
         {
             yield return StartClientSim();
             Players.SpawnRemotePlayer("Departing");
@@ -37,7 +37,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.ReadyCheckProcess
             process.BroadcastAddReadyPlayer(departingId);
 
             Players.RemovePlayer(departing);
-            PrivateFieldAccess.InvokeInstance(process, "OnOwnerAbandonedProcess");
+            PrivateFieldAccess.InvokeInstance(process, "OnBecameProcessOwner");
 
             Assert.IsFalse(Array.IndexOf(process.LastPlayerIds, departingId) >= 0,
                 "The departed player must be removed from the tracked set by the real scan.");
@@ -47,7 +47,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.ReadyCheckProcess
         }
 
         [UnityTest]
-        public IEnumerator OnOwnerAbandonedProcess_RealNewOwner_ReadyCheckActiveCorrectedForRealTakeover()
+        public IEnumerator OnBecameProcessOwner_RealNewOwner_ReadyCheckActiveCorrectedForRealTakeover()
         {
             yield return StartClientSim();
             Players.SpawnRemotePlayer("OldOwner");
@@ -62,10 +62,10 @@ namespace Tsvrc.Tests.PlayMode.Tracking.ReadyCheckProcess
             PrivateFieldAccess.SetField(process, "_isRunning", true);
             PrivateFieldAccess.SetField(process, "_readyCheckActive", false);
 
-            PrivateFieldAccess.InvokeInstance(process, "OnOwnerAbandonedProcess");
+            PrivateFieldAccess.InvokeInstance(process, "OnBecameProcessOwner");
 
             Assert.IsTrue(PrivateFieldAccess.GetField<bool>(process, "_readyCheckActive"),
-                "OnOwnerAbandonedProcess must correct the stale _readyCheckActive flag for the real new (local) owner.");
+                "OnBecameProcessOwner must correct the stale _readyCheckActive flag for the real new (local) owner.");
         }
     }
 }

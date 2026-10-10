@@ -1,90 +1,134 @@
+using System.Reflection;
 using NUnit.Framework;
 using Tsvrc.Testing.Framework;
+using UdonSharp;
+using UnityEngine;
+using UnityEngine.TestTools;
+
+using Tsvrc.Tests.Doubles;
 
 namespace Tsvrc.Tests.EditMode
 {
+    // The "rejected because not the owner" half of each guard can't be reached here (see
+    // ProcessTestBase). It's covered in Tests/PlayMode/Core/Process/ instead.
     public class ProcessNetworkCallableTests : ProcessTestBase
     {
+        private static int CurrentGeneration(Tsvrc.Core.Process process)
+        {
+            return PrivateFieldAccess.GetField<int>(process, "_runGeneration");
+        }
+
         [Test]
-        public void RequestStopProcess_OwnerAndRunning_Executes()
+        public void RunGeneration_IsDeclaredUdonSynced()
+        {
+            FieldInfo field = typeof(Tsvrc.Core.Process).GetField("_runGeneration",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, "_runGeneration field not found. Renamed?");
+            Assert.IsNotNull(field.GetCustomAttribute<UdonSyncedAttribute>(),
+                "_runGeneration must be [UdonSynced] or it never reaches other clients.");
+        }
+
+        [Test]
+        public void RequestStartProcess_NotRunning_Executes()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
+
+            process.RequestStartProcess(false);
+
+            Assert.AreEqual(1, process.OnProcessStartedCount);
+        }
+
+        [Test]
+        public void RequestStartProcess_AlreadyRunning_RejectedAndLogsWarning()
+        {
+            var process = CreateProcess<ProcessTestSubclass>();
             process.StartProcess();
 
-            process.RequestStopProcess();
+            LogAssert.Expect(LogType.Warning,
+                "[TsVRC] [ProcessTestSubclass] RequestStartProcess rejected: not the owner or already running.");
+            process.RequestStartProcess(false);
+
+            Assert.AreEqual(1, process.OnProcessStartedCount);
+        }
+
+        [Test]
+        public void RequestStopProcess_OwnerRunningAndCurrentGeneration_Executes()
+        {
+            var process = CreateProcess<ProcessTestSubclass>();
+            process.StartProcess();
+
+            process.RequestStopProcess(CurrentGeneration(process));
 
             Assert.AreEqual(1, process.OnProcessStoppedCount);
         }
 
         [Test]
-        public void RequestStopProcess_NotRunning_RejectedEvenThoughOwner()
+        public void RequestStopProcess_NotRunning_RejectedAndLogsWarning()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
 
-            process.RequestStopProcess();
+            LogAssert.Expect(LogType.Warning,
+                "[TsVRC] [ProcessTestSubclass] RequestStopProcess rejected: not running.");
+            process.RequestStopProcess(CurrentGeneration(process));
 
             Assert.AreEqual(0, process.OnProcessStoppedCount);
         }
 
         [Test]
-        public void RequestCompleteProcess_OwnerAndRunning_Executes()
+        public void RequestStopProcess_StaleGeneration_RejectedAndLogsWarning()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
+            process.StartProcess(); // run 1
+            int staleGeneration = CurrentGeneration(process);
+            process.StopProcess(); // run 1 ends
+            process.StartProcess(); // run 2 - a new, unrelated run, same owner
+
+            LogAssert.Expect(LogType.Warning,
+                "[TsVRC] [ProcessTestSubclass] RequestStopProcess rejected: stale run.");
+            process.RequestStopProcess(staleGeneration); // run 1's delayed request finally arrives
+
+            Assert.IsTrue(process.IsProcessRunning(),
+                "A stale request for a run that already ended must not stop whatever run is current now.");
+        }
+
+        [Test]
+        public void RequestCompleteProcess_OwnerRunningAndCurrentGeneration_Executes()
+        {
+            var process = CreateProcess<ProcessTestSubclass>();
             process.StartProcess();
 
-            process.RequestCompleteProcess();
+            process.RequestCompleteProcess(CurrentGeneration(process));
 
             Assert.AreEqual(1, process.OnProcessCompletedCount);
         }
 
         [Test]
-        public void RequestCompleteProcess_NotRunning_RejectedEvenThoughOwner()
+        public void RequestCompleteProcess_NotRunning_RejectedAndLogsWarning()
         {
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
 
-            process.RequestCompleteProcess();
+            LogAssert.Expect(LogType.Warning,
+                "[TsVRC] [ProcessTestSubclass] RequestCompleteProcess rejected: not running.");
+            process.RequestCompleteProcess(CurrentGeneration(process));
 
             Assert.AreEqual(0, process.OnProcessCompletedCount);
         }
 
         [Test]
-        public void RequestStopProcess_StaleCallArrivesAfterSameOwnerRestartsProcess_IncorrectlyStopsTheNewRun()
+        public void RequestCompleteProcess_StaleGeneration_RejectedAndLogsWarning()
         {
-            // Pins the current, documented gap rather than asserting a "fixed" behavior —
-            // matching TwoIndependentClients_...'s own pinning of the two-client StartProcess
-            // race for the same reason.
             var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
-            process.StartProcess(); // run 1
-            process.StopProcess(); // run 1 ends; the stale request below conceptually belongs here
-            SeedAsOwner(process);
-            process.StartProcess(); // run 2 — a new, unrelated run, same owner
-
-            process.RequestStopProcess(); // run 1's delayed request finally arrives
-
-            Assert.IsFalse(process.IsProcessRunning(),
-                "Documents the gap: a stale request for a past run stops the new run instead of being discarded.");
-        }
-
-        [Test]
-        public void RequestCompleteProcess_StaleCallArrivesAfterSameOwnerRestartsProcess_IncorrectlyCompletesTheNewRun()
-        {
-            // Same gap as RequestStopProcess above, mirrored for RequestCompleteProcess.
-            var process = CreateProcess<ProcessTestSubclass>();
-            SeedAsOwner(process);
             process.StartProcess();
+            int staleGeneration = CurrentGeneration(process);
             process.CompleteProcess();
-            SeedAsOwner(process);
             process.StartProcess();
 
-            process.RequestCompleteProcess();
+            LogAssert.Expect(LogType.Warning,
+                "[TsVRC] [ProcessTestSubclass] RequestCompleteProcess rejected: stale run.");
+            process.RequestCompleteProcess(staleGeneration);
 
-            Assert.IsFalse(process.IsProcessRunning(),
-                "Documents the gap: a stale request for a past run completes the new run instead of being discarded.");
+            Assert.IsTrue(process.IsProcessRunning(),
+                "A stale request for a run that already ended must not complete whatever run is current now.");
         }
     }
 }
