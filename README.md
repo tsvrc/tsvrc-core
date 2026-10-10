@@ -8,7 +8,9 @@
 > [!WARNING]
 > Core is an experiment, and AI coding tools generated part of its features. It isn't fully vibe
 > coded, but AI had a large share in writing it. Test the behaviour your world relies on before you
-> publish it.
+> publish it. For projects that are ready to use, consider
+> [Udon Test Kit](https://github.com/tsvrc/udon-test-kit) and
+> [Udon Tools Kit](https://github.com/tsvrc/udon-tools-kit).
 
 Core is an open-source framework for building VRChat worlds with UdonSharp: structured
 initialization, dependency wiring, and an editor tool that generates the code for both,
