@@ -8,54 +8,53 @@ need a world project to develop it in:
 1. Create a new VRChat World project through the [VRChat Creator
    Companion](https://vcc.docs.vrchat.com/), matching **Unity 2022.3** (`package.json`'s
    manifest target).
-2. Clone this repo into that project's `Assets` folder.
+2. Clone this repo into that project's `Assets` folder as `Assets/Tsvrc`, with its
+   submodule:
+
+   ```powershell
+   git clone --recurse-submodules https://github.com/tsvrc/tsvrc-core.git Assets/Tsvrc
+   ```
+
+   In a clone made without `--recurse-submodules`, run `git submodule update --init` once.
 3. Open the project in Unity.
+
+The submodule is [Udon Test Kit](https://tsvrc.com/docs/udon-test-kit/intro), at
+`Tests/UdonTestKit`, pinned to the commit TsVRC is tested with. TsVRC's editor code and tests
+build on it, and a release lists it as a dependency instead of shipping it. Don't also install
+the kit through the Creator Companion in the same project: two copies stop it compiling.
 
 ## Running tests
 
-Tests live under `Tests/EditMode` and `Tests/PlayMode`, wired into their own assemblies
-referencing `Tsvrc.Runtime`/`Tsvrc.Editor`. See [Testing your
-world](https://tsvrc.com/docs/tsvrc/testing/testing-your-world) for background on the
-testing helpers themselves (`TsPlayModeTestBase`, `PrivateFieldAccess`, ClientSim).
+Tests live under `Tests/EditMode` and `Tests/PlayMode`, with the test doubles both use in
+`Tests/Doubles`. They're written with Udon Test Kit; its
+[documentation](https://tsvrc.com/docs/udon-test-kit/intro) covers `ClientSimTestBase`,
+`Session`, `CallLog` and the rest.
 
 ### From the Editor
 
 Open **Window > General > Test Runner** and run the EditMode and PlayMode suites from
 there.
 
+If a Play Mode test fails before ClientSim starts, with a message naming project settings,
+run **Tools > TsVRC > Udon Test Kit > Fix ClientSim Project Settings** once in your project.
+
 ### From the command line (Windows)
 
-Windows blocks unsigned scripts by default. If you haven't already allowed local scripts
-to run, do this once:
+Close the Unity Editor, then run the kit's script with TsVRC's two test assemblies:
+
+```powershell
+.\Assets\Tsvrc\Tests\UdonTestKit\Scripts~\Invoke-UnityTests.ps1 -AssemblyNames "Tsvrc.Tests.EditMode;Tsvrc.Tests.PlayMode"
+```
+
+It prints only the tests that didn't pass, with their messages, and a count of the rest, and
+exits with 1 when any failed. Without `-AssemblyNames` it runs every test assembly under
+`Assets`, your world's included. Its other options are in the
+[Invoke-UnityTests.ps1 reference](https://tsvrc.com/docs/udon-test-kit/reference/invoke-unity-tests).
+
+If PowerShell refuses to run it because of its execution policy, allow local scripts once:
 
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-```
-
-Then:
-
-```powershell
-.\Assets\Tsvrc\Scripts~\Invoke-UnityTests.ps1
-```
-
-This runs both of TsVRC's own suites (`Tsvrc.Tests.EditMode` / `Tsvrc.Tests.PlayMode`) so
-you don't need the Editor open. It only prints failures, each with its message, and counts
-the rest. It finds your project by walking up from its own location, and finds the Unity
-Editor by checking the version pinned in that project's `ProjectVersion.txt` against Unity
-Hub's default install folder, falling back to the registry; if it still can't find one, it
-asks for the path instead of failing outright.
-
-| Parameter        | Default                                    | Use it to                                  |
-| ----------------- | ------------------------------------------ | ------------------------------------------- |
-| `-ProjectPath`     | nearest parent folder with `ProjectSettings` | point at a different Unity project         |
-| `-UnityPath`       | auto-detected                              | use a specific Unity install                |
-| `-TestMode`        | `All`                                      | run only `EditMode` or only `PlayMode`      |
-| `-AssemblyNames`   | `Tsvrc.Tests.EditMode` / `Tsvrc.Tests.PlayMode` | test a different assembly instead      |
-| `-ResultsPath`     | a timestamped folder under `$env:TEMP`     | keep the NUnit XML somewhere specific       |
-| `-Verbose`         | off                                        | print every test, not just failures         |
-
-```powershell
-.\Assets\Tsvrc\Scripts~\Invoke-UnityTests.ps1 -ProjectPath C:\path\to\your\project -AssemblyNames "YourWorld.Tests.EditMode"
 ```
 
 Add tests for new behavior; a PR that changes runtime or codegen behavior without a

@@ -104,8 +104,8 @@ project](https://tsvrc.com/docs/tsvrc/add-to-your-project).
 
 TsVRC is pre-1.0 and still shaping its API, a good time to influence how a module works
 rather than working around a locked one. Every runtime and codegen change ships with
-tests, see [Testing your world](https://tsvrc.com/docs/tsvrc/testing/testing-your-world)
-for the helpers used to test both this repo and your own.
+tests, written with [Udon Test Kit](https://tsvrc.com/docs/udon-test-kit/intro), the same kit
+you can test your own world with.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, running tests, and submitting a pull
 request. Community conduct is covered by the [org-wide Code of
