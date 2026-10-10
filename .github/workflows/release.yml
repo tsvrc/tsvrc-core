@@ -37,6 +37,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          # Tests/UdonTestKit is a development-only submodule, never part of a release.
+          submodules: false
 
       - name: Get Version
         id: version
@@ -64,12 +67,16 @@ jobs:
         # none of it is needed to run the package (see Testing/ for the public test API).
         run: |
           zip -r "${{ github.workspace }}/${{ env.zipFile }}" . \
-            -x ".git/*" ".github/*" \
+            -x ".git/*" ".github/*" ".gitmodules" \
             -x "Tests/*" "Tests.meta" \
             -x "AGENTS.md" "CONTRIBUTING.md" "SECURITY.md" "OPEN_SOURCE_PLAN.md"
 
       - name: Track Package Meta Files
-        run: find "${{ env.packagePath }}/" -name \*.meta >> metaList
+        # Leaves out Tests/ like the zip does. The .unitypackage holds every asset listed here.
+        run: |
+          find "${{ env.packagePath }}" \
+            \( -path "${{ env.packagePath }}/Tests" -o -path "${{ env.packagePath }}/Tests.meta" \) -prune \
+            -o -name '*.meta' -print >> metaList
 
       - name: Create UnityPackage
         uses: pCYSl5EDgo/create-unitypackage@v1.2.3
