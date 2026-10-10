@@ -64,7 +64,7 @@ jobs:
       - name: Create Package Zip
         working-directory: "${{ env.packagePath }}"
         # Exclude repo/CI plumbing, tsvrc's own internal test suite, and dev-only docs -
-        # none of it is needed to run the package (see Testing/ for the public test API).
+        # none of it is needed to run the package.
         run: |
           zip -r "${{ github.workspace }}/${{ env.zipFile }}" . \
             -x ".git/*" ".github/*" ".gitmodules" \
