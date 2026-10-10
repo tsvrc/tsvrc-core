@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using Tsvrc.StateMachine;
-using UdonSharp;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -38,39 +37,6 @@ namespace Tsvrc.Tests.EditMode
                 ArmRedirect = false;
                 SetState(RedirectTo);
             }
-        }
-    }
-
-    // A dispatch target for RegisterState's enter/exit methods. Tracks call counts and
-    // order per named method, and can optionally call back into the manager's SetState
-    // to simulate an enter/exit handler that itself triggers another transition.
-    public class StateTargetDouble : UdonSharpBehaviour
-    {
-        public List<string> Log;
-        public StateManager ManagerToRedirect;
-        public int RedirectTo;
-
-        public int EnterACount;
-        public int ExitACount;
-        public int EnterBCount;
-        public int ExitBCount;
-        public int EnterCCount;
-        public int ExitCCount;
-
-        public void EnterA() { EnterACount++; Log?.Add($"{name}.EnterA"); }
-        public void ExitA() { ExitACount++; Log?.Add($"{name}.ExitA"); }
-        public void EnterB() { EnterBCount++; Log?.Add($"{name}.EnterB"); }
-        public void ExitB() { ExitBCount++; Log?.Add($"{name}.ExitB"); }
-        public void EnterC() { EnterCCount++; Log?.Add($"{name}.EnterC"); }
-        public void ExitC() { ExitCCount++; Log?.Add($"{name}.ExitC"); }
-
-        // Registered as an enter method: redirects to RedirectTo via the manager as soon
-        // as it is invoked, exercising reentrant SetState from inside a dispatched
-        // enter/exit callback rather than from OnStateChanged.
-        public void EnterAndRedirect()
-        {
-            Log?.Add($"{name}.EnterAndRedirect");
-            ManagerToRedirect.SetState(RedirectTo);
         }
     }
 

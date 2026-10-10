@@ -101,15 +101,15 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void StopOverlay_Running_FiresOnOverlayUpdatedEventEvenWithNothingDrawn()
         {
+            using var calls = new CallLog();
             var overlay = CreateOverlay();
             SeedAsOwner(overlay);
             overlay.StartOverlay(new[] { "A" });
-            var listener = CreateComponent<TsListenerDouble>();
-            overlay.TsSubscribe(listener, PlayerPositionOverlay.OnOverlayUpdatedEvent, nameof(TsListenerDouble.CallbackA));
+            overlay.TsSubscribe(calls.CreateSpy("Listener"), PlayerPositionOverlay.OnOverlayUpdatedEvent, nameof(CallbackSpy.CallbackA));
 
             overlay.StopOverlay();
 
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
         }
 
         [Test]
@@ -307,15 +307,15 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void OnBlinkTick_ShowWithNoCachedPlayers_CallsPresentButNoMarkerVisible()
         {
+            using var calls = new CallLog();
             var overlay = CreateOverlay();
             SeedRunningAndUpdating(overlay);
             PrivateFieldAccess.SetField(overlay, "_scheduledBlinkTickCount", 1);
-            var listener = CreateComponent<TsListenerDouble>();
-            overlay.TsSubscribe(listener, PlayerPositionOverlay.OnOverlayUpdatedEvent, nameof(TsListenerDouble.CallbackA));
+            overlay.TsSubscribe(calls.CreateSpy("Listener"), PlayerPositionOverlay.OnOverlayUpdatedEvent, nameof(CallbackSpy.CallbackA));
 
             overlay._OnBlinkTick();
 
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
             Assert.AreEqual(0, GetRenderer(overlay).OnMarkerVisibleCount);
             Assert.AreEqual(1, GetRenderer(overlay).OnPresentCount);
         }
@@ -389,17 +389,17 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void OnTrackingCompleted_CallsPresentAndFiresEvent()
         {
+            using var calls = new CallLog();
             var overlay = CreateOverlay();
             SeedAsOwner(overlay);
             overlay.StartOverlay(new[] { "A" });
             int presentCountBefore = GetRenderer(overlay).OnPresentCount;
-            var listener = CreateComponent<TsListenerDouble>();
-            overlay.TsSubscribe(listener, PlayerPositionOverlay.OnOverlayUpdatedEvent, nameof(TsListenerDouble.CallbackA));
+            overlay.TsSubscribe(calls.CreateSpy("Listener"), PlayerPositionOverlay.OnOverlayUpdatedEvent, nameof(CallbackSpy.CallbackA));
 
             overlay.CompletePlayerTracking();
 
             Assert.Greater(GetRenderer(overlay).OnPresentCount, presentCountBefore);
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
         }
 
         [Test]

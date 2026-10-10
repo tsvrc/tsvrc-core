@@ -1,8 +1,6 @@
-using System.Collections.Generic;
 using Tsvrc.Core;
 using Tsvrc.Core.Generated;
 using Tsvrc.Utils;
-using UdonSharp;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -59,43 +57,6 @@ namespace Tsvrc.Tests.EditMode
         public override void TsDestroy()
         {
             TsDestroyCallCount++;
-        }
-    }
-
-    // The optional shared Log lets delivery-order tests assert call order across
-    // independent listener instances.
-    public class TsListenerDouble : UdonSharpBehaviour
-    {
-        public List<string> Log;
-        public int CallbackACount;
-        public int CallbackBCount;
-
-        public void CallbackA()
-        {
-            CallbackACount++;
-            Log?.Add($"{name}.CallbackA");
-        }
-
-        public void CallbackB()
-        {
-            CallbackBCount++;
-            Log?.Add($"{name}.CallbackB");
-        }
-    }
-
-    // CallbackA reentrantly subscribes a fresh listener to the same publisher/event
-    // it was invoked from, simulating a mid-TsEmit reentrant TsSubscribe call.
-    public class TsReentrantSubscriberDouble : UdonSharpBehaviour
-    {
-        public TsvrcBehaviour Publisher;
-        public string EventName;
-        public TsListenerDouble NewListener;
-        public int CallbackCount;
-
-        public void CallbackA()
-        {
-            CallbackCount++;
-            Publisher.TsSubscribe(NewListener, EventName, nameof(TsListenerDouble.CallbackA));
         }
     }
 }

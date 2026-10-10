@@ -44,28 +44,28 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void NotifyTrackedPlayersProcessStarted_Broadcasting_FiresOnAutoTrackingStartedEvent()
         {
+            using var calls = new CallLog();
             var tracker = CreateProcess<AutoPlayerTracker>();
             PrivateFieldAccess.SetField(tracker, "_isBroadcasting", true);
-            var listener = CreateComponent<TsListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingStartedEvent, nameof(TsListenerDouble.CallbackA));
+            tracker.TsSubscribe(calls.CreateSpy("Listener"), AutoPlayerTracker.OnAutoTrackingStartedEvent, nameof(CallbackSpy.CallbackA));
 
             tracker.NotifyTrackedPlayersProcessStarted(new[] { "A", "B" });
 
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
             CollectionAssert.AreEqual(new[] { "A", "B" }, tracker.LastPlayerIds);
         }
 
         [Test]
         public void StopAutoTracking_Running_FiresOnAutoTrackingStoppedEventAndClearsTrackedState()
         {
+            using var calls = new CallLog();
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new[] { "A", "B" });
-            var listener = CreateComponent<TsListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingStoppedEvent, nameof(TsListenerDouble.CallbackA));
+            tracker.TsSubscribe(calls.CreateSpy("Listener"), AutoPlayerTracker.OnAutoTrackingStoppedEvent, nameof(CallbackSpy.CallbackA));
 
             tracker.StopAutoTracking();
 
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
             Assert.IsFalse(tracker.IsProcessRunning());
             CollectionAssert.AreEqual(new string[0], GetTrackedPlayerIds(tracker));
             CollectionAssert.AreEqual(new string[0], tracker.LastPlayerIds);
@@ -74,27 +74,27 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void StopAutoTracking_NotRunning_LogsWarningAndFiresNoEvent()
         {
+            using var calls = new CallLog();
             var tracker = CreateProcess<AutoPlayerTracker>();
-            var listener = CreateComponent<TsListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingStoppedEvent, nameof(TsListenerDouble.CallbackA));
+            tracker.TsSubscribe(calls.CreateSpy("Listener"), AutoPlayerTracker.OnAutoTrackingStoppedEvent, nameof(CallbackSpy.CallbackA));
 
             LogAssert.Expect(LogType.Warning, "[TsVRC] [AutoPlayerTracker] Process is not running, ignoring stop call.");
             tracker.StopAutoTracking();
 
-            Assert.AreEqual(0, listener.CallbackACount);
+            CollectionAssert.IsEmpty(calls);
         }
 
         [Test]
         public void CompleteAutoTracking_Running_FiresOnAutoTrackingCompletedEventAndClearsTrackedState()
         {
+            using var calls = new CallLog();
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new[] { "A", "B" });
-            var listener = CreateComponent<TsListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingCompletedEvent, nameof(TsListenerDouble.CallbackA));
+            tracker.TsSubscribe(calls.CreateSpy("Listener"), AutoPlayerTracker.OnAutoTrackingCompletedEvent, nameof(CallbackSpy.CallbackA));
 
             tracker.CompleteAutoTracking();
 
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
             Assert.IsFalse(tracker.IsProcessRunning());
             CollectionAssert.AreEqual(new string[0], GetTrackedPlayerIds(tracker));
             CollectionAssert.AreEqual(new string[0], tracker.LastPlayerIds);
@@ -103,41 +103,41 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void CompleteAutoTracking_NotRunning_LogsWarningAndFiresNoEvent()
         {
+            using var calls = new CallLog();
             var tracker = CreateProcess<AutoPlayerTracker>();
-            var listener = CreateComponent<TsListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingCompletedEvent, nameof(TsListenerDouble.CallbackA));
+            tracker.TsSubscribe(calls.CreateSpy("Listener"), AutoPlayerTracker.OnAutoTrackingCompletedEvent, nameof(CallbackSpy.CallbackA));
 
             LogAssert.Expect(LogType.Warning, "[TsVRC] [AutoPlayerTracker] Process is not running, ignoring complete call.");
             tracker.CompleteAutoTracking();
 
-            Assert.AreEqual(0, listener.CallbackACount);
+            CollectionAssert.IsEmpty(calls);
         }
 
         [Test]
         public void OnDeserialization_FiresOnAutoTrackingDeserializationEventAndRefreshesLastPlayerIds()
         {
+            using var calls = new CallLog();
             var tracker = CreateProcess<AutoPlayerTracker>();
             SetTrackedPlayerIds(tracker, new[] { "A" });
-            var listener = CreateComponent<TsListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingDeserializationEvent, nameof(TsListenerDouble.CallbackA));
+            tracker.TsSubscribe(calls.CreateSpy("Listener"), AutoPlayerTracker.OnAutoTrackingDeserializationEvent, nameof(CallbackSpy.CallbackA));
 
             tracker.OnDeserialization();
 
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
             CollectionAssert.AreEqual(new[] { "A" }, tracker.LastPlayerIds);
         }
 
         [Test]
         public void AddTrackedPlayers_Owner_FiresOnAutoTrackingPlayersAddedEvent()
         {
+            using var calls = new CallLog();
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new string[0]);
-            var listener = CreateComponent<TsListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingPlayersAddedEvent, nameof(TsListenerDouble.CallbackA));
+            tracker.TsSubscribe(calls.CreateSpy("Listener"), AutoPlayerTracker.OnAutoTrackingPlayersAddedEvent, nameof(CallbackSpy.CallbackA));
 
             tracker.AddTrackedPlayers(new[] { "X", "Y" });
 
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
             CollectionAssert.AreEqual(new[] { "X", "Y" }, tracker.LastAddedPlayerIds);
             CollectionAssert.AreEqual(new[] { "X", "Y" }, GetTrackedPlayerIds(tracker));
         }
@@ -145,14 +145,14 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void RemoveTrackedPlayers_Owner_FiresOnAutoTrackingPlayersRemovedEvent()
         {
+            using var calls = new CallLog();
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new[] { "X", "Y" });
-            var listener = CreateComponent<TsListenerDouble>();
-            tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingPlayersRemovedEvent, nameof(TsListenerDouble.CallbackA));
+            tracker.TsSubscribe(calls.CreateSpy("Listener"), AutoPlayerTracker.OnAutoTrackingPlayersRemovedEvent, nameof(CallbackSpy.CallbackA));
 
             tracker.RemoveTrackedPlayers(new[] { "X" });
 
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
             CollectionAssert.AreEqual(new[] { "X" }, tracker.LastRemovedPlayerIds);
             CollectionAssert.AreEqual(new[] { "Y" }, GetTrackedPlayerIds(tracker));
         }
