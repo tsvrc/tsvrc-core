@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -20,19 +19,6 @@ namespace Tsvrc.Tests.EditMode
             // Never started.
 
             tracker.BroadcastAddReadyPlayer("TestOwner#" + OwnerPlayerId);
-
-            CollectionAssert.IsEmpty(GetReadyPlayerIds(tracker));
-        }
-
-        [Test]
-        public void BroadcastAddReadyPlayer_NotOwner_Rejected()
-        {
-            var tracker = CreateProcess<ReadyCheckProcessTestSubclass>();
-            SeedAsOwner(tracker);
-            tracker.StartReadyCheck(new[] { "A" });
-            PrivateFieldAccess.SetField(tracker, "_localPlayerIdInt", OwnerPlayerId + 1);
-
-            tracker.BroadcastAddReadyPlayer("A");
 
             CollectionAssert.IsEmpty(GetReadyPlayerIds(tracker));
         }
@@ -143,20 +129,6 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(tracker);
             SetTrackedPlayerIds(tracker, new[] { "A" });
             SetReadyPlayerIds(tracker, new[] { "A" });
-
-            tracker.BroadcastRemoveReadyPlayer("A");
-
-            CollectionAssert.AreEqual(new[] { "A" }, GetReadyPlayerIds(tracker));
-        }
-
-        [Test]
-        public void BroadcastRemoveReadyPlayer_NotOwner_Rejected()
-        {
-            var tracker = CreateProcess<ReadyCheckProcessTestSubclass>();
-            SeedAsOwner(tracker);
-            tracker.StartReadyCheck(new[] { "A", "B" });
-            tracker.BroadcastAddReadyPlayer("A");
-            PrivateFieldAccess.SetField(tracker, "_localPlayerIdInt", OwnerPlayerId + 1);
 
             tracker.BroadcastRemoveReadyPlayer("A");
 

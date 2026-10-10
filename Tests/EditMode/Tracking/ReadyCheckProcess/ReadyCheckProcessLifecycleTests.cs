@@ -80,7 +80,7 @@ namespace Tsvrc.Tests.EditMode
             tracker.BroadcastAddReadyPlayer("A");
             Assert.AreEqual(1, tracker.OnReadyCheckStartedCount);
 
-            LogAssert.Expect(LogType.Warning, "[TsVRC] [ReadyCheckProcessTestSubclass] Process is already running.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [ReadyCheckProcessTestSubclass] Process is already running, ignoring start call.");
             tracker.StartReadyCheck(new[] { "Z" });
 
             Assert.AreEqual(1, tracker.OnReadyCheckStartedCount,
@@ -98,7 +98,7 @@ namespace Tsvrc.Tests.EditMode
             SeedAsOwner(tracker);
             // Never started.
 
-            LogAssert.Expect(LogType.Warning, "[TsVRC] [ReadyCheckProcessTestSubclass] Process is not running.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [ReadyCheckProcessTestSubclass] Process is not running, ignoring stop call.");
             tracker.StopReadyCheck();
 
             Assert.AreEqual(0, tracker.OnReadyCheckStoppedCount);
@@ -111,7 +111,7 @@ namespace Tsvrc.Tests.EditMode
             var tracker = CreateProcess<ReadyCheckProcessTestSubclass>();
             SeedAsOwner(tracker);
 
-            LogAssert.Expect(LogType.Warning, "[TsVRC] [ReadyCheckProcessTestSubclass] Process is not running.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [ReadyCheckProcessTestSubclass] Process is not running, ignoring complete call.");
             tracker.CompleteReadyCheck();
 
             Assert.AreEqual(0, tracker.OnReadyCheckCompletedCount);

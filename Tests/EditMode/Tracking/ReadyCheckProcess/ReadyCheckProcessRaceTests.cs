@@ -42,7 +42,7 @@ namespace Tsvrc.Tests.EditMode
                 // own Notify* methods).
                 SetTrackedPlayerIds(tracker, new[] { "A" });
                 PrivateFieldAccess.SetField(tracker, "_isBroadcasting", true);
-                LogAssert.Expect(LogType.Warning, "[TsVRC] [ReadyCheckProcessTestSubclass] Process is not running.");
+                LogAssert.Expect(LogType.Warning, "[TsVRC] [ReadyCheckProcessTestSubclass] Process is not running, ignoring complete call.");
                 Assert.DoesNotThrow(() => tracker.NotifyTrackedPlayersRemoved(new[] { "B" }));
                 PrivateFieldAccess.SetField(tracker, "_isBroadcasting", false);
             };

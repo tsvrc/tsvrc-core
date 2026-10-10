@@ -60,12 +60,22 @@ namespace Tsvrc.Tracking
         // outer event context. This is safe because Udon is single-threaded.
         protected bool _isBroadcasting = false;
 
+        // The local player's ID, cached once in TsStart.
+        protected string _localPlayerId = "";
+
         /// <summary>The tracked player IDs at the time of the last received broadcast or deserialization.</summary>
         public string[] LastPlayerIds { get; private set; } = new string[0];
         /// <summary>The player IDs added in the last <see cref="BroadcastAddTrackedPlayers"/> broadcast.</summary>
         public string[] LastAddedPlayerIds { get; private set; } = new string[0];
         /// <summary>The player IDs removed in the last <see cref="BroadcastRemoveTrackedPlayers"/> broadcast.</summary>
         public string[] LastRemovedPlayerIds { get; private set; } = new string[0];
+
+        protected override void TsStart()
+        {
+            base.TsStart();
+
+            _localPlayerId = TsPlayer.GetPlayerID(Networking.LocalPlayer);
+        }
 
         public override void OnDeserialization()
         {
@@ -259,6 +269,10 @@ namespace Tsvrc.Tracking
             playerIds = TsArray.Dedupe(playerIds);
 
             _initialTrackerPlayerIds = playerIds;
+
+            // A non-owner's StartProcess only forwards the request, and the owner never sees
+            // _initialTrackerPlayerIds staged here, so the caller claims ownership first.
+            if (!IsProcessOwner()) SetProcessOwner(Networking.LocalPlayer);
 
             base.StartProcess(useProcessUpdate);
         }

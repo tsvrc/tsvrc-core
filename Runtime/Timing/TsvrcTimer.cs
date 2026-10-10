@@ -268,6 +268,9 @@ namespace Tsvrc.Timing
             // has already written _durationMs. That would silently corrupt the running timer
             // with no serialization to fix it, so we guard here instead.
             if (IsProcessRunning()) return;
+            // A non-owner's StartProcess only forwards the request, and the owner never sees
+            // _durationMs written here, so the caller claims ownership first.
+            if (!IsProcessOwner()) SetProcessOwner(Networking.LocalPlayer);
             _durationMs = 0;
             StartProcess();
         }
@@ -281,6 +284,8 @@ namespace Tsvrc.Timing
         {
             // Same guard as StartTimer(): prevent mutating _durationMs while already running.
             if (IsProcessRunning()) return;
+            // Same ownership claim as StartTimer().
+            if (!IsProcessOwner()) SetProcessOwner(Networking.LocalPlayer);
             _durationMs = durationMilliseconds < 0 ? 0 : durationMilliseconds;
             StartProcess(useProcessUpdate: _durationMs > 0);
         }

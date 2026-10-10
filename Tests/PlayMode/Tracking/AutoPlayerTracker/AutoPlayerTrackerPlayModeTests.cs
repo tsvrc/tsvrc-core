@@ -131,7 +131,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.AutoPlayerTracker
             var tracker = CreateProcess<Tsvrc.Tracking.AutoPlayerTracker>();
             tracker.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             tracker.StartAutoTracking();
-            PrivateFieldAccess.InvokeInstance(tracker, "SetProcessOwner", namedOwner);
+            MakeGenuinelyNotOwner(tracker, namedOwner);
             string[] idsBeforeJoin = GetTrackedPlayerIds(tracker);
 
             Players.SpawnRemotePlayer("NotAddedJoiner");

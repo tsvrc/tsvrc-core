@@ -78,7 +78,7 @@ namespace Tsvrc.Tests.EditMode
             var listener = CreateComponent<TsListenerDouble>();
             tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingStoppedEvent, nameof(TsListenerDouble.CallbackA));
 
-            LogAssert.Expect(LogType.Warning, "[TsVRC] [AutoPlayerTracker] Process is not running.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [AutoPlayerTracker] Process is not running, ignoring stop call.");
             tracker.StopAutoTracking();
 
             Assert.AreEqual(0, listener.CallbackACount);
@@ -107,7 +107,7 @@ namespace Tsvrc.Tests.EditMode
             var listener = CreateComponent<TsListenerDouble>();
             tracker.TsSubscribe(listener, AutoPlayerTracker.OnAutoTrackingCompletedEvent, nameof(TsListenerDouble.CallbackA));
 
-            LogAssert.Expect(LogType.Warning, "[TsVRC] [AutoPlayerTracker] Process is not running.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [AutoPlayerTracker] Process is not running, ignoring complete call.");
             tracker.CompleteAutoTracking();
 
             Assert.AreEqual(0, listener.CallbackACount);
@@ -167,7 +167,7 @@ namespace Tsvrc.Tests.EditMode
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new[] { "A", "B" });
 
-            LogAssert.Expect(LogType.Warning, "[TsVRC] [AutoPlayerTracker] Process is already running.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [AutoPlayerTracker] Process is already running, ignoring start call.");
             Assert.DoesNotThrow(() => tracker.StartAutoTracking());
 
             CollectionAssert.AreEqual(new[] { "A", "B" }, GetTrackedPlayerIds(tracker));
@@ -179,7 +179,7 @@ namespace Tsvrc.Tests.EditMode
             var tracker = CreateProcess<AutoPlayerTracker>();
             SeedRunning(tracker, new[] { "A" });
 
-            LogAssert.Expect(LogType.Warning, "[TsVRC] [AutoPlayerTracker] Process is already running.");
+            LogAssert.Expect(LogType.Warning, "[TsVRC] [AutoPlayerTracker] Process is already running, ignoring start call.");
             Assert.DoesNotThrow(() => tracker.StartPlayerTracking(new[] { "Z", "Y" }, true));
 
             CollectionAssert.AreEqual(new[] { "A" }, GetTrackedPlayerIds(tracker));

@@ -33,6 +33,30 @@ namespace Tsvrc.Tests.PlayMode.Timing.TsvrcTimer
         }
 
         [UnityTest]
+        public IEnumerator StartTimer_GenuinelyNotOwner_ClaimsOwnershipAndKeepsTheDuration()
+        {
+            yield return StartClientSim();
+            Players.SpawnRemotePlayer("RemoteOwner");
+            yield return null;
+            yield return null;
+            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
+            Assert.IsNotNull(remote, "Setup sanity check: RemoteOwner was not found.");
+
+            var timer = CreateProcess<TsTimerTestSubclass>();
+            timer.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
+            MakeGenuinelyNotOwner(timer, remote);
+            Assert.IsFalse(Networking.IsOwner(timer.gameObject),
+                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+
+            timer.StartTimer(5000);
+
+            Assert.IsTrue(Networking.IsOwner(timer.gameObject),
+                "A non-owner's StartTimer must claim ownership, since the duration it writes never reaches the owner.");
+            Assert.IsTrue(timer.IsProcessRunning());
+            Assert.AreEqual(5000, timer.DurationMs);
+        }
+
+        [UnityTest]
         public IEnumerator PauseTimer_RealNotOwnerAndNotUnityOwner_ForwardsToOwnerInstead()
         {
             yield return StartClientSim();

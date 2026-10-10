@@ -4,6 +4,7 @@ using System.Reflection;
 using NUnit.Framework;
 using Tsvrc.Core;
 using Tsvrc.Testing.Framework;
+using Tsvrc.Tracking;
 using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
@@ -14,11 +15,17 @@ namespace Tsvrc.Tests.EditMode
     // Tests/PlayMode/Core/Process/ instead.
     public abstract class ProcessTestBase
     {
-        // FIXME: No-op shim kept only so PlayerTracker/ReadyCheckProcess/TsvrcTimer/DataTransfer/
-        // RankedGameSession tests still compile. Don't call this from new Process tests.
+        // FIXME: Shim kept only for PlayerTracker/ReadyCheckProcess/TsvrcTimer/DataTransfer/
+        // RankedGameSession tests. Ownership needs no seeding here; it only stands in for
+        // PlayerTracker.TsStart's local player ID, since Networking.LocalPlayer is null outside
+        // Play Mode. Don't call this from new Process tests.
         protected const int OwnerPlayerId = 777;
 
-        protected static void SeedAsOwner(Process process, int playerId = OwnerPlayerId) { }
+        protected static void SeedAsOwner(Process process, int playerId = OwnerPlayerId)
+        {
+            if (process is PlayerTracker)
+                PrivateFieldAccess.SetField(process, "_localPlayerId", "TestOwner#" + playerId);
+        }
 
         private readonly List<GameObject> _spawned = new List<GameObject>();
 

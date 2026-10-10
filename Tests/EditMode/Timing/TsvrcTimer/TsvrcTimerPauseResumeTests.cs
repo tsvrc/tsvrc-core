@@ -5,15 +5,9 @@ using Tsvrc.Timing;
 namespace Tsvrc.Tests.EditMode
 {
     // Covers PauseTimer/ResumeTimer and their RequestPauseTimer/RequestResumeTimer
-    // network-callable counterparts, on the owner-direct path (SeedAsOwner makes
-    // IsProcessOwner() true, short-circuiting the non-owner SendCustomNetworkEvent
-    // forward before Networking.IsOwner is ever evaluated - same rationale as every
-    // other class in this suite, see ProcessTestBase's header comment), plus the
-    // dual-authority fallback path (IsProcessOwner() false but Networking.IsOwner(
-    // gameObject) true) near the bottom of this file. The pure non-owner-forwarding
-    // branch (both false) needs a real second networked client and cannot be
-    // constructed in Edit Mode or ClientSim, since Networking.IsOwner(gameObject) is
-    // true for a bare, unowned GameObject in both environments.
+    // network-callable counterparts on the owner-direct path: IsProcessOwner() is always
+    // true in Edit Mode (see ProcessTestBase's header comment). The non-owner forwarding
+    // branch lives in TsTimerPlayModeTests, which uses FakeOwnershipSyncable.
     public class TsTimerPauseResumeTests : TsTimerTestBase
     {
         [Test]
@@ -238,54 +232,6 @@ namespace Tsvrc.Tests.EditMode
             timer.ResumeTimer();
 
             CollectionAssert.AreEqual(new[] { "Hook:OnTimerResumed", "Event:OnTimerResumedEvent" }, timer.CallLog);
-        }
-
-        // Networking.IsOwner(gameObject) returns true for a bare, never-networked
-        // GameObject in Edit Mode, with no networking system running at all - every
-        // test above uses SeedAsOwner, which makes IsProcessOwner() true and
-        // short-circuits `!IsProcessOwner() && !Networking.IsOwner(gameObject)` to
-        // false before Networking.IsOwner is ever evaluated, so these two tests seed
-        // IsProcessOwner() false instead to reach the other branch. Since
-        // Networking.IsOwner(gameObject) is true here, the dual-authority fallback
-        // (`... || Networking.IsOwner(gameObject)`, the same "we accept authority if
-        // we are either the process owner by ID or the Unity owner" fallback
-        // documented on Process.StopProcess) executes locally even when
-        // _ownerPlayerIdInt names someone else.
-        [Test]
-        public void PauseTimer_OwnerIdMismatchButLocalHoldsUnityOwnership_ExecutesViaDualAuthorityFallback()
-        {
-            var timer = CreateProcess<TsTimerTestSubclass>();
-            PrivateFieldAccess.SetField(timer, "_isRunning", true);
-            PrivateFieldAccess.SetField(timer, "_localPlayerIdInt", 1);
-            PrivateFieldAccess.SetField(timer, "_localPlayerId", "Local#1");
-            PrivateFieldAccess.SetField(timer, "_ownerPlayerIdInt", 2);
-            PrivateFieldAccess.SetField(timer, "_ownerId", "Remote#2");
-
-            Assert.DoesNotThrow(() => timer.PauseTimer(),
-                "Networking.IsOwner(gameObject) on a bare, never-networked GameObject must not throw outside Play Mode.");
-
-            Assert.IsTrue(GetIsPausedField(timer),
-                "Local holds real Unity ownership (confirmed: Networking.IsOwner(gameObject) is true here), " +
-                "so the dual-authority fallback executes the pause directly despite the _ownerPlayerIdInt mismatch.");
-            Assert.AreEqual(1, timer.OnTimerPausedCount);
-        }
-
-        [Test]
-        public void ResumeTimer_OwnerIdMismatchButLocalHoldsUnityOwnership_ExecutesViaDualAuthorityFallback()
-        {
-            var timer = CreateProcess<TsTimerTestSubclass>();
-            PrivateFieldAccess.SetField(timer, "_isRunning", true);
-            SetIsPausedField(timer, true);
-            PrivateFieldAccess.SetField(timer, "_localPlayerIdInt", 1);
-            PrivateFieldAccess.SetField(timer, "_localPlayerId", "Local#1");
-            PrivateFieldAccess.SetField(timer, "_ownerPlayerIdInt", 2);
-            PrivateFieldAccess.SetField(timer, "_ownerId", "Remote#2");
-
-            Assert.DoesNotThrow(() => timer.ResumeTimer());
-
-            Assert.IsFalse(GetIsPausedField(timer),
-                "Same dual-authority fallback as the pause test above - executes locally, doesn't forward.");
-            Assert.AreEqual(1, timer.OnTimerResumedCount);
         }
 
         [Test]

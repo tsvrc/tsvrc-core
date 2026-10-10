@@ -75,7 +75,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
             tracker.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             tracker.StartPlayerTracking(new[] { departingId });
-            PrivateFieldAccess.InvokeInstance(tracker, "SetProcessOwner", namedOwner);
+            MakeGenuinelyNotOwner(tracker, namedOwner);
 
             Players.RemovePlayer(departing);
             tracker.OnPlayerLeft(departing);
