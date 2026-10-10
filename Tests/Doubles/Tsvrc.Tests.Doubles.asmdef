@@ -3,6 +3,7 @@
     "rootNamespace": "Tsvrc.Tests.EditMode",
     "references": [
         "Tsvrc.Runtime",
+        "Tsvrc.UdonTestKit",
         "UdonSharp.Runtime",
         "VRC.ClientSim"
     ],
@@ -12,7 +13,9 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": false,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
     "versionDefines": [],
     "noEngineReferences": false
 }

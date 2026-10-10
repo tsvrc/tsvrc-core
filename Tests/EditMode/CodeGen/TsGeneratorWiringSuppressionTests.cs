@@ -18,7 +18,7 @@ namespace Tsvrc.Tests.EditMode
         // program asset (WriteModules()'s raw File.WriteAllText output is never imported while
         // skipRefresh is true), so programAssetMissing stays true forever and Wire() is never
         // reached no matter how many settle passes run.
-        private const string TestGeneratedScriptPath = "Assets/Tsvrc/Tests/TestDoubles/CodeGen/TestGenerated.cs";
+        private const string TestGeneratedScriptPath = "Assets/Tsvrc/Tests/Doubles/CodeGen/TestGenerated.cs";
 
         private TsGeneratorTestHarness _harness;
         private TempSceneScope _scope;

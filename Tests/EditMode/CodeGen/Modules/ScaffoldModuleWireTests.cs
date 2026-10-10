@@ -23,7 +23,7 @@ namespace Tsvrc.Tests.EditMode
     // each test and deleted afterward, never the real project's Assets/TsGenerated.
     public class ScaffoldModuleWireTests
     {
-        private const string TestGeneratedScriptPath = "Assets/Tsvrc/Tests/TestDoubles/CodeGen/TestGenerated.cs";
+        private const string TestGeneratedScriptPath = "Assets/Tsvrc/Tests/Doubles/CodeGen/TestGenerated.cs";
 
         private TempSceneScope _scope;
 

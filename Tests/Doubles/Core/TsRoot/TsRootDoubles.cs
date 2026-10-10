@@ -4,7 +4,7 @@ using Tsvrc.Utils;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TestTsRoot (Tests/TestDoubles/Core/TsvrcBehaviour/TsvrcBehaviourDoubles.cs)
+    // TestTsRoot (Tests/Doubles/Core/TsvrcBehaviour/TsvrcBehaviourDoubles.cs)
     // already covers the no-override case (both Instance/Memory stay null) and is
     // reused here for that scenario. These three doubles cover every override
     // combination TsRoot's own two independent virtual properties allow: only

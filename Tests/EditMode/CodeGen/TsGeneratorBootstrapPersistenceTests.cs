@@ -17,7 +17,7 @@ namespace Tsvrc.Tests.EditMode
         // create the program asset, so ScaffoldModule.AfterFilesStable() reports
         // programAssetMissing == true forever, which alone forces every Run() pass to take the
         // write-then-stop branch and never actually reach Wire().
-        private const string TestGeneratedScriptPath = "Assets/Tsvrc/Tests/TestDoubles/CodeGen/TestGenerated.cs";
+        private const string TestGeneratedScriptPath = "Assets/Tsvrc/Tests/Doubles/CodeGen/TestGenerated.cs";
 
         private TsGeneratorTestHarness _harness;
         private TempSceneScope _scope;
