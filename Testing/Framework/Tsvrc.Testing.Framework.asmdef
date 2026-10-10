@@ -3,7 +3,6 @@
     "rootNamespace": "Tsvrc.Testing.Framework",
     "references": [
         "UnityEngine.TestRunner",
-        "Tsvrc.Editor",
         "VRC.SDKBase",
         "VRC.SDK3",
         "VRC.ClientSim"

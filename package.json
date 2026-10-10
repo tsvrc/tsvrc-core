@@ -11,7 +11,8 @@
     "url": "https://tsvrc.com"
   },
   "vpmDependencies": {
-    "com.vrchat.worlds": "3.10.x"
+    "com.vrchat.worlds": "3.10.x",
+    "com.tsvrc.udon-test-kit": "^1.0.0"
   },
   "changelogUrl": "https://github.com/tsvrc/tsvrc-core/releases"
 }

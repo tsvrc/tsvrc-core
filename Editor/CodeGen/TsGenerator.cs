@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Tsvrc.Config;
 using Tsvrc.Core;
+using Tsvrc.UdonTestKit;
 using UnityEditor;
 using UnityEngine;
 
@@ -69,19 +70,8 @@ namespace Tsvrc.Editor
         // reasons unrelated to any given entry. Read by TsModule.ApplyTreeShaking.
         internal static bool CurrentPassCountsForGracePeriod { get; private set; } = true;
 
-        // True for the entire duration of an automated test run (EditMode or PlayMode), computed
-        // once from the process's real command line. This is the only signal available at the
-        // one moment TsDomainReloadHandler's static constructor fires: right after the very first
-        // domain reload, before Unity Test Framework has discovered or started running anything,
-        // so no test-side SetUpFixture has had a chance to run yet either. See
-        // AutomaticTriggersSuppressed for the second, complementary signal that covers everything
-        // after that moment.
-        private static readonly bool IsAutomatedTestProcess = ComputeIsAutomatedTestProcess(Environment.GetCommandLineArgs());
-
-        // Ref-counted rather than a bool so nested SuppressAutomaticTriggers() scopes (for
-        // example a [SetUpFixture] wrapping a whole test assembly's run, with an individual
-        // test's own harness also taking a scope inside it) compose correctly: suppression only
-        // lifts once every scope that requested it has been disposed.
+        // Ref-counted rather than a bool so nested SuppressAutomaticTriggers() scopes compose
+        // correctly: suppression only lifts once every scope that requested it has been disposed.
         private static int _suppressionDepth;
 
         // The one flag every automatic (non-explicit) entry point below must check before
@@ -91,16 +81,14 @@ namespace Tsvrc.Editor
         // never gated by this: gating those would break every CodeGen test that drives TsGenerator
         // on purpose to test it. Only the reactive paths that would otherwise fire against
         // whatever scene Unity Test Framework happens to have open are suppressed.
-        internal static bool AutomaticTriggersSuppressed => _suppressionDepth > 0 || IsAutomatedTestProcess;
+        //
+        // A Play Mode run reports its start only after the domain reload into Play Mode, and
+        // TsDomainReloadHandler reacts to that reload, so entering Play Mode counts on its own.
+        internal static bool AutomaticTriggersSuppressed =>
+            _suppressionDepth > 0 || TestRun.IsActive || EditorApplication.isPlayingOrWillChangePlaymode;
 
-        // Held by a [SetUpFixture] in each test assembly - Tsvrc's own (Tsvrc.Tests.EditMode,
-        // Tsvrc.Tests.PlayMode) and every consuming world's own test assemblies alike (see
-        // Tsvrc.Testing.Framework's README and the AssemblyInfo.cs InternalsVisibleTo list
-        // below) - for the whole run, so no reactive trigger can regenerate TsGenerated against
-        // a test's temp/synthetic scene and corrupt a consuming project's real generated files.
-        // Safe to nest. TsGenerator itself stays internal (it's an implementation-detail class,
-        // not a public API surface), so reaching this specific seam from another assembly goes
-        // through InternalsVisibleTo rather than making the member public.
+        // Held while editor code edits config on purpose (TsPendingConfigEdit), so no reactive
+        // trigger regenerates halfway through the edit. Safe to nest.
         internal static IDisposable SuppressAutomaticTriggers() => new SuppressionScope();
 
         private sealed class SuppressionScope : IDisposable
@@ -115,15 +103,6 @@ namespace Tsvrc.Editor
             }
         }
 
-        // Pure and testable on its own: TsDomainReloadHandler used to duplicate this exact
-        // parsing logic locally. One source of truth here instead.
-        internal static bool ComputeIsAutomatedTestProcess(string[] commandLineArgs)
-        {
-            foreach (var arg in commandLineArgs)
-                if (string.Equals(arg, "-runTests", StringComparison.OrdinalIgnoreCase))
-                    return true;
-            return false;
-        }
         // Suppresses the rerun during the Wire pass itself, since Wire() assigns SerializedObject
         // properties, which fires OnPostprocessModifications.
         private static bool _isWiring;

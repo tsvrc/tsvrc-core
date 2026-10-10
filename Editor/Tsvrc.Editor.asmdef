@@ -12,7 +12,8 @@
         "VRC.SDK3.Editor",
         "VRC.Udon",
         "VRC.Udon.Editor",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "Tsvrc.UdonTestKit"
     ],
     "includePlatforms": [
         "Editor"
