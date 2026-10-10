@@ -1,37 +1,22 @@
 using System.Collections;
-using System.Collections.Generic;
 using NUnit.Framework;
 using Tsvrc.Player;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
 
 namespace Tsvrc.Tests.PlayMode.Player
 {
-    // A bare GameObject has no IClientSimSyncable component, so Networking.IsOwner falls back
-    // to the instance master and always reports the local player as owner - see
-    // FakeOwnershipSyncable's own doc comment. Attaching it here is what makes "the local
-    // player is genuinely not the owner" reachable at all, to verify Initialize's owner gate
+    // ClientSim makes the master the owner of a bare GameObject, so without Session.SetOwner the
+    // local player always owns the assigner. Handing it to a remote player is what makes "the
+    // local player is genuinely not the owner" reachable at all, to verify Initialize's owner gate
     // (the owner-shuffles case is already covered in EditMode, where a bare GameObject is
     // unconditionally its own owner).
-    public class PlayerColorAssignerPlayModeTests : TsPlayModeTestBase
+    public class PlayerColorAssignerPlayModeTests : ClientSimTestBase
     {
-        private readonly List<GameObject> _spawned = new List<GameObject>();
-
-        [TearDown]
-        public void TearDown()
+        public PlayerColorAssignerPlayModeTests() : base(TestScene.Empty("Tsvrc.Tests.PlayMode.PlayerColorAssigner"))
         {
-            foreach (GameObject go in _spawned)
-                if (go != null) Object.Destroy(go);
-            _spawned.Clear();
-        }
-
-        private PlayerColorAssigner CreateAssigner()
-        {
-            var go = new GameObject("Assigner");
-            _spawned.Add(go);
-            return go.AddComponent<PlayerColorAssigner>();
         }
 
         private static byte[] GetOrder(PlayerColorAssigner assigner) =>
@@ -40,18 +25,10 @@ namespace Tsvrc.Tests.PlayMode.Player
         [UnityTest]
         public IEnumerator Initialize_GenuinelyNotUnityOwner_DoesNotReshuffleOrder()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: the spawned remote player was not found.");
-
-            var assigner = CreateAssigner();
-            var syncable = assigner.gameObject.AddComponent<FakeOwnershipSyncable>();
-            syncable.InitializeOwner(remote.playerId);
-            Assert.IsFalse(Networking.IsOwner(assigner.gameObject),
-                "Setup sanity check: the local player must genuinely not be the owner.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
+            var assigner = new GameObject("Assigner").AddComponent<PlayerColorAssigner>();
+            Session.SetOwner(remote, assigner.gameObject);
 
             assigner.Initialize();
             byte[] order = GetOrder(assigner);

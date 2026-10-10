@@ -1,6 +1,6 @@
 using System.Collections;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
@@ -10,24 +10,25 @@ namespace Tsvrc.Tests.PlayMode.Core.Instance
     // IsTsMaster is a thin wrapper over Networking.IsMaster, which only resolves meaningfully
     // under a live ClientSim session. No test double is needed - a real, unsubclassed Instance
     // is exactly what this checks.
-    public class InstancePlayModeTests : TsPlayModeTestBase
+    public class InstancePlayModeTests : ClientSimTestBase
     {
-        private GameObject _gameObject;
-
-        [TearDown]
-        public void TearDown()
+        public InstancePlayModeTests() : base(TestScene.Empty("Tsvrc.Tests.PlayMode.Instance"))
         {
-            if (_gameObject != null) Object.DestroyImmediate(_gameObject);
+        }
+
+        private static Tsvrc.Core.Instance CreateInstance()
+        {
+            var instance = new GameObject(nameof(InstancePlayModeTests)).AddComponent<Tsvrc.Core.Instance>();
+            instance.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
+            return instance;
         }
 
         [UnityTest]
         public IEnumerator IsTsMaster_LocalPlayerIsMaster_MatchesRealNetworkingIsMaster()
         {
-            yield return StartClientSim(localPlayerIsMaster: true);
+            yield return Session.Start(localPlayerIsMaster: true);
 
-            _gameObject = new GameObject(nameof(InstancePlayModeTests));
-            var instance = _gameObject.AddComponent<Tsvrc.Core.Instance>();
-            instance.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
+            var instance = CreateInstance();
 
             Assert.AreEqual(Networking.IsMaster, instance.IsTsMaster);
             Assert.IsTrue(instance.IsTsMaster);
@@ -36,11 +37,9 @@ namespace Tsvrc.Tests.PlayMode.Core.Instance
         [UnityTest]
         public IEnumerator IsTsMaster_LocalPlayerIsNotMaster_MatchesRealNetworkingIsMaster()
         {
-            yield return StartClientSim(localPlayerIsMaster: false);
+            yield return Session.Start(localPlayerIsMaster: false);
 
-            _gameObject = new GameObject(nameof(InstancePlayModeTests));
-            var instance = _gameObject.AddComponent<Tsvrc.Core.Instance>();
-            instance.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
+            var instance = CreateInstance();
 
             Assert.AreEqual(Networking.IsMaster, instance.IsTsMaster);
             Assert.IsFalse(instance.IsTsMaster);

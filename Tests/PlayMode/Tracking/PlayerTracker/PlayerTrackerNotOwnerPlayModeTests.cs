@@ -1,15 +1,15 @@
 using System.Collections;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
 using Tsvrc.Tests.PlayMode.Core.Process;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
 
 namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
 {
     // The not-owner paths need a GameObject the local player genuinely doesn't own, which only
-    // FakeOwnershipSyncable under ClientSim can produce; Edit Mode always reports the local
+    // ClientSim can produce, through Session.SetOwner; Edit Mode always reports the local
     // player as owner.
     public class PlayerTrackerNotOwnerPlayModeTests : ProcessPlayModeTestBase
     {
@@ -21,19 +21,13 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         [UnityTest]
         public IEnumerator StartPlayerTracking_GenuinelyNotOwner_ClaimsOwnershipAndTracksTheGivenIds()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: RemoteOwner was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
             string remoteId = remote.displayName + "#" + remote.playerId;
 
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
             tracker.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotOwner(tracker, remote);
-            Assert.IsFalse(Networking.IsOwner(tracker.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+            Session.SetOwner(remote, tracker.gameObject);
 
             tracker.StartPlayerTracking(new[] { remoteId });
 
@@ -46,20 +40,14 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         [UnityTest]
         public IEnumerator BroadcastAddTrackedPlayers_GenuinelyNotOwner_Rejected()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: RemoteOwner was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
 
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
             tracker.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             tracker.StartPlayerTracking(new string[0]);
-            MakeGenuinelyNotOwner(tracker, remote);
+            Session.SetOwner(remote, tracker.gameObject);
             Assert.IsTrue(tracker.IsProcessRunning(), "Setup sanity check: tracking must still be running.");
-            Assert.IsFalse(Networking.IsOwner(tracker.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
 
             tracker.BroadcastAddTrackedPlayers(new[] { "A" });
 
@@ -70,20 +58,14 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         [UnityTest]
         public IEnumerator BroadcastRemoveTrackedPlayers_GenuinelyNotOwner_Rejected()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: RemoteOwner was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
 
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
             tracker.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             tracker.StartPlayerTracking(new[] { "A" });
-            MakeGenuinelyNotOwner(tracker, remote);
+            Session.SetOwner(remote, tracker.gameObject);
             Assert.IsTrue(tracker.IsProcessRunning(), "Setup sanity check: tracking must still be running.");
-            Assert.IsFalse(Networking.IsOwner(tracker.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
 
             tracker.BroadcastRemoveTrackedPlayers(new[] { "A" });
 

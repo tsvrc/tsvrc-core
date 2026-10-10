@@ -1,8 +1,8 @@
 using System.Collections;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
 using Tsvrc.Tests.PlayMode.Core.Process;
+using Tsvrc.UdonTestKit;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
@@ -17,31 +17,16 @@ namespace Tsvrc.Tests.PlayMode.Session
     // reproduce what [WirePool] wires at runtime.
     public class RankedGameSessionPlayModeTests : ProcessPlayModeTestBase
     {
-        private GameObject _sessionGameObject;
-
-        [TearDown]
-        public void TearDown()
-        {
-            if (_sessionGameObject != null) Object.DestroyImmediate(_sessionGameObject);
-        }
-
         [UnityTest]
         public IEnumerator FullLifecycle_RealPlayersFlowThroughLobbyReadyGameCompleted_EndsSessionNaturally()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("P1");
-            Players.SpawnRemotePlayer("P2");
-            yield return null;
-            yield return null;
-            VRCPlayerApi p1 = ClientSimPlayerEnvironment.FindPlayerByName("P1");
-            VRCPlayerApi p2 = ClientSimPlayerEnvironment.FindPlayerByName("P2");
-            Assert.IsNotNull(p1, "Setup sanity check: P1 was not found.");
-            Assert.IsNotNull(p2, "Setup sanity check: P2 was not found.");
+            yield return Session.Start();
+            VRCPlayerApi p1 = Session.SpawnRemotePlayer("P1");
+            VRCPlayerApi p2 = Session.SpawnRemotePlayer("P2");
             string p1Id = p1.displayName + "#" + p1.playerId;
             string p2Id = p2.displayName + "#" + p2.playerId;
 
-            _sessionGameObject = new GameObject(nameof(RankedGameSessionPlayModeTests));
-            var session = _sessionGameObject.AddComponent<RankedGameSessionTestSubclass>();
+            var session = new GameObject(nameof(RankedGameSessionPlayModeTests)).AddComponent<RankedGameSessionTestSubclass>();
             var lobbyTracker = CreateProcess<PlayerTrackerTestSubclass>();
             var readyCheck = CreateProcess<ReadyCheckProcessTestSubclass>();
             var gameTracker = CreateProcess<PlayerTrackerTestSubclass>();

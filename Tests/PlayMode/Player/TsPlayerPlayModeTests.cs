@@ -2,7 +2,7 @@ using System.Collections;
 using System.Linq;
 using NUnit.Framework;
 using Tsvrc.Player;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
 
@@ -10,16 +10,14 @@ namespace Tsvrc.Tests.PlayMode.Player
 {
     // ToArray is the only member of TsPlayer with zero VRCPlayerApi dependency - every other
     // member needs a live player list, which only resolves under a real ClientSim session.
-    public class TsPlayerPlayModeTests : TsPlayModeTestBase
+    public class TsPlayerPlayModeTests : ClientSimTestBase
     {
         [UnityTest]
         public IEnumerator GetAllPlayers_RealSpawnedPlayers_ReturnsEveryRealPlayer()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("First");
-            Players.SpawnRemotePlayer("Second");
-            yield return null;
-            yield return null;
+            yield return Session.Start();
+            Session.SpawnRemotePlayer("First");
+            Session.SpawnRemotePlayer("Second");
 
             VRCPlayerApi[] players = TsPlayer.GetAllPlayers();
 
@@ -32,7 +30,7 @@ namespace Tsvrc.Tests.PlayMode.Player
         [UnityTest]
         public IEnumerator GetPlayerID_RealLocalPlayer_MatchesRealDisplayNameAndPlayerId()
         {
-            yield return StartClientSim();
+            yield return Session.Start();
 
             string id = TsPlayer.GetPlayerID(Networking.LocalPlayer);
 
@@ -42,12 +40,8 @@ namespace Tsvrc.Tests.PlayMode.Player
         [UnityTest]
         public IEnumerator FindPlayerByID_RealSpawnedPlayer_ReturnsTheSameRealPlayer()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("Findable");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("Findable");
-            Assert.IsNotNull(remote, "Setup sanity check: Findable was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("Findable");
             string id = TsPlayer.GetPlayerID(remote);
 
             VRCPlayerApi found = TsPlayer.FindPlayerByID(id);
@@ -58,14 +52,10 @@ namespace Tsvrc.Tests.PlayMode.Player
         [UnityTest]
         public IEnumerator FindPlayerByID_RealDepartedPlayer_ReturnsNull()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("Departing");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("Departing");
-            Assert.IsNotNull(remote, "Setup sanity check: Departing was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("Departing");
             string id = TsPlayer.GetPlayerID(remote);
-            Players.RemovePlayer(remote);
+            Session.RemovePlayer(remote);
 
             VRCPlayerApi found = TsPlayer.FindPlayerByID(id);
 
@@ -75,16 +65,12 @@ namespace Tsvrc.Tests.PlayMode.Player
         [UnityTest]
         public IEnumerator ToPlayerApis_RealMixOfPresentAndDepartedIds_ReturnsOnlyThePresentOnes()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("Staying");
-            Players.SpawnRemotePlayer("Leaving");
-            yield return null;
-            yield return null;
-            VRCPlayerApi staying = ClientSimPlayerEnvironment.FindPlayerByName("Staying");
-            VRCPlayerApi leaving = ClientSimPlayerEnvironment.FindPlayerByName("Leaving");
+            yield return Session.Start();
+            VRCPlayerApi staying = Session.SpawnRemotePlayer("Staying");
+            VRCPlayerApi leaving = Session.SpawnRemotePlayer("Leaving");
             string stayingId = TsPlayer.GetPlayerID(staying);
             string leavingId = TsPlayer.GetPlayerID(leaving);
-            Players.RemovePlayer(leaving);
+            Session.RemovePlayer(leaving);
 
             VRCPlayerApi[] result = TsPlayer.ToPlayerApis(new[] { stayingId, leavingId });
 
@@ -95,10 +81,8 @@ namespace Tsvrc.Tests.PlayMode.Player
         [UnityTest]
         public IEnumerator GetAllPlayerIDs_RealSpawnedPlayers_MatchesGetAllPlayersFormattedIndividually()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("Remote");
-            yield return null;
-            yield return null;
+            yield return Session.Start();
+            Session.SpawnRemotePlayer("Remote");
 
             string[] ids = TsPlayer.GetAllPlayerIDs();
             VRCPlayerApi[] players = TsPlayer.GetAllPlayers();

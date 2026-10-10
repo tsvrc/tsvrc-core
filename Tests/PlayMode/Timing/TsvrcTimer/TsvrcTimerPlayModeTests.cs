@@ -1,8 +1,8 @@
 using System.Collections;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
 using Tsvrc.Tests.PlayMode.Core.Process;
+using Tsvrc.UdonTestKit;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
@@ -12,13 +12,13 @@ namespace Tsvrc.Tests.PlayMode.Timing.TsvrcTimer
     // GetServerTimeMilliseconds() only advances with real wall-clock time under a live
     // ClientSim session - a platform fact, not tsvrc logic, proven with a real WaitForSeconds
     // coroutine. PauseTimer/ResumeTimer's non-owner-forwarding branch needs a GameObject that
-    // genuinely isn't Unity-owned by the local player - FakeOwnershipSyncable produces that for real.
+    // genuinely isn't Unity-owned by the local player - Session.SetOwner produces that for real.
     public class TsTimerPlayModeTests : ProcessPlayModeTestBase
     {
         [UnityTest]
         public IEnumerator GetElapsedMilliseconds_RealRunningTimer_GrowsWithRealWallClockTime()
         {
-            yield return StartClientSim();
+            yield return Session.Start();
 
             var timer = CreateProcess<TsTimerTestSubclass>();
             timer.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
@@ -35,18 +35,12 @@ namespace Tsvrc.Tests.PlayMode.Timing.TsvrcTimer
         [UnityTest]
         public IEnumerator StartTimer_GenuinelyNotOwner_ClaimsOwnershipAndKeepsTheDuration()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: RemoteOwner was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
 
             var timer = CreateProcess<TsTimerTestSubclass>();
             timer.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotOwner(timer, remote);
-            Assert.IsFalse(Networking.IsOwner(timer.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+            Session.SetOwner(remote, timer.gameObject);
 
             timer.StartTimer(5000);
 
@@ -57,22 +51,15 @@ namespace Tsvrc.Tests.PlayMode.Timing.TsvrcTimer
         }
 
         [UnityTest]
-        public IEnumerator PauseTimer_RealNotOwnerAndNotUnityOwner_ForwardsToOwnerInstead()
+        public IEnumerator PauseTimer_GenuinelyNotOwner_ForwardsToOwnerInstead()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: RemoteOwner was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
 
             var timer = CreateProcess<TsTimerTestSubclass>();
             timer.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotOwner(timer, remote);
             timer.StartTimer();
-            PrivateFieldAccess.InvokeInstance(timer, "SetProcessOwner", remote);
-            Assert.IsFalse(Networking.IsOwner(timer.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+            Session.SetOwner(remote, timer.gameObject);
 
             timer.PauseTimer();
 
@@ -81,23 +68,16 @@ namespace Tsvrc.Tests.PlayMode.Timing.TsvrcTimer
         }
 
         [UnityTest]
-        public IEnumerator ResumeTimer_RealNotOwnerAndNotUnityOwner_ForwardsToOwnerInstead()
+        public IEnumerator ResumeTimer_GenuinelyNotOwner_ForwardsToOwnerInstead()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: RemoteOwner was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
 
             var timer = CreateProcess<TsTimerTestSubclass>();
             timer.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             timer.StartTimer();
             PrivateFieldAccess.SetField(timer, "_isPaused", true);
-            MakeGenuinelyNotOwner(timer, remote);
-            PrivateFieldAccess.InvokeInstance(timer, "SetProcessOwner", remote);
-            Assert.IsFalse(Networking.IsOwner(timer.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+            Session.SetOwner(remote, timer.gameObject);
 
             timer.ResumeTimer();
 

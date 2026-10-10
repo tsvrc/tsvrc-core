@@ -1,8 +1,8 @@
 using System.Collections;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
 using Tsvrc.Tests.PlayMode.Core.Process;
+using Tsvrc.UdonTestKit;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
@@ -28,12 +28,8 @@ namespace Tsvrc.Tests.PlayMode.UI.PlayerPositionOverlay
         [UnityTest]
         public IEnumerator OnRemoteTick_RealTrackedPlayer_CachesActualWorldPosition()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("Tracked");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("Tracked");
-            Assert.IsNotNull(remote, "Setup sanity check: Tracked was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("Tracked");
             Vector3 realPos = remote.GetPosition();
             string trackedId = remote.displayName + "#" + remote.playerId;
 
@@ -52,7 +48,7 @@ namespace Tsvrc.Tests.PlayMode.UI.PlayerPositionOverlay
         [UnityTest]
         public IEnumerator OnBlinkTick_RealTrackedLocalPlayer_CallsOnMarkerVisibleWithActualCurrentPosition()
         {
-            yield return StartClientSim();
+            yield return Session.Start();
             Networking.LocalPlayer.TeleportTo(new Vector3(5f, 0f, 7f), Networking.LocalPlayer.GetRotation(),
                 VRC_SceneDescriptor.SpawnOrientation.Default, false);
             string localId = Networking.LocalPlayer.displayName + "#" + Networking.LocalPlayer.playerId;
@@ -73,7 +69,7 @@ namespace Tsvrc.Tests.PlayMode.UI.PlayerPositionOverlay
         [UnityTest]
         public IEnumerator OnRemoteTick_RendererUsesHeadingTrue_CachesRealRotation()
         {
-            yield return StartClientSim();
+            yield return Session.Start();
             Networking.LocalPlayer.TeleportTo(Networking.LocalPlayer.GetPosition(),
                 Quaternion.Euler(0f, 90f, 0f), VRC_SceneDescriptor.SpawnOrientation.Default, false);
             string localId = Networking.LocalPlayer.displayName + "#" + Networking.LocalPlayer.playerId;
@@ -92,7 +88,7 @@ namespace Tsvrc.Tests.PlayMode.UI.PlayerPositionOverlay
         [UnityTest]
         public IEnumerator OnRemoteTick_RendererUsesHeadingFalse_CachesZeroRegardlessOfRealRotation()
         {
-            yield return StartClientSim();
+            yield return Session.Start();
             Networking.LocalPlayer.TeleportTo(Networking.LocalPlayer.GetPosition(),
                 Quaternion.Euler(0f, 90f, 0f), VRC_SceneDescriptor.SpawnOrientation.Default, false);
             string localId = Networking.LocalPlayer.displayName + "#" + Networking.LocalPlayer.playerId;

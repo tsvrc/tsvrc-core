@@ -1,7 +1,6 @@
 using System.Collections;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
-using Tsvrc.Tests.EditMode;
+using Tsvrc.UdonTestKit;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VRC.SDK3.Data;
@@ -11,68 +10,59 @@ namespace Tsvrc.Tests.PlayMode.Utils.TsvrcMemory
 {
     // Set/Remove/Clear's Networking.IsOwner(gameObject)-false ownership-claim branch (synced
     // tier) needs a real GameObject that genuinely isn't Unity-owned by the local player -
-    // FakeOwnershipSyncable produces that for real. OnPlayerRestored + real PlayerData needs a
+    // Session.SetOwner produces that for real. OnPlayerRestored + real PlayerData needs a
     // real local VRCPlayerApi, and ClientSim never organically dispatches it to a plain
     // UdonSharpBehaviour, so it is invoked directly below.
-    public class TsMemoryPlayModeTests : TsPlayModeTestBase
+    public class TsMemoryPlayModeTests : ClientSimTestBase
     {
-        private GameObject _gameObject;
-
-        [TearDown]
-        public void TearDown()
+        public TsMemoryPlayModeTests() : base(TestScene.Empty("Tsvrc.Tests.PlayMode.TsvrcMemory"))
         {
-            if (_gameObject != null) Object.DestroyImmediate(_gameObject);
+        }
+
+        private static Tsvrc.Utils.TsvrcMemory CreateMemory()
+        {
+            var memory = new GameObject(nameof(TsMemoryPlayModeTests)).AddComponent<Tsvrc.Utils.TsvrcMemory>();
+            memory.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
+            return memory;
         }
 
         [UnityTest]
         public IEnumerator Set_SyncedKeyWhileGenuinelyNotUnityOwner_ClaimsRealOwnership()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("OtherOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi otherOwner = ClientSimPlayerEnvironment.FindPlayerByName("OtherOwner");
-            Assert.IsNotNull(otherOwner, "Setup sanity check: OtherOwner was not found.");
-
-            _gameObject = new GameObject(nameof(TsMemoryPlayModeTests));
-            var memory = _gameObject.AddComponent<Tsvrc.Utils.TsvrcMemory>();
-            memory.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            var syncable = _gameObject.AddComponent<FakeOwnershipSyncable>();
-            syncable.InitializeOwner(otherOwner.playerId);
-
+            yield return Session.Start();
+            VRCPlayerApi otherOwner = Session.SpawnRemotePlayer("OtherOwner");
+            var memory = CreateMemory();
+            Session.SetOwner(otherOwner, memory.gameObject);
             memory.Register("key", persist: false, synced: true);
-            Assert.IsFalse(Networking.IsOwner(_gameObject),
-                "Setup sanity check: the local player must genuinely not be the Unity owner.");
 
             memory.Set("key", new DataToken("value"));
 
-            Assert.IsTrue(Networking.IsOwner(_gameObject),
+            Assert.IsTrue(Networking.IsOwner(memory.gameObject),
                 "Set on a synced key must claim real Unity ownership when the local player isn't already the owner.");
         }
 
         [UnityTest]
-        public IEnumerator OnPlayerRestored_RealLocalPlayer_LoadsPersistValueFromRealPlayerData()
+        public IEnumerator OnPlayerRestored_AfterARealRejoin_LoadsPersistValueFromRealPlayerData()
         {
-            yield return StartClientSim();
-
-            _gameObject = new GameObject(nameof(TsMemoryPlayModeTests));
-            var memory = _gameObject.AddComponent<Tsvrc.Utils.TsvrcMemory>();
-            memory.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-
+            ClientSimSession.DeleteSavedData();
+            yield return Session.Start();
+            var memory = CreateMemory();
             memory.Register("score", persist: true, synced: false);
             memory.Add("score", new DataToken(0));
             memory.OnPlayerRestored(Networking.LocalPlayer);
             memory.Set("score", new DataToken(42));
+            yield return null;
 
-            // Simulate a fresh session's restore against the same real PlayerData.
-            PrivateFieldAccess.SetField(memory, "_playerRestored", false);
-            PrivateFieldAccess.GetField<DataDictionary>(memory, "_persistStore").Clear();
+            Session.End();
+            yield return Session.Start();
+            var rejoined = CreateMemory();
+            rejoined.Register("score", persist: true, synced: false);
+            rejoined.Add("score", new DataToken(0));
+            rejoined.OnPlayerRestored(Networking.LocalPlayer);
 
-            memory.OnPlayerRestored(Networking.LocalPlayer);
-
-            Assert.IsTrue(memory.IsPlayerRestored);
-            Assert.AreEqual(42, memory.GetInt("score"),
-                "OnPlayerRestored must load the value back from real PlayerData, not the local cache.");
+            Assert.IsTrue(rejoined.IsPlayerRestored);
+            Assert.AreEqual(42, rejoined.GetInt("score"),
+                "OnPlayerRestored must load the value saved before the player left from real PlayerData.");
         }
     }
 }

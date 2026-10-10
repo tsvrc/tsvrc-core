@@ -4,8 +4,7 @@
     "references": [
         "Tsvrc.Runtime",
         "Tsvrc.UdonTestKit",
-        "UdonSharp.Runtime",
-        "VRC.ClientSim"
+        "UdonSharp.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
