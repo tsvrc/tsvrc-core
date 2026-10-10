@@ -5,6 +5,11 @@
 [![Release](https://img.shields.io/github/v/release/tsvrc/tsvrc-core?style=flat&label=release&color=58a6ff&labelColor=161b22)](https://github.com/tsvrc/tsvrc-core/releases)
 [![License: Apache-2.0](https://img.shields.io/github/license/tsvrc/tsvrc-core?style=flat&color=58a6ff&labelColor=161b22)](LICENSE.md)
 
+> [!WARNING]
+> TsVRC is an experiment, and AI coding tools generated part of its features. It isn't fully vibe
+> coded, but AI had a large share in writing it. Test the behaviour your world relies on before you
+> publish it.
+
 TsVRC is an open-source framework for building VRChat worlds with UdonSharp: structured
 initialization, dependency wiring, and an editor tool that generates the code for both,
 on top of the VRChat Worlds SDK.
