@@ -1,6 +1,6 @@
 using Tsvrc.Core.Generated;
 using Tsvrc.Core;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 
 namespace Tsvrc.Tests.EditMode
 {

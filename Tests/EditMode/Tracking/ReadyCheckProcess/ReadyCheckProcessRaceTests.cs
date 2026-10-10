@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using UnityEngine;
 

@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using Tsvrc.Core;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Tracking;
+using Tsvrc.UdonTestKit;
 using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode

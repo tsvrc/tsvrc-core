@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Tsvrc.Config;
 using Tsvrc.Editor;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using Tsvrc.Utils;
 using UnityEditor;
 using UnityEngine;

@@ -9,6 +9,7 @@
         "Tsvrc.Testing.Framework",
         "Tsvrc.Testing.UI",
         "Tsvrc.Testing.Behaviours",
+        "Tsvrc.UdonTestKit",
         "UdonSharp.Runtime",
         "UdonSharp.Editor",
         "Unity.TextMeshPro",

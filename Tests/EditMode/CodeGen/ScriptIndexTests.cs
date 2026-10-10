@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using Tsvrc.Editor;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEditor;
 
 namespace Tsvrc.Tests.EditMode

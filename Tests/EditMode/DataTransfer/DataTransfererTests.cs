@@ -1,6 +1,6 @@
 using NUnit.Framework;
 using Tsvrc.DataTransfer;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 
 namespace Tsvrc.Tests.EditMode
 {

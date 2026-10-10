@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Tsvrc.Config;
 using Tsvrc.Editor;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEditor;
 using UnityEngine.TestTools;
 using UnityEngine;

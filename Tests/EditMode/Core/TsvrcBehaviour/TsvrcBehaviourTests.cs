@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using System;
 using Tsvrc.Core.Generated;
 using Tsvrc.Core;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using UnityEngine;
 

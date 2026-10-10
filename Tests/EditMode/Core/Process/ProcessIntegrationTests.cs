@@ -1,8 +1,8 @@
 using NUnit.Framework;
 using Tsvrc.Core;
-using Tsvrc.Testing.Framework;
 
 using Tsvrc.Tests.Doubles;
+using Tsvrc.UdonTestKit;
 
 namespace Tsvrc.Tests.EditMode
 {

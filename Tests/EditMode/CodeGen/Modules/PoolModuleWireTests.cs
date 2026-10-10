@@ -4,7 +4,7 @@ using System.Collections;
 using System;
 using Tsvrc.Editor;
 using Tsvrc.StateMachine;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEditor;
 using UnityEngine.TestTools;
 using UnityEngine;

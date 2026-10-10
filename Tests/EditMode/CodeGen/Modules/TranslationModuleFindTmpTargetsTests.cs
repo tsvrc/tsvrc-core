@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections;
 using TMPro;
 using Tsvrc.Editor;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 
 namespace Tsvrc.Tests.EditMode
 {

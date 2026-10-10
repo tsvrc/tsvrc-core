@@ -1,6 +1,6 @@
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Timing;
+using Tsvrc.UdonTestKit;
 
 namespace Tsvrc.Tests.EditMode
 {
