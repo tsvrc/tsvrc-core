@@ -3,7 +3,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/tsvrc/tsvrc-core?style=flat&label=stars&color=58a6ff&labelColor=161b22)](https://github.com/tsvrc/tsvrc-core/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/tsvrc/tsvrc-core?style=flat&label=last%20commit&color=58a6ff&labelColor=161b22)](https://github.com/tsvrc/tsvrc-core/commits/main)
 [![Release](https://img.shields.io/github/v/release/tsvrc/tsvrc-core?style=flat&label=release&color=58a6ff&labelColor=161b22)](https://github.com/tsvrc/tsvrc-core/releases)
-[![License: Apache-2.0](https://img.shields.io/github/license/tsvrc/tsvrc-core?style=flat&color=58a6ff&labelColor=161b22)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/github/license/tsvrc/tsvrc-core?style=flat&color=58a6ff&labelColor=161b22)](LICENSE.md)
 
 TsVRC is an open-source framework for building VRChat worlds with UdonSharp: structured
 initialization, dependency wiring, and an editor tool that generates the code for both,
@@ -119,7 +119,7 @@ Entirely optional, and appreciated if you'd like to:
 
 ## License
 
-Apache-2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE). The TsVRC name and logo are
+Apache-2.0, see [LICENSE](LICENSE.md) and [NOTICE](NOTICE). The TsVRC name and logo are
 governed separately, see
 [TRADEMARK.md](https://github.com/tsvrc/.github/blob/main/TRADEMARK.md).
 
