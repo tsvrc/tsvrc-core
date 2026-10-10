@@ -1,0 +1,3 @@
+[submodule "Tests/UdonTestKit"]
+	path = Tests/UdonTestKit
+	url = https://github.com/tsvrc/udon-test-kit.git
