@@ -2,21 +2,18 @@ changelog:
   exclude:
     labels:
       - no-changelog
+      - dependencies
   categories:
-    - title: Breaking Changes
+    - title: Breaking changes
       labels:
         - breaking-change
-    - title: New Features
+    - title: New features
       labels:
         - feature
         - enhancement
-    - title: Bug Fixes
+    - title: Bug fixes
       labels:
         - bug
-        - fix
-    - title: Dependencies
-      labels:
-        - dependencies
-    - title: Other Changes
+    - title: Other changes
       labels:
         - "*"
