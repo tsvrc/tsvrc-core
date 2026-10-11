@@ -13,9 +13,9 @@
   ],
   "license": "Apache-2.0",
   "author": {
-    "name": "TsVRC",
+    "name": "Antony Seas",
     "email": "contact@tsvrc.com",
-    "url": "https://tsvrc.com"
+    "url": "https://github.com/ToniSeas"
   },
   "vpmDependencies": {
     "com.vrchat.worlds": "3.10.x",
