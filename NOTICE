@@ -3,8 +3,7 @@ Copyright 2025-2026 Antony Seas
 
 This repository (tsvrc-core) is the UdonSharp framework distributed as "TsVRC Core". It's one
 project under the tsvrc GitHub organization (https://github.com/tsvrc). TsVRC Core is
-open-source and community-maintained. It isn't affiliated with, endorsed by, or
-sponsored by VRChat Inc.
+open-source. It isn't affiliated with, endorsed by, or sponsored by VRChat Inc.
 
 "TsVRC" and any associated logos aren't registered trademarks, they're the name and logo
 used across the tsvrc organization, not just this repository. See TRADEMARK.md for how
