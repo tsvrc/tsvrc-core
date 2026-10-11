@@ -50,7 +50,7 @@ namespace Tsvrc.Editor
         public override void OnInspectorGUI()
         {
             TsEditorGUI.DrawStatusBox(
-                "This is Tsvrc's own package-level builtin config, shared by every world using this " +
+                "This is the Tsvrc package-level builtin config, shared by every world using this " +
                 "copy of Tsvrc - anything registered here becomes available to every world, not just " +
                 "this one. Register your own world's globals/pool prefabs/factories via " +
                 "Tsvrc > Configure instead, unless you specifically intend to add a library-wide builtin.",

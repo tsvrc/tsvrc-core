@@ -4,7 +4,7 @@ using Tsvrc.Editor;
 namespace Tsvrc.Tests.EditMode
 {
     // Pure matching-rule coverage for TsUsageScanner, exercised against synthetic source strings
-    // rather than real project scripts - mirrors ScriptIndexTests' own ParseInto-only split for
+    // rather than real project scripts - mirrors ScriptIndexTests own ParseInto-only split for
     // the same reason (deterministic, isolated from whatever this repo's real scripts say).
     public class TsUsageScannerTests
     {

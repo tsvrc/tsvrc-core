@@ -4,8 +4,8 @@ namespace Tsvrc.Core
 {
     /// <summary>
     /// Marks a class as intentionally not a real codegen scaffold candidate - e.g. a test
-    /// double subclass used to unit-test a consumer's behavior. TsGenerator's
-    /// bootstrap-detection scan and InstanceModule's scaffold-instance scan both skip any
+    /// double subclass used to unit-test a consumer's behavior. The TsGenerator
+    /// bootstrap-detection scan and the InstanceModule scaffold-instance scan both skip any
     /// type carrying this attribute, so it's never mistaken for the user's real scaffold and
     /// never gets an unwanted (and failing, since it has no matching generated program
     /// asset) Wire() attempt.

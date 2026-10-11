@@ -7,7 +7,7 @@ using VRC.Udon.Common.Interfaces;
 namespace Tsvrc.Timing
 {
     /// <summary>
-    /// Tracks time between a synced start and end using VRChat's server clock.
+    /// Tracks time between a synced start and end using the VRChat server clock.
     /// All clients share the same time anchors and compute elapsed time locally.
     /// No per-tick network sync is needed.
     ///

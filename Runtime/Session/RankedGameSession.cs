@@ -86,7 +86,7 @@ namespace Tsvrc.Session
 
         /// <summary>
         /// Current session state, compared against <see cref="RankedGameSessionState"/> constants.
-        /// Set locally at each phase transition, not re-derived from the sub-trackers' synced
+        /// Set locally at each phase transition, not re-derived from the sub-trackers synced
         /// flags - those only update instantly for whichever client owns that Process, so a live
         /// read would go stale on every other client. TsStart seeds it once from that live read,
         /// which is safe only there: a late joiner's sub-trackers are already current, not mid-flight.
@@ -116,7 +116,7 @@ namespace Tsvrc.Session
         /// <see cref="GamePlayerIds"/> as it was immediately before the most recent
         /// <see cref="OnSessionEndedEvent"/>/<see cref="OnSessionStoppedEvent"/> (from an InGame
         /// stop) tore the game tracker down. Read this instead of <see cref="GamePlayerIds"/>
-        /// from inside those events' handlers - by the time they fire, the live tracker has
+        /// from inside those events handlers - by the time they fire, the live tracker has
         /// already been stopped and cleared.
         /// </summary>
         public string[] LastEndedGamePlayerIds { get; private set; } = new string[0];

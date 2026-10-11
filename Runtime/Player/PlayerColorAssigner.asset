@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: PlayerColorAssigner
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: 6ad5ba2f1a0831743b3572c6e3860aea,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: d777d7d092d32be4fb8ace3134394513,
     type: 2}
   udonAssembly: 
   assemblyError: 

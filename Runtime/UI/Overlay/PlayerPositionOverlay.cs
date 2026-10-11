@@ -15,7 +15,7 @@ namespace Tsvrc.UI
     /// about rendering is synced.
     ///
     /// Two independent ticks: the remote tick (<see cref="RemoteUpdateInterval"/>) caches
-    /// tracked players' world positions; the blink tick (<see cref="MarkerOnDuration"/>/
+    /// tracked players world positions; the blink tick (<see cref="MarkerOnDuration"/>/
     /// <see cref="MarkerOffDuration"/>) alternates showing that cache via
     /// <see cref="PlayerMarkerRenderer.OnMarkerVisible"/> and hiding, always finishing with one
     /// <see cref="PlayerMarkerRenderer.OnPresent"/> call.

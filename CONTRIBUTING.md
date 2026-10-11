@@ -6,8 +6,8 @@ This repo is a VPM package, not a full project on its own (see `package.json`), 
 need a world project to develop it in:
 
 1. Create a new VRChat World project through the [VRChat Creator
-   Companion](https://vcc.docs.vrchat.com/), matching **Unity 2022.3** (`package.json`'s
-   manifest target).
+   Companion](https://vcc.docs.vrchat.com/), matching **Unity 2022.3** (the manifest target in
+   `package.json`).
 2. Clone this repo into that project's `Assets` folder as `Assets/Tsvrc`, with its
    submodule:
 
@@ -19,7 +19,7 @@ need a world project to develop it in:
 3. Open the project in Unity.
 
 The submodule is [Udon Test Kit](https://tsvrc.com/docs/udon-test-kit/intro), at
-`Tests/UdonTestKit`, pinned to the commit Core is tested with. Core's editor code and tests
+`Tests/UdonTestKit`, pinned to the commit Core is tested with. The Core editor code and tests
 build on it, and a release lists it as a dependency instead of shipping it. Don't also install
 the kit through the Creator Companion in the same project: two copies stop it compiling.
 
@@ -40,7 +40,7 @@ run **Tools > TsVRC > Udon Test Kit > Fix ClientSim Project Settings** once in y
 
 ### From the command line (Windows)
 
-Close the Unity Editor, then run the kit's script with Core's two test assemblies:
+Close the Unity Editor, then run the kit's script with the two Core test assemblies:
 
 ```powershell
 .\Assets\Tsvrc\Tests\UdonTestKit\Scripts~\Invoke-UnityTests.ps1 -AssemblyNames "Tsvrc.Tests.EditMode;Tsvrc.Tests.PlayMode"

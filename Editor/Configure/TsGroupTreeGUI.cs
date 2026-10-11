@@ -367,7 +367,7 @@ namespace Tsvrc.Editor
 
             // Always the selected group's own direct entries, never widened to its subtree - the
             // tree's own search results are already flat (only groups that directly contain a
-            // match), so widening here used to pull in sibling/descendant groups' entries too.
+            // match), so widening here used to pull in sibling/descendant groups entries too.
             bool scopeChanged = state.LastEntriesPageGroupId != state.SelectedGroupId ||
                 state.LastEntriesPageSearchText != state.SearchText;
             var indices = new List<int>();
@@ -718,7 +718,7 @@ namespace Tsvrc.Editor
             }
 
             // A group is a search result if its own name matches, or it has a direct entry whose
-            // name matches - not "or a descendant matches" (see BuildRows' own comment). Internal
+            // name matches - not "or a descendant matches" (see BuildRows own comment). Internal
             // (not private) and takes searchText as a parameter rather than reading the instance
             // searchString, so it's directly unit-testable.
             internal static HashSet<int> ComputeDirectMatches(Dictionary<int, GroupInfo> groups,

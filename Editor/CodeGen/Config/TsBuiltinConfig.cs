@@ -37,7 +37,7 @@ namespace Tsvrc.Editor
         public TsGroupedEntry[] FactoryEntries;
 
         /// <summary>Nested groups organizing <see cref="FactoryEntries"/>.</summary>
-        [Tooltip("Nested groups organizing FactoryEntries. Each group's (and its ancestors') name becomes a prefix on the generated Create method name for prefabs inside it.")]
+        [Tooltip("Nested groups organizing FactoryEntries. Each group's (and its ancestors) name becomes a prefix on the generated Create method name for prefabs inside it.")]
         public TsGroup[] FactoryGroups;
 
         /// <summary>The next unused id to assign in <see cref="FactoryGroups"/>.</summary>

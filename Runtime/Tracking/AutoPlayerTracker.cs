@@ -62,7 +62,7 @@ namespace Tsvrc.Tracking
         /// Any player still mid-joining at this instant has not yet fired their
         /// <c>OnPlayerJoined</c>; it will fire after the process starts and be handled there.
         ///
-        /// UdonSharp runs on Unity's single main thread, so no <c>OnPlayerJoined</c> event
+        /// UdonSharp runs on the single Unity main thread, so no <c>OnPlayerJoined</c> event
         /// can interleave between <c>GetAllPlayerIDs()</c> and the process going live.
         /// </remarks>
         public void StartAutoTracking()

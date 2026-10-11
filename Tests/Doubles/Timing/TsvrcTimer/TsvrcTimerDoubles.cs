@@ -6,7 +6,7 @@ namespace Tsvrc.Tests.EditMode
 {
     // TsvrcTimer carries Process's [UdonBehaviourSyncMode] attribute, so this double
     // lives in Tsvrc.Tests.Doubles for the same reason PlayerTrackerTestSubclass/
-    // ProcessTestSubclass do (see those files' header comments) - AddComponent()
+    // ProcessTestSubclass do (see those files header comments) - AddComponent()
     // silently returns null for such a script when it's defined in an Editor-platform-
     // restricted assembly.
     //

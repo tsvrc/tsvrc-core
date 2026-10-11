@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: PlayerMarkerRenderer
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: c31049ffef4152a41b48541c17e65364,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: 1cf91d33a36ba074c8a7c8d377b26528,
     type: 2}
   udonAssembly: 
   assemblyError: 

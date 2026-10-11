@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c333ccfdd0cbdbc4ca30cef2dd6e6b9b, type: 3}
   m_Name: RasterPlayerMarkerRenderer
   m_EditorClassIdentifier: 
-  serializedUdonProgramAsset: {fileID: 11400000, guid: 46f74f6b50cf4da4abbbb05056e99de0,
+  serializedUdonProgramAsset: {fileID: 11400000, guid: df715b7b2b9ff2e459dd8c62550f609b,
     type: 2}
   udonAssembly: 
   assemblyError: 

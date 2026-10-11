@@ -6,7 +6,7 @@ namespace Tsvrc.Tests.EditMode
     // the tracked/already-ready filters. NetworkCalling.CallingPlayer reads null outside a real
     // dispatch, so the self-only "caller must match playerId" guard here is always skipped in
     // this environment: a direct call for an arbitrary playerId is indistinguishable, from this
-    // class's own guards' point of view, from that id's real owner forwarding their own
+    // class's own guards point of view, from that id's real owner forwarding their own
     // SetReady() call, which is what makes a direct call usable to simulate a remote player's
     // own request landing at the owner.
     public class ReadyCheckProcessBroadcastReadyTests : ReadyCheckProcessTestBase

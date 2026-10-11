@@ -48,7 +48,7 @@ namespace Tsvrc.Tests.EditMode
             // program asset), which itself counts as a change and stops the pass again; the third
             // is the first pass that reaches Wire(), and since this consuming project has a real,
             // live Instance subclass (MolInstance), InstanceModule.Wire() creates its "Instance"
-            // child and program asset for the first time here too. Every priming pass' own
+            // child and program asset for the first time here too. Every priming pass own
             // file/scene writes are a legitimate, externally looking reason for TsAssetWatcher to
             // schedule a rerun, which isn't what this test is about, so _rerunPending is reset
             // after each. Only the fourth pass has nothing left to write, create, or wire for the

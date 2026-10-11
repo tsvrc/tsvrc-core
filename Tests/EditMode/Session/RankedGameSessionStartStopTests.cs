@@ -109,7 +109,7 @@ namespace Tsvrc.Tests.EditMode
         }
 
         // Regression test: a caller that already knows a player is present can union them into
-        // the snapshot without waiting on LobbyPlayerIds' network round-trip.
+        // the snapshot without waiting on LobbyPlayerIds network round-trip.
         [Test]
         public void StartSession_AdditionalKnownPresentPlayerIds_UnionedIntoSnapshot()
         {
@@ -290,7 +290,7 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void AddLoadingParticipant_AlreadyTrackedPlayer_NoOps()
         {
-            // Mirrors AddTrackedPlayers' own silent-ignore behavior for a duplicate id -
+            // Mirrors AddTrackedPlayers own silent-ignore behavior for a duplicate id -
             // calling this for a player already part of the original StartSession snapshot
             // must not corrupt the roster or double-count them.
             var h = CreateWiredSession();

@@ -124,7 +124,7 @@ namespace Tsvrc.Editor
             => ResolveEntries(inputs, Policy);
 
         // A construct's field name is always its component type name, already a valid identifier;
-        // duplicates of the same type are disambiguated by ResolveEntries' own suffix dedup.
+        // duplicates of the same type are disambiguated by ResolveEntries own suffix dedup.
         private static string ConstructPrimaryName(string typeName, string goName) => typeName;
 
         private static string FieldName(string name) => $"_construct{name}";

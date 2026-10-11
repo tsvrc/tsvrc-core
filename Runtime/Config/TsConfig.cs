@@ -27,7 +27,7 @@ namespace Tsvrc.Config
         public TsGroupedEntry[] GlobalEntries;
 
         /// <summary>Nested groups organizing <see cref="GlobalEntries"/>. Organizational by default; a group can opt into namespacing via <see cref="TsGroup.IncludeInName"/>.</summary>
-        [Tooltip("Nested groups organizing GlobalEntries. Organizational by default - toggle 'Namespace with group name' on a group to prefix its entries' generated member names (e.g. _ts.EnemiesSpawner).")]
+        [Tooltip("Nested groups organizing GlobalEntries. Organizational by default - toggle 'Namespace with group name' on a group to prefix its entries generated member names (e.g. _ts.EnemiesSpawner).")]
         public TsGroup[] GlobalGroups;
 
         /// <summary>The next unused id to assign in <see cref="GlobalGroups"/>.</summary>
@@ -49,7 +49,7 @@ namespace Tsvrc.Config
         public TsGroupedEntry[] ConstructEntries;
 
         /// <summary>Nested groups organizing <see cref="ConstructEntries"/>. Organizational by default; a group can opt into namespacing via <see cref="TsGroup.IncludeInName"/>.</summary>
-        [Tooltip("Nested groups organizing ConstructEntries. Organizational by default - toggle 'Namespace with group name' on a group to prefix its entries' generated member names.")]
+        [Tooltip("Nested groups organizing ConstructEntries. Organizational by default - toggle 'Namespace with group name' on a group to prefix its entries generated member names.")]
         public TsGroup[] ConstructGroups;
 
         /// <summary>The next unused id to assign in <see cref="ConstructGroups"/>.</summary>
@@ -60,7 +60,7 @@ namespace Tsvrc.Config
         public TsGroupedEntry[] FactoryEntries;
 
         /// <summary>Nested groups organizing <see cref="FactoryEntries"/>. Each group's ancestor chain becomes a prefix on the generated Create method name for prefabs inside it.</summary>
-        [Tooltip("Nested groups organizing FactoryEntries. Each group's (and its ancestors') name becomes a prefix on the generated Create method name for prefabs inside it.")]
+        [Tooltip("Nested groups organizing FactoryEntries. Each group's (and its ancestors) name becomes a prefix on the generated Create method name for prefabs inside it.")]
         public TsGroup[] FactoryGroups;
 
         /// <summary>The next unused id to assign in <see cref="FactoryGroups"/>.</summary>

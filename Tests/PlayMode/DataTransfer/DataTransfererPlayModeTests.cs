@@ -126,7 +126,7 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
             transferer.TransferData(BuildString(3000), new[] { stayingId, leavingId });
 
             // Neither remote target is the local player, so nothing auto-acks; mark both
-            // targets' chunks received directly instead.
+            // targets chunks received directly instead.
             transferer.BroadcastAddReadyPlayer(stayingId);
             transferer.BroadcastAddReadyPlayer(leavingId);
 
