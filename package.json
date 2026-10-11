@@ -4,6 +4,13 @@
   "version": "0.1.3",
   "unity": "2022.3",
   "description": "Open-source UdonSharp framework for VRChat worlds: structured initialization, dependency wiring, and editor codegen.",
+  "keywords": [
+    "vrchat",
+    "udon",
+    "udonsharp",
+    "code-generation",
+    "dependency-injection"
+  ],
   "license": "Apache-2.0",
   "author": {
     "name": "TsVRC",
@@ -14,5 +21,6 @@
     "com.vrchat.worlds": "3.10.x",
     "com.tsvrc.udon-test-kit": "^1.0.0"
   },
+  "documentationUrl": "https://tsvrc.com/docs/core/intro",
   "changelogUrl": "https://github.com/tsvrc/tsvrc-core/releases"
 }
