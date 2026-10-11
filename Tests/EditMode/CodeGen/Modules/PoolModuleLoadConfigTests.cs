@@ -4,7 +4,7 @@ using NUnit.Framework;
 using Tsvrc.Config;
 using Tsvrc.Editor;
 using Tsvrc.StateMachine;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UdonSharp;
 using UnityEditor;
 using UnityEngine;

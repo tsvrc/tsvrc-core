@@ -1,6 +1,6 @@
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Tracking;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using UnityEngine;
 
@@ -285,7 +285,7 @@ namespace Tsvrc.Tests.EditMode
         // inside it - runs. Every OnReadyCheck*Event's own doc comment says "Read LastPlayerIds
         // in your callback"; the following three tests pin that the data is actually already
         // correct at that point, not just that the hooks fire in the right relative order
-        // (already covered by the EventOrdering tests above). Mirrors PlayerTrackerLifecycleTests'
+        // (already covered by the EventOrdering tests above). Mirrors PlayerTrackerLifecycleTests
         // own LastPlayerIdsInsideOnTracking*-style pattern, one level further in for this class's
         // own, earlier-firing hooks.
 

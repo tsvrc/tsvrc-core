@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using Tsvrc.Player;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode

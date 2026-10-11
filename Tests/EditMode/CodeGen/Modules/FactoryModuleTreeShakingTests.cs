@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Tsvrc.Config;
 using Tsvrc.Editor;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -13,12 +13,12 @@ namespace Tsvrc.Tests.EditMode
     // FactoryModule.LoadConfig()'s tree-shaking gate (TsModule.ApplyTreeShaking). A Factory
     // entry's usage signature is its generated Create{Name}(...) call site
     // (TsUsageScanner.IsMethodCallReferenced), not a bare member access, so this gets its own
-    // file rather than sharing GlobalModuleTreeShakingTests' fixture.
+    // file rather than sharing GlobalModuleTreeShakingTests fixture.
     //
     // Tsvrc ships its own real Assets/Tsvrc/Runtime/Config/TsBuiltinConfig.asset with real
     // builtin Factory prefabs. Those flow through the same tree-shaking filter as this file's own
     // scratch prefab, so assertions here only check for the presence/absence of this file's own
-    // entry rather than exact totals, matching FactoryModuleLoadConfigTests' own style.
+    // entry rather than exact totals, matching FactoryModuleLoadConfigTests own style.
     public class FactoryModuleTreeShakingTests
     {
         private const string SnapshotKey = "FactoryModule";

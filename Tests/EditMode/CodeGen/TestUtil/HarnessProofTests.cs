@@ -3,7 +3,7 @@ using NUnit.Framework;
 using Tsvrc.Config;
 using Tsvrc.Core.Generated;
 using Tsvrc.Editor;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEditor;
 using UnityEngine;
 

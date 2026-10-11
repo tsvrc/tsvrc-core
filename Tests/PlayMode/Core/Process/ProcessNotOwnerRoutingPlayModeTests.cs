@@ -1,7 +1,7 @@
 using System.Collections;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.Doubles;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
 
@@ -11,26 +11,19 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
     // Can't be reached in EditMode, where IsOwner defaults true - that owner half lives in
     // ProcessLifecycleTests/ProcessNetworkCallableTests instead.
     //
-    // A bare AddComponent<Process>() has no IClientSimSyncable, so ClientSimPlayerManager.IsOwner
-    // falls back to comparing against the instance master, true by default for the local client.
-    // Each test attaches FakeOwnershipSyncable via MakeGenuinelyNotOwner to override that.
+    // ClientSim makes the master the owner of every GameObject without VRCObjectSync or
+    // VRCObjectPool, so each test hands the process to a remote player with Session.SetOwner.
     public class ProcessNotOwnerRoutingPlayModeTests : ProcessPlayModeTestBase
     {
         [UnityTest]
         public IEnumerator StartProcess_GenuinelyNotOwner_ForwardsInsteadOfExecutingLocally()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: the spawned remote player was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotOwner(process, remote);
-            Assert.IsFalse(Networking.IsOwner(process.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+            Session.SetOwner(remote, process.gameObject);
 
             process.StartProcess();
 
@@ -43,18 +36,12 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
         [UnityTest]
         public IEnumerator RequestStartProcess_GenuinelyNotOwner_DiscardsWithoutExecuting()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: the spawned remote player was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotOwner(process, remote);
-            Assert.IsFalse(Networking.IsOwner(process.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+            Session.SetOwner(remote, process.gameObject);
 
             process.RequestStartProcess(false);
 
@@ -64,22 +51,15 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
         }
 
         [UnityTest]
-        public IEnumerator StopProcess_GenuinelyNotProcessOwnerAndNotOwner_ForwardsInsteadOfExecutingLocally()
+        public IEnumerator StopProcess_GenuinelyNotOwner_ForwardsInsteadOfExecutingLocally()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: the spawned remote player was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotOwner(process, remote);
             process.StartProcess(useProcessUpdate: false);
-            PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
-            Assert.IsFalse(Networking.IsOwner(process.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+            Session.SetOwner(remote, process.gameObject);
 
             process.StopProcess();
 
@@ -90,48 +70,34 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
         }
 
         [UnityTest]
-        public IEnumerator RequestStopProcess_GenuinelyNotProcessOwnerAndNotOwner_DiscardsWithoutExecuting()
+        public IEnumerator RequestStopProcess_GenuinelyNotOwner_DiscardsWithoutExecuting()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: the spawned remote player was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotOwner(process, remote);
             process.StartProcess(useProcessUpdate: false);
-            PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
-            Assert.IsFalse(Networking.IsOwner(process.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+            Session.SetOwner(remote, process.gameObject);
 
             process.RequestStopProcess(PrivateFieldAccess.GetField<int>(process, "_runGeneration"));
 
             Assert.IsTrue(process.IsProcessRunning(),
                 "A misrouted RequestStopProcess call must be discarded when the local player is genuinely " +
-                "neither the named process owner nor the real owner.");
+                "not the real owner.");
             Assert.AreEqual(0, process.OnProcessStoppedCount);
         }
 
         [UnityTest]
-        public IEnumerator CompleteProcess_GenuinelyNotProcessOwnerAndNotOwner_ForwardsInsteadOfExecutingLocally()
+        public IEnumerator CompleteProcess_GenuinelyNotOwner_ForwardsInsteadOfExecutingLocally()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: the spawned remote player was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotOwner(process, remote);
             process.StartProcess(useProcessUpdate: false);
-            PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
-            Assert.IsFalse(Networking.IsOwner(process.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+            Session.SetOwner(remote, process.gameObject);
 
             process.CompleteProcess();
 
@@ -142,28 +108,21 @@ namespace Tsvrc.Tests.PlayMode.Core.Process
         }
 
         [UnityTest]
-        public IEnumerator RequestCompleteProcess_GenuinelyNotProcessOwnerAndNotOwner_DiscardsWithoutExecuting()
+        public IEnumerator RequestCompleteProcess_GenuinelyNotOwner_DiscardsWithoutExecuting()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: the spawned remote player was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
 
             var process = CreateProcess<ProcessTestSubclass>();
             process.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
-            MakeGenuinelyNotOwner(process, remote);
             process.StartProcess(useProcessUpdate: false);
-            PrivateFieldAccess.InvokeInstance(process, "SetProcessOwner", remote);
-            Assert.IsFalse(Networking.IsOwner(process.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+            Session.SetOwner(remote, process.gameObject);
 
             process.RequestCompleteProcess(PrivateFieldAccess.GetField<int>(process, "_runGeneration"));
 
             Assert.IsTrue(process.IsProcessRunning(),
                 "A misrouted RequestCompleteProcess call must be discarded when the local player is genuinely " +
-                "neither the named process owner nor the real owner.");
+                "not the real owner.");
             Assert.AreEqual(0, process.OnProcessCompletedCount);
         }
     }

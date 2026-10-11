@@ -50,7 +50,7 @@ namespace Tsvrc.Tests.EditMode
         }
 
         // Missing-field/malformed-JSON error paths are TranslationModule.ParseLanguageJson's own
-        // behavior, already covered by TranslationParsingTests' ParseLanguageJson_* tests -
+        // behavior, already covered by TranslationParsingTests ParseLanguageJson_* tests -
         // PeekKeyLabel just forwards to it, so re-testing that matrix here would be redundant.
 
         [Test]

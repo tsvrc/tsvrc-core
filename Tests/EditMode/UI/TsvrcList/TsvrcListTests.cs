@@ -1,8 +1,8 @@
 using NUnit.Framework;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using Tsvrc.Testing.Framework;
 using Tsvrc.UI;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using UnityEngine;
 using VRC.SDK3.Data;
@@ -474,34 +474,30 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void OnItemSelected_SetsSelectedIndexAndEmitsEvent()
         {
+            using var calls = new CallLog();
             TsvrcList list = CreateList();
-            var listenerGO = new GameObject("Listener");
-            _spawned.Add(listenerGO);
-            var listener = listenerGO.AddComponent<TsListenerDouble>();
-            list.TsSubscribe(listener, TsvrcList.OnItemSelectedEvent, nameof(TsListenerDouble.CallbackA));
+            list.TsSubscribe(calls.CreateSpy("Listener"), TsvrcList.OnItemSelectedEvent, nameof(CallbackSpy.CallbackA));
 
             list.OnItemSelected(2);
 
             Assert.AreEqual(2, list.SelectedIndex);
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
         }
 
         [Test]
         public void OnItemSelected_IndexOutOfDataRange_NotValidatedAndStillSetsAndEmits()
         {
             // Documents current behavior: OnItemSelected performs no bounds checking
-            // against the current dataset — any int is accepted and emitted as-is.
+            // against the current dataset - any int is accepted and emitted as-is.
+            using var calls = new CallLog();
             TsvrcList list = CreateList();
             list.SetData(MakeData(2));
-            var listenerGO = new GameObject("Listener");
-            _spawned.Add(listenerGO);
-            var listener = listenerGO.AddComponent<TsListenerDouble>();
-            list.TsSubscribe(listener, TsvrcList.OnItemSelectedEvent, nameof(TsListenerDouble.CallbackA));
+            list.TsSubscribe(calls.CreateSpy("Listener"), TsvrcList.OnItemSelectedEvent, nameof(CallbackSpy.CallbackA));
 
             list.OnItemSelected(9999);
 
             Assert.AreEqual(9999, list.SelectedIndex);
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
         }
 
         [Test]

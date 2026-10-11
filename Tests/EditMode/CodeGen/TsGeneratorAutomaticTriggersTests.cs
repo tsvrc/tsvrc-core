@@ -1,49 +1,26 @@
 using NUnit.Framework;
 using Tsvrc.Editor;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // TsGenerator.ComputeIsAutomatedTestProcess() / SuppressAutomaticTriggers() /
-    // AutomaticTriggersSuppressed: the single mechanism that stops TsGenerator's reactive
-    // hierarchyChanged/asset-watcher triggers from regenerating TsGenerated against whatever
-    // scene a test run happens to have open. See TsDomainReloadHandler and the two
-    // AutomaticTriggersSetUpFixture classes (Tests/EditMode, Tests/PlayMode) for how
-    // this is actually armed for a real test run - the tests below exercise the primitives
-    // directly instead.
+    // SuppressAutomaticTriggers() / AutomaticTriggersSuppressed: what stops TsGenerator's
+    // reactive hierarchyChanged/asset-watcher triggers from regenerating TsGenerated against
+    // whatever scene a test run happens to have open.
     //
-    // AutomaticTriggersSuppressed is not directly assertable as false in this suite: this very
-    // assembly's own AutomaticTriggersSetUpFixture holds a permanent scope for the
-    // whole run, and under a real -runTests batchmode invocation ComputeIsAutomatedTestProcess
-    // would independently make it true anyway. Every test below is written to hold regardless of
-    // that baseline, asserting relative changes in _suppressionDepth rather than an absolute
-    // "currently unsuppressed" state.
+    // AutomaticTriggersSuppressed is true for this whole suite, since a test run is in progress,
+    // so the scope tests below assert relative changes in _suppressionDepth rather than an
+    // absolute "currently unsuppressed" state.
     public class TsGeneratorAutomaticTriggersTests
     {
         [Test]
-        public void ComputeIsAutomatedTestProcess_RunTestsFlagPresent_ReturnsTrue()
+        public void AutomaticTriggersSuppressed_DuringATestRunWithNoScopeHeld_IsTrue()
         {
-            Assert.IsTrue(TsGenerator.ComputeIsAutomatedTestProcess(
-                new[] { "Unity.exe", "-batchmode", "-runTests", "-testPlatform", "EditMode" }));
-        }
+            Assume.That(PrivateFieldAccess.GetField<int>(typeof(TsGenerator), "_suppressionDepth"), Is.EqualTo(0));
 
-        [Test]
-        public void ComputeIsAutomatedTestProcess_RunTestsFlagPresent_IsCaseInsensitive()
-        {
-            Assert.IsTrue(TsGenerator.ComputeIsAutomatedTestProcess(new[] { "-RUNTESTS" }));
-        }
-
-        [Test]
-        public void ComputeIsAutomatedTestProcess_NoRunTestsFlag_ReturnsFalse()
-        {
-            Assert.IsFalse(TsGenerator.ComputeIsAutomatedTestProcess(
-                new[] { "Unity.exe", "-batchmode", "-quit" }));
-        }
-
-        [Test]
-        public void ComputeIsAutomatedTestProcess_EmptyArgs_ReturnsFalse()
-        {
-            Assert.IsFalse(TsGenerator.ComputeIsAutomatedTestProcess(new string[0]));
+            Assert.IsTrue(TsGenerator.AutomaticTriggersSuppressed,
+                "A test run's scenes never hold the project's real TsConfig, so the reactive triggers " +
+                "must hold back for the whole run without any scope being taken.");
         }
 
         [Test]

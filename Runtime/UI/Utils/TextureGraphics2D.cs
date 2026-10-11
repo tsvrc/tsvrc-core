@@ -178,7 +178,7 @@ namespace Tsvrc.UI.Utils
         /// <summary>
         /// Draws a filled, heading-aware triangle directly into a pre-allocated <see cref="Color32"/>
         /// pixel buffer. The tip points in the direction given by <paramref name="headingDegrees"/>
-        /// (0° = up/north, 90° = right/east clockwise, matching Unity's Y-axis rotation convention).
+        /// (0° = up/north, 90° = right/east clockwise, matching the Unity Y-axis rotation convention).
         /// The triangle is inscribed in a (2×<paramref name="halfWidth"/>) × (2×<paramref name="halfHeight"/>)
         /// bounding box centered on (<paramref name="cx"/>, <paramref name="cy"/>), where y=0 is the
         /// bottom of the buffer (Unity <c>SetPixels32</c> convention).

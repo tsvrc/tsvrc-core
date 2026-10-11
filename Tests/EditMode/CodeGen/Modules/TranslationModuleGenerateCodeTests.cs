@@ -2,7 +2,7 @@ using NUnit.Framework;
 using System.Collections.Generic;
 using System;
 using Tsvrc.Editor;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 
 namespace Tsvrc.Tests.EditMode
 {

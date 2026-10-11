@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using Tsvrc.StateMachine;
+using Tsvrc.UdonTestKit;
 using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
@@ -85,7 +86,7 @@ namespace Tsvrc.Tests.EditMode
         public void SetState_NullTarget_DispatchSkippedSilently()
         {
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            manager.RegisterState(StateA, null, nameof(StateTargetDouble.EnterA));
+            manager.RegisterState(StateA, null, nameof(StateTargetSpy.EnterA));
 
             Assert.DoesNotThrow(() => manager.SetState(StateA));
             Assert.AreEqual(StateA, manager.CurrentState);
@@ -94,57 +95,59 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void RegisterState_ExplicitTarget_DispatchesOnThatTargetNotTheManager()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var target = CreateBehaviour<StateTargetDouble>();
-            manager.RegisterState(StateA, enterMethod: nameof(StateTargetDouble.EnterA), target: target);
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
+            manager.RegisterState(StateA, enterMethod: nameof(StateTargetSpy.EnterA), target: target);
 
             manager.SetState(StateA);
 
-            Assert.AreEqual(1, target.EnterACount);
+            CollectionAssert.AreEqual(new[] { "Target.EnterA" }, calls);
         }
 
         [Test]
         public void RegisterState_NullEnterAndExitMethods_TreatedAsEmptyAndNeverDispatched()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var target = CreateBehaviour<StateTargetDouble>();
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
             manager.RegisterState(StateA, target: target);
             manager.RegisterState(StateB, target: target);
 
             manager.SetState(StateA);
             manager.SetState(StateB);
 
-            Assert.AreEqual(0, target.EnterACount);
-            Assert.AreEqual(0, target.ExitACount);
+            CollectionAssert.IsEmpty(calls);
         }
 
         [Test]
         public void RegisterState_ReRegisterSameState_OverwritesPreviousEntryEntirely()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var oldTarget = CreateBehaviour<StateTargetDouble>("Old");
-            var newTarget = CreateBehaviour<StateTargetDouble>("New");
-            manager.RegisterState(StateA, enterMethod: nameof(StateTargetDouble.EnterA), target: oldTarget);
+            var oldTarget = calls.CreateSpy<StateTargetSpy>("Old");
+            var newTarget = calls.CreateSpy<StateTargetSpy>("New");
+            manager.RegisterState(StateA, enterMethod: nameof(StateTargetSpy.EnterA), target: oldTarget);
 
-            manager.RegisterState(StateA, enterMethod: nameof(StateTargetDouble.EnterB), target: newTarget);
+            manager.RegisterState(StateA, enterMethod: nameof(StateTargetSpy.EnterB), target: newTarget);
             manager.SetState(StateA);
 
-            Assert.AreEqual(0, oldTarget.EnterACount, "Old registration must be fully replaced, not merged.");
-            Assert.AreEqual(1, newTarget.EnterBCount);
+            CollectionAssert.AreEqual(new[] { "New.EnterB" }, calls, "Old registration must be fully replaced, not merged.");
         }
 
         [Test]
         public void UnregisterState_RemovesEntry_SubsequentTransitionSkipsExitWithoutThrowing()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var target = CreateBehaviour<StateTargetDouble>();
-            manager.RegisterState(StateA, exitMethod: nameof(StateTargetDouble.ExitA), target: target);
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
+            manager.RegisterState(StateA, exitMethod: nameof(StateTargetSpy.ExitA), target: target);
             manager.SetState(StateA);
 
             manager.UnregisterState(StateA);
 
             Assert.DoesNotThrow(() => manager.SetState(StateB));
-            Assert.AreEqual(0, target.ExitACount);
+            CollectionAssert.IsEmpty(calls);
         }
 
         [Test]
@@ -162,33 +165,33 @@ namespace Tsvrc.Tests.EditMode
             // snapshot frozen when a state was entered. Re-registering the currently
             // active state changes what fires on the *next* exit from it, even though
             // enter already ran (or didn't run at all here) under the old registration.
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var oldTarget = CreateBehaviour<StateTargetDouble>("Old");
-            var newTarget = CreateBehaviour<StateTargetDouble>("New");
-            manager.RegisterState(StateA, exitMethod: nameof(StateTargetDouble.ExitA), target: oldTarget);
+            var oldTarget = calls.CreateSpy<StateTargetSpy>("Old");
+            var newTarget = calls.CreateSpy<StateTargetSpy>("New");
+            manager.RegisterState(StateA, exitMethod: nameof(StateTargetSpy.ExitA), target: oldTarget);
             manager.SetState(StateA);
 
-            manager.RegisterState(StateA, exitMethod: nameof(StateTargetDouble.ExitB), target: newTarget);
+            manager.RegisterState(StateA, exitMethod: nameof(StateTargetSpy.ExitB), target: newTarget);
             manager.SetState(StateB);
 
-            Assert.AreEqual(0, oldTarget.ExitACount);
-            Assert.AreEqual(1, newTarget.ExitBCount);
+            CollectionAssert.AreEqual(new[] { "New.ExitB" }, calls);
         }
 
         [Test]
         public void SetState_SameAsCurrentState_IsANoOp()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var target = CreateBehaviour<StateTargetDouble>();
-            manager.RegisterState(StateA, target, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
+            manager.RegisterState(StateA, target, nameof(StateTargetSpy.EnterA), nameof(StateTargetSpy.ExitA));
             manager.SetState(StateA);
             int callsAfterFirstEntry = manager.OnStateChangedCallCount;
 
             manager.SetState(StateA);
 
             Assert.AreEqual(callsAfterFirstEntry, manager.OnStateChangedCallCount);
-            Assert.AreEqual(1, target.EnterACount);
-            Assert.AreEqual(0, target.ExitACount);
+            CollectionAssert.AreEqual(new[] { "Target.EnterA" }, calls);
         }
 
         [Test]
@@ -198,46 +201,46 @@ namespace Tsvrc.Tests.EditMode
             // id. Because _currentState starts at -1, SetState(-1) short-circuits on
             // the same-state check before ever consulting _stateData, so a registered
             // state -1 can never actually be entered via SetState.
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var target = CreateBehaviour<StateTargetDouble>();
-            manager.RegisterState(-1, enterMethod: nameof(StateTargetDouble.EnterA), target: target);
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
+            manager.RegisterState(-1, enterMethod: nameof(StateTargetSpy.EnterA), target: target);
 
             manager.SetState(-1);
 
             Assert.AreEqual(-1, manager.CurrentState);
             Assert.AreEqual(-1, manager.PreviousState);
-            Assert.AreEqual(0, target.EnterACount);
+            CollectionAssert.IsEmpty(calls);
             Assert.AreEqual(0, manager.OnStateChangedCallCount);
         }
 
         [Test]
         public void SetState_FirstTransitionFromUnsetState_NoExitDispatched_OnlyEnter()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var target = CreateBehaviour<StateTargetDouble>();
-            manager.RegisterState(StateA, target, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
+            manager.RegisterState(StateA, target, nameof(StateTargetSpy.EnterA), nameof(StateTargetSpy.ExitA));
 
             manager.SetState(StateA);
 
-            Assert.AreEqual(1, target.EnterACount);
-            Assert.AreEqual(0, target.ExitACount);
+            CollectionAssert.AreEqual(new[] { "Target.EnterA" }, calls);
         }
 
         [Test]
         public void SetState_TransitionBetweenTwoRegisteredStates_ExitThenEnterInOrder()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var log = new List<string>();
-            var target = CreateBehaviour<StateTargetDouble>();
-            target.Log = log;
-            manager.RegisterState(StateA, target, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
-            manager.RegisterState(StateB, target, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB));
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
+            manager.RegisterState(StateA, target, nameof(StateTargetSpy.EnterA), nameof(StateTargetSpy.ExitA));
+            manager.RegisterState(StateB, target, nameof(StateTargetSpy.EnterB), nameof(StateTargetSpy.ExitB));
             manager.SetState(StateA);
-            log.Clear();
+            calls.Clear();
 
             manager.SetState(StateB);
 
-            Assert.AreEqual(new[] { $"{target.name}.ExitA", $"{target.name}.EnterB" }, log.ToArray());
+            CollectionAssert.AreEqual(new[] { "Target.ExitA", "Target.EnterB" }, calls);
         }
 
         [Test]
@@ -288,42 +291,44 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void SetState_EmptyEnterMethodOnRegisteredState_SkipsEnterDispatch()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var target = CreateBehaviour<StateTargetDouble>();
-            manager.RegisterState(StateA, exitMethod: nameof(StateTargetDouble.ExitA), target: target);
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
+            manager.RegisterState(StateA, exitMethod: nameof(StateTargetSpy.ExitA), target: target);
 
             Assert.DoesNotThrow(() => manager.SetState(StateA));
-            Assert.AreEqual(0, target.EnterACount);
+            CollectionAssert.IsEmpty(calls);
         }
 
         [Test]
         public void SetState_EmptyExitMethodOnRegisteredState_SkipsExitDispatch()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var target = CreateBehaviour<StateTargetDouble>();
-            manager.RegisterState(StateA, enterMethod: nameof(StateTargetDouble.EnterA), target: target);
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
+            manager.RegisterState(StateA, enterMethod: nameof(StateTargetSpy.EnterA), target: target);
             manager.SetState(StateA);
+            calls.Clear();
 
             Assert.DoesNotThrow(() => manager.SetState(StateB));
-            Assert.AreEqual(0, target.ExitACount);
+            CollectionAssert.IsEmpty(calls);
         }
 
         [Test]
         public void SetState_MixedTargetsAcrossStates_EachDispatchesOnlyToItsOwnTarget()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var targetA = CreateBehaviour<StateTargetDouble>("TargetA");
-            var targetB = CreateBehaviour<StateTargetDouble>("TargetB");
-            manager.RegisterState(StateA, targetA, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
-            manager.RegisterState(StateB, targetB, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB));
+            var targetA = calls.CreateSpy<StateTargetSpy>("TargetA");
+            var targetB = calls.CreateSpy<StateTargetSpy>("TargetB");
+            manager.RegisterState(StateA, targetA, nameof(StateTargetSpy.EnterA), nameof(StateTargetSpy.ExitA));
+            manager.RegisterState(StateB, targetB, nameof(StateTargetSpy.EnterB), nameof(StateTargetSpy.ExitB));
             manager.SetState(StateA);
+            calls.Clear();
 
             manager.SetState(StateB);
 
-            Assert.AreEqual(1, targetA.ExitACount);
-            Assert.AreEqual(0, targetA.EnterBCount);
-            Assert.AreEqual(1, targetB.EnterBCount);
-            Assert.AreEqual(0, targetB.ExitACount);
+            CollectionAssert.AreEqual(new[] { "TargetA.ExitA", "TargetB.EnterB" }, calls);
         }
 
         [Test]
@@ -341,74 +346,69 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void SetState_OnStateChanged_FiresBeforeEnterDispatchOfNewState()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var target = CreateBehaviour<StateTargetDouble>();
-            manager.RegisterState(StateA, enterMethod: nameof(StateTargetDouble.EnterA), target: target);
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
+            manager.RegisterState(StateA, enterMethod: nameof(StateTargetSpy.EnterA), target: target);
 
             manager.SetState(StateA);
 
             Assert.AreEqual(1, manager.OnStateChangedCallCount);
-            Assert.AreEqual(1, target.EnterACount);
+            CollectionAssert.AreEqual(new[] { "Target.EnterA" }, calls);
         }
 
         [Test]
         public void SetState_FullDispatchOrder_ExitThenOnStateChangedThenTsEmitThenEnter()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var log = new List<string>();
-            var target = CreateBehaviour<StateTargetDouble>();
-            target.Log = log;
-            var externalListener = CreateBehaviour<TsListenerDouble>("External");
-            externalListener.Log = log;
-            manager.RegisterState(StateA, target, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
-            manager.RegisterState(StateB, target, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB));
-            manager.TsSubscribe(externalListener, "OnStateChanged", nameof(TsListenerDouble.CallbackA));
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
+            manager.RegisterState(StateA, target, nameof(StateTargetSpy.EnterA), nameof(StateTargetSpy.ExitA));
+            manager.RegisterState(StateB, target, nameof(StateTargetSpy.EnterB), nameof(StateTargetSpy.ExitB));
+            manager.TsSubscribe(calls.CreateSpy("External"), "OnStateChanged", nameof(CallbackSpy.CallbackA));
             manager.SetState(StateA);
-            log.Clear();
+            calls.Clear();
 
             manager.SetState(StateB);
 
-            Assert.AreEqual(
-                new[] { $"{target.name}.ExitA", "External.CallbackA", $"{target.name}.EnterB" },
-                log.ToArray());
+            CollectionAssert.AreEqual(new[] { "Target.ExitA", "External.CallbackA", "Target.EnterB" }, calls);
         }
 
         [Test]
         public void SetState_TsEmit_NotifiesExternalTsSubscribeSubscribers()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var listener = CreateBehaviour<TsListenerDouble>();
-            manager.TsSubscribe(listener, "OnStateChanged", nameof(TsListenerDouble.CallbackA));
+            manager.TsSubscribe(calls.CreateSpy("Listener"), "OnStateChanged", nameof(CallbackSpy.CallbackA));
 
             manager.SetState(StateA);
             manager.SetState(StateB);
 
-            Assert.AreEqual(2, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA", "Listener.CallbackA" }, calls);
         }
 
         [Test]
         public void SetState_TsEmit_DoesNotNotifySubscribersOfDifferentEventNames()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var listener = CreateBehaviour<TsListenerDouble>();
-            manager.TsSubscribe(listener, "SomeOtherEvent", nameof(TsListenerDouble.CallbackA));
+            manager.TsSubscribe(calls.CreateSpy("Listener"), "SomeOtherEvent", nameof(CallbackSpy.CallbackA));
 
             manager.SetState(StateA);
 
-            Assert.AreEqual(0, listener.CallbackACount);
+            CollectionAssert.IsEmpty(calls);
         }
 
         [Test]
         public void SetState_ExitTargetGameObjectDestroyedBeforeTransition_IsSkippedSilently()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var targetGo = new GameObject("DestroyedExitTarget");
-            _spawned.Add(targetGo);
-            var target = targetGo.AddComponent<StateTargetDouble>();
-            manager.RegisterState(StateA, exitMethod: nameof(StateTargetDouble.ExitA), target: target);
+            var target = calls.CreateSpy<StateTargetSpy>("DestroyedExitTarget");
+            manager.RegisterState(StateA, exitMethod: nameof(StateTargetSpy.ExitA), target: target);
             manager.SetState(StateA);
 
-            Object.DestroyImmediate(targetGo);
+            Object.DestroyImmediate(target.gameObject);
 
             Assert.DoesNotThrow(() => manager.SetState(StateB));
             Assert.AreEqual(StateB, manager.CurrentState);
@@ -417,13 +417,12 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void SetState_EnterTargetGameObjectDestroyedBeforeTransition_IsSkippedSilently()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var targetGo = new GameObject("DestroyedEnterTarget");
-            _spawned.Add(targetGo);
-            var target = targetGo.AddComponent<StateTargetDouble>();
-            manager.RegisterState(StateB, enterMethod: nameof(StateTargetDouble.EnterB), target: target);
+            var target = calls.CreateSpy<StateTargetSpy>("DestroyedEnterTarget");
+            manager.RegisterState(StateB, enterMethod: nameof(StateTargetSpy.EnterB), target: target);
 
-            Object.DestroyImmediate(targetGo);
+            Object.DestroyImmediate(target.gameObject);
 
             Assert.DoesNotThrow(() => manager.SetState(StateB));
             Assert.AreEqual(StateB, manager.CurrentState);
@@ -432,77 +431,65 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void SetState_DestroyedTargetForOneState_DoesNotPreventOtherStatesFromDispatching()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var destroyedGo = new GameObject("Destroyed");
-            _spawned.Add(destroyedGo);
-            var destroyedTarget = destroyedGo.AddComponent<StateTargetDouble>();
-            var aliveTarget = CreateBehaviour<StateTargetDouble>("Alive");
-            manager.RegisterState(StateA, exitMethod: nameof(StateTargetDouble.ExitA), target: destroyedTarget);
-            manager.RegisterState(StateB, enterMethod: nameof(StateTargetDouble.EnterB), target: aliveTarget);
+            var destroyedTarget = calls.CreateSpy<StateTargetSpy>("Destroyed");
+            var aliveTarget = calls.CreateSpy<StateTargetSpy>("Alive");
+            manager.RegisterState(StateA, exitMethod: nameof(StateTargetSpy.ExitA), target: destroyedTarget);
+            manager.RegisterState(StateB, enterMethod: nameof(StateTargetSpy.EnterB), target: aliveTarget);
             manager.SetState(StateA);
-            Object.DestroyImmediate(destroyedGo);
+            Object.DestroyImmediate(destroyedTarget.gameObject);
 
             manager.SetState(StateB);
 
-            Assert.AreEqual(1, aliveTarget.EnterBCount);
+            CollectionAssert.AreEqual(new[] { "Alive.EnterB" }, calls);
         }
 
         [Test]
         public void SetState_ReentrantFromOnStateChanged_QueuedTransitionRunsAfterCurrentOneFinishes()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerReentrantSubclass>();
-            var log = new List<string>();
-            var target = CreateBehaviour<StateTargetDouble>();
-            target.Log = log;
-            manager.RegisterState(StateA, target, nameof(StateTargetDouble.EnterA), nameof(StateTargetDouble.ExitA));
-            manager.RegisterState(StateB, target, nameof(StateTargetDouble.EnterB), nameof(StateTargetDouble.ExitB));
-            manager.RegisterState(StateC, target, nameof(StateTargetDouble.EnterC), nameof(StateTargetDouble.ExitC));
+            var target = calls.CreateSpy<StateTargetSpy>("Target");
+            manager.RegisterState(StateA, target, nameof(StateTargetSpy.EnterA), nameof(StateTargetSpy.ExitA));
+            manager.RegisterState(StateB, target, nameof(StateTargetSpy.EnterB), nameof(StateTargetSpy.ExitB));
+            manager.RegisterState(StateC, target, nameof(StateTargetSpy.EnterC), nameof(StateTargetSpy.ExitC));
             manager.ArmRedirect = true;
             manager.RedirectFrom = StateB;
             manager.RedirectTo = StateC;
             manager.SetState(StateA);
-            log.Clear();
+            calls.Clear();
 
             // Entering StateB triggers a reentrant SetState(StateC) from OnStateChanged.
             manager.SetState(StateB);
 
             // The reentrant call must be deferred until StateB's own transition (its
             // enter dispatch included) has fully finished, then run as its own complete
-            // transition - not interleaved mid-way through StateB's dispatch.
-            Assert.AreEqual(
-                new[]
-                {
-                    $"{target.name}.ExitA",
-                    $"{target.name}.EnterB",
-                    $"{target.name}.ExitB",
-                    $"{target.name}.EnterC",
-                },
-                log.ToArray());
+            // transition - not interleaved mid-way through StateB's dispatch, and without
+            // StateB's enter firing a second time.
+            CollectionAssert.AreEqual(
+                new[] { "Target.ExitA", "Target.EnterB", "Target.ExitB", "Target.EnterC" },
+                calls);
             Assert.AreEqual(StateC, manager.CurrentState);
             Assert.AreEqual(StateB, manager.PreviousState);
-            Assert.AreEqual(1, target.EnterBCount, "StateB's enter must fire exactly once, not re-fired stale after the nested transition.");
             Assert.AreEqual(new[] { StateA, StateB, StateC }, manager.ObservedNewStates.ToArray());
         }
 
         [Test]
         public void SetState_ReentrantFromEnterMethodTarget_QueuedTransitionRunsAfterCurrentOneFinishes()
         {
+            using var calls = new CallLog();
             var manager = CreateBehaviour<StateManagerTestSubclass>();
-            var log = new List<string>();
-            var redirectTarget = CreateBehaviour<StateTargetDouble>("Redirect");
-            redirectTarget.Log = log;
+            var redirectTarget = calls.CreateSpy<StateTargetSpy>("Redirect");
             redirectTarget.ManagerToRedirect = manager;
             redirectTarget.RedirectTo = StateB;
-            var targetB = CreateBehaviour<StateTargetDouble>("TargetB");
-            targetB.Log = log;
-            manager.RegisterState(StateA, enterMethod: nameof(StateTargetDouble.EnterAndRedirect), target: redirectTarget);
-            manager.RegisterState(StateB, enterMethod: nameof(StateTargetDouble.EnterB), target: targetB);
+            var targetB = calls.CreateSpy<StateTargetSpy>("TargetB");
+            manager.RegisterState(StateA, enterMethod: nameof(StateTargetSpy.EnterAndRedirect), target: redirectTarget);
+            manager.RegisterState(StateB, enterMethod: nameof(StateTargetSpy.EnterB), target: targetB);
 
             manager.SetState(StateA);
 
-            Assert.AreEqual(
-                new[] { "Redirect.EnterAndRedirect", "TargetB.EnterB" },
-                log.ToArray());
+            CollectionAssert.AreEqual(new[] { "Redirect.EnterAndRedirect", "TargetB.EnterB" }, calls);
             Assert.AreEqual(StateB, manager.CurrentState);
             Assert.AreEqual(StateA, manager.PreviousState);
         }

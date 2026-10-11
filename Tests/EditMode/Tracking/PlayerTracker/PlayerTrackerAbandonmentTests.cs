@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -15,7 +15,7 @@ namespace Tsvrc.Tests.EditMode
     // "VRCSDKBase-Editor.dll" but not "VRCSDKBase.dll" (only Tests/PlayMode/
     // Tsvrc.Tests.PlayMode.asmdef does), and VRCPlayerApi is defined in the latter, so a
     // VRCPlayerApi parameter - even a literal `null` - fails to compile in this assembly.
-    // Both methods' "not running" early-return branches are covered in Play Mode instead,
+    // Both methods "not running" early-return branches are covered in Play Mode instead,
     // where the type resolves and a real player is available anyway.
     public class PlayerTrackerAbandonmentTests : PlayerTrackerTestBase
     {

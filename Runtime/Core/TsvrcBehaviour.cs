@@ -22,7 +22,7 @@ namespace Tsvrc.Core
 
         // Logical subscriber count. The three backing arrays above are capacity, not
         // count: TsSubscribe grows them by doubling for amortized O(1) growth. TsEmit
-        // iterates up to this count, not the arrays' Length, so unused trailing
+        // iterates up to this count, not the arrays Length, so unused trailing
         // capacity is never touched.
         private int _subCount;
 

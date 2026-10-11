@@ -1,7 +1,7 @@
 using System.Collections;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
+using Tsvrc.UdonTestKit;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
@@ -14,33 +14,25 @@ namespace Tsvrc.Tests.PlayMode.Player.HeadClipGuard
     // so it is invoked directly below, same as every other such callback in this codebase. A
     // live ClientSim local player's head tracking data is a real, stable value derived from the
     // capsule position, not null or zero.
-    public class HeadClipGuardPlayModeTests : TsPlayModeTestBase
+    public class HeadClipGuardPlayModeTests : ClientSimTestBase
     {
-        private GameObject _guardGameObject;
-        private GameObject _colliderGameObject;
-
-        [TearDown]
-        public void TearDown()
+        public HeadClipGuardPlayModeTests() : base(TestScene.Empty("Tsvrc.Tests.PlayMode.HeadClipGuard"))
         {
-            if (_guardGameObject != null) Object.DestroyImmediate(_guardGameObject);
-            if (_colliderGameObject != null) Object.DestroyImmediate(_colliderGameObject);
         }
 
         [UnityTest]
         public IEnumerator PostLateUpdate_RealHeadInsideViolatingCollider_TeleportsPlayerOut()
         {
-            yield return StartClientSim();
+            yield return Session.Start();
             VRCPlayerApi local = Networking.LocalPlayer;
             Vector3 realHeadPos = local.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
             Vector3 posBefore = local.GetPosition();
 
-            _colliderGameObject = new GameObject("ViolatingCollider");
-            var collider = _colliderGameObject.AddComponent<BoxCollider>();
+            var collider = new GameObject("ViolatingCollider").AddComponent<BoxCollider>();
             collider.transform.position = realHeadPos;
             collider.size = Vector3.one * 2f;
 
-            _guardGameObject = new GameObject(nameof(HeadClipGuardPlayModeTests));
-            var guard = _guardGameObject.AddComponent<Tsvrc.Player.HeadClipGuard>();
+            var guard = new GameObject(nameof(HeadClipGuardPlayModeTests)).AddComponent<Tsvrc.Player.HeadClipGuard>();
             guard.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             guard.Begin(new[] { collider }, 1);
             // Bypasses the movement gate for this first call regardless of the real spawn
@@ -59,17 +51,15 @@ namespace Tsvrc.Tests.PlayMode.Player.HeadClipGuard
         [UnityTest]
         public IEnumerator PostLateUpdate_RealHeadOutsideAnyCollider_NoTeleport()
         {
-            yield return StartClientSim();
+            yield return Session.Start();
             VRCPlayerApi local = Networking.LocalPlayer;
             Vector3 posBefore = local.GetPosition();
 
-            _colliderGameObject = new GameObject("FarAwayCollider");
-            var collider = _colliderGameObject.AddComponent<BoxCollider>();
+            var collider = new GameObject("FarAwayCollider").AddComponent<BoxCollider>();
             collider.transform.position = new Vector3(1000f, 1000f, 1000f);
             collider.size = Vector3.one * 2f;
 
-            _guardGameObject = new GameObject(nameof(HeadClipGuardPlayModeTests));
-            var guard = _guardGameObject.AddComponent<Tsvrc.Player.HeadClipGuard>();
+            var guard = new GameObject(nameof(HeadClipGuardPlayModeTests)).AddComponent<Tsvrc.Player.HeadClipGuard>();
             guard.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             guard.Begin(new[] { collider }, 1);
             PrivateFieldAccess.SetField(guard, "_lastHeadPos", Vector3.zero);

@@ -6,7 +6,7 @@ namespace Tsvrc.Tests.EditMode
 {
     // TsBuiltinConfigInspector - mirrors TsConfigInspectorTests: only verifies the editor is
     // actually registered/constructible for TsBuiltinConfig. OnInspectorGUI itself is IMGUI and
-    // not exercised here, matching this suite's existing convention (see TsConfigInspectorTests'
+    // not exercised here, matching this suite's existing convention (see TsConfigInspectorTests
     // own comment for why).
     public class TsBuiltinConfigInspectorTests
     {

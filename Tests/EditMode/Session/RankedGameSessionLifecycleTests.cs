@@ -1,6 +1,6 @@
 using NUnit.Framework;
 using Tsvrc.Session;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using UnityEngine;
 
@@ -268,7 +268,7 @@ namespace Tsvrc.Tests.EditMode
         public void TsStart_GameTrackerAlreadyRunning_SeedsCurrentStateAsInGame()
         {
             // Simulates a client that joins after InGame was already reached elsewhere: it never
-            // receives the one-shot _OnReadyCheckCompleted event, only the sub-trackers' already-
+            // receives the one-shot _OnReadyCheckCompleted event, only the sub-trackers already-
             // running synced state by the time TsConstruct/TsStart runs for it - CurrentState's
             // one-time catch-up read (not a live derivation - see its own doc comment) is what
             // covers this case.

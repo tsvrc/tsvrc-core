@@ -1,0 +1,20 @@
+{
+    "name": "Tsvrc.Tests.Doubles",
+    "rootNamespace": "Tsvrc.Tests.EditMode",
+    "references": [
+        "Tsvrc.Runtime",
+        "Tsvrc.UdonTestKit",
+        "UdonSharp.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

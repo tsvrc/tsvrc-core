@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using UnityEngine;
 
@@ -199,7 +199,7 @@ namespace Tsvrc.Tests.EditMode
 
         // LastPlayerIds is assigned before the OnTracking* hook is called in every Notify*
         // method - the following three tests pin that ordering directly, mirroring
-        // ProcessLifecycleTests' RunningStateInsideOnProcessStopped-style pattern.
+        // ProcessLifecycleTests RunningStateInsideOnProcessStopped-style pattern.
 
         [Test]
         public void StartPlayerTracking_LastPlayerIdsAlreadyCurrentInsideOnTrackingStartedHook()

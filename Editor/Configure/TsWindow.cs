@@ -322,7 +322,7 @@ namespace Tsvrc.Editor
         internal static string DetermineBuiltinConfigWarning(bool isBuiltinConfigMissing)
         {
             if (!isBuiltinConfigMissing) return null;
-            return $"Tsvrc's builtin config asset is missing at '{TsModule.BuiltinConfigPath}' - library-provided " +
+            return $"The Tsvrc builtin config asset is missing at '{TsModule.BuiltinConfigPath}' - library-provided " +
                 "globals, pool prefabs, and factories will not be included until it's restored.";
         }
 

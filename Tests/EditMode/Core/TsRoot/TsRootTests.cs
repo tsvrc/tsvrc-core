@@ -9,7 +9,7 @@ namespace Tsvrc.Tests.EditMode
 {
     // TsRoot is abstract with exactly two independent virtual properties
     // (Instance, Memory), both defaulting to null. Tests here pin the default-null
-    // value, that the two properties' overrides are independent of each other, and
+    // value, that the two properties overrides are independent of each other, and
     // the abstract/UdonSharpBehaviour shape the rest of the library
     // (TsvrcBehaviour._ts, ScaffoldModule.FindCompiledType()) depends on.
     public class TsRootTests

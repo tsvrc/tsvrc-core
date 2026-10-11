@@ -4,8 +4,8 @@ namespace Tsvrc.Config
 {
     /// <summary>
     /// One node in a Global/Factory group tree. Flat and parent-referencing rather than
-    /// recursive, so it maps directly onto a TreeView's id/parent-id row model and avoids
-    /// Unity's nested-type serialization depth limit.
+    /// recursive, so it maps directly onto the TreeView id/parent-id row model and avoids
+    /// the Unity nested-type serialization depth limit.
     /// </summary>
     [Serializable]
     public class TsGroup

@@ -12,7 +12,7 @@ namespace Tsvrc.Tests.EditMode
     // so an edit made in that window is never silently swept into its recompile continuation.
     public class TsGeneratorRegeneratePersistenceTests
     {
-        private const string TestGeneratedScriptPath = "Assets/Tsvrc/Tests/TestDoubles/CodeGen/TestGenerated.cs";
+        private const string TestGeneratedScriptPath = "Assets/Tsvrc/Tests/Doubles/CodeGen/TestGenerated.cs";
 
         private TsGeneratorTestHarness _harness;
         private TempSceneScope _scope;

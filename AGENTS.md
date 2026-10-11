@@ -8,12 +8,17 @@ Runtime code lives in `Runtime/`, editor/codegen tooling in `Editor/`, tests in 
 ## Setup
 
 - Requires Unity 2022.3, opened via the VRChat Creator Companion (VCC) pointing at a
-  local checkout, not opened standalone. See `CONTRIBUTING.md`.
+  local checkout, not opened standalone. Udon Test Kit is a submodule at
+  `Tests/UdonTestKit`, so clone with `--recurse-submodules`. See `CONTRIBUTING.md`.
 
 ## Test
 
 - Open **Window > General > Test Runner** in Unity and run the EditMode and PlayMode
-  suites, or on Windows run `Scripts~/Invoke-UnityTests.ps1`. See `CONTRIBUTING.md`.
+  suites, or on Windows, with the Editor closed, run
+  `Tests/UdonTestKit/Scripts~/Invoke-UnityTests.ps1 -AssemblyNames "Tsvrc.Tests.EditMode;Tsvrc.Tests.PlayMode"`.
+  See `CONTRIBUTING.md`.
+- Tests use Udon Test Kit (`Tsvrc.UdonTestKit`) directly; Core has no testing helpers of
+  its own.
 
 ## Code style
 

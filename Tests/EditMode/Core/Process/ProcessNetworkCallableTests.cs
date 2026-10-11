@@ -1,6 +1,6 @@
 using System.Reflection;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UdonSharp;
 using UnityEngine;
 using UnityEngine.TestTools;

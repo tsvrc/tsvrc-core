@@ -1,6 +1,6 @@
 using NUnit.Framework;
 using Tsvrc.Core.Generated;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using UnityEngine;
 

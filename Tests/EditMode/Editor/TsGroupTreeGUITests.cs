@@ -98,7 +98,7 @@ namespace Tsvrc.Tests.EditMode
         {
             // Landing at a fixed, predictable position (page 1, row 1) regardless of how many
             // entries already exist is what lets "+ Add" stay clickable in place for repeated
-            // adds - see TsGroupTreeGUI.DrawContents' own comment on the button.
+            // adds - see TsGroupTreeGUI.DrawContents own comment on the button.
             var marker = _scope.CreateGameObject("Existing");
             _config.GlobalEntries = new[] { new TsGroupedEntry { Value = marker, GroupId = 1, Name = "Existing" } };
             _so.Update();

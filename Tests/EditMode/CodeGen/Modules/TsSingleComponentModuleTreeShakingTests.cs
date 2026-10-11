@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Tsvrc.Config;
 using Tsvrc.Editor;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using Tsvrc.Utils;
 using UnityEditor;
 using UnityEngine;
@@ -263,7 +263,7 @@ namespace Tsvrc.Tests.EditMode
         }
 
         // Referencing something after a missed pass must reset its miss-streak, not just survive
-        // that one pass - mirrors TsModuleHelpersTests' equivalent generic-helper coverage, pinned
+        // that one pass - mirrors TsModuleHelpersTests equivalent generic-helper coverage, pinned
         // here too since TsSingleComponentModule reimplements the grace calls directly rather than
         // going through ApplyTreeShaking.
         [Test]

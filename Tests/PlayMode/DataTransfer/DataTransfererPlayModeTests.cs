@@ -1,8 +1,8 @@
 using System.Collections;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
 using Tsvrc.Tests.PlayMode.Core.Process;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using VRC.SDKBase;
 
@@ -30,7 +30,7 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         [UnityTest]
         public IEnumerator TransferData_RealOwnerSingleChunkMessage_FullCascadeToOnTransferCompletedEvent()
         {
-            yield return StartClientSim();
+            yield return Session.Start();
             string localId = PlayerId(Networking.LocalPlayer);
 
             var transferer = CreateProcess<DataTransfererTestSubclass>();
@@ -56,20 +56,14 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         [UnityTest]
         public IEnumerator TransferData_GenuinelyNotOwner_ClaimsOwnershipAndSendsTheFirstChunk()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("RemoteOwner");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("RemoteOwner");
-            Assert.IsNotNull(remote, "Setup sanity check: RemoteOwner was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("RemoteOwner");
             string localId = PlayerId(Networking.LocalPlayer);
 
             var transferer = CreateProcess<DataTransfererTestSubclass>();
             transferer.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             transferer.SubscribeToAllTransferEvents();
-            MakeGenuinelyNotOwner(transferer, remote);
-            Assert.IsFalse(Networking.IsOwner(transferer.gameObject),
-                "Setup sanity check: FakeOwnershipSyncable did not make the local player a genuine non-owner.");
+            Session.SetOwner(remote, transferer.gameObject);
 
             transferer.TransferData("hello real world", new[] { localId });
 
@@ -83,7 +77,7 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         [UnityTest]
         public IEnumerator TransferData_RealOwnerMultiChunkMessage_AdvancesThroughEachChunkToCompletion()
         {
-            yield return StartClientSim();
+            yield return Session.Start();
             string localId = PlayerId(Networking.LocalPlayer);
             // DataChunker.CHUNK_SIZE is 2500; 6001 chars spans exactly 3 chunks (2500, 2500, 1001).
             string data = BuildString(6001);
@@ -120,15 +114,9 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         [UnityTest]
         public IEnumerator StartNextReadyCheck_RealTargetLeavesDuringInterChunkGap_ExcludedFromNextChunk()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("Staying");
-            Players.SpawnRemotePlayer("Leaving");
-            yield return null;
-            yield return null;
-            VRCPlayerApi staying = ClientSimPlayerEnvironment.FindPlayerByName("Staying");
-            VRCPlayerApi leaving = ClientSimPlayerEnvironment.FindPlayerByName("Leaving");
-            Assert.IsNotNull(staying, "Setup sanity check: Staying was not found.");
-            Assert.IsNotNull(leaving, "Setup sanity check: Leaving was not found.");
+            yield return Session.Start();
+            VRCPlayerApi staying = Session.SpawnRemotePlayer("Staying");
+            VRCPlayerApi leaving = Session.SpawnRemotePlayer("Leaving");
             string stayingId = PlayerId(staying);
             string leavingId = PlayerId(leaving);
 
@@ -138,11 +126,11 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
             transferer.TransferData(BuildString(3000), new[] { stayingId, leavingId });
 
             // Neither remote target is the local player, so nothing auto-acks; mark both
-            // targets' chunks received directly instead.
+            // targets chunks received directly instead.
             transferer.BroadcastAddReadyPlayer(stayingId);
             transferer.BroadcastAddReadyPlayer(leavingId);
 
-            Players.RemovePlayer(leaving);
+            Session.RemovePlayer(leaving);
             transferer._StartNextReadyCheck();
 
             string[] trackedIds = GetTrackedPlayerIds(transferer);
@@ -155,15 +143,9 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         [UnityTest]
         public IEnumerator StartNextReadyCheck_RealAllTargetsLeaveDuringInterChunkGap_BroadcastsStoppedInstead()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("First");
-            Players.SpawnRemotePlayer("Second");
-            yield return null;
-            yield return null;
-            VRCPlayerApi first = ClientSimPlayerEnvironment.FindPlayerByName("First");
-            VRCPlayerApi second = ClientSimPlayerEnvironment.FindPlayerByName("Second");
-            Assert.IsNotNull(first, "Setup sanity check: First was not found.");
-            Assert.IsNotNull(second, "Setup sanity check: Second was not found.");
+            yield return Session.Start();
+            VRCPlayerApi first = Session.SpawnRemotePlayer("First");
+            VRCPlayerApi second = Session.SpawnRemotePlayer("Second");
             string firstId = PlayerId(first);
             string secondId = PlayerId(second);
 
@@ -174,8 +156,8 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
             transferer.BroadcastAddReadyPlayer(firstId);
             transferer.BroadcastAddReadyPlayer(secondId);
 
-            Players.RemovePlayer(first);
-            Players.RemovePlayer(second);
+            Session.RemovePlayer(first);
+            Session.RemovePlayer(second);
             transferer._StartNextReadyCheck();
 
             Assert.AreEqual(0, transferer.OnTransferCompletedEventCount);
@@ -187,15 +169,9 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         [UnityTest]
         public IEnumerator OnProcessUpdate_RealAllTargetsLeaveDuringActiveFirstChunk_CancelsStalledTransferInstead()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("First");
-            Players.SpawnRemotePlayer("Second");
-            yield return null;
-            yield return null;
-            VRCPlayerApi first = ClientSimPlayerEnvironment.FindPlayerByName("First");
-            VRCPlayerApi second = ClientSimPlayerEnvironment.FindPlayerByName("Second");
-            Assert.IsNotNull(first, "Setup sanity check: First was not found.");
-            Assert.IsNotNull(second, "Setup sanity check: Second was not found.");
+            yield return Session.Start();
+            VRCPlayerApi first = Session.SpawnRemotePlayer("First");
+            VRCPlayerApi second = Session.SpawnRemotePlayer("Second");
             string firstId = PlayerId(first);
             string secondId = PlayerId(second);
 
@@ -209,9 +185,9 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
             // Real OnPlayerLeft, invoked directly (ClientSim never organically dispatches VRC
             // lifecycle callbacks to a plain UdonSharpBehaviour), removes each departed target
             // from the tracked set one at a time - exactly like a genuine mid-instance departure.
-            Players.RemovePlayer(first);
+            Session.RemovePlayer(first);
             transferer.OnPlayerLeft(first);
-            Players.RemovePlayer(second);
+            Session.RemovePlayer(second);
             transferer.OnPlayerLeft(second);
 
             Assert.AreEqual(0, GetTrackedPlayerIds(transferer).Length,
@@ -234,12 +210,8 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         [UnityTest]
         public IEnumerator OnBecameProcessOwner_RealNewOwnerMidTransfer_StopsReadyCheckForRealTakeover()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("PendingTarget");
-            yield return null;
-            yield return null;
-            VRCPlayerApi pendingTarget = ClientSimPlayerEnvironment.FindPlayerByName("PendingTarget");
-            Assert.IsNotNull(pendingTarget, "Setup sanity check: PendingTarget was not found.");
+            yield return Session.Start();
+            VRCPlayerApi pendingTarget = Session.SpawnRemotePlayer("PendingTarget");
             string pendingTargetId = PlayerId(pendingTarget);
 
             var transferer = CreateProcess<DataTransfererTestSubclass>();
@@ -263,7 +235,7 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         [UnityTest]
         public IEnumerator OnBecameProcessOwner_RealNewOwnerDuringInterChunkGap_StopsThePendingTransfer()
         {
-            yield return StartClientSim();
+            yield return Session.Start();
             string localId = PlayerId(Networking.LocalPlayer);
 
             var transferer = CreateProcess<DataTransfererTestSubclass>();
@@ -295,12 +267,8 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         [UnityTest]
         public IEnumerator CancelDataTransfer_RealActiveTransfer_StopsAndBroadcastsStoppedEvent()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("Target");
-            yield return null;
-            yield return null;
-            VRCPlayerApi target = ClientSimPlayerEnvironment.FindPlayerByName("Target");
-            Assert.IsNotNull(target, "Setup sanity check: Target was not found.");
+            yield return Session.Start();
+            VRCPlayerApi target = Session.SpawnRemotePlayer("Target");
             string targetId = PlayerId(target);
 
             var transferer = CreateProcess<DataTransfererTestSubclass>();
@@ -319,7 +287,7 @@ namespace Tsvrc.Tests.PlayMode.DataTransfer
         [UnityTest]
         public IEnumerator CancelDataTransfer_RealDuringInterChunkGap_StopsThePendingTransfer()
         {
-            yield return StartClientSim();
+            yield return Session.Start();
             string localId = PlayerId(Networking.LocalPlayer);
 
             var transferer = CreateProcess<DataTransfererTestSubclass>();

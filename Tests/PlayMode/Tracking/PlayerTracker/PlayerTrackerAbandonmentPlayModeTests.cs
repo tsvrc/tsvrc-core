@@ -1,9 +1,9 @@
 using System;
 using System.Collections;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
 using Tsvrc.Tests.PlayMode.Core.Process;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using VRC.SDK3.ClientSim;
 using VRC.SDKBase;
@@ -19,19 +19,15 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         [UnityTest]
         public IEnumerator OnPlayerLeft_RealTrackedRemotePlayerLeaves_BroadcastsRemoval()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("Tracked");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("Tracked");
-            Assert.IsNotNull(remote, "Setup sanity check: the spawned remote player was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("Tracked");
             string remoteId = remote.displayName + "#" + remote.playerId;
 
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
             tracker.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             tracker.StartPlayerTracking(new[] { remoteId });
 
-            Players.RemovePlayer(remote);
+            Session.RemovePlayer(remote);
             tracker.OnPlayerLeft(remote);
 
             Assert.IsFalse(Array.IndexOf(tracker.LastPlayerIds, remoteId) >= 0,
@@ -41,18 +37,14 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         [UnityTest]
         public IEnumerator OnPlayerLeft_RealNonTrackedRemotePlayerLeaves_NoBroadcast()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("NotTracked");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("NotTracked");
-            Assert.IsNotNull(remote, "Setup sanity check: the spawned remote player was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("NotTracked");
 
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
             tracker.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             tracker.StartPlayerTracking(Array.Empty<string>());
 
-            Players.RemovePlayer(remote);
+            Session.RemovePlayer(remote);
             tracker.OnPlayerLeft(remote);
 
             Assert.AreEqual(0, tracker.OnTrackingPlayersRemovedCount);
@@ -61,23 +53,17 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         [UnityTest]
         public IEnumerator OnPlayerLeft_GenuinelyNotNamedOwner_NoBroadcast()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("NamedOwner");
-            Players.SpawnRemotePlayer("Departing");
-            yield return null;
-            yield return null;
-            VRCPlayerApi namedOwner = ClientSimPlayerEnvironment.FindPlayerByName("NamedOwner");
-            VRCPlayerApi departing = ClientSimPlayerEnvironment.FindPlayerByName("Departing");
-            Assert.IsNotNull(namedOwner, "Setup sanity check: NamedOwner was not found.");
-            Assert.IsNotNull(departing, "Setup sanity check: Departing was not found.");
+            yield return Session.Start();
+            VRCPlayerApi namedOwner = Session.SpawnRemotePlayer("NamedOwner");
+            VRCPlayerApi departing = Session.SpawnRemotePlayer("Departing");
             string departingId = departing.displayName + "#" + departing.playerId;
 
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
             tracker.TsConstruct((Tsvrc.Core.Generated.TsRoot)null);
             tracker.StartPlayerTracking(new[] { departingId });
-            MakeGenuinelyNotOwner(tracker, namedOwner);
+            Session.SetOwner(namedOwner, tracker.gameObject);
 
-            Players.RemovePlayer(departing);
+            Session.RemovePlayer(departing);
             tracker.OnPlayerLeft(departing);
 
             Assert.AreEqual(0, tracker.OnTrackingPlayersRemovedCount,
@@ -87,12 +73,8 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         [UnityTest]
         public IEnumerator OnPlayerSuspendChanged_RealTrackedRemotePlayerSuspends_BroadcastsRemoval()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("Suspending");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("Suspending");
-            Assert.IsNotNull(remote, "Setup sanity check: the spawned remote player was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("Suspending");
             string remoteId = remote.displayName + "#" + remote.playerId;
 
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
@@ -109,12 +91,8 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         [UnityTest]
         public IEnumerator OnPlayerSuspendChanged_RealTrackedRemotePlayerWakesUp_NoAction()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("WakingUp");
-            yield return null;
-            yield return null;
-            VRCPlayerApi remote = ClientSimPlayerEnvironment.FindPlayerByName("WakingUp");
-            Assert.IsNotNull(remote, "Setup sanity check: the spawned remote player was not found.");
+            yield return Session.Start();
+            VRCPlayerApi remote = Session.SpawnRemotePlayer("WakingUp");
             string remoteId = remote.displayName + "#" + remote.playerId;
 
             var tracker = CreateProcess<PlayerTrackerTestSubclass>();
@@ -131,18 +109,10 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         [UnityTest]
         public IEnumerator OnBecameProcessOwner_RealMixOfDepartedSuspendedAndActiveTrackedPlayers_RemovesOnlyInactiveOnes()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("Departed");
-            Players.SpawnRemotePlayer("Suspended");
-            Players.SpawnRemotePlayer("StillActive");
-            yield return null;
-            yield return null;
-            VRCPlayerApi departed = ClientSimPlayerEnvironment.FindPlayerByName("Departed");
-            VRCPlayerApi suspended = ClientSimPlayerEnvironment.FindPlayerByName("Suspended");
-            VRCPlayerApi stillActive = ClientSimPlayerEnvironment.FindPlayerByName("StillActive");
-            Assert.IsNotNull(departed, "Setup sanity check: Departed was not found.");
-            Assert.IsNotNull(suspended, "Setup sanity check: Suspended was not found.");
-            Assert.IsNotNull(stillActive, "Setup sanity check: StillActive was not found.");
+            yield return Session.Start();
+            VRCPlayerApi departed = Session.SpawnRemotePlayer("Departed");
+            VRCPlayerApi suspended = Session.SpawnRemotePlayer("Suspended");
+            VRCPlayerApi stillActive = Session.SpawnRemotePlayer("StillActive");
             string departedId = departed.displayName + "#" + departed.playerId;
             string suspendedId = suspended.displayName + "#" + suspended.playerId;
             string stillActiveId = stillActive.displayName + "#" + stillActive.playerId;
@@ -152,7 +122,7 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
             tracker.StartPlayerTracking(new[] { departedId, suspendedId, stillActiveId });
 
             suspended.GetClientSimPlayer().isSuspended = true;
-            Players.RemovePlayer(departed);
+            Session.RemovePlayer(departed);
 
             PrivateFieldAccess.InvokeInstance(tracker, "OnBecameProcessOwner");
 
@@ -167,15 +137,9 @@ namespace Tsvrc.Tests.PlayMode.Tracking.PlayerTracker
         [UnityTest]
         public IEnumerator OnBecameProcessOwner_RealAllTrackedPlayersStillActive_NoRemoval()
         {
-            yield return StartClientSim();
-            Players.SpawnRemotePlayer("Active1");
-            Players.SpawnRemotePlayer("Active2");
-            yield return null;
-            yield return null;
-            VRCPlayerApi active1 = ClientSimPlayerEnvironment.FindPlayerByName("Active1");
-            VRCPlayerApi active2 = ClientSimPlayerEnvironment.FindPlayerByName("Active2");
-            Assert.IsNotNull(active1, "Setup sanity check: Active1 was not found.");
-            Assert.IsNotNull(active2, "Setup sanity check: Active2 was not found.");
+            yield return Session.Start();
+            VRCPlayerApi active1 = Session.SpawnRemotePlayer("Active1");
+            VRCPlayerApi active2 = Session.SpawnRemotePlayer("Active2");
             string active1Id = active1.displayName + "#" + active1.playerId;
             string active2Id = active2.displayName + "#" + active2.playerId;
 

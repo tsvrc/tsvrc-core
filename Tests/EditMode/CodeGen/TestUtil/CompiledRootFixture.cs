@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Tsvrc.Tests.EditMode
 {
-    // Adds the permanent TestGenerated double (Tests/TestDoubles/CodeGen/TestGenerated.cs) to
+    // Adds the permanent TestGenerated double (Tests/Doubles/CodeGen/TestGenerated.cs) to
     // a fresh GameObject inside a TempSceneScope, and redirects TsPaths.CompiledClassName so
     // ScaffoldModule.FindCompiledType() and FindRoot() resolve to it. Module Wire() tests then
     // call through real production code against this synthetic root, never a consuming

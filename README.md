@@ -1,20 +1,27 @@
-# TsVRC
+# TsVRC Core
 
 [![GitHub stars](https://img.shields.io/github/stars/tsvrc/tsvrc-core?style=flat&label=stars&color=58a6ff&labelColor=161b22)](https://github.com/tsvrc/tsvrc-core/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/tsvrc/tsvrc-core?style=flat&label=last%20commit&color=58a6ff&labelColor=161b22)](https://github.com/tsvrc/tsvrc-core/commits/main)
 [![Release](https://img.shields.io/github/v/release/tsvrc/tsvrc-core?style=flat&label=release&color=58a6ff&labelColor=161b22)](https://github.com/tsvrc/tsvrc-core/releases)
 [![License: Apache-2.0](https://img.shields.io/github/license/tsvrc/tsvrc-core?style=flat&color=58a6ff&labelColor=161b22)](LICENSE.md)
 
-TsVRC is an open-source framework for building VRChat worlds with UdonSharp: structured
+> [!WARNING]
+> Core is an experiment, and AI coding tools generated part of its features. It isn't fully vibe
+> coded, but AI had a large share in writing it. Test the behaviour your world relies on before you
+> publish it. For projects that are ready to use, consider
+> [Udon Test Kit](https://github.com/tsvrc/udon-test-kit) and
+> [Udon Tools Kit](https://github.com/tsvrc/udon-tools-kit).
+
+Core is an open-source framework for building VRChat worlds with UdonSharp: structured
 initialization, dependency wiring, and an editor tool that generates the code for both,
 on top of the VRChat Worlds SDK.
 
 Most frameworks like this resolve dependencies at runtime, through reflection or a
-dependency-injection container. TsVRC resolves them once, at edit time: an editor pass
+dependency-injection container. Core resolves them once, at edit time: an editor pass
 reads your project's configuration and writes plain C# with direct references already
 baked in. Nothing gets looked up while the world is actually running.
 
-Docs: [tsvrc.com](https://tsvrc.com).
+Docs: [tsvrc.com/docs/core](https://tsvrc.com/docs/core/intro).
 
 *TsVRC is not affiliated with, endorsed by, or sponsored by VRChat Inc.*
 
@@ -33,12 +40,12 @@ public class HelloWorld : TsBehaviour
 ```
 
 Attach this to a GameObject, register it as a construct in **Tsvrc > Configure**, and
-TsVRC calls `TsStart` on it once at world startup. Full walkthrough: [Build your first
-behaviour](https://tsvrc.com/docs/tsvrc/first-behaviour).
+Core calls `TsStart` on it once at world startup. Full walkthrough: [Build your first
+behaviour](https://tsvrc.com/docs/core/first-behaviour).
 
 ## How it fits together
 
-TsVRC splits into two halves: an editor pass that runs while you build, and plain
+Core splits into two halves: an editor pass that runs while you build, and plain
 UdonSharp that runs for players. Your own scripts extend a generated shadow class rather
 than the framework's runtime classes directly, so they get a typed reference back to your
 project instead of a generic one.
@@ -66,8 +73,8 @@ flowchart LR
     world -- "_ts.Memory / _ts.Log / _ts.Instance" --> base
 ```
 
-Full explanation: [How TsVRC fits
-together](https://tsvrc.com/docs/tsvrc/core-concepts/how-it-fits-together).
+Full explanation: [How Core fits
+together](https://tsvrc.com/docs/core/core-concepts/how-it-fits-together).
 
 *Is this overcomplicated? idk, but I like it.*
 
@@ -75,7 +82,7 @@ together](https://tsvrc.com/docs/tsvrc/core-concepts/how-it-fits-together).
 
 Six generated pieces cover most of what a world needs:
 
-- **Constructs** — register a behaviour once and TsVRC initializes it for you, in a fixed
+- **Constructs** — register a behaviour once and Core initializes it for you, in a fixed
   order, instead of wiring startup by hand.
 - **Globals** — point at a scene object once and reach it from any behaviour by name.
 - **Memory** — a shared key-value store with ephemeral, persistent, and synced tiers.
@@ -85,27 +92,27 @@ Six generated pieces cover most of what a world needs:
 - **Instance** — one behaviour standing in for the running world instance itself, found
   and wired automatically.
 
-Details for each: [tsvrc.com/framework](https://tsvrc.com/framework).
+Details for each: [tsvrc.com/core](https://tsvrc.com/core).
 
 ## Install
 
 Through the [VRChat Creator Companion](https://vcc.docs.vrchat.com/) (recommended, it
-resolves the VRChat Worlds SDK version TsVRC depends on):
+resolves the VRChat Worlds SDK version Core depends on):
 
 ```
 https://vpm.tsvrc.com/index.json
 ```
 
-Add that as a community repository, then install **TsVRC** (`com.tsvrc.core`) from the
-package list. Full steps, including the `.unitypackage` alternative: [Add TsVRC to your
-project](https://tsvrc.com/docs/tsvrc/add-to-your-project).
+Add that as a community repository, then install **TsVRC Core** (`com.tsvrc.core`) from the
+package list. Full steps, including the `.unitypackage` alternative: [Add TsVRC Core to your
+project](https://tsvrc.com/docs/core/add-to-your-project).
 
 ## Contributing
 
-TsVRC is pre-1.0 and still shaping its API, a good time to influence how a module works
+Core is pre-1.0 and still shaping its API, a good time to influence how a module works
 rather than working around a locked one. Every runtime and codegen change ships with
-tests, see [Testing your world](https://tsvrc.com/docs/tsvrc/testing/testing-your-world)
-for the helpers used to test both this repo and your own.
+tests, written with [Udon Test Kit](https://tsvrc.com/docs/udon-test-kit/intro), the same kit
+you can test your own world with.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, running tests, and submitting a pull
 request. Community conduct is covered by the [org-wide Code of

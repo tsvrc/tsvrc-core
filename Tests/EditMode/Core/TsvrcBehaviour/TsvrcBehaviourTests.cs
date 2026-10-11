@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using System;
 using Tsvrc.Core.Generated;
 using Tsvrc.Core;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using UnityEngine.TestTools;
 using UnityEngine;
 
@@ -190,10 +190,11 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void TsSubscribe_Single_AppendsOneEntryToAllThreeArrays()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listener = CreateBehaviour<TsListenerDouble>();
+            CallbackSpy listener = calls.CreateSpy("Listener");
 
-            publisher.TsSubscribe(listener, "Ev", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(listener, "Ev", nameof(CallbackSpy.CallbackA));
 
             var listeners = PrivateFieldAccess.GetField<UdonSharp.UdonSharpBehaviour[]>(publisher, "_subListeners");
             var keys = PrivateFieldAccess.GetField<string[]>(publisher, "_subKeys");
@@ -205,35 +206,36 @@ namespace Tsvrc.Tests.EditMode
             Assert.AreEqual(1, PrivateFieldAccess.GetField<int>(publisher, "_subCount"));
             Assert.AreSame(listener, listeners[0]);
             Assert.AreEqual("Ev", keys[0]);
-            Assert.AreEqual(nameof(TsListenerDouble.CallbackA), callbacks[0]);
+            Assert.AreEqual(nameof(CallbackSpy.CallbackA), callbacks[0]);
         }
 
         [Test]
         public void TsSubscribe_SameListenerTwiceForSameEvent_DeliversCallbackTwice()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listener = CreateBehaviour<TsListenerDouble>();
+            CallbackSpy listener = calls.CreateSpy("Listener");
 
-            publisher.TsSubscribe(listener, "Ev", nameof(TsListenerDouble.CallbackA));
-            publisher.TsSubscribe(listener, "Ev", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(listener, "Ev", nameof(CallbackSpy.CallbackA));
+            publisher.TsSubscribe(listener, "Ev", nameof(CallbackSpy.CallbackA));
             publisher.TsEmit("Ev");
 
-            Assert.AreEqual(2, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA", "Listener.CallbackA" }, calls);
         }
 
         [Test]
         public void TsSubscribe_SameListenerDifferentEvents_BothRecorded()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listener = CreateBehaviour<TsListenerDouble>();
+            CallbackSpy listener = calls.CreateSpy("Listener");
 
-            publisher.TsSubscribe(listener, "EvA", nameof(TsListenerDouble.CallbackA));
-            publisher.TsSubscribe(listener, "EvB", nameof(TsListenerDouble.CallbackB));
+            publisher.TsSubscribe(listener, "EvA", nameof(CallbackSpy.CallbackA));
+            publisher.TsSubscribe(listener, "EvB", nameof(CallbackSpy.CallbackB));
             publisher.TsEmit("EvA");
             publisher.TsEmit("EvB");
 
-            Assert.AreEqual(1, listener.CallbackACount);
-            Assert.AreEqual(1, listener.CallbackBCount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA", "Listener.CallbackB" }, calls);
         }
 
         [Test]
@@ -247,43 +249,44 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void TsSubscribe_NullAndEmptyEventName_MatchOrdinaryStringEquality()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listenerForNull = CreateBehaviour<TsListenerDouble>("ListenerNull");
-            var listenerForEmpty = CreateBehaviour<TsListenerDouble>("ListenerEmpty");
+            CallbackSpy listenerForNull = calls.CreateSpy("ListenerNull");
+            CallbackSpy listenerForEmpty = calls.CreateSpy("ListenerEmpty");
 
-            publisher.TsSubscribe(listenerForNull, null, nameof(TsListenerDouble.CallbackA));
-            publisher.TsSubscribe(listenerForEmpty, "", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(listenerForNull, null, nameof(CallbackSpy.CallbackA));
+            publisher.TsSubscribe(listenerForEmpty, "", nameof(CallbackSpy.CallbackA));
 
             publisher.TsEmit(null);
             publisher.TsEmit("");
 
-            Assert.AreEqual(1, listenerForNull.CallbackACount);
-            Assert.AreEqual(1, listenerForEmpty.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "ListenerNull.CallbackA", "ListenerEmpty.CallbackA" }, calls);
         }
 
         [Test]
         public void TsSubscribe_GrowsCapacityByDoublingInsteadOfReallocatingEveryCall()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listenerA = CreateBehaviour<TsListenerDouble>("A");
-            var listenerB = CreateBehaviour<TsListenerDouble>("B");
-            var filler = CreateBehaviour<TsListenerDouble>("Filler");
-            var overflow = CreateBehaviour<TsListenerDouble>("Overflow");
+            CallbackSpy listenerA = calls.CreateSpy("A");
+            CallbackSpy listenerB = calls.CreateSpy("B");
+            CallbackSpy filler = calls.CreateSpy("Filler");
+            CallbackSpy overflow = calls.CreateSpy("Overflow");
 
-            publisher.TsSubscribe(listenerA, "Ev", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(listenerA, "Ev", nameof(CallbackSpy.CallbackA));
             var afterFirst = PrivateFieldAccess.GetField<UdonSharp.UdonSharpBehaviour[]>(publisher, "_subListeners");
 
             // Subscribing again while capacity remains must reuse the same array.
-            publisher.TsSubscribe(listenerB, "Ev", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(listenerB, "Ev", nameof(CallbackSpy.CallbackA));
             var afterSecond = PrivateFieldAccess.GetField<UdonSharp.UdonSharpBehaviour[]>(publisher, "_subListeners");
             Assert.AreSame(afterFirst, afterSecond, "Subscribing within existing capacity must not reallocate.");
 
             // Fill remaining capacity, then subscribe once more to force a grow.
             while (PrivateFieldAccess.GetField<int>(publisher, "_subCount") < afterSecond.Length)
-                publisher.TsSubscribe(filler, "Filler", nameof(TsListenerDouble.CallbackA));
+                publisher.TsSubscribe(filler, "Filler", nameof(CallbackSpy.CallbackA));
             var full = PrivateFieldAccess.GetField<UdonSharp.UdonSharpBehaviour[]>(publisher, "_subListeners");
 
-            publisher.TsSubscribe(overflow, "Ev", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(overflow, "Ev", nameof(CallbackSpy.CallbackA));
             var afterGrow = PrivateFieldAccess.GetField<UdonSharp.UdonSharpBehaviour[]>(publisher, "_subListeners");
 
             Assert.AreNotSame(full, afterGrow, "Subscribing beyond capacity must reallocate.");
@@ -293,18 +296,18 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void TsSubscribe_CapacityGrowth_PreservesAlreadySubscribedEntries()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listeners = new TsListenerDouble[10];
-            for (int i = 0; i < listeners.Length; i++)
+            var expected = new string[10];
+            for (int i = 0; i < expected.Length; i++)
             {
-                listeners[i] = CreateBehaviour<TsListenerDouble>("L" + i);
-                publisher.TsSubscribe(listeners[i], "Ev", nameof(TsListenerDouble.CallbackA));
+                publisher.TsSubscribe(calls.CreateSpy("L" + i), "Ev", nameof(CallbackSpy.CallbackA));
+                expected[i] = "L" + i + ".CallbackA";
             }
 
             publisher.TsEmit("Ev");
 
-            foreach (var listener in listeners)
-                Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(expected, calls);
         }
 
         [Test]
@@ -318,57 +321,51 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void TsEmit_OneMatchingSubscriber_InvokesCallbackExactlyOnce()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listener = CreateBehaviour<TsListenerDouble>();
-            publisher.TsSubscribe(listener, "Ev", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(calls.CreateSpy("Listener"), "Ev", nameof(CallbackSpy.CallbackA));
 
             publisher.TsEmit("Ev");
 
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
         }
 
         [Test]
         public void TsEmit_MultipleSubscribers_AllInvoked()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listenerA = CreateBehaviour<TsListenerDouble>("A");
-            var listenerB = CreateBehaviour<TsListenerDouble>("B");
-            publisher.TsSubscribe(listenerA, "Ev", nameof(TsListenerDouble.CallbackA));
-            publisher.TsSubscribe(listenerB, "Ev", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(calls.CreateSpy("A"), "Ev", nameof(CallbackSpy.CallbackA));
+            publisher.TsSubscribe(calls.CreateSpy("B"), "Ev", nameof(CallbackSpy.CallbackA));
 
             publisher.TsEmit("Ev");
 
-            Assert.AreEqual(1, listenerA.CallbackACount);
-            Assert.AreEqual(1, listenerB.CallbackACount);
+            CollectionAssert.AreEquivalent(new[] { "A.CallbackA", "B.CallbackA" }, calls);
         }
 
         [Test]
         public void TsEmit_DifferentEvent_DoesNotCrossInvoke()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listener = CreateBehaviour<TsListenerDouble>();
-            publisher.TsSubscribe(listener, "EventY", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(calls.CreateSpy("Listener"), "EventY", nameof(CallbackSpy.CallbackA));
 
             publisher.TsEmit("EventX");
 
-            Assert.AreEqual(0, listener.CallbackACount);
+            CollectionAssert.IsEmpty(calls);
         }
 
         [Test]
         public void TsEmit_DeliveryOrder_MatchesSubscriptionOrder()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var log = new List<string>();
-            var listenerA = CreateBehaviour<TsListenerDouble>("First");
-            var listenerB = CreateBehaviour<TsListenerDouble>("Second");
-            listenerA.Log = log;
-            listenerB.Log = log;
-            publisher.TsSubscribe(listenerA, "Ev", nameof(TsListenerDouble.CallbackA));
-            publisher.TsSubscribe(listenerB, "Ev", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(calls.CreateSpy("First"), "Ev", nameof(CallbackSpy.CallbackA));
+            publisher.TsSubscribe(calls.CreateSpy("Second"), "Ev", nameof(CallbackSpy.CallbackA));
 
             publisher.TsEmit("Ev");
 
-            Assert.AreEqual(new[] { "First.CallbackA", "Second.CallbackA" }, log.ToArray());
+            CollectionAssert.AreEqual(new[] { "First.CallbackA", "Second.CallbackA" }, calls);
         }
 
         [Test]
@@ -383,13 +380,13 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void TsEmit_ListenerNullAtSubscribeTime_EarlierListenersStillReceivedBeforeThrow()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var goodListener = CreateBehaviour<TsListenerDouble>();
-            publisher.TsSubscribe(goodListener, "Ev", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(calls.CreateSpy("Listener"), "Ev", nameof(CallbackSpy.CallbackA));
             publisher.TsSubscribe(null, "Ev", "Callback");
 
             Assert.Throws<NullReferenceException>(() => publisher.TsEmit("Ev"));
-            Assert.AreEqual(1, goodListener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
         }
 
         [Test]
@@ -398,69 +395,66 @@ namespace Tsvrc.Tests.EditMode
             // TsEmit snapshots the arrays before iterating, and TsSubscribe never
             // mutates in place, so a subscription added mid-emit is not invoked until
             // the next TsEmit call.
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var newListener = CreateBehaviour<TsListenerDouble>("New");
-            var reentrant = CreateBehaviour<TsReentrantSubscriberDouble>("Reentrant");
+            var reentrant = calls.CreateSpy<ReentrantSubscriberSpy>("Reentrant");
             reentrant.Publisher = publisher;
             reentrant.EventName = "Ev";
-            reentrant.NewListener = newListener;
-            publisher.TsSubscribe(reentrant, "Ev", nameof(TsReentrantSubscriberDouble.CallbackA));
+            reentrant.NewListener = calls.CreateSpy("New");
+            publisher.TsSubscribe(reentrant, "Ev", nameof(ReentrantSubscriberSpy.SubscribeNewListener));
 
             publisher.TsEmit("Ev");
 
-            Assert.AreEqual(1, reentrant.CallbackCount);
-            Assert.AreEqual(0, newListener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Reentrant.SubscribeNewListener" }, calls);
 
+            calls.Clear();
             publisher.TsEmit("Ev");
 
-            Assert.AreEqual(1, newListener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Reentrant.SubscribeNewListener", "New.CallbackA" }, calls);
         }
 
         [Test]
         public void TsEmit_UnconstructedBehaviour_StillWorks()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listener = CreateBehaviour<TsListenerDouble>();
-            publisher.TsSubscribe(listener, "Ev", nameof(TsListenerDouble.CallbackA));
+            publisher.TsSubscribe(calls.CreateSpy("Listener"), "Ev", nameof(CallbackSpy.CallbackA));
 
             Assert.DoesNotThrow(() => publisher.TsEmit("Ev"));
-            Assert.AreEqual(1, listener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
         }
 
         [Test]
         public void TsEmit_ListenerGameObjectDestroyedBeforeEmit_IsSkippedSilently()
         {
             // A listener destroyed after subscribing is skipped instead of receiving a
-            // callback on a dead object — distinct from a listener that was null at
-            // subscribe time, which still throws (see TsEmit_ListenerNullAtSubscribeTime_
+            // callback on a dead object, unlike a listener that was null at subscribe time,
+            // which still throws (see TsEmit_ListenerNullAtSubscribeTime_
             // ThrowsNullReferenceException above).
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listenerGo = new GameObject("DestroyedListener");
-            _spawned.Add(listenerGo);
-            var listener = listenerGo.AddComponent<TsListenerDouble>();
-            publisher.TsSubscribe(listener, "Ev", nameof(TsListenerDouble.CallbackA));
+            CallbackSpy listener = calls.CreateSpy("Destroyed");
+            publisher.TsSubscribe(listener, "Ev", nameof(CallbackSpy.CallbackA));
 
-            UnityEngine.Object.DestroyImmediate(listenerGo);
+            UnityEngine.Object.DestroyImmediate(listener.gameObject);
 
             Assert.DoesNotThrow(() => publisher.TsEmit("Ev"));
-            Assert.AreEqual(0, listener.CallbackACount);
+            CollectionAssert.IsEmpty(calls);
         }
 
         [Test]
         public void TsEmit_DestroyedListenerAmongOthers_OthersStillReceiveCallback()
         {
+            using var calls = new CallLog();
             var publisher = CreateBehaviour<TsvrcBehaviourTestSubclass>();
-            var listenerGo = new GameObject("DestroyedListener");
-            _spawned.Add(listenerGo);
-            var destroyedListener = listenerGo.AddComponent<TsListenerDouble>();
-            var aliveListener = CreateBehaviour<TsListenerDouble>("Alive");
-            publisher.TsSubscribe(destroyedListener, "Ev", nameof(TsListenerDouble.CallbackA));
-            publisher.TsSubscribe(aliveListener, "Ev", nameof(TsListenerDouble.CallbackA));
+            CallbackSpy destroyedListener = calls.CreateSpy("Destroyed");
+            publisher.TsSubscribe(destroyedListener, "Ev", nameof(CallbackSpy.CallbackA));
+            publisher.TsSubscribe(calls.CreateSpy("Alive"), "Ev", nameof(CallbackSpy.CallbackA));
 
-            UnityEngine.Object.DestroyImmediate(listenerGo);
+            UnityEngine.Object.DestroyImmediate(destroyedListener.gameObject);
 
             Assert.DoesNotThrow(() => publisher.TsEmit("Ev"));
-            Assert.AreEqual(1, aliveListener.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Alive.CallbackA" }, calls);
         }
 
         [Test]

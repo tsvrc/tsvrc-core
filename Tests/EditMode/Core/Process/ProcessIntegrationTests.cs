@@ -1,8 +1,8 @@
 using NUnit.Framework;
 using Tsvrc.Core;
-using Tsvrc.Testing.Framework;
 
 using Tsvrc.Tests.Doubles;
+using Tsvrc.UdonTestKit;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -75,14 +75,14 @@ namespace Tsvrc.Tests.EditMode
         [Test]
         public void ProcessSubclass_CanUseInheritedPubSub_FromWithinItsOwnHook()
         {
+            using var calls = new CallLog();
             var process = CreateProcess<EventingProcess>();
-            var listenerDouble = CreateComponent<TsListenerDouble>("Listener");
-            process.TsSubscribe(listenerDouble, EventingProcess.DoneEvent, nameof(TsListenerDouble.CallbackA));
+            process.TsSubscribe(calls.CreateSpy("Listener"), EventingProcess.DoneEvent, nameof(CallbackSpy.CallbackA));
 
             process.StartProcess();
             process.CompleteProcess();
 
-            Assert.AreEqual(1, listenerDouble.CallbackACount);
+            CollectionAssert.AreEqual(new[] { "Listener.CallbackA" }, calls);
         }
     }
 }

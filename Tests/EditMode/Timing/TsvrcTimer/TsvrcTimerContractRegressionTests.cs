@@ -1,7 +1,7 @@
 using NUnit.Framework;
 using System.Reflection;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Timing;
+using Tsvrc.UdonTestKit;
 
 namespace Tsvrc.Tests.EditMode
 {
@@ -110,7 +110,7 @@ namespace Tsvrc.Tests.EditMode
             Assert.IsNotNull(method);
             Assert.AreEqual(typeof(Tsvrc.Core.Process), method.DeclaringType,
                 "TsvrcTimer must not override OnBecameProcessOwner - if it ever does, the " +
-                "ownership-handover Play Mode tests' premise (no timer-specific override to break) " +
+                "ownership-handover Play Mode tests premise (no timer-specific override to break) " +
                 "silently stops holding.");
         }
 

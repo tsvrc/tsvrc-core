@@ -1,7 +1,7 @@
 using NUnit.Framework;
 using System;
 using Tsvrc.Editor;
-using Tsvrc.Testing.Framework;
+using Tsvrc.UdonTestKit;
 using Tsvrc.Utils;
 using UnityEditor;
 using UnityEngine.TestTools;

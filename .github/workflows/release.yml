@@ -1,102 +1,58 @@
-name: Build Release
+name: Release
 
 on:
   workflow_dispatch:
 
 jobs:
-  # Ensure the PACKAGE_NAME repository variable has been created
-  config:
-    runs-on: ubuntu-latest
-    outputs:
-      config_package: ${{ steps.config_package.outputs.configPackage }}
-    steps:
-      - name: Validate Package Config
-        id: config_package
-        run: |
-          if [ "${{ vars.PACKAGE_NAME }}" != "" ]; then
-            echo "configPackage=true" >> $GITHUB_OUTPUT;
-          else
-            echo "configPackage=false" >> $GITHUB_OUTPUT;
-          fi
-
-  # Build and release the package. Skipped if PACKAGE_NAME isn't configured.
-  #
-  # Adapted from https://github.com/vrchat-community/template-package's release.yml:
-  # that template assumes the package lives in a "Packages/<name>" subfolder of a
-  # full Unity project. This repo's root IS the package (package.json lives at the
-  # repo root), since it's added to a Unity project as a local VPM package rather
-  # than checked out as a project itself, so packagePath is "." instead.
-  build:
-    needs: config
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
-      packagePath: .
-    if: needs.config.outputs.config_package == 'true'
+      # The package is these files only. Tests and contributor docs stay in the repository.
+      PACKAGE_FILES: >-
+        package.json package.json.meta README.md README.md.meta LICENSE.md LICENSE.md.meta
+        NOTICE NOTICE.meta Editor Editor.meta Prefabs Prefabs.meta Runtime Runtime.meta
     steps:
-      - name: Checkout
-        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Get Version
-        id: version
-        run: echo "value=$(jq -r .version "${{ env.packagePath }}/package.json")" >> "$GITHUB_OUTPUT"
-
-      - name: Require Version Bump
-        # Fails before any build work starts if package.json's version wasn't bumped
-        # since the last release, so re-running this workflow is a no-op, never a
-        # duplicate or overwritten release.
+      - name: Read the package name and version
         run: |
-          if git ls-remote --exit-code --tags origin "refs/tags/${{ steps.version.outputs.value }}" >/dev/null; then
-            echo "::error::Version ${{ steps.version.outputs.value }} is already released - bump package.json's version first."
+          echo "NAME=$(jq -r .name package.json)" >> "$GITHUB_ENV"
+          echo "VERSION=$(jq -r .version package.json)" >> "$GITHUB_ENV"
+
+      - name: Check the version is new
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" > /dev/null; then
+            echo "::error::$VERSION is already released. Bump the version in package.json."
             exit 1
           fi
 
-      - name: Set Environment Variables
+      - name: Create the zip
+        run: zip -r "$NAME-$VERSION.zip" $PACKAGE_FILES
+
+      - name: Create the unitypackage
+        # The Packages/ prefix makes Unity install it where the Creator Companion does.
         run: |
-          echo "zipFile=${{ vars.PACKAGE_NAME }}-${{ steps.version.outputs.value }}".zip >> $GITHUB_ENV
-          echo "unityPackage=${{ vars.PACKAGE_NAME }}-${{ steps.version.outputs.value }}.unitypackage" >> $GITHUB_ENV
-          echo "version=${{ steps.version.outputs.value }}" >> $GITHUB_ENV
+          mkdir unitypackage
+          find $PACKAGE_FILES -name '*.meta' | while read -r meta; do
+            asset="${meta%.meta}"
+            dir="unitypackage/$(sed -n 's/^guid: \([0-9a-f]*\).*/\1/p' "$meta")"
+            mkdir "$dir"
+            cp "$meta" "$dir/asset.meta"
+            if [ -f "$asset" ]; then cp "$asset" "$dir/asset"; fi
+            printf 'Packages/%s/%s' "$NAME" "$asset" > "$dir/pathname"
+          done
+          tar -czf "$NAME-$VERSION.unitypackage" -C unitypackage .
 
-      - name: Create Package Zip
-        working-directory: "${{ env.packagePath }}"
-        # Exclude repo/CI plumbing, tsvrc's own internal test suite, and dev-only docs -
-        # none of it is needed to run the package (see Testing/ for the public test API).
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          zip -r "${{ github.workspace }}/${{ env.zipFile }}" . \
-            -x ".git/*" ".github/*" \
-            -x "Tests/*" "Tests.meta" \
-            -x "AGENTS.md" "CONTRIBUTING.md" "SECURITY.md" "OPEN_SOURCE_PLAN.md"
+          gh release create "$VERSION" "$NAME-$VERSION.zip" "$NAME-$VERSION.unitypackage" \
+            --target "$GITHUB_SHA" --generate-notes
 
-      - name: Track Package Meta Files
-        run: find "${{ env.packagePath }}/" -name \*.meta >> metaList
-
-      - name: Create UnityPackage
-        uses: pCYSl5EDgo/create-unitypackage@v1.2.3
-        with:
-          package-path: ${{ env.unityPackage }}
-          include-files: metaList
-
-      - name: Create Tag
-        id: tag_version
-        uses: rickstaa/action-create-tag@a1c7777fcb2fee4f19b0f283ba888afa11678b72
-        with:
-          tag: "${{ env.version }}"
-
-      - name: Make Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
-        with:
-          generate_release_notes: true
-          files: |
-            ${{ env.zipFile }}
-            ${{ env.unityPackage }}
-            ${{ env.packagePath }}/package.json
-          tag_name: ${{ env.version }}
-
-      - name: Notify VPM listing
-        run: |
-          curl -sf -X POST \
-            -H "Authorization: Bearer ${{ secrets.VPM_LISTING_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/tsvrc/vpm/dispatches \
-            -d '{"event_type":"package-released"}'
+      - name: Update the VPM listing
+        env:
+          GH_TOKEN: ${{ secrets.VPM_LISTING_TOKEN }}
+        run: gh api repos/tsvrc/vpm/dispatches -f event_type=package-released

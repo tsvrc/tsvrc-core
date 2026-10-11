@@ -1,6 +1,6 @@
 {
   "name": "com.tsvrc.core",
-  "displayName": "TsVRC",
+  "displayName": "TsVRC Core",
   "version": "0.1.2",
   "unity": "2022.3",
   "description": "Open-source UdonSharp framework for VRChat worlds: structured initialization, dependency wiring, and editor codegen.",
@@ -11,7 +11,8 @@
     "url": "https://tsvrc.com"
   },
   "vpmDependencies": {
-    "com.vrchat.worlds": "3.10.x"
+    "com.vrchat.worlds": "3.10.x",
+    "com.tsvrc.udon-test-kit": "^1.0.0"
   },
   "changelogUrl": "https://github.com/tsvrc/tsvrc-core/releases"
 }

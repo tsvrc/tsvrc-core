@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Tests.EditMode;
 using Tsvrc.UI;
+using Tsvrc.UdonTestKit;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VRC.SDK3.Data;
@@ -13,7 +13,7 @@ namespace Tsvrc.Tests.PlayMode.UI.TsvrcList
     // Destroy() does not actually run in Edit Mode, so real pooled ListItem GameObjects are
     // never actually destroyed there. This covers the real, deferred Instantiate/Destroy
     // pool-churn lifecycle a page change or data reset triggers.
-    public class TsListPlayModeTests : TsPlayModeTestBase
+    public class TsListPlayModeTests
     {
         private readonly List<GameObject> _spawned = new List<GameObject>();
 

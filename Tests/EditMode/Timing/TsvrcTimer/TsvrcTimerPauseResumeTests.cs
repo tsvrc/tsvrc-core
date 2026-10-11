@@ -1,13 +1,13 @@
 using NUnit.Framework;
-using Tsvrc.Testing.Framework;
 using Tsvrc.Timing;
+using Tsvrc.UdonTestKit;
 
 namespace Tsvrc.Tests.EditMode
 {
     // Covers PauseTimer/ResumeTimer and their RequestPauseTimer/RequestResumeTimer
     // network-callable counterparts on the owner-direct path: IsProcessOwner() is always
     // true in Edit Mode (see ProcessTestBase's header comment). The non-owner forwarding
-    // branch lives in TsTimerPlayModeTests, which uses FakeOwnershipSyncable.
+    // branch lives in TsTimerPlayModeTests, which uses Session.SetOwner.
     public class TsTimerPauseResumeTests : TsTimerTestBase
     {
         [Test]
