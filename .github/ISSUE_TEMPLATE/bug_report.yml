@@ -1,43 +1,22 @@
 name: Bug report
-description: Something in Core isn't working as documented.
+description: Something in Core doesn't work as documented.
 labels: [bug]
 body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: >-
+        What you did, what you expected, and what happened instead, with any error from the Unity
+        log. Steps that start from a new world project help most.
+    validations:
+      required: true
   - type: input
-    id: tsvrc-version
+    id: core-version
     attributes:
       label: Core version
-      description: The version shown in VCC or your package.json's vpmDependencies lock.
-    validations:
-      required: true
-  - type: input
-    id: unity-version
-    attributes:
-      label: Unity version
-    validations:
-      required: true
+      description: Shown in the Creator Companion, or in package.json of Core.
   - type: input
     id: sdk-version
     attributes:
       label: VRChat Worlds SDK version
-    validations:
-      required: true
-  - type: textarea
-    id: repro
-    attributes:
-      label: Steps to reproduce
-      description: Minimal steps starting from a fresh project, if possible.
-    validations:
-      required: true
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected behavior
-    validations:
-      required: true
-  - type: textarea
-    id: actual
-    attributes:
-      label: Actual behavior
-      description: Include the exact error/log output if there is one.
-    validations:
-      required: true

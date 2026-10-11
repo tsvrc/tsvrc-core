@@ -1,42 +1,20 @@
 # AGENTS.md
 
-## Project overview
+TsVRC Core is an UdonSharp framework for VRChat worlds (Unity 2022.3, VPM package
+`com.tsvrc.core`). [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, tests, coding conventions and
+pull requests; follow it. This file only adds what it leaves out.
 
-UdonSharp framework for VRChat worlds (Unity 2022.3, VPM package `com.tsvrc.core`).
-Runtime code lives in `Runtime/`, editor/codegen tooling in `Editor/`, tests in `Tests/`.
+## Layout
 
-## Setup
-
-- Requires Unity 2022.3, opened via the VRChat Creator Companion (VCC) pointing at a
-  local checkout, not opened standalone. Udon Test Kit is a submodule at
-  `Tests/UdonTestKit`, so clone with `--recurse-submodules`. See `CONTRIBUTING.md`.
-
-## Test
-
-- Open **Window > General > Test Runner** in Unity and run the EditMode and PlayMode
-  suites, or on Windows, with the Editor closed, run
-  `Tests/UdonTestKit/Scripts~/Invoke-UnityTests.ps1 -AssemblyNames "Tsvrc.Tests.EditMode;Tsvrc.Tests.PlayMode"`.
-  See `CONTRIBUTING.md`.
-- Tests use Udon Test Kit (`Tsvrc.UdonTestKit`) directly; Core has no testing helpers of
-  its own.
-
-## Code style
-
-- Fields are private by default. If something needs to be public, expose it as a global
-  rather than widening the field's own access (see `Editor/CodeGen` history for the
-  pattern).
-- Never hand-edit generated code. If generated output looks wrong, the fix belongs in
+- `Runtime/` ships in world builds. `Editor/` holds the editor tools, with the code generator in
   `Editor/CodeGen`.
+- `Tests/EditMode/` and `Tests/PlayMode/` hold the tests, with shared test doubles in
+  `Tests/Doubles/`. They use Udon Test Kit (`Tsvrc.UdonTestKit`), a submodule at
+  `Tests/UdonTestKit`, directly: Core has no testing helpers of its own.
+- User documentation isn't in this repo: it's `docs/core/` in `tsvrc/docs`.
 
-## Commit / PR rules
+## Running tests
 
-- Every commit must be signed off (`git commit -s`) per the
-  [DCO](https://developercertificate.org/).
-- Disclose AI assistance in the PR description. You're responsible for reviewing and
-  testing everything you submit, the same as if you'd written it by hand. See
-  `CONTRIBUTING.md`.
-
-## Security
-
-- Don't commit secrets or API tokens. Report vulnerabilities per `SECURITY.md`, not as a
-  public issue.
+Close the Unity Editor, then run
+`Tests/UdonTestKit/Scripts~/Invoke-UnityTests.ps1 -AssemblyNames "Tsvrc.Tests.EditMode;Tsvrc.Tests.PlayMode"`.
+Add `-TestMode EditMode` or `-TestMode PlayMode` to run one mode.
