@@ -8,9 +8,9 @@ UdonSharp framework for VRChat worlds: structured initialization, dependency wir
 codegen.
 
 > [!WARNING]
-> Core is a proof of concept, written partly by hand and partly with AI coding tools. I'm reviewing
-> it and adding tests so it works correctly. The tools that don't need the framework move to
-> [Udon Tools Kit](https://github.com/tsvrc/udon-tools-kit) and
+> I built Core as a proof of concept, partly by hand and partly with AI coding tools, and I'm
+> reviewing it and adding tests so it works correctly. The parts that don't need the framework move
+> to [Udon Tools Kit](https://github.com/tsvrc/udon-tools-kit) and
 > [Udon Test Kit](https://github.com/tsvrc/udon-test-kit), which are reviewed, fully tested and
 > ready to use, and the plan is to build Core on top of Udon Tools Kit. Until Core gets there, test
 > what your world relies on before you publish it, and if something breaks,
