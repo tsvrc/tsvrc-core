@@ -2,7 +2,10 @@
 
 Bug reports, fixes and new features are welcome. Before you build a feature or change a public API,
 open an issue to agree on its shape, so the code you write is the code that gets merged. Questions
-go in [GitHub Discussions](https://github.com/orgs/tsvrc/discussions).
+go in [GitHub Discussions](https://github.com/orgs/tsvrc/discussions). To find something to work
+on, look at the issues labelled
+[good first issue](https://github.com/tsvrc/tsvrc-core/labels/good%20first%20issue) or
+[help wanted](https://github.com/tsvrc/tsvrc-core/labels/help%20wanted).
 
 ## Reporting a bug
 
@@ -40,7 +43,7 @@ The tests are in `Tests/EditMode` and `Tests/PlayMode`, with the test doubles bo
 Run both modes before opening a pull request. In the Editor, use the EditMode and PlayMode tabs of
 **Window > General > Test Runner**. If a Play Mode test fails before ClientSim starts, with a
 message naming project settings, run **Tools > TsVRC > Udon Test Kit > Fix ClientSim Project
-Settings** once. From PowerShell, with the Editor closed:
+Settings** once. From PowerShell, in the project folder, with the Editor closed:
 
 ```powershell
 .\Assets\Tsvrc\Tests\UdonTestKit\Scripts~\Invoke-UnityTests.ps1 -AssemblyNames "Tsvrc.Tests.EditMode;Tsvrc.Tests.PlayMode"

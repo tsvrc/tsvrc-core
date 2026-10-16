@@ -1,20 +1,11 @@
 # AGENTS.md
 
 TsVRC Core is an UdonSharp framework for VRChat worlds (Unity 2022.3, VPM package
-`com.tsvrc.core`). [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, tests, coding conventions and
-pull requests; follow it. This file only adds what it leaves out.
+`com.tsvrc.core`). Follow [CONTRIBUTING.md](CONTRIBUTING.md), the guide for every contributor: its
+rules apply to you as written. This file adds only what's specific to an agent.
 
-## Layout
-
-- `Runtime/` ships in world builds. `Editor/` holds the editor tools, with the code generator in
-  `Editor/CodeGen`.
-- `Tests/EditMode/` and `Tests/PlayMode/` hold the tests, with shared test doubles in
-  `Tests/Doubles/`. They use Udon Test Kit (`Tsvrc.UdonTestKit`), a submodule at
-  `Tests/UdonTestKit`, directly: Core has no testing helpers of its own.
-- User documentation isn't in this repo: it's `docs/core/` in `tsvrc/docs`.
-
-## Running tests
-
-Close the Unity Editor, then run
-`Tests/UdonTestKit/Scripts~/Invoke-UnityTests.ps1 -AssemblyNames "Tsvrc.Tests.EditMode;Tsvrc.Tests.PlayMode"`.
-Add `-TestMode EditMode` or `-TestMode PlayMode` to run one mode.
+- Run the tests from the command line, as [Running tests](CONTRIBUTING.md#running-tests) shows.
+  Unity can't open a project another instance has open, so if the Unity Editor has it open, ask the
+  person you work for to close it instead of stopping Unity yourself.
+- A change is done when both test modes pass. Say what you ran and give the summary line of each
+  run.
